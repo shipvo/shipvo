@@ -346,7 +346,7 @@ async function rollbackRun(argv: string[], json: boolean): Promise<Done> {
       downgrades.push({ platform: pf, from: applied, to: targetState ?? 0 });
       if (!allowDowngrade) {
         const msg = `Release ${to} (${pf}) has state_version ${targetState ?? "none"}, but phones already run state_version ${applied}. Older code may not read data the newer release stored. Publish a fix forward, or pass --allow-state-downgrade to roll back anyway. The choice is recorded in the audit log.`;
-        if (json) throw new CliFailure(msg, "state_downgrade", 1, [{ command: `shipvo rollback ${argv.join(" ")} --allow-state-downgrade --json`, why: "Roll back anyway." }]);
+        if (json) throw new CliFailure(msg, "state_downgrade", 1, [{ command: `shipvo rollback ${argv.filter((x) => x !== "--json").join(" ")} --allow-state-downgrade --json`, why: "Roll back anyway." }]);
         console.error(msg); process.exit(1);
       }
     }

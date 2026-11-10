@@ -301,6 +301,23 @@ describe("publish and the Hermes bytecode check", () => {
       expect(String((console.error as any).mock.calls.at(-1)[0])).toMatch(/state_version 2.*state_version 3.*--allow-state-downgrade/);
       expect(puts).toEqual([]);
     });
+    it("the --json hint names --json once", async () => {
+      seedState(3, 2);
+      const out = vi.spyOn(console, "log").mockImplementation(() => {});
+      await rollback(["--to", "2", "--bands", "b0", "--json"]);
+      const doc = JSON.parse(String(out.mock.calls.at(-1)![0]));
+      const cmd = doc.next[0].command as string;
+      expect(cmd).toBe("shipvo rollback --to 2 --bands b0 --allow-state-downgrade --json");
+      process.exitCode = 0;
+    });
+    it("a rollback takes the highest state_version across bands", async () => {
+      seedState(0, 2);
+      values.set("p/demo/1/b1", ptr(3));
+      const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+      await expect(rollback(["--to", "2", "--bands", "b0,b1"])).rejects.toThrow("exit");
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(puts).toEqual([]);
+    });
     it("with --allow-state-downgrade it succeeds and the new pointer carries the lower state_version", async () => {
       seedState(3, 2);
       await rollback(["--to", "2", "--bands", "b0", "--allow-state-downgrade"]);

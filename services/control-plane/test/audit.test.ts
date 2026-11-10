@@ -150,7 +150,7 @@ describe("audit on publish", () => {
     const { calls } = await run(pk, buf, false, prev);
     const after = JSON.parse(calls[0].args[8] as string);
     expect(after.state_downgrade).toEqual({ from: 3, to: 2 });
-    expect(after.allowed_by).toBe("--allow-state-downgrade");
+    expect(after.allowed_by).toBeUndefined();
     expect(JSON.parse(calls[0].args[7] as string)).toEqual({ release: 6, state_version: 3 });
   });
   it("records a normal publish (bundle matches release) as publish", async () => {

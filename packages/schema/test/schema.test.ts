@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { satisfiesRange, checkNativeModules, ShellManifest, ReleasePointer, Telemetry, GateReport, bandForCohort, canonicalize, parsePolicy } from "../src/index";
+import { satisfiesRange, checkNativeModules, ShellManifest, ReleasePointer, GateReport, bandForCohort, canonicalize, parsePolicy } from "../src/index";
 
 const sig = "AAAA".repeat(16);
 const manifest = {
@@ -204,9 +204,5 @@ describe("release pointer state_version", () => {
     const v = ReleasePointer.safeParse({ ...base, state_version: 3 });
     expect(v.success && v.data.state_version).toBe(3);
     for (const bad of [0, -1, 1.5, "2"]) expect(ReleasePointer.safeParse({ ...base, state_version: bad }).success).toBe(false);
-  });
-  it("crash_loop_revert telemetry carries state_version_from and state_version_to", () => {
-    const t = Telemetry.safeParse({ schema_version: "1.0", app_id: "tide", release: 4, event: "crash_loop_revert", state_version_from: 3, state_version_to: 2 });
-    expect(t.success && [t.data.state_version_from, t.data.state_version_to]).toEqual([3, 2]);
   });
 });

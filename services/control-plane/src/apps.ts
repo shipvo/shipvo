@@ -205,14 +205,14 @@ async function auditPublish(db: any, id: string, key: string, buf: ArrayBuffer, 
     const backTo = m && Number(m[1]) !== body.release ? Number(m[1]) : null;
     let before: string | null = null, prevState = 0;
     try { const pb = prev ? JSON.parse(JSON.parse(prev).body) : null; const r = pb?.release; if (Number.isInteger(r)) before = JSON.stringify({ release: r, ...(pb.state_version ? { state_version: pb.state_version } : {}) }); prevState = Number.isInteger(pb?.state_version) ? pb.state_version : 0; } catch { /* no usable previous pointer */ }
-    // A rollback that lowers state_version only gets here when the CLI got --allow-state-downgrade; record that choice.
+    // A rollback that lowers state_version is recorded as a fact. The control plane cannot see CLI flags.
     const newState = Number.isInteger(body.state_version) ? body.state_version : 0;
     const stateDowngrade = backTo !== null && prevState > newState;
     const owner = await db.prepare("SELECT acc.github_login AS login FROM apps a JOIN accounts acc ON acc.id = a.account_id WHERE a.app_id = ?").bind(id).first();
     await recordAudit(db, {
       app_id: id, actor: String(owner?.login ?? id), actor_kind: "person", action: backTo === null ? "publish" : "rollback",
       release: body.release, release_id: key, before,
-      after: JSON.stringify({ release: body.release, band: body.band, platform: body.platform ?? "android", ...(body.state_version ? { state_version: body.state_version } : {}), ...(stateDowngrade ? { state_downgrade: { from: prevState, to: newState }, allowed_by: "--allow-state-downgrade" } : {}), ...(backTo === null ? {} : { rolled_back_to: backTo }) }),
+      after: JSON.stringify({ release: body.release, band: body.band, platform: body.platform ?? "android", ...(body.state_version ? { state_version: body.state_version } : {}), ...(stateDowngrade ? { state_downgrade: { from: prevState, to: newState } } : {}), ...(backTo === null ? {} : { rolled_back_to: backTo }) }),
     });
   } catch { console.warn(`audit write failed: app=${id} action=publish`); }
 }

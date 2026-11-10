@@ -166,9 +166,6 @@ export const Telemetry = z.object({
   bytes_downloaded: z.number().int().nonnegative().optional(),
   apply_ms: z.number().nonnegative().optional(),
   device_class: z.enum(["low", "mid", "high"]).optional(),
-  /** On crash_loop_revert: the state_version of the release that was reverted and of the one the device went to (0 = none declared). */
-  state_version_from: z.number().int().nonnegative().optional(),
-  state_version_to: z.number().int().nonnegative().optional(),
 });
 export type Telemetry = z.infer<typeof Telemetry>;
 

@@ -10,8 +10,6 @@ export type { ForwardedEvent };
 export type RuntimeState = {
   cohort: number; band: "b0" | "b1" | "b2";
   runningRelease: number; currentRelease: number; pendingRelease: number; previousRelease: number;
-  /** `state_version` of the running release (0 = none declared). Shells before this field report no value. */
-  appliedStateVersion?: number;
   blockedRelease?: number; shellVersion?: string;
   baseUrl: string; appId: string; shellMajor: number;
 };
@@ -82,17 +80,6 @@ export async function enableSignedTelemetry(opts: { storage: TelemetryStorage; r
   return identity;
 }
 
-/**
- * The `state_version` the running release declared for its stored data (AsyncStorage, SQLite, MMKV), or 0 when it
- * declared none. Compare it with the version your data was written at to migrate, or to refuse newer data.
- */
-export function getAppliedStateVersion(): number {
-  try { const v = (native ?? fallback).getState()?.appliedStateVersion; return typeof v === "number" && v > 0 ? v : 0; } catch { return 0; }
-}
-
-export { pickRevertTarget } from "./revert";
-export type { RevertCandidate } from "./revert";
-
 const listeners = new Set<(events: string[]) => void>();
 /** Called with every batch of queued events the runtime drains, in `reportRuntimeEvents`. Returns an unsubscribe function. */
 export function onRuntimeEvents(fn: (events: string[]) => void): () => void {
@@ -122,11 +109,11 @@ export function reportRuntimeEvents(): string[] {
     const rn = require("react-native");
     if (rn.Platform?.OS === "android" && typeof rn.Platform.Version === "number") androidApi = rn.Platform.Version;
   } catch {}
-  forwardRuntimeEvents(events, (event, release, versions) => {
+  forwardRuntimeEvents(events, (event, release) => {
     try {
       // Same payload the sample app sent before this moved here: device_class is fixed to "low", android_api is set on Android only.
       const body = { schema_version: "1.0", app_id: appId, release: release ?? state.runningRelease ?? 0, event,
-        device_class: "low", android_api: androidApi, ...(versions ?? {}) };
+        device_class: "low", android_api: androidApi };
       const post = (b: string) => Promise.resolve(fetch(`${baseUrl}/t`, { method: "POST", headers: { "content-type": "application/json" },
         body: b })).catch(() => {});
       const id = identity;
