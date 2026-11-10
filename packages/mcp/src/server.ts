@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { auditAccessibility } from "./a11y-audit.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 // Shipvo MCP: agents use Shipvo apps with no phone.
 //   PN_SIM=http://localhost:4545  PN_CONTROL=https://api.shipvo.dev  PN_OWNER_TOKEN=...  shipvo-mcp
@@ -494,6 +495,16 @@ use(server, tools.app_activity,
     }
     const s = sessions.get(session); if (s) s.steps++;
     return { ...text(out.join("\n") || "No spec apps on this phone."), structuredContent: { apps } };
+  });
+use(server, tools.a11y_audit,
+  async ({ session }) => {
+    need(session);
+    const r = await act({ session, action: "sizes" }) as Act & { sizes?: Record<string, [number, number]>; skin?: string };
+    if (!r.ok) return result(session, r);
+    if (!r.sizes) return result(session, { ok: false, code: "sizes_unavailable", error: "the simulator did not report element sizes." });
+    const { issues } = auditAccessibility(r.screen ?? "", r.skin === "ios" ? "ios" : "android", r.sizes);
+    const s = sessions.get(session); if (s) s.steps++;
+    return { ...text(issues.length ? issues.map((i) => `${i.code} [${i.ref}] ${i.message}`).join("\n") : "No accessibility issues found."), structuredContent: { issues } };
   });
 use(server, tools.set_phone_time, 
   async ({ session, at }) => { need(session); return result(session, await act({ session, action: "set_time", at })); });
