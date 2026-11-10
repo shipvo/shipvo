@@ -80,7 +80,15 @@ The person can stop the agent at any time. Any touch or key press on the phone p
 
 The simulator serves a `/watch` page. Open it in a browser to see the agent's phone live, in its Android or iOS frame. It lists live sessions, follows the newest one unless you pick one, and starts view only; the viewer can turn on **Take over** to drive the phone. For a phone you can touch directly, see [Driving the live phone](#driving-the-live-phone). The video stream runs only while someone is watching. `/sessions` reports `skin` and `streaming` for each session. For a phone you can also touch, use [`shipvo run`](run.md).
 
-On the hosted phone, `open_app` also returns `watch_url`, a link to a read-only view of that one session on Android or iOS (pass `platform` to pick the phone). The link is signed and lasts one hour. It carries no API key, shows only that session, and cannot tap, swipe or type. To drive the phone from the page, choose **Take over** and sign in with the GitHub account that owns the key. A link for another session, an expired or changed link, and a revoked key are all refused.
+### Watch link on the hosted phone
+
+On the hosted phone, `open_app` also returns `watch_url` (in the text and in `structuredContent`) and says "The user can watch at <url>." Open it to see that one session live, in its Android or iOS frame. Pass `platform` to `open_app` to pick the phone.
+
+1. Ask your assistant to open your app on the hosted phone.
+2. Copy the `watch_url` from the reply and open it in your browser. You see the phone and each step as it happens.
+3. To take over, choose **Sign in to take over** and sign in with the GitHub account that owns the key.
+
+The link is read-only and shows one session only. It stops working after one hour and when the key is revoked. No API key is in the URL. A viewer who is not signed in cannot tap, swipe, type or press keys. Ask for a new link by calling `open_app` again.
 
 ## What the tree shows (and hides), on purpose
 
@@ -232,6 +240,8 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 **A tool answers `{ "status": "running", "job": … }`.** Nothing failed. The work (a preview or a build upload) takes longer than the wait. Ask the assistant to call `job_status` with that `job`. Calling the same tool again returns the same job, so it never starts a second publish. Another key gets `job_not_found`, and a job is kept for 15 minutes after it finishes.
 
 **The assistant cannot find a button.** The tree only lists what a person could see and touch (see [What the tree shows](#what-the-tree-shows-and-hides-on-purpose)). Ask the assistant to read the screen again after the app finishes loading, and check that the button has a label.
+
+**The `watch_url` shows an error or does not load.** The link is valid for one hour, for one session. Call `open_app` again for a new one. If there is no `watch_url` in the reply, you are on a local simulator; open `/watch` there instead.
 
 **Two sessions do not see each other's orders.** They were opened without the same `room`. Open both with the same `room` value on the same simulator (see [Rooms](#rooms-several-phones-one-backend)).
 
