@@ -103,7 +103,7 @@ It sees the screen as an accessibility tree: roles, names and references such as
 
 The simulator is not a phone. It renders your app on the web and simulates the device, so it does not catch native crashes, real camera or GPU behaviour, or slow-phone performance. Everything simulated is labelled: receipts say `SIMULATED-` and `device_log` marks each event `simulated: true`. Keep a short pass on a real device before a store release, and see the [parity results](parity-results.md) for where the simulator and real devices differ.
 
-## Check it works
+## Troubleshooting
 
 If the assistant says it has no Shipvo tools, check these in order:
 
@@ -114,8 +114,14 @@ If the assistant says it has no Shipvo tools, check these in order:
 
 A sandbox sleeps after 30 idle minutes and wakes on the next call, so a slow first reply after a break is normal. Sessions survive reconnects: `list_sessions` shows what is still open.
 
-## Next
+**The assistant tapped the wrong thing or says it cannot find a button.** Ask it to read the screen first and list what it sees. If a button has no name there, give it an accessible label in your app.
+
+**The assistant stops answering after a few weeks.** The key expires after 30 days. Run `shipvo login` again, then `shipvo mcp`, and put the new key in your client config.
+
+## Next steps
 
 - Write the same flows as typed tests that run on every pull request: [Test your app in CI](testing.md).
 - Every tool the assistant can call: [Agents and Shipvo apps](agents.md#the-tools).
 - Let any agent open your app: [list it](agents.md#listing-your-app-for-every-agent).
+- Follow a worked example: [Test your app with an assistant](tutorials/test-with-an-assistant.md).
+- Look up a word: the [glossary](glossary.md).
