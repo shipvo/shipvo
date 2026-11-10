@@ -26,7 +26,7 @@ shipvo.json: stateVersion must be a positive integer (got 0).
 shipvo rollback --to 5
 ```
 
-If phones already run a higher `state_version` than release 5 declares (or release 5 declares none), the command stops and changes nothing:
+If phones already run a higher `state_version` than release 5 declares (or release 5 declares none), the command stops with exit code 1 and does not republish the platform that failed the check:
 
 ```
 Release 5 (android) has state_version 2, but phones already run state_version 3. Older code may not read data the newer release stored. Publish a fix forward, or pass --allow-state-downgrade to roll back anyway. The choice is recorded in the audit log.
@@ -60,6 +60,8 @@ shipvo audit tide
 **I use `--bands` or `--platform`.** The check uses the highest `state_version` across the bands you name, for each platform, so a rollback of one band is still checked against what phones in it run.
 
 **Nothing is reported for old releases.** Releases published before you set `stateVersion` carry no number. A rollback stops only when phones run a higher `state_version` than the target, so you can roll back freely to a release with no number when phones run none either.
+
+**I roll back with `--platform all`.** Each platform is checked and republished in turn, Android first. If iOS fails the check, the command exits 1 after Android is already republished. Run `shipvo rollback --platform ios --to 5 --dry-run` first to check each platform, or roll back one platform at a time.
 
 ## Next steps
 

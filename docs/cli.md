@@ -321,7 +321,7 @@ shipvo rollback --to 5 --allow-state-downgrade
 - `--platform android|ios|all` picks the platform (default `android`).
 - `--dry-run` prints what would change and writes nothing.
 - `--allow-state-downgrade` lets the rollback go ahead when phones run a higher `state_version` than the target release. Without it the command stops with exit code 1, and with `--json` the error code is `state_downgrade`. The choice is recorded in the audit log.
-- `--json` prints the result as described in the `--json` section below.
+- `--json` prints the result as described in [`--json` for `publish`, `promote`, `rollback` and `auto-halt`](#--json-for-publish-promote-rollback-and-auto-halt).
 
 See [Rollbacks and stored data](rollbacks-and-stored-data.md) for when to use `--allow-state-downgrade`.
 
