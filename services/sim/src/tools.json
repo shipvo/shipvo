@@ -114,7 +114,7 @@
   },
   {
     "name": "arrange_apps",
-    "description": "Lay out an installed app on the home screen: pinned (first), hidden (not on the home screen, still opens with switch_app), position (0 first) and schedule (days, from, to: the app shows only then, e.g. a weekly planner Monday to Friday 08:00-18:00 and weekend plans on Saturday). Leave days out or pass an empty list for every day. Pass schedule: null to always show. Fails with not_installed or bad_placement. The home screen text says which apps are showing and why one is not. Logged in device_log.",
+    "description": "Lay out an installed app on the home screen: pinned (first), hidden (not on the home screen, still opens with switch_app), position (0 first) and schedule (days, from, to: the app shows only then, e.g. a weekly planner Monday to Friday 08:00-18:00 and weekend plans on Saturday). Leave days out or pass an empty list for every day. Add timezone (an IANA name such as Europe/Berlin) to read the window in that zone. Pass schedule: null to always show. Fails with not_installed, bad_placement or bad_timezone. The home screen text says which apps are showing and why one is not. Logged in device_log.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -171,6 +171,9 @@
                 "to": {
                   "type": "string",
                   "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                "timezone": {
+                  "type": "string"
                 }
               },
               "additionalProperties": false
@@ -2207,7 +2210,7 @@
   },
   {
     "name": "schedule_app",
-    "description": "Show an installed app only in a daily time window, by the phone's clock (see set_phone_time), for example your Tasks app from 08:00 to 10:00 on weekdays. from and to are HH:MM (default 00:00 and 23:59); a window that crosses midnight belongs to the day it starts. Leave days out for every day. Pin and hide still apply. Same schedule as arrange_apps. Fails with not_installed or bad_placement.",
+    "description": "Show an installed app only in a daily time window, by the phone's clock (see set_phone_time) or in the time zone you give, for example your Tasks app from 08:00 to 10:00 on weekdays. from and to are HH:MM (default 00:00 and 23:59); a window that crosses midnight belongs to the day it starts. Leave days out for every day. timezone is an optional IANA name such as Europe/Berlin or America/New_York: from, to and days are then read in that zone, whatever the phone clock is. Pin and hide still apply. Same schedule as arrange_apps. Fails with not_installed, bad_placement or bad_timezone.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -2218,6 +2221,10 @@
         "id": {
           "type": "string",
           "description": "App id"
+        },
+        "timezone": {
+          "type": "string",
+          "description": "IANA time zone name, for example Europe/Berlin"
         },
         "from": {
           "type": "string",

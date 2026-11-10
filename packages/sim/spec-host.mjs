@@ -241,6 +241,8 @@ export class SpecHost {
   version(session, id) { return this.running.get(key(session, id))?.version ?? null; }
 
   has(session, id) { return this.running.has(key(session, id)); }
+  /** The app's current data, or undefined when it is not running. */
+  dataOf(session, id) { return this.running.get(key(session, id))?.app.data; }
   drop(session, id) { this.unschedule(key(session, id)); return this.running.delete(key(session, id)); }
   dropSession(session) { for (const k of [...this.running.keys()]) if (k.startsWith(`${session}/`)) { this.unschedule(k); this.running.delete(k); } }
 

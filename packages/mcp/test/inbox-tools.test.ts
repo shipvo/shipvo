@@ -21,7 +21,7 @@ beforeAll(async () => {
     const body = raw ? JSON.parse(raw) : {};
     res.writeHead(200, { "content-type": "application/json" });
     if (req.url === "/act") {
-      seen.push(body);
+      if (body.action !== "pending_banner") seen.push(body);
       if (body.action === "inbox_read") return res.end(JSON.stringify({ ok: true, address: MAIL.to, messages: [MAIL] }));
       if (body.action === "inbox_wait") return res.end(JSON.stringify(body.subject === "never" ? { ok: false, code: "inbox_timeout", error: "no mail arrived within 100 ms" } : { ok: true, address: MAIL.to, message: MAIL }));
       if (body.action === "inbox_clear") return res.end(JSON.stringify({ ok: true, cleared: 1 }));
@@ -51,5 +51,32 @@ describe("inbox tools", () => {
     expect(t.isError).toBe(true); expect(t.structuredContent.code).toBe("inbox_timeout");
     expect(JSON.parse(((await c.callTool({ name: "inbox_clear", arguments: { session: "s" } })) as any).content[0].text)).toEqual({ cleared: 1 });
     await c.close();
+  }, 30000);
+});
+
+describe("pending banner", () => {
+  it("starts a tool result with the pending line for the calling assistant, and adds nothing when none waits", async () => {
+    const asked: any[] = [];
+    let banner = "Inbox: 2 unread for chatgpt, 1 task open";
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") { asked.push(body); return res.end(JSON.stringify({ ok: true, banner })); }
+      if (body.action === "inbox_clear") return res.end(JSON.stringify({ ok: true, cleared: 0 }));
+      res.end(JSON.stringify({ ok: true, screen: "Home" }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "openai-mcp", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const r: any = await c.callTool({ name: "inbox_clear", arguments: { session: "s" } });
+    expect(r.content[0].text).toBe(`${banner}\n{"cleared":0}`);
+    expect(asked.at(-1)).toMatchObject({ session: "s", agent: "openai-mcp" });
+    banner = "";
+    const q: any = await c.callTool({ name: "inbox_clear", arguments: { session: "s" } });
+    expect(q.content[0].text).toBe('{"cleared":0}');
+    await c.close(); srv.close();
   }, 30000);
 });
