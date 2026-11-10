@@ -144,8 +144,8 @@
       sp.set("phones", String(many.count)); sp.set("mix", many.mix); if (state.dark) sp.set("dark", "1");
       u.search = "?" + sp.toString(); u.hash = "#many";
       history.replaceState(null, "", u.toString());
-      note.textContent = "Link copied.";
-      try { navigator.clipboard.writeText(u.toString()).catch(function () { note.textContent = "Link is in the address bar."; }); } catch (e) { note.textContent = "Link is in the address bar."; }
+      var fail = function () { note.textContent = "Link is in the address bar."; };
+      try { navigator.clipboard.writeText(u.toString()).then(function () { note.textContent = "Link copied."; }, fail); } catch (e) { fail(); }
     });
     function render() {
       var n = Math.round(Number(num.value));
@@ -173,7 +173,7 @@
     Array.prototype.forEach.call(document.querySelectorAll("#pg-side a"), function (a) {
       if (a.getAttribute("data-feature") === f.id) a.setAttribute("aria-current", "true"); else a.removeAttribute("aria-current");
     });
-    var panel = $("pg-panel");
+    var panel = $("pg-panel"); manyGrid = null;
     panel.textContent = "";
     var h = document.createElement("h2"); h.textContent = f.title; panel.appendChild(h);
     var p = document.createElement("p"); p.textContent = f.text; panel.appendChild(p);
