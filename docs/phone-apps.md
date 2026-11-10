@@ -203,6 +203,8 @@ Connect ChatGPT and Claude to the same phone and install the Assistant Inbox. Th
 
 A message to `anyone` reaches whichever assistant checks first. The Messages and Tasks tabs show the same data, so you can follow the exchange on the phone. An explicit `from` still works when you want to send as someone else.
 
+`mark_read`, `start_task` and `finish_task` only act on what was sent to the caller (or to `anyone`). When nothing matched they return `updated: false` with the reason, so an assistant is never told it worked when it did not. A finished task keeps its first reply. Two clients of the same assistant, such as claude.ai and Claude Code, share the name `claude` and so share one inbox. A client that connects with no name has no caller, and these actions then match any row, as they do when a person taps the screen.
+
 ### Assistant Inbox troubleshooting
 
 | You see | Why | Fix |

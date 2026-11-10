@@ -129,3 +129,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Assistant Inbox and `{{ caller }}` (assistants on one phone message each other, hand off tasks, share reports) | [phone-apps](phone-apps.md#assistants-talking-to-each-other), [troubleshooting](phone-apps.md#assistant-inbox-troubleshooting) | | | |
 | Android patch memory guard (falls back to the full download; `patchError` `over_memory_budget`, `out_of_memory`) | [runtime](../packages/runtime/README.md#patches-and-memory-android) | | | |
 | `csv()` exports a collection as CSV | [phone-apps](phone-apps.md#export-data-as-csv) | | | |
+| Roll back safely with a state version (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |

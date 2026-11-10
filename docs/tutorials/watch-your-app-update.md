@@ -127,6 +127,8 @@ You started a phone with one command, changed a product name and price, saw the 
 
 On 2026-11-10, on a GitHub Actions Linux runner with Node 22.23, we ran `shipvo run android` for a new shop app and changed the name and price of one product in `products.json`. The new name was visible in the Android frame 1.3 s after the file was saved. The terminal printed `rebuilt in 1.0 s`. A typo in the same file showed the red bar with the line and column. The next save with the typo fixed removed it. We took the screenshots from that run. The repository also checks this on the Android and iOS frames in `packages/cli/test/run-live-reload.test.ts`.
 
+In a separate CI job, we changed one word in `src/data/products.json` of the shop template while `shipvo run android` was running, on ubuntu-latest. The job reads the `rebuilt in` line the terminal prints. It measures that line, not the time until pixels change. The line read `rebuilt in 0.9 s` with the warm Metro cache and `rebuilt in 1.0 s` with `--clear`. See the [CI run](https://github.com/shipvo/shipvo/actions/runs/42778073795).
+
 ## Next steps
 
 - [Make a shop with your own products](your-own-shop.md): put in your own list and prices
