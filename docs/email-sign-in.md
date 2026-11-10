@@ -65,16 +65,17 @@ The inbox, the tools and `phone.inbox` are the same on the Android and iOS phone
 
 ## Troubleshooting
 
-| What you see | Why | What to do |
+| You see | Cause | Fix |
 | --- | --- | --- |
-| `inbox_timeout` | No mail matched your `subject` or `from` before the timeout. | Check the app really asked for a code. Loosen `subject` (it matches part of the text, any case). Check the `mockNetwork` rule has a `mail` field and its `url` and `method` match the request the app sends. Raise `timeout` (at most 25000 ms). |
-| `inbox_no_code` | The mail arrived but holds no 4 to 8 digit number. | Use `waitFor` and read `text`, or check the mail text in your stub. |
-| Status 550 from `https://inbox.shipvo.test/send` | The `to` address is not this session's address. | Use the address from `inbox.address()` or `inbox_read`. Each session has its own. |
-| The address changed | Each session has its own address, and it is removed when the session ends. | Ask for the address again in the new session. |
-| `session_ended` while waiting (MCP) | The session closed during the wait. | Open a new session and start the sign-in again. |
+| `inbox_timeout` | No mail matched `subject` or `from` before `timeout` ran out | Call `inbox_read` (or `phone.inbox.list()`) to see what arrived. If it is empty, check that the app tapped the send button and that your `mockNetwork` rule has a `mail` field. If mail is there, loosen `subject`. |
+| `inbox_no_code` | The matching mail has no 4 to 8 digit number | Read the mail with `waitFor` and look at `text`. For a link, use `links[0]` instead. |
+| `bad_timeout` | `timeout_ms` is above 25000 or not a whole number | Use a whole number from 0 to 25000. |
+| `session_ended` | The session closed while you waited | Open the app again. The inbox and its address are new for each session. |
+| Status 550 from `https://inbox.shipvo.test/send` | The `to` address is not this session's address | Send to the address from `inbox_read` or `phone.inbox.address()`. |
+| An old code is picked up | The inbox still holds mail from an earlier attempt | Call `inbox_clear` (or `phone.inbox.clear()`) before each attempt. |
 
 ## Next steps
 
-- [Test your app in CI](testing.md): run this test on every pull request.
-- [Test with an assistant](test-with-an-assistant.md): set up the MCP tools the steps above use.
-- [Agents](agents.md): the full list of MCP tools.
+- [Testing](testing.md) for `mockNetwork` and the rest of the typed test API.
+- [Agents](agents.md) for the other tools an assistant can call on the phone.
+- [Phone apps](phone-apps.md) for the apps on the phone that send and read mail.
