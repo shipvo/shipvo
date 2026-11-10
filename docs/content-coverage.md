@@ -9,7 +9,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 1. Describe an app and it appears (`create_app`, `update_app`, `app_activity`; launch kit written 10 Nov; tutorial, video and blog needed) and the browser playground (launch kit written 10 Nov; tutorial, video and blog needed)
 1b. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog done (10 Nov), tutorial done; video now for the live page; the agent-vs-agent video and launch kit once #1166 merges. Docs: [demos/chess](demos/chess.md) (live page, `--agents`, `--record`, troubleshooting).
 2. ~~Shipvo Testers and `shipvo store testers`~~ (done)
-3. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog done) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial and video need the new section)
+3. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog done) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial done 10 Nov; video needs the new section)
 4. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps (Settings, Browser, Store, updates) need tutorial and video (blog done 10 Nov), and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
 5. Store path: `shipvo store` from working app to both stores (video done; tutorial, blog)
 6. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
@@ -51,6 +51,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | `shipvo auto-halt` | [CLI guide](cli.md), [self-hosting](self-hosting.md) | [ship-a-fix](tutorials/ship-a-fix.md) | | |
 | MCP delivery results, `wait_for`, `settle` | [agents](agents.md), [mcp](../packages/mcp/README.md) | | | |
 | `shipvo run android\|ios` (phone frame in your browser) | [run](run.md) | [run-your-app-on-a-phone](tutorials/run-your-app-on-a-phone.md) | [See your app on a phone in your browser](videos.md#see-your-app-on-a-phone-in-your-browser-with-shipvo-run) | [see-your-react-native-app-on-a-phone-in-your-browser](../blog/see-your-react-native-app-on-a-phone-in-your-browser.md) |
+| Live reload in `shipvo run` (save a file, the phone updates; plain error bar) | [run](run.md#edit-and-save-the-phone-updates) | [watch-your-app-update](tutorials/watch-your-app-update.md) | | |
 | Assistant attaches to the live `shipvo run` phone (`open_app`, with `platform` and `show` to start the phone and watch) | [run](run.md), [agents](agents.md) | | | |
 | Record demo videos (`record_start`, `record_marker`, `record_stop`) | [record](record.md), [worked example](record-a-demo-video.md) | | | |
 | Shipvo Testers and `shipvo store testers` | [store](store.md), [get-your-12-testers](tutorials/get-your-12-testers.md) | [get-your-12-testers](tutorials/get-your-12-testers.md) | [Get your 12 Google Play testers](videos.md) | [google-play-12-testers-14-days](../blog/google-play-12-testers-14-days.md) |
@@ -116,3 +117,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Gallery of example specs (`packages/spec/gallery`) | [spec-blocks](spec-blocks.md#example-specs) | | | |
 | Faster rebuild after a save in `shipvo run` (Metro cache kept) | [run](run.md) | | | |
 | Signing seed backup and restore on a new machine (`shipvo keys export`, `shipvo keys import`) | [new-machine](new-machine.md) | | | |
+| See what an agent built and changed in a spec app (`app_activity`) | [phone-apps](phone-apps.md#see-what-was-built-and-changed) | | | |
+| Fetch an app's live data now (`refresh_app`) | [phone-apps](phone-apps.md#fetch-live-data-now) | | | |
+| Show or hide an app on a time window (`schedule_app`, `clear_schedule`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
+| Network proxy refusal codes (`x-shipvo-net-error`) | [phone-network](phone-network.md#troubleshooting) | | | |
