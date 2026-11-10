@@ -42,9 +42,9 @@ If the halt rule passes but the failures look fake, Shipvo does not halt the rel
 
 The release keeps serving while it is held. The hold shows in `approvals_list` and in the app admin with its reason. There is one hold per release.
 
-1. Open the app admin and read the hold.
-2. Press Approve to halt the release now. The halt is written to the audit log with your approval.
-3. Press Deny if the failures are not real. The hold clears and the release keeps serving.
+1. Open the app admin and find the hold on the "Waiting for your approval" card.
+2. Press Approve on that card to halt the release now. The halt is written to the audit log with your approval.
+3. Press Deny on that card if the failures are not real. The hold clears and the release keeps serving.
 
 An agent or a token cannot decide a hold. Failures from established installs halt at once, as above.
 
