@@ -1,0 +1,121 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "meal-planner",
+    "name": "Meal planner",
+    "description": "Plan meals by day and see how many you have planned."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable"
+  },
+  "data": {
+    "meals": {
+      "source": "collection",
+      "fields": {
+        "name": "text",
+        "day": "text",
+        "note": "text"
+      },
+      "seed": []
+    },
+    "planned": {
+      "source": "computed",
+      "value": "{{ size(meals) }}"
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Meals",
+      "body": [
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "Meals planned: {{ planned }}"
+        },
+        {
+          "type": "calendar",
+          "label": "Planned meals",
+          "from": "meals",
+          "view": "week",
+          "at": "2026-11-10",
+          "date": "{{ item.day }}",
+          "title": "{{ item.name }}",
+          "detail": "{{ item.note }}",
+          "empty": {
+            "message": "No meals planned yet"
+          }
+        },
+        {
+          "type": "form",
+          "label": "Add meal form",
+          "submit": {
+            "label": "Add meal",
+            "action": "add_meal"
+          },
+          "fields": [
+            {
+              "name": "name",
+              "type": "text",
+              "label": "Meal",
+              "required": true,
+              "maxLength": 60
+            },
+            {
+              "name": "day",
+              "type": "text",
+              "label": "Day (2026-11-10)",
+              "required": true,
+              "maxLength": 10
+            },
+            {
+              "name": "note",
+              "type": "text",
+              "label": "Note",
+              "maxLength": 60
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "actions": {
+    "add_meal": {
+      "description": "Add one meal to the plan.",
+      "input": {
+        "name": {
+          "type": "text"
+        },
+        "day": {
+          "type": "text"
+        },
+        "note": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "do": [
+        {
+          "insert": "meals",
+          "value": {
+            "name": "{{ input.name }}",
+            "day": "{{ input.day }}",
+            "note": "{{ input.note }}"
+          }
+        },
+        {
+          "toast": "Meal added"
+        }
+      ]
+    }
+  }
+}
