@@ -1,0 +1,3 @@
+- `@shipvo/runtime`: an uncaught JS error now queues a `js_crash:<cold|reload>` event, and `reportRuntimeEvents` sends it as `js_crash_cold` or `js_crash_reload`. Crash reports say whether the crash happened on a cold start or after an in-place reload, on Android and iOS.
+- `@shipvo/schema`: the telemetry `event` enum accepts `js_crash_cold` and `js_crash_reload`.
+- Migration: none; shells without this change send no `js_crash_*` events.
