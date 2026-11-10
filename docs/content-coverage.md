@@ -104,3 +104,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | SAML sign-in for the control plane | [sso](sso.md) | | | |
 | W3C `traceparent` recorded from MCP tool calls | [mcp](../packages/mcp/README.md) | | | |
 | Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
+| Open a build from a URL (`build_url`, build cache, `bad_url`, `host_not_allowed`, `too_large`) | [test-your-build](test-your-build.md#open-a-build-from-a-url) | | | |
+| Watch link on the hosted phone (`open_app` `platform`, `watch_url`) | [agents](agents.md#watch-link-on-the-hosted-phone) | | | |
+| Phone frame page `/phone?session=` with shared Store state | [phone-apps](phone-apps.md) | | | |

@@ -47,6 +47,20 @@ If your coding agent runs the local `@shipvo/mcp` server (`shipvo agents setup` 
 
 `upload_build` reads your project, so it runs only on the local (stdio) server. Add `npx @shipvo/mcp` next to the hosted one. A key with read scope cannot upload.
 
+## Open a build from a URL
+
+If your build is already hosted as a file, the simulator can fetch it for you. `POST /session` on the simulator accepts a `build_url`. It downloads the build into a size-capped build cache, unpacks it, opens it as the app and replies with `build: <id>`. The id is the build's sha256 content id, so the same file gives the same id. Over MCP, `open_app("<app>@build:<id>")` sends that id and the reply names the build that opened.
+
+The host must be on the same allow-list the phone browser uses. This is checked again on every redirect. A failed fetch leaves no session and no file behind.
+
+| Code | Meaning | What to do |
+| --- | --- | --- |
+| `bad_url` | The URL is not a valid `http(s)` URL. | Check the address. |
+| `host_not_allowed` | The host (or a redirect target) is not on the allow-list. | Use an allowed host, or upload with `shipvo sim --hosted`. |
+| `too_large` | The file is over the size cap. | Remove unused assets and try again. |
+| `unreachable` | The fetch timed out or the host did not answer. | Check the link opens in a browser, then retry. |
+| `bad_build` | The file is not a `.tar.gz` build with an `index.html` at its top level, or it contains links. | Pack the `sim-dist` folder from `shipvo sim` and try again. |
+
 ## Who can see a build
 
 A build is private to your account. A key from another account gets `build_not_found`, the same answer as for a build that never existed. A build is deleted when it expires.

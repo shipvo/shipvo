@@ -1,0 +1,1 @@
+- docs: `build_url` (open a build from a URL, with its error codes) on the test-your-build page, and the `watch_url` link on the hosted phone on the agents page.
