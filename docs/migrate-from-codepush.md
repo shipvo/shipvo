@@ -93,7 +93,7 @@ The pointer files are under `p/<appId>/<shell major>/<band>`. Check one with `sh
 
 ## Step 5. Ship the store build
 
-Build and submit one new binary with the Shipvo plugin and your public key in it. Users on the old CodePush build keep running their last CodePush bundle. They get Shipvo updates only after they install this binary. Shipvo cannot update a build that does not contain its runtime.
+Build and submit one new binary with the Shipvo plugin and your public key in it. Users on the old CodePush build keep running their last CodePush bundle. They get Shipvo updates only after they install this binary. Ship the Step 5 store build first; every build with the runtime then updates over the air.
 
 ## Step 6. Publish
 
@@ -138,7 +138,7 @@ This signs the code of release 3 as the next release number and publishes it to 
 - **The native build fails after `--apply`.** A native file still calls CodePush, for example `CodePush.getJSBundleFile()` or `[CodePush bundleURL]`. `--apply` lists each file and line under its manual steps. Change them by hand.
 - **`shipvo doctor` prints a FAIL line.** The line ends with the fix. Make that change and run `doctor` again until every line says PASS.
 - **`shipvo publish` fails on a project that is not Expo.** `publish` runs `npx expo export`, so the project needs Expo installed.
-- **Users on the old build get no Shipvo update.** They need the new store binary from Step 5. Shipvo cannot update a build that does not contain its runtime.
+- **Users on the old build get no Shipvo update.** They need the new store binary from Step 5. Ship the Step 5 store build first; every build with the runtime then updates over the air.
 - **Installed apps refuse updates after you changed machines.** The signing seed is missing or different. Restore it with `shipvo keys import` ([new-machine.md](new-machine.md)).
 
 ## Next steps
