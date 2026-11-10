@@ -85,6 +85,8 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: `shipvo keys root --out <file>` creates the offline root key ([Root key and key rotation](key-rotation.md), #1417)
+- 2026-11-10: Install card and Settings let you allow or deny each device permission per app ([Phone apps](phone-apps.md#allow-or-deny-what-an-app-can-use), #1356)
 - 2026-11-10: `room_log` and `room_note` let a lead agent see what the other agents in a room did and leave notes for them ([Agents](agents.md#room-log-and-notes), #1419)
 - 2026-11-10: Exported phone apps carry their home-screen layout, and `import_phone_apps` warns about each invalid layout field ([Phone apps](phone-apps.md), #1401)
 - 2026-11-10: `app_activity` shows what the agent built and changed in each spec app, `refresh_app` fetches a data source now, and `schedule_app` shows or hides an app on a time window ([Phone apps](phone-apps.md#see-what-was-built-and-changed), #1396, #1379, #1357)

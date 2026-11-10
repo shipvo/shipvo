@@ -51,6 +51,17 @@ Use this to check which keys your apps have saved, without anyone seeing the key
 
 With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate a key or revoke it from a script.
 
+## Allow or deny what an app can use
+
+Use this to decide which device features each app on the phone may use. It looks the same on the Android and iOS skins.
+
+1. Open the Store on the phone and tap an app that asks for device features.
+2. The install card lists every permission the app asks for (notifications, camera, location, contacts, calendar, photos, files). Each has a switch, Allowed to start.
+3. Switch off any you want to deny, then tap **Install**.
+4. To change an answer later, open Settings. It has one switch for each app and permission.
+
+If an app runs an action that needs a permission you denied (a `notify` step needs `notifications`), nothing in that action runs and it returns `permission_denied` with the permission's name. The answers are kept in the phone's `phone.json` (`apps[].permissions`) and travel with `export_phone_apps` and `import_phone_apps`. `install_app` returns `declared` (what the app asks for) and `permissions` (your answers), and the home text lists each app's answers.
+
 ## Open a web page in the phone's Browser
 
 Use this when your app links to a web page (a payment page, a privacy policy) and you want to check the page and the way back.
@@ -189,6 +200,7 @@ The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action in
 | `placement.… not valid, dropped` in the `warnings` of `import_phone_apps` | An exported layout has a field that is not valid | The valid fields were kept. Fix the field named in the warning and import again with `replace: true` |
 | `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
 | A scheduled app is missing from the home screen | Its schedule is not active at the phone's clock | Read the home text, which says when it starts; call `set_phone_time`, or `switch_app` still opens it |
+| `permission_denied` from an app action | You denied the permission the action needs | Allow it in Settings, in the app's permission row, then run the action again |
 | `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
 
 ## Next steps
