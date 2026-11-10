@@ -57,12 +57,15 @@ test("removing the app stops refreshes", async () => {
 
 test("cost limits still apply: the refresh is rejected by the limit", async () => {
   const sp = spec({ get: "https://api.example.com/p?x={{ [1,2,3].map(a, [1,2,3].map(b, a+b)) }}" });
-  const { host, timers, tick, calls } = setup(sp, { maxCost: 1 });
-  const { runSource } = await import("../spec/dist/index.js");
-  await assert.rejects(runSource(sp, "price", { fetch: async () => { throw new Error("no call"); }, secrets: () => undefined, maxCost: 1, scope: { state: {}, data: {} } }), /cost|limit|budget/i);
-  await tick(timers[0]);
-  assert.equal(calls(), 0);
-  assert.doesNotMatch(JSON.stringify(host.tree("s", "app")), /Price 10/);
+  const limited = setup(sp, { maxCost: 1 });
+  await limited.tick(limited.timers[0]);
+  assert.equal(limited.calls(), 0);
+  assert.doesNotMatch(JSON.stringify(limited.host.tree("s", "app")), /Price 10/);
+  // The same spec fetches when no limit is set, so the limit is what stopped it.
+  const free = setup(sp);
+  await free.tick(free.timers[0]);
+  assert.equal(free.calls(), 1);
+  assert.match(JSON.stringify(free.host.tree("s", "app")), /Price 10/);
 });
 
 test("a failed refresh keeps the last value", async () => {
@@ -105,4 +108,32 @@ test("replacing the spec reschedules and drops the old timer", () => {
   assert.equal(host.update("s", "app", spec({ refresh: 120 })).ok, true);
   assert.equal(cleared(), 1);
   assert.equal(timers[1].ms, 120000);
+});
+
+test("the page script leaves an unchanged page alone and swaps it when data changed", async () => {
+  const vm = await import("node:vm");
+  const { host, timers, tick } = setup();
+  const html = host.page("s", "app");
+  const v = /data-v="([0-9a-f]+)"/.exec(html)[1];
+  let swaps = 0, scrolled = [];
+  const hostEl = { getAttribute: () => v };
+  const doc = {
+    hidden: false, activeElement: null,
+    getElementById: () => hostEl,
+    addEventListener() {},
+    body: { appendChild() {}, insertBefore() {}, set innerHTML(_) { swaps++; } }
+  };
+  let poll;
+  const win = { scrollY: 120, scrollTo: (x, y) => scrolled.push(y) };
+  const script = /<script id="sv-host"[^>]*>([\s\S]*)<\/script>/.exec(html)[1];
+  const fetch = async (_u, init) => ({ json: async () => host.op("s", "app", JSON.parse(init.body)) });
+  vm.runInNewContext(script, { document: doc, window: win, location: { pathname: "/spec/s/app" }, fetch, setInterval: (fn) => { poll = fn; } });
+  poll(); await new Promise((r) => setImmediate(r));
+  assert.equal(swaps, 0, "an unchanged page is not rebuilt");
+  await tick(timers[0]);
+  poll(); await new Promise((r) => setImmediate(r));
+  assert.equal(swaps, 1);
+  assert.deepEqual(scrolled, [120], "scroll position is kept");
+  poll(); await new Promise((r) => setImmediate(r));
+  assert.equal(swaps, 1, "no second rebuild without new data");
 });

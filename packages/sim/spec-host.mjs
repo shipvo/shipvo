@@ -1,6 +1,7 @@
 // Runs app specs on the simulated phone. A spec app is a JSON document (see @shipvo/spec). This host keeps one running
 // app per phone and app id, renders its screen as a page the phone shows, and applies the taps, typing and choices
 // that page sends back. The page is real HTML with labelled controls, so the screen and tap tools work on it as on any app.
+import { createHash } from "node:crypto";
 import { createApp, runSource, memoryCache } from "@shipvo/spec";
 
 const REFRESH_POLL_MS = 5000;
@@ -9,15 +10,16 @@ const REFRESH_POLL_MS = 5000;
 export const HOST_SCRIPT = `(function(){
 var base=location.pathname.replace(/\\/$/,"");
 function send(op){return fetch(base+"/op",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(op)}).then(function(r){return r.json()}).then(function(r){
- if(r&&typeof r.html==="string"){var m=/<body[^>]*>([\\s\\S]*)<\\/body>/i.exec(r.html);if(m){var s=document.getElementById("sv-host");document.body.innerHTML=m[1];if(s)document.body.appendChild(s)}}
+ if(r&&typeof r.html==="string"){shown=r.v;swap(r.html)}
  if(r&&r.ok===false){var p=document.createElement("p");p.setAttribute("role","alert");p.textContent=r.error||"That did not work";document.body.insertBefore(p,document.body.firstChild)}})}
 function name(el){return el.getAttribute("aria-label")||el.textContent.trim()}
 function form(el){var f=el.closest("form");return f?f.getAttribute("aria-label"):null}
-var shown=null;
+var hs=document.getElementById("sv-host");var shown=hs?hs.getAttribute("data-v"):null;
+function swap(h){var m=/<body[^>]*>([\\s\\S]*)<\\/body>/i.exec(h);if(!m)return;var y=window.scrollY,s=document.getElementById("sv-host");document.body.innerHTML=m[1];if(s)document.body.appendChild(s);window.scrollTo(0,y)}
 function poll(){if(document.hidden)return;fetch(base+"/op",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({op:"view"})}).then(function(r){return r.json()}).then(function(r){
- if(!r||typeof r.html!=="string"||r.html===shown)return;shown=r.html;
+ if(!r||typeof r.html!=="string"||r.v===shown)return;
  var ae=document.activeElement;if(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))return;
- var m=/<body[^>]*>([\\s\\S]*)<\\/body>/i.exec(r.html);if(m){var s=document.getElementById("sv-host");document.body.innerHTML=m[1];if(s)document.body.appendChild(s)}}).catch(function(){})}
+ shown=r.v;swap(r.html)}).catch(function(){})}
 if(${REFRESH_POLL_MS})setInterval(poll,${REFRESH_POLL_MS});
 document.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
  var sw=t.closest('button[role="switch"]');if(sw)return send({op:"toggle",label:name(sw)});
@@ -28,6 +30,9 @@ document.addEventListener("change",function(e){var t=e.target;if(!t||!t.closest)
  if(t.type==="radio"){var g=t.closest('[role="radiogroup"]');return send({op:"field",form:fm,field:g?g.getAttribute("aria-label"):"",value:name(t)})}
  send({op:"field",form:fm,field:name(t),value:t.type==="checkbox"?t.checked:t.value})});
 })();`;
+
+const version = (html) => createHash("sha1").update(html).digest("hex").slice(0, 16);
+const withScript = (html) => html.replace("</body>", `<script id="sv-host" data-v="${version(html)}">${HOST_SCRIPT}</script></body>`);
 
 const key = (session, id) => `${session}/${id}`;
 
@@ -148,7 +153,7 @@ export class SpecHost {
     if (!r) return null;
     const out = r.app.render();
     if (!out.ok) return null;
-    return out.html.replace("</body>", `<script id="sv-host">${HOST_SCRIPT}</script></body>`);
+    return withScript(out.html);
   }
 
   /** The screen as text for an agent: role and name of each node. */
@@ -183,7 +188,7 @@ export class SpecHost {
       default: res = { ok: false, error: `unknown op '${body?.op}'` };
     }
     const out = a.render();
-    const html = out.ok ? out.html.replace("</body>", `<script id="sv-host">${HOST_SCRIPT}</script></body>`) : undefined;
-    return { ...(res.ok === false && "errors" in res ? { ok: false, error: Object.values(res.errors).join(" ") } : res), ...(html ? { html } : {}) };
+    const html = out.ok ? withScript(out.html) : undefined;
+    return { ...(res.ok === false && "errors" in res ? { ok: false, error: Object.values(res.errors).join(" ") } : res), ...(html ? { html, v: version(out.html) } : {}) };
   }
 }
