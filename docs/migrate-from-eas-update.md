@@ -1,6 +1,6 @@
 # Migrate from EAS Update to Shipvo
 
-This guide is for developers of an Expo app that ships updates with EAS Update. You will end with the same app receiving signed Shipvo updates, with a plan you can read before anything changes.
+This page is for developers with an Expo app on EAS Update. You will get a plan for your app, the safe edits applied with backups, and the order of the remaining steps.
 
 This guide moves an Expo app that uses `expo-updates` (EAS Update) to Shipvo over-the-air updates. `shipvo migrate --plan` (`packages/cli/src/migrate.ts`) prints the plan for your app. It only reads; it changes no files. `shipvo migrate --apply` makes the safe edits for you (see below). You do the other steps by hand.
 
@@ -103,6 +103,8 @@ Each message below is printed by the CLI on this branch.
 - **`shipvo migrate needs --plan ... or --apply ...`** (exit code 2). Pass one of the two flags. Passing both prints `Use --plan or --apply, not both.`
 - **The plan tells you to check entries by hand.** Your config is `app.config.js` or `app.config.ts`, which the CLI does not edit. Remove the `expo-updates` plugin and the `updates` and `runtimeVersion` keys yourself.
 - **The app still calls `Updates.checkForUpdateAsync`.** `--apply` does not edit your code. Search for `expo-updates` imports and remove them before you build.
+- **Lockfile still lists `expo-updates`**: `--apply` does not touch the lockfile. Run your package manager's install.
+- **Phones still get EAS updates**: installed apps keep the old update system until a new store build ships. That is expected. Only the new build uses Shipvo.
 
 ## Next steps
 
@@ -110,3 +112,4 @@ Each message below is printed by the CLI on this branch.
 - [Publish your first release and widen it by cohort](cli.md).
 - [Roll back a bad release](cli.md).
 - [Migrate from CodePush](migrate-from-codepush.md) if you have other apps on CodePush.
+- [Key rotation](key-rotation.md): change the signing key later without a store build.
