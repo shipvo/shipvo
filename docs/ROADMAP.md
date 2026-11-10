@@ -86,6 +86,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
 - 2026-11-10: A page for founders and developers on describing an app and watching it appear, with a checked example spec and troubleshooting ([Describe an app](describe-an-app.md))
+- 2026-11-10: Revoke a saved key from the Secrets screen, and the gallery grows to five example specs ([Revoke](phone-apps.md#see-saved-keys-in-settings), [Example specs](spec-blocks.md#example-specs), #1388, #1385)
 - 2026-11-10: `shipvo keys root` creates the offline root key for key rotation ([Key rotation](key-rotation.md), #1417)
 - 2026-11-10: The Store install card lists each device permission an app declares, with Allow and Deny ([Phone apps](phone-apps.md#device-permissions-per-app), #1356)
 - 2026-11-10: `room_log` and `room_note` let a lead agent see what the other agents in a room did and leave notes for them ([Agents](agents.md#room-log-and-notes), #1419)

@@ -1,5 +1,7 @@
 # Migrate from EAS Update to Shipvo
 
+This page is for developers with an Expo app on EAS Update. You will get a plan for your app, the safe edits applied with backups, and the order of the remaining steps.
+
 This guide moves an Expo app that uses `expo-updates` (EAS Update) to Shipvo over-the-air updates. `shipvo migrate --plan` (`packages/cli/src/migrate.ts`) prints the plan for your app. It only reads; it changes no files. `shipvo migrate --apply` makes the safe edits for you (see below). You do the other steps by hand.
 
 Facts about `expo-updates` are from the [Expo EAS Update docs](https://docs.expo.dev/eas-update/introduction/).
@@ -92,4 +94,17 @@ After `shipvo migrate --apply` and `shipvo init --yes` on that copy, `init` prin
 - Release status: `shipvo status`, and the control plane admin at `/app/<id>/admin` for content, orders and the owner API (see [getting-started.md](getting-started.md)).
 - Channels and branches: group devices with bands.
 
-See also [Migrate from CodePush](migrate-from-codepush.md) and [cli.md](cli.md).
+## Troubleshooting
+
+- **`shipvo init` refuses to run**: `expo-updates` is still in the app. Run `shipvo migrate --plan` and remove every entry it lists.
+- **`migrate --apply` says the git tree is not clean** (`dirty_tree`): commit or stash your work and run it again. `--force` applies anyway. Backups are in `.shipvo/migrate-backup/`.
+- **The plan says to check the config by hand**: your app uses `app.config.js` or `app.config.ts`, which `migrate` does not read or edit. Remove the `expo-updates` plugin, `updates` and `runtimeVersion` there yourself.
+- **Lockfile still lists `expo-updates`**: `--apply` does not touch the lockfile. Run your package manager's install.
+- **Phones still get EAS updates**: installed apps keep the old update system until a new store build ships. That is expected. Only the new build uses Shipvo.
+
+## Next steps
+
+- [Getting started](getting-started.md): what `shipvo init` and `shipvo publish` do.
+- [New machine and key backup](new-machine.md): back up the signing seed now.
+- [Key rotation](key-rotation.md): change the signing key later without a store build.
+- [Migrate from CodePush](migrate-from-codepush.md) and [CLI guide](cli.md).
