@@ -282,8 +282,6 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 
 **The `watch_url` shows an error or does not load.** The link is valid for one hour, for one session. Call `open_app` again for a new one. If there is no `watch_url` in the reply, you are on a local simulator; open `/watch` there instead.
 
-**ChatGPT shows "The server couldn't complete MCP setup".** Connectors can name a newer MCP protocol version than the server lists. The hosted phone accepts that and answers with the newest version it speaks, so setup completes. If you still see the message, check that the URL is `https://sim.shipvo.dev/mcp/<key>` with your key, and add the connector again.
-
 **`room_log` or `room_note` returns `no_room`.** The room ends when its last session ends, and its log goes with it. Open a session with `room` again and read the log while a session is still open.
 
 **Two sessions do not see each other's orders.** They were opened without the same `room`. Open both with the same `room` value on the same simulator (see [Rooms](#rooms-several-phones-one-backend)).
