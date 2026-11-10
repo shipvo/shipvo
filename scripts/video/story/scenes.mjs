@@ -38,10 +38,11 @@ export function setDialogue({ mouth = {}, lines = [] } = {}) {
   for (const [who, c] of Object.entries({ mara, jun, dana, pip })) c.mouthFn = mouth[who] ? (t) => mouth[who][Math.round(t * FPS)] ?? 0 : null;
 }
 /** The line being spoken, burned into the picture so the film works on mute. */
+const esc = (x) => String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 function subtitle(t) {
   const l = LINES.find((x) => t >= x.start && t <= x.end + .25);
   if (!l) return "";
-  return `<g><rect x="340" y="656" width="600" height="46" rx="14" fill="#0b1f3a" opacity=".82"/><text x="640" y="688" text-anchor="middle" font-family="system-ui,sans-serif" font-size="26" fill="#fff"><tspan fill="#7fb2ff" font-weight="700">${NAMES[l.who] || l.who}: </tspan>${l.text}</text></g>`;
+  return `<g><rect x="340" y="656" width="600" height="46" rx="14" fill="#0b1f3a" opacity=".82"/><text x="640" y="688" text-anchor="middle" font-family="system-ui,sans-serif" font-size="26" fill="#fff"><tspan fill="#7fb2ff" font-weight="700">${esc(NAMES[l.who] || l.who)}: </tspan>${esc(l.text)}</text></g>`;
 }
 
 /** A walker: simple silhouette with a phone in hand, bobbing as it walks. */

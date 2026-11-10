@@ -123,15 +123,6 @@ def download(tid, outdir):
     return p
 
 
-ALLOWED_LICENSES = ("by", "by-sa", "publicdomain", "zero")
-
-
-def track_license(tid):
-    """Licence slug from the MP3's own ID3 copyright tag (first 64 KB), or "unknown"."""
-    data = subprocess.run(["curl", "-sSL", "-m", "30", "-r", "0-65535", DL.format(id=tid)], capture_output=True).stdout
-    m = re.search(rb"creativecommons\.org/(?:licenses|publicdomain)/([a-z-]+)/", data)
-    return m.group(1).decode() if m else "unknown"
-
 
 def pcm(path, sr=11025):
     raw = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-ac", "1", "-ar", str(sr), "-f", "f32le", "-"],
