@@ -89,7 +89,6 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 - 2026-11-10: Assistant Inbox: assistants on one phone message each other and hand over tasks, with `{{ caller }}` filled in automatically ([Phone apps](phone-apps.md#assistants-talking-to-each-other), #1472)
 - 2026-11-10: An Android patch that runs out of memory or is over the memory budget falls back to the full download ([Getting started](getting-started.md), #1454)
 - 2026-11-10: Agents can use the prefixed refs the phone returns after a restart ([Agents](agents.md), #1459)
-- 2026-11-10: Assistant Inbox app: assistants on one phone message each other and hand over tasks, with automatic assistant identity ([Phone apps](phone-apps.md), #1472)
 - 2026-11-10: `csv()` exports a spec app's collection as CSV ([Phone apps](phone-apps.md), #1458)
 - 2026-11-10: Declare a `stateVersion` with each release; `shipvo rollback` stops before sending phones to older code that cannot read newer saved data ([Rollbacks and stored data](rollbacks-and-stored-data.md), #1442)
 - 2026-11-10: **Use log** on the Secrets screen shows when, where and with what outcome each saved key was used ([Phone apps](phone-apps.md#see-saved-keys-in-settings), #1431)

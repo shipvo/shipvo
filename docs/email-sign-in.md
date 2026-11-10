@@ -59,11 +59,12 @@ Agents use three tools. Each takes the `session` from `open_app`.
 
 ## What you will see
 
-`inbox_read` (or `phone.inbox.list()`) returns the address and the mail so far. After the sign-in request in the example above, one message is there:
+`inbox_read` returns the address and the mail so far as `{ address, messages }`. In a test, `phone.inbox.address()` gives the address and `phone.inbox.list()` gives the messages array. After the sign-in request in the example above, one message is there:
 
 ```json
 { "address": "s-1a2b3c4d5e6f@inbox.shipvo.test",
-  "messages": [ { "id": "m1", "from": "login@example.test", "subject": "Your sign-in code",
+  "messages": [ { "id": "m1", "from": "login@example.test",
+                  "to": "s-1a2b3c4d5e6f@inbox.shipvo.test", "subject": "Your sign-in code",
                   "text": "Your code is 482913. It expires in 10 minutes.",
                   "codes": ["482913"], "links": [], "received_at": "2026-11-10T09:00:00.000Z" } ] }
 ```
@@ -73,7 +74,7 @@ Agents use three tools. Each takes the `session` from `open_app`.
 | You see | Why | What to do |
 | --- | --- | --- |
 | `inbox_timeout` | No mail matched `subject` or `from` before `timeout` ran out. The message names the address it waited on | Check the app used the address from `inbox.address()`. Call `inbox_read` with no filter to see what did arrive, then loosen the filter. Filters match part of the text and ignore case |
-| `inbox_no_code` | The mail has no standalone 4 to 8 digit number | Read `text` from `waitFor`. A code inside a longer number or a word is not picked up. Links are not codes: use `links` |
+| `inbox_no_code` | The mail has no standalone 4 to 8 digit number. Raised by `phone.inbox.code()`; `inbox_wait` returns an empty `codes` list instead | Read `text` from `waitFor`. A code inside a longer number or a word is not picked up. Links are not codes: use `links` |
 | Status 550 from `inbox.shipvo.test/send` | The `to` address is not this session's address | Send to the address `inbox.address()` returns. Each session has its own |
 | `session_ended` | The session closed while you were waiting | Open a new session and request the mail again. The inbox does not carry over |
 | An old code is returned | An earlier mail in the same session still matches | Call `inbox_clear` before each sign-in attempt |
