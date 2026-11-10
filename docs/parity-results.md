@@ -76,7 +76,7 @@ On iOS, the mobile-money number field opens a number pad with no Done key, and t
 
 ## Definitions (what the numbers do and do not measure)
 
-- **Actionable parity:** the set of actionable elements on a screen (buttons, radio options, text fields, links, checkboxes), each reduced to `role:label`, compared as sets: shared elements divided by all elements seen on either side. Disabled controls count on both sides, but their enabled state is not compared. Platform chrome (scroll indicators, keyboard keys) is excluded by the platform's own accessibility flags, not by name. **100% means: the agent can act on the same controls, with the same names, on both.** It is not a full accessibility-tree diff: enabled/disabled state, element order, bounds and field values are not part of the score yet.
+- **Actionable parity:** the set of actionable elements on a screen (buttons, radio options, text fields, links, checkboxes), each reduced to `role:label`, compared as sets: shared elements divided by all elements seen on either side. Disabled controls count on both sides, but their enabled state is not compared. Platform chrome (scroll indicators, keyboard keys) is excluded by the platform's own accessibility flags, not by name. **100% means: the agent can act on the same controls, with the same names, on both.** The score compares the actionable controls and their names; enabled/disabled state, element order, bounds and field values are outside it.
 - **Text coverage:** the share of text the simulator shows that also appears on the device, exactly or contained in a longer label.
 - **Same order:** on every "Order placed" screen, the order itself (lines, total, delivery and payment) must be identical on both sides; receipts differ by provider (`SIMULATED-` vs `SANDBOX-`) and are normalised.
 - **Visibility rules applied on both sides:** only on-screen items of a horizontal rail; nothing behind a modal sheet (the rule TalkBack and iOS apply; Android's uiautomator tree does not, so the Android driver applies it); the on-screen keyboard is never part of the app.
@@ -86,7 +86,7 @@ On iOS, the mobile-money number field opens a number pad with no Done key, and t
 1. **Text grouping on iOS:** iOS reads some rows as a single label where the web reads separate lines; the agent sees the same information, grouped differently. That is the text gap on iOS (89% on "Order placed").
 2. **On-screen keyboards** exist only on devices. Fields behave the same, and the device drivers dismiss the keyboard when a field needs it.
 3. **Native features** (camera, push, payment sheets) run in the simulator as simulated device features ([device API](device-api.md)); flows that use the real native sheets run on the Android emulator and iOS Simulator lanes.
-4. **Two purchase flows** are measured on the sample shop, and Flow C covers native features on Android. The native driver also runs on any USB-connected Android phone.
+4. **Three flows** are measured on the sample shop (two purchase flows and a native-features flow), on Android and iOS.
 
 ## Run it yourself
 
