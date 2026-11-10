@@ -46,5 +46,5 @@ Each line holds roles, counts, types and hashes. It never holds app text, label 
 ## Next steps
 
 - [CLI guide](cli.md#shipvo-explore---record-features-file): every `explore` flag and the `--json` envelope.
-- [Lumi](lumi.md): watch the same walk on a phone and save findings as tests with `--save-tests`.
+- [Lumi](lumi.md): test your app while you watch on Shipvo Phone, and turn a finding into a test with Save as test.
 - [Testing](testing.md): turn a finding into a typed test.

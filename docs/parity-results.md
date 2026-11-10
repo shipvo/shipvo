@@ -95,7 +95,7 @@ Run parity on a build that is not being published: an over-the-air update applie
 
 1. Open the repository's **Actions** tab and pick `parity` (Android) or `parity-ios` (iOS).
 2. Choose **Run workflow** and wait for the run to finish.
-3. Open the run summary. It lists each screen with the actionable and text percentages shown above.
+3. Open the run summary. It shows the parity report: each screen with the actionable and text percentages shown above (the iOS job prints the raw JSON of the same report if the formatted page is missing).
 
 The workflows are `.github/workflows/parity.yml` and `.github/workflows/parity-ios.yml`. The drivers are in `apps/tide-and-tackle/sim/`.
 
