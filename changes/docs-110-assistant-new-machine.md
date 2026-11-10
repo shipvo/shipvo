@@ -1,0 +1,2 @@
+- docs: "Test your app with an assistant" and "Moving to a new machine" now say who they are for, show the expected output, and have Troubleshooting and Next steps sections; glossary gains "Signing seed".
+- Migration: none.
