@@ -640,8 +640,10 @@ use(server, tools.audit_log,
       if (!r.ok) return fail("audit_failed", `the control plane answered HTTP ${r.status}.`);
       const got = ((await r.json()) as { rows?: Array<Record<string, unknown> & { id: number }> }).rows ?? [];
       for (const g of got) if (!action || g.action === action) rows.push({ actor: g.actor, action: g.action, subject: g.release ?? g.release_id ?? null, at: g.at });
-      if (got.length < (action ? AUDIT_PAGE : want)) break;
-      before = got[got.length - 1].id;
+      // Key-rotation rows have negative ids: they do not fill a page and cannot be a cursor.
+      const real = got.filter((g) => g.id > 0);
+      if (real.length < (action ? AUDIT_PAGE : want)) break;
+      before = real[real.length - 1].id;
     }
     const out = rows.slice(0, want);
     return { ...text(JSON.stringify(out, null, 2)), structuredContent: { app, rows: out } };

@@ -100,9 +100,9 @@ describe("GET /audit/:app", () => {
     const p2: any = await (await app.request("/audit/tide?limit=2&before=4", { headers: H }, env)).json();
     expect(p2.rows.map((x: any) => x.id)).toEqual([3, 2]);
     await app.request("/audit/tide?limit=9999", { headers: H }, env);
-    expect(calls[calls.length - 1].args.at(-1)).toBe(200);
+    expect(calls.filter((c) => c.sql.includes("FROM audit_log")).at(-1)!.args.at(-1)).toBe(200);
     await app.request("/audit/tide", { headers: H }, env);
-    expect(calls[calls.length - 1].args.at(-1)).toBe(50);
+    expect(calls.filter((c) => c.sql.includes("FROM audit_log")).at(-1)!.args.at(-1)).toBe(50);
     expect((await app.request("/audit/tide?limit=abc", { headers: H }, env)).status).toBe(400);
     expect((await app.request("/audit/tide?before=x", { headers: H }, env)).status).toBe(400);
   });
@@ -174,5 +174,24 @@ describe("audit on publish", () => {
     const { r } = await run(pk, buf, true);
     expect(r.status).toBe(200);
     warn.mockRestore();
+  });
+  describe("key-rotation rows", () => {
+    const rl = (id: number, at: string) => ({ id, app_id: "tide", at, actor: "ann", actor_kind: "person", sequence: id, valid_from: at });
+    const at = (rows: any[], ats: string[]) => rows.map((r, i) => ({ ...r, at: ats[i] }));
+    const call = async (rows: any[], rot: any[], q = "") => {
+      const { DB } = mkDb(rows, {}, rot);
+      const r = await app.request(`/audit/tide${q}`, { headers: { authorization: "Bearer tok" } }, { DB, POINTERS: {} as any, OWNER_TOKEN: "tok" } as any);
+      return ((await r.json()) as any).rows as any[];
+    };
+    it("limit caps the audit rows and drops rotation rows older than the page", async () => {
+      const rows = at(mk(3, "tide"), ["2026-01-01T00:00:00Z", "2026-01-03T00:00:00Z", "2026-01-05T00:00:00Z"]);
+      const out = await call(rows, [rl(2, "2026-01-06T00:00:00Z"), rl(1, "2026-01-02T00:00:00Z")], "?limit=1");
+      expect(out.map((x) => x.id)).toEqual([-2, 3]);
+    });
+    it("a short page carries every rotation row, interleaved by time", async () => {
+      const rows = at(mk(3, "tide"), ["2026-01-01T00:00:00Z", "2026-01-03T00:00:00Z", "2026-01-05T00:00:00Z"]);
+      const out = await call(rows, [rl(2, "2026-01-04T00:00:00Z"), rl(1, "2026-01-02T00:00:00Z")]);
+      expect(out.map((x) => x.id)).toEqual([3, -2, 2, -1, 1]);
+    });
   });
 });

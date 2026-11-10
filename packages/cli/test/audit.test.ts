@@ -82,7 +82,7 @@ describe("shipvo audit", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     await audit(["--format", "csv", "shop"], { fetchFn: f as any });
     const lines = String(log.mock.calls[0][0]).split("\n");
-    expect(lines[1]).toBe(`"-1","shop","2026-01-01T00:00:00Z","ann@b.c","person","key-rotation","","","","{""sequence"":2,""valid_from"":""2026-11-06T00:00:00.000Z""}"`.replace('"-1"', `"'-1"`));
+    expect(lines[1]).toBe(`"'-1","shop","2026-01-01T00:00:00Z","ann@b.c","person","key-rotation","","","","{""sequence"":2,""valid_from"":""2026-11-06T00:00:00.000Z""}"`);
   });
 
   it("rotation rows do not move the paging cursor or the limit", async () => {
@@ -93,5 +93,15 @@ describe("shipvo audit", () => {
     await audit(["shop"], { fetchFn: f as any });
     expect(f.mock.calls.map((c) => String(c[0]))).toEqual(["https://cp.test/audit/shop?limit=200", "https://cp.test/audit/shop?limit=200&before=201"]);
     expect(JSON.parse(String(log.mock.calls[0][0]))).toHaveLength(202);
+  });
+
+  it("--limit counts only real rows, so a rotation row does not cost an entry", async () => {
+    inApp();
+    const f = vi.fn(async () => resp([rot(), row(9), row(8), row(7), row(6), row(5)]));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await audit(["shop", "--limit", "5"], { fetchFn: f as any });
+    const out = JSON.parse(String(log.mock.calls[0][0]));
+    expect(out.map((x: any) => x.id)).toEqual([-1, 9, 8, 7, 6, 5]);
+    expect(f).toHaveBeenCalledTimes(1);
   });
 });

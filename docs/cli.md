@@ -298,6 +298,7 @@ shipvo audit shop --limit 100                  # only the newest 100 entries
 
 - It pages through `GET /audit/<app>` with `?before=<id>`, 200 rows at a time. `--limit` caps the total (default: all).
 - CSV has a header row, every field in double quotes, and columns in this order: `id`, `app_id`, `at`, `actor`, `actor_kind`, `action`, `release`, `release_id`, `before`, `after`. Objects are written as JSON text.
+- Key rotation uploads appear as `key-rotation` rows with a negative `id`. In CSV the id is written as `'-1`, because of the formula rule below. They do not count towards `--limit`.
 - A value that starts with `=`, `+`, `-` or `@` gets a leading `'` so a spreadsheet does not run it as a formula.
 - It needs `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create`. A non-2xx answer prints the status and exits 1. The token is never printed.
 

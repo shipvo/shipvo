@@ -23,6 +23,11 @@ beforeAll(async () => {
     if (u.pathname === "/audit/ghost") { res.writeHead(404); return res.end("{}"); }
     res.writeHead(200, { "content-type": "application/json" });
     const before = u.searchParams.get("before"), n = Math.min(Number(u.searchParams.get("limit")), 200);
+    if (u.pathname === "/audit/rot") {
+      // A key-rotation row (negative id) is the oldest row on page 1.
+      const rows = ROWS.filter((r) => before === null || r.id < Number(before)).slice(0, n);
+      return res.end(JSON.stringify({ app: "rot", rows: before === null ? [...rows, { id: -3, app_id: "rot", at: "2026-10-01", actor: "ann", actor_kind: "person", action: "key-rotation", release: null, release_id: null, before: null, after: null }] : rows }));
+    }
     res.end(JSON.stringify({ app: "tide", rows: ROWS.filter((r) => before === null || r.id < Number(before)).slice(0, n) }));
   });
   await new Promise<void>((r) => fake.listen(0, r));
@@ -65,6 +70,15 @@ describe("audit_log", () => {
     const rows = r.structuredContent.rows;
     expect(rows).toHaveLength(100); // 300 rows, every third is a rollback
     expect(rows.every((x: any) => x.action === "rollback")).toBe(true);
+    await c.close();
+  });
+  it("a key-rotation row at the end of a page is not used as the paging cursor", async () => {
+    const c = await connect("good");
+    urls.length = 0;
+    const r: any = await c.callTool({ name: "audit_log", arguments: { app: "rot", action: "publish", limit: 150 } });
+    expect(r.isError).toBeFalsy();
+    expect(r.structuredContent.rows).toHaveLength(150);
+    expect(urls).toEqual(["/audit/rot?limit=200", "/audit/rot?limit=200&before=101"]);
     await c.close();
   });
   it("returns typed unauthorized and not_found errors", async () => {

@@ -39,7 +39,7 @@ export async function audit(argv: string[], deps: { fetchFn?: typeof fetch } = {
       const { appId, rows, format, limit } = await auditRows(argv, deps);
       if (format === "csv") throw new UsageError("--json always returns rows in data. Drop --format csv, or drop --json.");
       const next = [{ command: "shipvo status --json", why: "See how the latest release does on phones." }];
-      if (limit !== undefined && rows.length === limit) next.unshift({ command: `shipvo audit ${appId} --json`, why: "Read the whole log, not just the newest entries." });
+      if (limit !== undefined && rows.filter((x) => x.id > 0).length === limit) next.unshift({ command: `shipvo audit ${appId} --json`, why: "Read the whole log, not just the newest entries." });
       return { code: "ok", summary: `${rows.length} audit ${rows.length === 1 ? "entry" : "entries"} for "${appId}", newest first.`, data: { app: appId, count: rows.length, rows }, next };
     }, [{ command: "shipvo doctor --json", why: "Check your setup." }]);
   }
@@ -67,9 +67,10 @@ async function auditRows(argv: string[], deps: { fetchFn?: typeof fetch }) {
   const f = deps.fetchFn ?? fetch;
 
   const rows: Row[] = [];
+  let count = 0; // rows with a real id; key-rotation rows (negative ids) ride along and do not use up --limit
   let before: number | undefined;
-  while (rows.length < max) {
-    const want = Math.min(PAGE, max - rows.length);
+  while (count < max) {
+    const want = Math.min(PAGE, max - count);
     const url = `${base}/audit/${encodeURIComponent(appId)}?limit=${want}${before !== undefined ? `&before=${before}` : ""}`;
     let r: Response;
     try { r = await f(url, { headers: { authorization: `Bearer ${token}` } }); }
@@ -77,11 +78,11 @@ async function auditRows(argv: string[], deps: { fetchFn?: typeof fetch }) {
     if (!r.ok) throw new CliFailure(`Audit request failed: HTTP ${r.status}${r.status === 401 ? " (the token was not accepted for this app)" : ""}.`, r.status === 401 ? "auth_failed" : "remote_failed", 1, [{ command: r.status === 401 ? "shipvo app create" : "shipvo doctor --json", why: r.status === 401 ? "Get a publish token for this app." : "Check the control plane." }]);
     const page = ((await r.json()) as { rows?: Row[] }).rows ?? [];
     rows.push(...page);
-    // Key rotation rows have negative ids and ride on the first page. They do not count towards the page size or the cursor.
+    // Key rotation rows have negative ids and ride on the first page. They do not count towards the page size, the limit or the cursor.
     const plain = page.filter((x) => x.id > 0);
+    count += plain.length;
     if (plain.length < want) break;
     before = plain[plain.length - 1].id;
   }
-  if (rows.length > max) rows.length = max;
   return { appId, rows, format, limit: Number.isFinite(max) ? max : undefined };
 }

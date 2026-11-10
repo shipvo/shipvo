@@ -35,4 +35,11 @@ describe("shipvo keys root", () => {
     await expect(signingKey(["root", "--out", out])).rejects.toThrow("exit 1");
     expect(readFileSync(out, "utf8")).toBe("keep\n");
   });
+  it("exits 2 when --out has no value", async () => {
+    inApp();
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(((c?: number) => { throw new Error("exit " + c); }) as any);
+    await expect(signingKey(["root", "--out"])).rejects.toThrow("exit 2");
+    expect(String(err.mock.calls[0][0])).toContain("Usage: shipvo keys root --out");
+  });
 });
