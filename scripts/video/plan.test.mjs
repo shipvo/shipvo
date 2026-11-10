@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildPlan, sentences, vtt, flashes, LEAD } from "./plan.mjs";
+import { buildPlan, sentences, vtt, flashes, LEAD, imgPath } from "./plan.mjs";
 
 const script = { scenes: [
   { id: "a", visual: "x", min: 2, narration: "One. Two.", caption: "One. 2." },
@@ -49,4 +49,9 @@ test("a flash that starts after its scene ends is dropped", () => {
   const s = { scenes: [{ ...script.scenes[0], flashes: [{ at: 999, text: "late" }] }, script.scenes[1]] };
   const p = buildPlan(s, man);
   assert.deepEqual(flashes(s, p), []);
+});
+
+test("imgPath takes dir/name as given and searches the default folders for a bare name", () => {
+  assert.equal(imgPath("/p", "describe-an-app/shot", () => false), "/p/describe-an-app/shot.png");
+  assert.equal(imgPath("/p", "shot", (f) => f === "/p/test-with-an-assistant/shot.png"), "/p/test-with-an-assistant/shot.png");
 });
