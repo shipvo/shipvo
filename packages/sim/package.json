@@ -29,6 +29,7 @@
     "app-name.mjs",
     "identity.mjs",
     "banner.mjs",
+    "permission-log.mjs",
     "share.mjs",
     "backup.mjs",
     "search.mjs",

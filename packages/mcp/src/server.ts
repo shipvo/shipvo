@@ -416,6 +416,8 @@ use(server, tools.list_wakeups,
   async ({ session }) => { need(session); const r = await act({ session, action: "list_wakeups" }) as Act & { wakeups?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ wakeups: r.wakeups }, null, 2)); });
 use(server, tools.clear_wakeup,
   async ({ session, name }) => { need(session); const r = await act({ session, action: "clear_wakeup", name }) as Act & { cleared?: boolean }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cleared: r.cleared === true })); });
+use(server, tools.permission_log,
+  async ({ session, app, permission, event, limit }) => { need(session); const r = await act({ session, action: "permission_log", app, permission, event, limit }) as Act & { entries?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ entries: r.entries }, null, 2)); });
 use(server, tools.get_connectivity,
   async ({ session }) => { need(session); const r = await act({ session, action: "get_connectivity" }) as Act & { connectivity?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.connectivity)); });
 use(server, tools.set_connectivity,

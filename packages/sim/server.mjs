@@ -37,6 +37,8 @@ import { createNav, pressHome, openRecents, resume, killApp, assertForeground, s
 import { assistantName } from "./identity.mjs";
 import { pendingBanner, waitForNew } from "./banner.mjs";
 import { createWakeups, WakeupError } from "./wakeup.mjs";
+import { createPermissionLog, PermissionLogError } from "./permission-log.mjs";
+import { actionDeviceNeeds } from "@shipvo/spec";
 import { initialConnectivity, applyConnectivity, networkOf, describeConnectivity, ConnectivityError } from "./connectivity.mjs";
 import { shareTargets, shareInput, ShareError } from "./share.mjs";
 import { createReminders, ReminderError } from "./reminders.mjs";
@@ -267,6 +269,18 @@ async function syncNetwork(s, page) {
   if (open && JSON.stringify(now) !== before) { s.shade.open = "none"; await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
 }
 const specHost = new SpecHost();
+// The session's permission log (grants, denials, removals, uses, blocks). See permission-log.mjs.
+const permLog = (s) => (s.permLog ??= createPermissionLog());
+/** After a spec app action: each device permission it needs is "used", or "blocked" when the person denied it. */
+function logUses(s, appId, action, res, caller) {
+  const spec = specHost.snapshot(sidOf(s), appId)?.spec;
+  const needs = spec ? actionDeviceNeeds(spec, action) : [];
+  const denied = res?.ok === false && /^permission_denied:/.test(res.error ?? "") ? (/"([a-z_]+)" permission/.exec(res.error)?.[1] ?? null) : null;
+  for (const p of needs) {
+    if (denied && p !== denied) continue;   // the action stopped at the first denied permission
+    permLog(s).add({ app: appId, permission: p, event: denied ? "blocked" : "used", by: action, caller });
+  }
+}
 /** One answer per device permission a spec declares: the person's (`given`), or allowed when none was given. */
 const declaredAnswers = (spec, given) => Object.fromEntries((Array.isArray(spec?.permissions?.device) ? spec.permissions.device : []).filter((p) => DEVICE_PERMISSIONS.includes(p)).map((p) => [p, typeof given?.[p] === "boolean" ? given[p] : true]));
 // The phone's clock: the real time, or the time a test set with set_time.
@@ -445,6 +459,7 @@ async function act(id, body) {
       const nm = String(body.name ?? body.spec?.app?.name ?? appId).replace(/[<>"'\\]/g, "").slice(0, 40);
       s.apps.installed_apps.push({ id: appId, name: nm, url: `spec://${appId}`, version: "1", kind: "spec", ...(Object.keys(perms).length ? { permissions: perms } : {}) });
       s.apps.log.push({ at: Date.now(), name: "create_app", app: appId, source: "real", version: "1" });
+      permLog(s).answers(appId, null, perms, "install");
       if (body.open !== false) {
         // If opening fails, the app is not left installed or running.
         try { await switchToApp(s, page, appId, true); }
@@ -499,6 +514,7 @@ async function act(id, body) {
         const ex = s.apps.installed_apps.find((x) => x.id === a.id);
         if (ex) { uninstallApp(s.apps, a.id, s.nav); specHost.drop(sidOf(s), a.id); }
         const perms = declaredAnswers(a.spec, a.permissions);
+        permLog(s).answers(a.id, ex?.permissions ?? null, perms, "import");
         const made = specHost.create(sidOf(s), a.id, a.spec, { style: a.style === "ios" ? "ios" : "android", data: a.data ?? undefined, state: a.settings ?? undefined, permissions: perms });
         const nm = String(a.name ?? a.spec?.app?.name ?? a.id).replace(/[<>"'\\]/g, "").slice(0, 40);
         const placement = a.placement == null ? null : cleanPlacement(a.placement);
@@ -528,6 +544,7 @@ async function act(id, body) {
       entry.version = String(up.version);
       // A new version may ask for other device permissions: new ones start allowed (as on install), kept ones keep the person's answer, dropped ones go.
       const perms = declaredAnswers(body.spec, entry.permissions);
+      permLog(s).answers(appId, entry.permissions ?? null, perms, "update");
       if (Object.keys(perms).length) entry.permissions = perms; else delete entry.permissions;
       specHost.syncPermissions(sidOf(s), appId, perms);
       if (typeof body.name === "string" && body.name.trim()) entry.name = body.name.replace(/[<>"'\\]/g, "").slice(0, 40);
@@ -560,11 +577,17 @@ async function act(id, body) {
       const appId = String(body.id ?? "");
       if (!specHost.has(sidOf(s), appId)) throw new SimError("not_installed", `'${appId}' is not a spec app running on this phone`);
       const res = specHost.call(sidOf(s), appId, String(body.action_name ?? ""), body.input && typeof body.input === "object" ? body.input : {}, { caller: assistantName(body.agent) });
+      logUses(s, appId, String(body.action_name ?? ""), res, assistantName(body.agent));
       s.apps.log.push({ at: Date.now(), name: "app_action", app: appId, action: String(body.action_name ?? ""), source: "real", ...(body.agent ? { caller: assistantName(body.agent) } : {}) });
       if (s.apps.current_app === appId && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
       if (res.ok === false && /^permission_denied:/.test(res.error)) throw new SimError("permission_denied", res.error.replace(/^permission_denied:\s*/, ""));
       if (res.ok === false) throw new SimError("action_failed", res.error);
       return { value: res.value ?? null, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
+    }
+    // The permission log: every grant, denial, removal, use and block, per app. Changes nothing.
+    case "permission_log": {
+      try { return { entries: permLog(s).list({ app: body.app, permission: body.permission, event: body.event, limit: body.limit }) }; }
+      catch (e) { if (e instanceof PermissionLogError) throw new SimError(e.code, e.message); throw e; }
     }
     // Connectivity: Wi-Fi, mobile data and airplane mode for the whole phone. Every app reads the result (spec apps as `network`,
     // apps with a bundle through the device layer), and spec apps' http data does not load while the phone is offline.
@@ -645,6 +668,7 @@ async function act(id, body) {
       const id = String(body.id ?? "");
       try { setPermission(s.apps, id, String(body.permission ?? ""), body.allowed); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       specHost.setPermission(sidOf(s), id, String(body.permission), body.allowed);
+      permLog(s).add({ app: id, permission: String(body.permission), event: body.allowed ? "granted" : "denied", by: "settings" });
       // `profile` is the phone.json form of the phone with these answers: save it and start a new session with it (phone) to keep them.
       // A Store app (not a spec app) has no running host, so its answer is stored and enforces nothing until it runs.
       return { id, permissions: s.apps.installed_apps.find((a) => a.id === id).permissions, installed_apps: s.apps.installed_apps, profile: exportProfile(s.apps) };
@@ -661,8 +685,9 @@ async function act(id, body) {
           const real = found && !/^fixture:/i.test(String(found.url ?? "")) ? await fetchAppBundle(found) : undefined;
           installApp(s.apps, id, catalog, real, body.permissions);
           installed = s.apps.installed_apps.find((a) => a.id === id);
+          permLog(s).answers(id, null, installed?.permissions ?? {}, "install");
         }
-        else if (body.action === "uninstall_app") { uninstallApp(s.apps, id, s.nav); specHost.drop(sidOf(s), id); }
+        else if (body.action === "uninstall_app") { const was = s.apps.installed_apps.find((a) => a.id === id)?.permissions ?? null; uninstallApp(s.apps, id, s.nav); specHost.drop(sidOf(s), id); permLog(s).answers(id, was, null, "uninstall"); }
         else {
           await switchToApp(s, page, id);
         }
@@ -891,7 +916,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: search_phone, get_connectivity, set_connectivity, screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for, share_targets, share, get_clipboard, set_clipboard, set_reminder, list_reminders, cancel_reminder, backup_phone, restore_phone`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: permission_log, screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for, search_phone, share_targets, share, get_clipboard, set_clipboard, set_reminder, list_reminders, cancel_reminder, backup_phone, restore_phone, get_connectivity, set_connectivity`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

@@ -209,6 +209,19 @@ uninstall_app { session, id: "notes" } -> back on the home screen
 device_log { session }                 -> install_app (source "real" for marketplace apps, with the bundle sha256), switch_app, uninstall_app
 ```
 
+## See the permission log
+
+`permission_log` lists every device permission decision on the phone, oldest first, on Android and iOS:
+
+- `granted` and `denied`: from install, import, an update or the Settings switch (`by` says which).
+- `removed`: an update dropped the permission, or the app was uninstalled.
+- `used` and `blocked`: an app action needed the permission and ran, or stopped because the person denied it. `by` is the action and `caller` the assistant that called it.
+
+```json
+{ "session": "demo", "app": "remind", "event": "blocked" }
+```
+
+Filter by `app`, `permission` or `event`. `limit` is 1 to 500 (default 100). Nothing is changed.
 ## Share sheet and clipboard
 
 Share text from one app into another, and copy and paste, on Android and iOS.

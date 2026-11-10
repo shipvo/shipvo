@@ -281,4 +281,26 @@ describe("reminder tools", () => {
     expect(bad.isError).toBe(true); expect(bad.content[0].text).toContain("airplane_on");
     await c.close(); srv.close();
   }, 30000);
+  it("permission_log passes its filters on and returns the entries", async () => {
+    const seen: any[] = [];
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      res.end(JSON.stringify({ ok: true, entries: [{ at: 1, app: "remind", permission: "camera", event: "blocked", by: "scan" }] }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const r: any = await c.callTool({ name: "permission_log", arguments: { session: "s", app: "remind", event: "blocked", limit: 10 } });
+    expect(seen.at(-1)).toMatchObject({ action: "permission_log", session: "s", app: "remind", event: "blocked", limit: 10 });
+    expect(JSON.parse(r.content[0].text).entries[0].event).toBe("blocked");
+    const bad: any = await c.callTool({ name: "permission_log", arguments: { session: "s", event: "maybe" } });
+    expect(bad.isError).toBe(true);
+    await c.close(); srv.close();
+  }, 30000);
 });
