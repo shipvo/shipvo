@@ -2535,6 +2535,46 @@
     }
   },
   {
+    "name": "search_phone",
+    "description": "Find text anywhere on the phone in one call: rows in every app's data (contacts, messages, alarms, notes, tasks and any app you built) and notifications. Not case sensitive. Each hit says the app, the collection, the row id, the field that matched and a short snippet, with the full row. Use app to look in one app, or 'notifications'. Changes nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "query": {
+          "type": "string",
+          "description": "Text to look for, up to 200 characters"
+        },
+        "app": {
+          "type": "string",
+          "description": "Only this app id, or 'notifications'"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Most results to return (default 20)"
+        }
+      },
+      "required": [
+        "session",
+        "query"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "secret_status",
     "description": "Whether a key is saved in the vault, as { saved, valid, access }. Never returns the key. valid is null when it was not checked. Needs an owner token.",
     "inputSchema": {
