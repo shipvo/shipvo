@@ -7,6 +7,8 @@ import { evaluate, evaluateTemplate } from "./eval.js";
 import type { EvalOptions } from "./eval.js";
 import type { Issue } from "./types.js";
 import { aggregatePoints, chartSvg, chartText } from "./chart.js";
+import { CALENDAR_VIEWS, placePins, validCoords, visibleDays, weekdayColumn } from "./calendar-map.js";
+import type { CalendarView } from "./calendar-map.js";
 import { resolveShapes, vectorSvg } from "./vector.js";
 import type { Shape } from "./vector.js";
 import type { Aggregate, ChartKind, ChartPoint } from "./chart.js";
@@ -207,6 +209,10 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
         return buildKanban(b, scope, label);
       case "timeline":
         return buildTimeline(b, scope, label);
+      case "calendar":
+        return buildCalendar(b, scope, label);
+      case "map":
+        return buildMap(b, scope, label);
       case "vector": {
         const width = Number(b.width) > 0 ? Number(b.width) : 100, height = Number(b.height) > 0 ? Number(b.height) : 100;
         const shapes = resolveShapes(b.shapes, (v) => (typeof v === "string" && v.includes("{{") ? tpl(v, scope) : v));
@@ -271,6 +277,46 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
     }));
     const empty = str(b.empty?.message, scope);
     return { role: "list", name: label || "Timeline", block: "timeline", children: children.length || !empty ? children : [{ role: "status", name: empty, block: "empty", children: [] }] };
+  };
+
+  /** Registers a tappable event or pin: `app.press(title)` runs the block's `onSelect`. */
+  const tappable = (b: Obj, title: string, sc: Record<string, unknown>) => {
+    if (b.onSelect && title) registry.set(`button:${title}`, { kind: "button", block: { label: title, onPress: b.onSelect }, scope: sc });
+  };
+
+  const buildCalendar = (b: Obj, scope: Record<string, unknown>, label: string): ScreenNode => {
+    const view: CalendarView = (CALENDAR_VIEWS as readonly string[]).includes(b.view) ? b.view : "month";
+    const events = itemsOf(b, scope).map((item) => {
+      const sc = { ...scope, item };
+      const date = text(each(b.date, sc));
+      return { sc, date, day: date.slice(0, 10), title: str(b.title, sc), detail: str(b.detail, sc) };
+    }).filter((e) => /^\d{4}-\d{2}-\d{2}/.test(e.date)).sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0));
+    const at = (typeof b.at === "string" ? text(b.at.includes("{{") ? tpl(b.at, scope) : b.at).slice(0, 10) : "") || events[0]?.day || "";
+    const shown = /^\d{4}-\d{2}-\d{2}$/.test(at) ? visibleDays(view, at) : [];
+    const days = view === "agenda" ? [...new Set(events.map((e) => e.day))] : shown.filter((d) => events.some((e) => e.day === d));
+    const children = days.map((day): ScreenNode => ({
+      role: "group", name: day, block: "day", props: { day },
+      children: events.filter((e) => e.day === day).map((e): ScreenNode => {
+        tappable(b, e.title, e.sc);
+        return { role: b.onSelect ? "button" : "listitem", name: [e.title, e.detail].filter(Boolean).join(", "), block: "event", children: [], props: { title: e.title, detail: e.detail, time: e.date.length > 10 ? e.date.slice(11, 16) : "", key: e.title } };
+      })
+    }));
+    const empty = str(b.empty?.message, scope);
+    return { role: view === "agenda" ? "list" : "grid", name: label || "Calendar", block: "calendar", children: children.length || !empty ? children : [{ role: "status", name: empty, block: "empty", children: [] }], props: { view, days: shown, offset: shown[0] ? weekdayColumn(shown[0]) : 0 } };
+  };
+
+  const buildMap = (b: Obj, scope: Record<string, unknown>, label: string): ScreenNode => {
+    const raw = itemsOf(b, scope).map((item) => {
+      const sc = { ...scope, item };
+      return { sc, title: str(b.title, sc), lat: Number(each(b.lat, sc)), lng: Number(each(b.lng, sc)) };
+    }).filter((p) => validCoords(p.lat, p.lng));
+    const placed = placePins(raw);
+    const children = placed.map((p, i): ScreenNode => {
+      tappable(b, p.title, raw[i]!.sc);
+      return { role: b.onSelect ? "button" : "listitem", name: p.title, block: "pin", children: [], props: { title: p.title, lat: p.lat, lng: p.lng, x: p.x, y: p.y, key: p.title } };
+    });
+    const empty = str(b.empty?.message, scope);
+    return { role: "group", name: label || "Map", block: "map", children: children.length || !empty ? children : [{ role: "status", name: empty, block: "empty", children: [] }], props: { pins: children.length } };
   };
 
   const buildChart = (b: Obj, scope: Record<string, unknown>, label: string): ScreenNode => {
@@ -538,6 +584,20 @@ function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string,
         return `<div ${a} style="display:flex;flex-direction:column;gap:4px"><div style="font:600 ${Math.round(13 * t.scale)}px ${t.font};color:${t.p.muted}">${esc(n.name)}</div>${inner}</div>`;
       case "entry":
         return `<div ${a} style="padding:8px 0 8px 12px;border-left:2px solid ${t.p.primary};font:500 ${Math.round(15 * t.scale)}px ${t.font};color:${t.p.text}">${pr.time ? `<span style="color:${t.p.muted};margin-right:8px">${esc(pr.time)}</span>` : ""}${esc(pr.title)}${pr.detail ? `<div style="font:400 ${Math.round(13 * t.scale)}px ${t.font};color:${t.p.muted}">${esc(pr.detail)}</div>` : ""}</div>`;
+      case "calendar": {
+        const days = (pr.days as string[]) ?? [];
+        if (pr.view === "agenda" || !days.length) return `<div ${a} style="display:flex;flex-direction:column;gap:${gap("md")}px">${inner}</div>`;
+        const by = new Map(n.children.map((c) => [c.name, c]));
+        const cell = (d: string) => `<div style="min-height:${ios ? 56 : 64}px;padding:4px;background:${t.p.surface};border-radius:${Math.round(t.radius / 2)}px;font:400 ${Math.round(12 * t.scale)}px ${t.font};color:${t.p.muted}">${Number(d.slice(8))}${by.get(d) ? by.get(d)!.children.map(node).join("") : ""}</div>`;
+        const pad = pr.view === "month" ? `<div></div>`.repeat(Number(pr.offset)) : "";
+        return `<div ${a} style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">${pad}${days.map(cell).join("")}</div>`;
+      }
+      case "event":
+        return `<${n.role === "button" ? 'button type="button"' : "div"} ${a} style="display:block;width:100%;text-align:left;box-sizing:border-box;margin-top:2px;padding:${ios ? 4 : 6}px 8px;border:0;border-radius:${Math.round(t.radius / 2)}px;background:${t.p.primary};color:${t.p.background};font:500 ${Math.round(13 * t.scale)}px ${t.font}">${pr.time ? `${esc(pr.time)} ` : ""}${esc(pr.title)}${pr.detail ? ` <span style="font-weight:400">${esc(pr.detail)}</span>` : ""}</${n.role === "button" ? "button" : "div"}>`;
+      case "map":
+        return `<div ${a} style="position:relative;height:${Math.round(220 * t.scale)}px;background:${t.p.surface};border-radius:${t.radius}px;overflow:hidden;background-image:linear-gradient(${t.p.muted}22 1px,transparent 1px),linear-gradient(90deg,${t.p.muted}22 1px,transparent 1px);background-size:25% 25%">${inner}</div>`;
+      case "pin":
+        return `<${n.role === "button" ? 'button type="button"' : "div"} ${a} style="position:absolute;left:${Number(pr.x)}%;top:${Number(pr.y)}%;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;border:0;background:none;padding:0;font:500 ${Math.round(12 * t.scale)}px ${t.font};color:${t.p.text}"><span style="display:block;width:14px;height:14px;border-radius:${ios ? "50%" : "50% 50% 50% 0"};background:${t.p.danger};${ios ? "" : "transform:rotate(-45deg);"}"></span>${esc(pr.title)}</${n.role === "button" ? "button" : "div"}>`;
       case "list": {
         const ios = style === "ios";
         const wrap = ios ? `background:${t.p.surface};border-radius:${t.radius}px;overflow:hidden` : "";
