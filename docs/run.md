@@ -53,7 +53,7 @@ Run: [CI run 42355471525](https://github.com/shipvo/shipvo/actions/runs/42355471
 
 ## Edit and save, the phone updates
 
-While `shipvo run` is open it watches your project. When you save a file, it rebuilds the web copy in the background and reloads the app inside the phone. You stay on the same screen address. The terminal prints one line per rebuild, for example `rebuilt in 2.1 s`. As soon as a save is seen, the terminal prints `Rebuilding...` and the page shows a small "Updating…" hint until the new build loads.
+While `shipvo run` is open it watches your project. When you save a file, it rebuilds the web copy in the background and reloads the app inside the phone. You stay on the same screen address. The terminal prints one line per rebuild, for example `rebuilt in 2.1 s`. Rebuilds after a save keep the Metro cache, so they are faster than the first build, which starts clean. As soon as a save is seen, the terminal prints `Rebuilding...` and the page shows a small "Updating…" hint until the new build loads.
 
 After the first build, rebuilds keep the bundler's cache, so only the files you changed are processed again. The same applies to `shipvo sim --watch`.
 
