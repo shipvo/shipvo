@@ -89,6 +89,15 @@ describe("evaluate: text and fallbacks", () => {
     expect(ev("'hello'.startsWith('he')")).toBe(true);
     expect(ev("'hello'.matches('h.*o')")).toBe(true);
   });
+  it("csv", () => {
+    const rows = [{ title: "A, B", note: 'say "hi"', tags: ["x", "y"], n: 2 }, { title: "line\nbreak", n: null }];
+    expect(evaluate("csv(rows, ['title','note','tags','n'])", { rows })).toBe(
+      'title,note,tags,n\r\n"A, B","say ""hi""",x; y,2\r\n"line\nbreak",,,\r\n'
+    );
+    expect(String(evaluate("csv(rows)", { rows })).split("\r\n")[0]).toBe("title,note,tags,n");
+    expect(ev("csv([], ['a'])")).toBe("a\r\n");
+  });
+
   it("orElse", () => {
     expect(ev("orElse(null, 'x')")).toBe("x");
     expect(ev("orElse('a', 'x')")).toBe("a");
