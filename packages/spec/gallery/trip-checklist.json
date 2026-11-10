@@ -1,0 +1,98 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "trip-checklist",
+    "name": "Trip checklist",
+    "description": "List what to pack and see how many items each group has."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable"
+  },
+  "data": {
+    "items": {
+      "source": "collection",
+      "fields": { "name": "text", "group": "text", "qty": "number" },
+      "seed": []
+    },
+    "count": {
+      "source": "computed",
+      "value": "{{ sum(items.map(i, i.qty)) }}"
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Trip",
+      "body": [
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "Items to pack: {{ count }}"
+        },
+        {
+          "type": "chart",
+          "kind": "bar",
+          "from": "items",
+          "x": "{{ item.group }}",
+          "y": "{{ item.qty }}",
+          "aggregate": "sum",
+          "label": "Items by group"
+        },
+        {
+          "type": "form",
+          "label": "Add item form",
+          "submit": { "label": "Add item", "action": "add_item" },
+          "fields": [
+            { "name": "name", "type": "text", "label": "Item", "required": true, "maxLength": 60 },
+            { "name": "group", "type": "text", "label": "Group", "required": true, "maxLength": 60 },
+            { "name": "qty", "type": "number", "label": "Quantity", "min": 1, "max": 99 }
+          ]
+        },
+        {
+          "type": "list",
+          "label": "Packing list",
+          "from": "{{ sortBy(items, 'group') }}",
+          "item": {
+            "title": "{{ item.name }}",
+            "subtitle": "{{ item.group }}, quantity: {{ item.qty }}"
+          },
+          "empty": {
+            "message": "Nothing to pack yet"
+          }
+        }
+      ]
+    }
+  ],
+  "actions": {
+    "add_item": {
+      "description": "Add one item to the packing list.",
+      "input": {
+        "name": { "type": "text" },
+        "group": { "type": "text" },
+        "qty": { "type": "number", "default": 1 }
+      },
+      "do": [
+        {
+          "insert": "items",
+          "value": {
+            "name": "{{ input.name }}",
+            "group": "{{ input.group }}",
+            "qty": "{{ input.qty }}"
+          }
+        },
+        {
+          "toast": "Item added"
+        }
+      ]
+    }
+  }
+}

@@ -9,7 +9,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 1. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog done (10 Nov), tutorial done; video now for the live page; the agent-vs-agent video and launch kit once #1166 merges. Docs: [demos/chess](demos/chess.md) (live page, `--agents`, `--record`, troubleshooting).
 2. ~~Shipvo Testers and `shipvo store testers`~~ (done)
 3. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog done) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial and video need the new section)
-4. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps (Settings, Browser, Store, updates) need tutorial, video and blog, and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
+4. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps (Settings, Browser, Store, updates) need tutorial and video (blog done 10 Nov), and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
 5. Store path: `shipvo store` from working app to both stores (video done; tutorial, blog)
 6. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
 7. Signed over-the-air updates, staged rollout and rollback (video; tutorial done)
@@ -64,7 +64,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Phone home, recents, shade and power controls | [agents](agents.md), [phone-apps](phone-apps.md) | | | |
 | Lumi on Shipvo Phone (captions, reactions, first-run guide) | [lumi](lumi.md) | [test-your-app-with-lumi](tutorials/test-your-app-with-lumi.md) | | [lumi-tests-your-app-while-you-watch](../blog/lumi-tests-your-app-while-you-watch.md) |
 | `shipvo lumi` (test your app while you watch) | [lumi](lumi.md), [cli](cli.md) | [test-your-app-with-lumi](tutorials/test-your-app-with-lumi.md) | [Have Lumi test your app while you watch](videos.md#have-lumi-test-your-app-while-you-watch) | [lumi-tests-your-app-while-you-watch](../blog/lumi-tests-your-app-while-you-watch.md) |
-| Network profiles (`set_network_profile`, `device.net.type`) | [device-api](device-api.md#network-profiles), [phone-network](phone-network.md) | | | |
+| Network profiles (`set_network_profile`, `get_network_profile`, `phone.setNetwork`, `phone.json` network) | [device-api](device-api.md#network-profiles), [phone-network](phone-network.md#over-mcp) | | | |
 | Behaviour timeline (compare releases and pull requests) | [timeline](timeline.md) | | | |
 | Run tests on a real emulator or simulator (`--device agent-device`) | [testing](testing.md#run-on-a-real-emulator-or-simulator-with-agent-device) | | | |
 | Notes and Tasks first-party app | [phone-apps](phone-apps.md) | | | |
@@ -97,7 +97,8 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Saved-key routes: list, rotate, revoke and use log (`/vault/keys`, `/vault-ui/*` in the simulator) | [self-hosting](self-hosting.md#saved-key-routes-vault) | | | |
 | Key rotations in the pointer response (`rotations`) | [self-hosting](self-hosting.md#pointer-response-and-key-rotations) | | | |
 | Playground Many phones (1 to 12 Android and iOS phones, shareable link) | [getting-started](getting-started.md#try-it-in-your-browser-first) | | | |
-| Pin and hide apps on the home screen (`pin_app`, `hide_app`) | [phone-apps](phone-apps.md) | | | |
+| Pin and hide apps on the home screen (`pin_app`, `hide_app`) | [phone-apps](phone-apps.md) | | | [test-an-app-on-a-phone-with-a-store-and-other-apps](../blog/test-an-app-on-a-phone-with-a-store-and-other-apps.md) |
+| Arrange the home screen (`arrange_apps`, schedules, `set_phone_time`) | [phone-apps](phone-apps.md) | | | [test-an-app-on-a-phone-with-a-store-and-other-apps](../blog/test-an-app-on-a-phone-with-a-store-and-other-apps.md) |
 | Describe an app and it appears (`create_app`, `update_app`) | [phone-apps](phone-apps.md) | | | |
 | Export and import a phone's apps (`export_phone_apps`, `import_phone_apps`) | [phone-apps](phone-apps.md) | | | |
 | Real app install from the Store (`install_app`, `find_apps`) | [phone-apps](phone-apps.md) | | | |
@@ -106,7 +107,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Spec `calendar` and `map` blocks (month, week, agenda, pins, `onSelect`) | [spec-blocks](spec-blocks.md#calendars-and-maps) | | | |
 | Open a build from a link (`build_url` on `POST /session`) | [test-your-build](test-your-build.md#open-a-build-from-a-link) | | | |
 | Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
-| Arrange the home screen and set the phone clock (`arrange_apps`, `set_phone_time`) | [phone-apps](phone-apps.md) | | | |
+| Arrange the home screen and set the phone's clock (`arrange_apps`, `set_phone_time`, `placement` in `phone.json`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
 | Phone frame page `/phone?session=` with Store and installed apps | [phone-apps](phone-apps.md) | | | |
 | Watch link on the hosted phone (`watch_url`, read-only, sign in to take over) | [agents](agents.md#watch-link-on-the-hosted-phone) | | | |
 | Hosted MCP sign-in with URL client ids (Client ID Metadata Documents) | [agents](agents.md) | | | |
