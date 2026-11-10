@@ -1,0 +1,2 @@
+- New first-party spec app, Assistant Inbox (`templates/assistant-inbox`): assistants on one phone send each other messages and hand over tasks with status and a reply. Nine actions become MCP tools.
+- Migration: none; new app.

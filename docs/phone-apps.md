@@ -178,8 +178,19 @@ device_log { session }                 -> install_app (source "real" for marketp
 | Files and Photos | Keeps files and photos in one place, sorted by album. | `save_file`, `find_files`, `move_to_album`, `show_matches`, `delete_file` | [`templates/files-photos/app.json`](../templates/files-photos/app.json) |
 | Wallet | Keeps tickets, receipts and passes, grouped by kind, with an expiring-soon list. | `save_pass`, `find_pass`, `show_matches`, `delete_pass` | [`templates/wallet/app.json`](../templates/wallet/app.json) |
 | Shop | Lists products, takes orders and shows them in one place; the currency is a setting. | `add_product`, `find_products`, `place_order`, `list_orders`, `set_currency`, `show_matches`, `pick_product` | [`templates/shop/app.json`](../templates/shop/app.json) |
+| Assistant Inbox | Lets ChatGPT, Claude and other assistants on the same phone message each other and hand over tasks. Android and iOS. | `send_message`, `check_inbox`, `mark_read`, `read_thread`, `hand_off`, `my_tasks`, `start_task`, `finish_task`, `sent_tasks` | [`templates/assistant-inbox/app.json`](../templates/assistant-inbox/app.json) |
 
 The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action into a tool. Two assistants on the same phone read and write the same tasks and notes. Copy the folder to start your own app. The screen tree names every control: tabs `Tasks` and `Notes`, lists `Open tasks`, `Done tasks` and `Notes`, forms `Complete task form`, `New task form` and `New note form`. Test: `pnpm --filter @shipvo/spec test`.
+
+### Assistants talking to each other
+
+Connect ChatGPT and Claude to the same phone and install the Assistant Inbox. Each assistant says who it is in `from` or `to`, and both read and write the same inbox:
+
+1. ChatGPT calls `send_message` with `from: "chatgpt"`, `to: "claude"`.
+2. Claude calls `check_inbox` with `to: "claude"`, answers with `send_message`, and calls `mark_read`.
+3. To pass work, `hand_off` creates a task for the other assistant. They list theirs with `my_tasks`, call `start_task`, then `finish_task` with the result. The sender reads the status and reply with `sent_tasks`.
+
+A message to `anyone` reaches whichever assistant checks first. The Messages and Tasks tabs show the same data, so you can follow the exchange on the phone.
 
 ## Open a link in the owning app
 

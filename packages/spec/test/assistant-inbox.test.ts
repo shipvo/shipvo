@@ -1,0 +1,109 @@
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { createApp, describeTree, toolsFromSpec, unlabelled, validate } from "../src/index.js";
+
+const spec = JSON.parse(readFileSync(new URL("../../../templates/assistant-inbox/app.json", import.meta.url), "utf8"));
+const NOW = "2026-11-10T12:00:00Z";
+
+/** The phone's per-app data area: one JSON value. Each assistant's call loads it, runs a tool and saves it back. */
+function phone() {
+  let saved: unknown;
+  return {
+    call(tool: string, input: Record<string, unknown>) {
+      const t = toolsFromSpec(spec).find((x) => x.name === tool);
+      if (!t) throw new Error(`no tool ${tool}`);
+      const r = createApp(spec, { data: saved as never, now: NOW });
+      if (!r.ok) throw new Error(JSON.stringify(r.errors));
+      const out = r.app.call(t.action, input) as any;
+      if (out.ok) saved = { messages: r.app.data.messages, handoffs: r.app.data.handoffs };
+      return { out, app: r.app };
+    }
+  };
+}
+
+describe("Assistant Inbox spec app", () => {
+  it("validates with no errors or warnings", () => {
+    const v = validate(spec);
+    expect(v.errors).toEqual([]);
+    expect(v.warnings).toEqual([]);
+  });
+
+  it("gives every action a tool and labels every control", () => {
+    const names = toolsFromSpec(spec).map((t) => t.name).sort();
+    expect(names).toEqual(["check_inbox", "finish_task", "hand_off", "mark_read", "my_tasks", "read_thread", "send_message", "sent_tasks", "start_task"]);
+    const r = createApp(spec)!;
+    if (!r.ok) throw new Error("bad spec");
+    const t = r.app.render();
+    if (!t.ok) throw new Error("render");
+    expect(unlabelled(t.tree)).toEqual([]);
+    expect(describeTree(t.tree)).toContain("Messages");
+  });
+
+  it("ChatGPT messages Claude, Claude reads it once and replies", () => {
+    const p = phone();
+    const sent = p.call("send_message", { from: "ChatGPT", to: "Claude", body: "Can you review the export file?" }).out;
+    expect(sent).toEqual({ ok: true, value: { id: "m1" } });
+
+    const claude = p.call("check_inbox", { to: "claude" }).out.value.messages;
+    expect(claude.map((m: any) => [m.from, m.to, m.body])).toEqual([["chatgpt", "claude", "Can you review the export file?"]]);
+    expect(p.call("check_inbox", { to: "ChatGPT" }).out.value.messages).toEqual([]);
+
+    p.call("mark_read", { id: "m1" });
+    expect(p.call("check_inbox", { to: "Claude" }).out.value.messages).toEqual([]);
+
+    p.call("send_message", { from: "Claude", to: "ChatGPT", body: "Looks right. Header row and quoting are fine." });
+    const back = p.call("check_inbox", { to: "chatgpt" }).out.value.messages;
+    expect(back).toHaveLength(1);
+    expect(back[0].body).toContain("Header row");
+
+    const thread = p.call("read_thread", { a: "claude", b: "chatgpt" }).out.value.messages;
+    expect(thread.map((m: any) => m.id)).toEqual(["m1", "m2"]);
+  });
+
+  it("a message to anyone reaches whoever checks", () => {
+    const p = phone();
+    p.call("send_message", { from: "claude", to: "anyone", body: "Standup at 10." });
+    expect(p.call("check_inbox", { to: "chatgpt" }).out.value.messages).toHaveLength(1);
+    expect(p.call("check_inbox", { to: "cursor" }).out.value.messages).toHaveLength(1);
+  });
+
+  it("hands a task over, tracks it and returns the result to the sender", () => {
+    const p = phone();
+    const made = p.call("hand_off", { from: "Claude", to: "ChatGPT", title: "Test checkout on iOS", detail: "Use the Shop app." }).out;
+    expect(made.value).toEqual({ id: "h1" });
+
+    const mine = p.call("my_tasks", { to: "chatgpt" }).out.value.tasks;
+    expect(mine.map((h: any) => [h.id, h.status, h.detail])).toEqual([["h1", "open", "Use the Shop app."]]);
+    expect(p.call("my_tasks", { to: "claude" }).out.value.tasks).toEqual([]);
+
+    p.call("start_task", { id: "h1" });
+    expect(p.call("sent_tasks", { from: "claude" }).out.value.tasks[0].status).toBe("doing");
+
+    p.call("finish_task", { id: "h1", reply: "Passed. Order TT-1001 created." });
+    expect(p.call("my_tasks", { to: "chatgpt" }).out.value.tasks).toEqual([]);
+    const done = p.call("sent_tasks", { from: "Claude" }).out.value.tasks[0];
+    expect([done.status, done.reply]).toEqual(["done", "Passed. Order TT-1001 created."]);
+  });
+
+  it("the screens show messages and tasks as they arrive", () => {
+    const p = phone();
+    p.call("send_message", { from: "claude", to: "chatgpt", body: "Hello" });
+    const { app } = p.call("hand_off", { from: "claude", to: "chatgpt", title: "Write the report" });
+    const r = app.render();
+    if (!r.ok) throw new Error("render");
+    const text = describeTree(r.tree);
+    expect(text).toContain("1 unread");
+    expect(text).toContain("claude to chatgpt");
+    app.selectTab("Tasks");
+    const t = app.render();
+    if (!t.ok) throw new Error("render");
+    expect(describeTree(t.tree)).toContain("Write the report");
+    expect(describeTree(t.tree)).toContain("1 open");
+  });
+
+  it("refuses a message with no sender or body", () => {
+    const p = phone();
+    expect(p.call("send_message", { to: "claude", body: "hi" }).out.ok).toBe(false);
+    expect(p.call("send_message", { from: "a", to: "b" }).out.ok).toBe(false);
+  });
+});
