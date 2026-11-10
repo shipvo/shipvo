@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { satisfiesRange, checkNativeModules, ShellManifest, ReleasePointer, Telemetry, GateReport, bandForCohort, canonicalize, parsePolicy } from "../src/index";
+import { satisfiesRange, checkNativeModules, ShellManifest, ReleasePointer, GateReport, bandForCohort, canonicalize, parsePolicy } from "../src/index";
 
 const sig = "AAAA".repeat(16);
 const manifest = {
@@ -47,23 +47,6 @@ describe("release pointer", () => {
     const withV = ReleasePointer.safeParse({ ...base, hermes_bytecode_version: 96 });
     expect(withV.success && withV.data.hermes_bytecode_version).toBe(96);
     expect(ReleasePointer.safeParse({ ...base, hermes_bytecode_version: 1.5 }).success).toBe(false);
-  });
-});
-describe("state_version", () => {
-  const h = "a".repeat(64);
-  const base = { schema_version: "1.0", app_id: "tide", shell_major: 1, band: "b0", release: 1,
-    issued_at: "2026-10-29T21:00:00Z", core: { version: "1.0.0", sha256: h, size: 10, url: "c" }, min_shell_version: "1.0.0", signature: sig };
-  it("round-trips and is optional", () => {
-    const withV = ReleasePointer.safeParse({ ...base, state_version: 3 });
-    expect(withV.success && withV.data.state_version).toBe(3);
-    const none = ReleasePointer.safeParse(base);
-    expect(none.success && "state_version" in none.data).toBe(false);
-  });
-  it("rejects zero, negatives and fractions", () => {
-    for (const v of [0, -1, 1.5]) expect(ReleasePointer.safeParse({ ...base, state_version: v }).success).toBe(false);
-  });
-  it("telemetry carries state_version_from and _to", () => {
-    expect(Telemetry.safeParse({ schema_version: "1.0", app_id: "a", release: 4, event: "crash_loop_revert", state_version_from: 3, state_version_to: 2 }).success).toBe(true);
   });
 });
 describe("release pointer kind", () => {

@@ -12,8 +12,6 @@ export type ShipvoConfig = {
   publicKey: string;
   /** Hermes bytecode version(s) the app's shells run. If set, `shipvo publish` refuses bundles that differ. */
   hermesBytecodeVersion?: number | number[];
-  /** Version of the data format (AsyncStorage, SQLite, MMKV) this release writes. A positive whole number. Signed into the release; rollbacks to a lower value need `--allow-state-downgrade`. */
-  stateVersion?: number;
   /** Hermes engine build the app's shells run, such as "250829098.0.10". If set, `shipvo publish` refuses to run with another hermes-compiler. */
   hermesEngine?: string;
   /** Version of the stored-data format (AsyncStorage, SQLite, MMKV) this app version uses. A positive integer. `shipvo publish` signs it into the release. */
