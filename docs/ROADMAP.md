@@ -85,6 +85,8 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: **Assistant Inbox**: assistants on one phone message each other, hand off tasks and share reports; apps read `{{ caller }}` ([Phone apps](phone-apps.md#assistants-talking-to-each-other), #1472)
+- 2026-11-10: Android updates fall back to the full download when a patch would not fit in memory ([Runtime](../packages/runtime/README.md#patches-and-memory-android), #1454)
 - 2026-11-10: **Use log** on the Secrets screen shows when, where and with what outcome each saved key was used ([Phone apps](phone-apps.md#see-saved-keys-in-settings), #1431)
 - 2026-11-10: A page for founders and developers on describing an app and watching it appear, with a checked example spec and troubleshooting ([Describe an app](describe-an-app.md))
 - 2026-11-10: Revoke a saved key from the Secrets screen, and the gallery grows to five example specs ([Revoke](phone-apps.md#see-saved-keys-in-settings), [Example specs](spec-blocks.md#example-specs), #1388, #1385)

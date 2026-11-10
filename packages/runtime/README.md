@@ -69,6 +69,14 @@ A silent push or a background task can start the app process with no screen. Shi
 
 An uncaught JS error in a background load counts as one failed boot at once (the error hook is installed when `@shipvo/runtime` loads), so a release that crashes there is still rolled back. Three loads with a screen and no `markHealthy` still revert the release.
 
+## Patches and memory (Android)
+
+Before it applies a patch, the Android runtime checks that the base bundle, the patch and the new bundle together fit in 40 % of the app's heap limit. If they do not, it skips the patch and downloads the full bundle instead. If the patch step runs out of memory, it does the same. The update still lands, signed and checked the same way, and the next one tries a patch again.
+
+`Runtime.checkForUpdate()` tells you what happened in `CheckResult`: `via` is `"full"` and `patchError` is `"over_memory_budget"` or `"out_of_memory"`. `patchError` is `null` when a patch was applied or none was tried.
+
+Troubleshooting: if `via` is often `"full"` on small phones, updates download more bytes but still work. Look at `patchError` in your telemetry to see how many phones skip patches.
+
 ## Crash after `markHealthy`
 
 `markHealthy` means the first screen rendered. It promotes a staged release, but it does not clear the unhealthy-boot count. The count is cleared when the app has stayed in the foreground for 30 seconds, or when it goes to background. If the process dies before that, the next launch counts as an unhealthy boot for that release. After 3 unhealthy boots inside 60 seconds the runtime blocks the release, goes back to the previous one and records `crash_loop_revert`.

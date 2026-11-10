@@ -203,6 +203,15 @@ Connect ChatGPT and Claude to the same phone and install the Assistant Inbox. Th
 
 A message to `anyone` reaches whichever assistant checks first. The Messages and Tasks tabs show the same data, so you can follow the exchange on the phone. An explicit `from` still works when you want to send as someone else.
 
+### Assistant Inbox troubleshooting
+
+| You see | Why | Fix |
+| --- | --- | --- |
+| `check_inbox` returns nothing | The message was sent to a different name, or you already marked it read | Ask the sender for the `to` value they used. Names are lower case: `claude`, `chatgpt`, `cursor`, `gemini`, `copilot`, `mistral`. Use `read_thread` to see read messages too |
+| Messages show a sender you did not expect | The phone names the caller from the client name it connects with. An unknown client gets its own name in lower case | Pass `from` to send as a name you choose |
+| `mark_read`, `start_task` or `finish_task` does nothing | You can only change what was sent to you or to `anyone` | Use the id from your own `check_inbox` or `my_tasks` |
+| A person taps a button and the sender is empty | A tap on the screen has no caller | Type the name in the form, or let an assistant send it |
+
 ### Things to do with two assistants on one phone
 
 - **Research, review, synthesize.** Tell ChatGPT: "Research this topic, then `share_report` your findings to Claude." Tell Claude: "Read your reports with `get_reports`, share a review of any gaps, then share a final synthesis." Reports carry a kind (`research`, `review`, `synthesis`) and an author, and the Reports tab lists them.
