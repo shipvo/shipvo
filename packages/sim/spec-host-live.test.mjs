@@ -287,3 +287,31 @@ test("app_activity lists versions with what changed, sources and events; limit a
   assert.equal(one.apps[0].events.length, 1);
   assert.equal((await act("sp-act2", { action: "app_activity", id: "ghost" })).code, "not_installed");
 });
+
+test("export_apps carries the home-screen layout and import_apps restores it; a bad layout is dropped with a warning", async () => {
+  assert.ok((await call("/session", { session: "pl-a" })).ok);
+  for (const id of ["gifts-p", "gifts-q"]) { const g = structuredClone(GIFTS); g.app.id = id; assert.equal((await act("pl-a", { action: "create_app", id, spec: g, open: false })).ok, true); }
+  await act("pl-a", { action: "set_time", at: "2026-11-14T09:00:00" });   // a Saturday
+  const lay = { pinned: true, position: 3, schedule: { days: ["sat"], from: "08:00", to: "18:00" } };
+  assert.equal((await act("pl-a", { action: "arrange_apps", id: "gifts-p", ...lay })).ok, true);
+  const ex = await act("pl-a", { action: "export_apps" });
+  assert.deepEqual(ex.apps.find((a) => a.id === "gifts-p").placement, { pinned: 1, position: 3, schedule: { days: ["sat"], from: "08:00", to: "18:00" } });
+  assert.equal("placement" in ex.apps.find((a) => a.id === "gifts-q"), false);
+
+  assert.ok((await call("/session", { session: "pl-b" })).ok);
+  const im = await act("pl-b", { action: "import_apps", apps: JSON.parse(JSON.stringify(ex.apps)) });
+  assert.equal(im.ok, true, JSON.stringify(im));
+  assert.equal(im.warnings, undefined);
+  assert.deepEqual(im.installed_apps.find((a) => a.id === "gifts-p").placement, ex.apps[0].placement);
+  await act("pl-b", { action: "set_time", at: "2026-11-14T09:00:00" });
+  assert.match((await act("pl-b", { action: "press_home" })).screen, /button "Gift Tracker" \(gifts-p 1, pinned/);
+  await act("pl-b", { action: "set_time", at: "2026-11-16T09:00:00" });    // a Monday: the Saturday-only app is off the home screen
+  assert.match((await act("pl-b", { action: "press_home" })).screen, /\(gifts-p\): not showing now, scheduled sat/);
+
+  assert.ok((await call("/session", { session: "pl-c" })).ok);
+  const bad = JSON.parse(JSON.stringify(ex.apps)); bad[0].placement = { pinned: true, schedule: { days: ["noday"], from: "08:00" } };
+  const r = await act("pl-c", { action: "import_apps", apps: bad });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.deepEqual(r.installed_apps.find((a) => a.id === "gifts-p").placement, { pinned: 1 });
+  assert.match(r.warnings[0], /apps\[0\]\.placement/);
+});

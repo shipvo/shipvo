@@ -856,7 +856,7 @@
   },
   {
     "name": "export_phone_apps",
-    "description": "Copy the spec apps (made with create_app) out of the phone. Returns JSON with, per app, id, name, style (android or ios), spec, data (what was entered into its collections) and settings. Pass ids to export only some. Vault secrets and keys are never included. Give the result to import_phone_apps on another phone to recreate the apps. Fails with not_installed (an id is not a spec app).",
+    "description": "Copy the spec apps (made with create_app) out of the phone. Returns JSON with, per app, id, name, style (android or ios), spec, data (what was entered into its collections), settings and its home-screen layout (placement: pinned, hidden, position, schedule) when it has one. Pass ids to export only some. Vault secrets and keys are never included. Give the result to import_phone_apps on another phone to recreate the apps. Fails with not_installed (an id is not a spec app).",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1071,7 +1071,7 @@
   },
   {
     "name": "import_phone_apps",
-    "description": "Put apps from export_phone_apps on this phone, with their data and settings. Every spec is checked first: all problems come back with their path (for example apps[1].spec.screens) and nothing is installed unless all are valid. An id that is already installed fails with already_installed unless replace is true. Android and iOS styles are kept. Fails with invalid_spec or already_installed.",
+    "description": "Put apps from export_phone_apps on this phone, with their data, settings and home-screen layout. Every spec is checked first: all problems come back with their path (for example apps[1].spec.screens) and nothing is installed unless all are valid. An id that is already installed fails with already_installed unless replace is true. Android and iOS styles are kept. Fails with invalid_spec or already_installed.",
     "inputSchema": {
       "type": "object",
       "properties": {

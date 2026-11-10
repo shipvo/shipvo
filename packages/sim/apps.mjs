@@ -135,7 +135,7 @@ export const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /** A placement from outside (phone.json, an export) reduced to what is valid: bad fields are dropped. Returns an object or null. */
-function cleanPlacement(raw) {
+export function cleanPlacement(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   var p = {};
   if (raw.pinned === true) p.pinned = 1;
