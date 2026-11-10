@@ -6,15 +6,15 @@ This page is for developers and self-hosters who want to know what one simulator
 
 1. Build the sample app for the web:
 
-```bash
-cd apps/tide-and-tackle && PN_SIM=1 npx expo export --platform web --output-dir sim-dist && cd ../..
-```
+   ```bash
+   cd apps/tide-and-tackle && PN_SIM=1 npx expo export --platform web --output-dir sim-dist && cd ../..
+   ```
 
 2. Run the bench:
 
-```bash
-node scripts/sim-bench/run.mjs --sessions 5 --out .shipvo/sim-bench.json
-```
+   ```bash
+   node scripts/sim-bench/run.mjs --sessions 5 --out .shipvo/sim-bench.json
+   ```
 
 3. Read the table it prints, or open `.shipvo/sim-bench.json`.
 
@@ -52,7 +52,7 @@ Measured on 2026-11-05, 5 sessions, sample app `apps/tide-and-tackle` (local web
 
 From the table, each extra session added about 135 MB on this run (1142.1 − 599.8, over 4 sessions: 135.6 MB).
 
-These numbers are from one run of the sample app, on the machine above. For measurements at higher session counts, see [products-simulators](https://shipvo.dev/products/simulators/) and `docs/product/sim-bench/`.
+These numbers are from one run of the sample app, on the machine above. For measurements at higher session counts, see [Simulator scale results](https://shipvo.dev/products/simulators/).
 
 ## Troubleshooting
 

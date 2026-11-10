@@ -12,29 +12,29 @@ This page is for developers who change Lumi or want to see what it finds. You wi
 
 1. Build the CLI:
 
-```bash
-pnpm --filter @shipvo/schema build && pnpm --filter @shipvo/cli build
-```
+   ```bash
+   pnpm --filter @shipvo/schema build && pnpm --filter @shipvo/cli build
+   ```
 
 2. Run the bench:
 
-```bash
-node scripts/lumi/bench.mjs                      # spec apps, budgets 50 and 200, seed 1
-node scripts/lumi/bench.mjs --budgets 100 --seed 3 --out bench.json
-node scripts/lumi/bench.mjs --start-sim --platform android   # also run Tide and Tackle on the Android simulator
-node scripts/lumi/bench.mjs --sim http://localhost:4546 --platform ios
-```
+   ```bash
+   node scripts/lumi/bench.mjs                      # spec apps, budgets 50 and 200, seed 1
+   node scripts/lumi/bench.mjs --budgets 100 --seed 3 --out bench.json
+   node scripts/lumi/bench.mjs --start-sim --platform android   # also run Tide and Tackle on the Android simulator
+   node scripts/lumi/bench.mjs --sim http://localhost:4546 --platform ios
+   ```
 
 3. Read the output. The script prints a table and then the same data as JSON (`--json` prints only JSON). The same seed gives the same output. With the defaults it looks like this:
 
-```text
-| app     | set      | budget | steps | screens | flows | bugs |
-| ------- | -------- | ------ | ----- | ------- | ----- | ---- |
-| shop    | tuning   | 50     | 43    | 5       | 2/5   | 3/3  |
-| shop    | tuning   | 200    | 44    | 5       | 2/5   | 3/3  |
-| account | held out | 50     | 50    | 0       | 2/5   | 1/3  |
-| account | held out | 200    | 71    | 8       | 2/5   | 3/3  |
-```
+   ```text
+   | app     | set      | budget | steps | screens | flows | bugs |
+   | ------- | -------- | ------ | ----- | ------- | ----- | ---- |
+   | shop    | tuning   | 50     | 43    | 5       | 2/5   | 3/3  |
+   | shop    | tuning   | 200    | 44    | 5       | 2/5   | 3/3  |
+   | account | held out | 50     | 50    | 0       | 2/5   | 1/3  |
+   | account | held out | 200    | 71    | 8       | 2/5   | 3/3  |
+   ```
 
 Options:
 
@@ -68,7 +68,7 @@ Each bug has a flag in `scripts/lumi/spec-app.mjs` and a check that says which f
 
 ## Results
 
-Measured on 2026-11-07 with `node scripts/lumi/bench.mjs --budgets 50,200 --seed 1` (bugs on, ranker off). `tide-and-tackle` was not run in this measurement.
+Measured on 2026-11-07 with `node scripts/lumi/bench.mjs --budgets 50,200 --seed 1` (bugs on, ranker off).
 
 | App | Budget | Steps used | Screens | Flows finished | Planted bugs found |
 | --- | --- | --- | --- | --- | --- |
