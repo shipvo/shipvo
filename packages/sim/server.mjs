@@ -474,6 +474,7 @@ async function act(id, body) {
     }
     case "install_app": case "uninstall_app": case "switch_app": {
       const id = String(body.id ?? "");
+      let installed;
       try {
         if (body.action === "install_app") {
           const catalog = Array.isArray(body.catalog) ? body.catalog : s.apps.store;
@@ -482,6 +483,7 @@ async function act(id, body) {
           // A listing with a real URL is fetched first: the install keeps the bundle's sha256 and size, and fails if the bundle cannot be fetched.
           const real = found && !/^fixture:/i.test(String(found.url ?? "")) ? await fetchAppBundle(found) : undefined;
           installApp(s.apps, id, catalog, real, body.permissions);
+          installed = s.apps.installed_apps.find((a) => a.id === id);
         }
         else if (body.action === "uninstall_app") { uninstallApp(s.apps, id, s.nav); specHost.drop(sidOf(s), id); }
         else {
@@ -490,7 +492,7 @@ async function act(id, body) {
       } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       if (body.action === "uninstall_app" && s.nav.where === "home") await page.evaluate(setVisibilityInPage, "background");
       const where = s.nav.where;
-      return { where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
+      return { where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, ...(installed ? { declared: installed.declared ?? [], permissions: installed.permissions ?? {} } : {}), screen: where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
     }
     // Search the Store by need. Read-only; logged in device_log as simulated.
     case "find_apps": {

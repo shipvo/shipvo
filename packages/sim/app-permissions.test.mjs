@@ -63,3 +63,29 @@ for (const style of ["android", "ios"]) {
     await b.close();
   });
 }
+
+test("the default Store lists an app that declares permissions, and its consent card shows them", () => {
+  const st = createApps();
+  const app = st.store.find((a) => a.id === "tidewatch");
+  assert.deepEqual(app.declared, ["notifications", "location"]);
+  assert.match(consentCardHtml(app), /data-perm="location"/);
+  installApp(st, "tidewatch");
+  assert.deepEqual(st.installed_apps[0].permissions, { notifications: true, location: true });
+});
+
+test("the marketplace mapping carries an app's declared device permissions into its listing", () => {
+  assert.match(appsClientScript("app", {}), /permissions\.device/);
+});
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: the default Store shows the consent card for Tide Watch`, async () => {
+    const { chromium } = require("playwright");
+    const b = await chromium.launch(); const page = await b.newPage();
+    const f = renderFrame({ skin: style, screen: `<iframe id="app" srcdoc="&lt;p&gt;hi&lt;/p&gt;"></iframe>` });
+    await page.setContent(`<style>${f.css}</style>${f.html}<script>${appsClientScript("app", {})}</script>`);
+    await page.evaluate(() => document.querySelector('[data-part="store-icon"]').click());
+    await page.evaluate(() => document.querySelector('[data-part="store-install"][data-app="tidewatch"]').click());
+    assert.equal(await page.locator('[data-part="consent-switch"]').count(), 2);
+    await b.close();
+  });
+}

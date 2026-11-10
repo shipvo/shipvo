@@ -84,6 +84,7 @@ export class SpecHost {
   }
 
   /** Sets one permission answer for a running app. The next action sees it. */
+  // An unknown app is ignored on purpose: the person may toggle Settings for an app that is not running yet.
   setPermission(session, id, permission, allowed) { const r = this.running.get(key(session, id)); if (r) r.devicePermissions[permission] = allowed; }
 
   version(session, id) { return this.running.get(key(session, id))?.version ?? null; }

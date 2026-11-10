@@ -11,6 +11,7 @@ export const STORE_FIXTURE = [
   { id: "tide", name: "Tide & Tackle", url: "fixture://tide", version: "1.0.0" },
   { id: "notes", name: "Pocket Notes", url: "fixture://notes", version: "0.3.1" },
   { id: "weather", name: "Harbour Weather", url: "fixture://weather", version: "2.1.0" },
+  { id: "tidewatch", name: "Tide Watch", url: "fixture://tidewatch", version: "1.2.0", declared: ["notifications", "location"] },
 ];
 
 /** The device features an app may ask for (see docs/design/app-spec.md). */
@@ -136,9 +137,9 @@ export function setPermission(st, id, permission, allowed) {
   note(st, "set_permission", id, { permission, allowed }); return st;
 }
 
-/** The consent card for an install: one row per declared permission, each with Allow and Deny (Allow is on to start). */
+/** The consent card for an install: one row per declared permission, each with a switch that reads Allowed or Denied (Allowed to start). */
 export function consentCardHtml(app) {
-  const rows = (app.declared ?? []).map((p) => `<div class="sf-perm" role="group" aria-label="${esc(p)}"><b>${esc(p)}</b><button type="button" role="switch" data-part="consent-switch" data-perm="${esc(p)}" aria-checked="true" aria-label="Allow ${esc(app.name)} to use ${esc(p)}">Allow</button></div>`).join("");
+  const rows = (app.declared ?? []).map((p) => `<div class="sf-perm" role="group" aria-label="${esc(p)}"><b>${esc(p)}</b><button type="button" role="switch" data-part="consent-switch" data-perm="${esc(p)}" aria-checked="true" aria-label="${esc(p)} for ${esc(app.name)}: allowed">Allowed</button></div>`).join("");
   return `<div class="sf-consent" data-part="consent-card" role="group" aria-label="Install ${esc(app.name)}"><b>${esc(app.name)} asks for</b>${rows || "<p>No device permissions.</p>"}<button type="button" data-part="consent-install" data-app="${esc(app.id)}">Install</button><button type="button" data-part="consent-cancel">Cancel</button></div>`;
 }
 /** Settings rows: one switch per app and permission. */
@@ -218,7 +219,7 @@ export const storeCss = [
   `.sf-store{position:absolute;inset:0;z-index:8;overflow:auto;padding:70px 20px 40px;box-sizing:border-box;background:#0b1320;color:#fff;font-family:system-ui,sans-serif}[data-theme="light"] .sf-store{background:#f4f7fb;color:#111}`,
   `.sf-store[hidden]{display:none}.sf-store-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #8883;font:600 15px system-ui,sans-serif}.sf-store-row small{opacity:.6;font-weight:400}`,
   `.sf-store-row button,.sf-store .sf-close{border:0;border-radius:999px;padding:12px 18px;min-height:44px;background:#f4a261;color:#102030;font:600 14px system-ui,sans-serif;cursor:pointer}.sf-store-have{color:#8a94a6;font-size:13px}[data-theme="light"] .sf-store-have{color:#4a5568}.sf-store .sf-close{margin-top:18px;background:#8883;color:inherit}`,
-  `.sf-consent{margin-top:16px;padding:14px;border-radius:14px;background:#8883}.sf-perm{display:flex;justify-content:space-between;align-items:center;padding:8px 0}.sf-consent button[role=switch][aria-checked=false]{background:#8886}.sf-consent button{margin:8px 8px 0 0}`,
+  `.sf-consent{margin-top:16px;padding:14px;border-radius:14px;background:#8883}.sf-perm{display:flex;justify-content:space-between;align-items:center;padding:8px 0}.sf-consent button[role=switch][aria-checked=false]{background:transparent;color:inherit;border:2px solid currentColor}.sf-consent button{margin:8px 8px 0 0}`,
   `.sf-apps{position:absolute;left:28px;right:28px;top:180px;display:flex;flex-wrap:wrap;gap:20px 24px}.sf-apps .sf-icon{position:static}`,
 ].join("");
 
@@ -242,7 +243,7 @@ var msg="";
 function drawHome(){box.innerHTML=installedIconsHtml(st)}
 var card=null,given={};
 function drawStore(){q("store-rows").innerHTML=storeRowsHtml(st)+(card?consentCardHtml(card):"")+(msg?'<p class="sf-store-msg" role="status">'+esc(msg)+'</p>':"")}
-function loadStore(){if(!mp)return Promise.resolve();return fetch(mp.replace(/\\/$/,"")+"/apps/public").then(function(r){return r.json()}).then(function(j){var l=(j&&j.apps)||[];if(l.length)st.store=l.map(function(a){return entry({id:a.app_id,name:a.name||a.app_id,version:a.latest_release!=null?"r"+a.latest_release:"latest",url:"app://"+a.app_id+(a.latest_release!=null?"@r"+a.latest_release:"@latest")})})}).catch(function(){})}
+function loadStore(){if(!mp)return Promise.resolve();return fetch(mp.replace(/\\/$/,"")+"/apps/public").then(function(r){return r.json()}).then(function(j){var l=(j&&j.apps)||[];if(l.length)st.store=l.map(function(a){return entry({id:a.app_id,name:a.name||a.app_id,declared:a.declared||(a.permissions&&a.permissions.device)||(a.spec&&a.spec.permissions&&a.spec.permissions.device),version:a.latest_release!=null?"r"+a.latest_release:"latest",url:"app://"+a.app_id+(a.latest_release!=null?"@r"+a.latest_release:"@latest")})})}).catch(function(){})}
 // Without a session the page fetches the app itself. The marketplace answers with CORS open, so a page on any origin can read it.
 function bundle(a){var m=/^app:\\/\\/([a-z0-9-]+)(?:@(r?\\d+|latest))?$/.exec(a.url||"");if(!m)return Promise.reject(new Error("This app has no bundle URL"));var b=mp.replace(/\\/$/,"")+"/w/"+m[1]+"/";
 return(m[2]&&m[2]!=="latest"?Promise.resolve("r"+m[2].replace("r","")):fetch(b+"releases.json").then(function(r){if(!r.ok)throw new Error("No published release");return r.json()}).then(function(j){return"r"+j.latest})).then(function(rel){return b+rel+"/index.html"})}
@@ -260,7 +261,7 @@ if(t.closest('[data-part="settings-icon"],[data-part="settings-gear"]')){setTime
 var ps=t.closest('[data-part="perm-switch"]');if(ps){try{setPermission(st,ps.getAttribute("data-app"),ps.getAttribute("data-perm"),ps.getAttribute("aria-checked")!=="true")}catch(x){}drawPerms();return}
 if(t.closest('[data-part="store-icon"]'))return open(true);
 if(t.closest('[data-part="store-close"]'))return open(false);
-var cs=t.closest('[data-part="consent-switch"]');if(cs){var on=cs.getAttribute("aria-checked")!=="true";given[cs.getAttribute("data-perm")]=on;cs.setAttribute("aria-checked",String(on));cs.textContent=on?"Allow":"Deny";return}
+var cs=t.closest('[data-part="consent-switch"]');if(cs){var on=cs.getAttribute("aria-checked")!=="true";given[cs.getAttribute("data-perm")]=on;cs.setAttribute("aria-checked",String(on));cs.setAttribute("aria-label",cs.getAttribute("data-perm")+" for "+(card?card.name:"")+": "+(on?"allowed":"denied"));cs.textContent=on?"Allowed":"Denied";return}
 if(t.closest('[data-part="consent-cancel"]')){card=null;given={};drawStore();return}
 var ci=t.closest('[data-part="consent-install"]');
 var i=ci||t.closest('[data-part="store-install"]');if(i){var id=i.getAttribute("data-app");

@@ -75,3 +75,13 @@ for (const style of ["android", "ios"]) {
     assert.deepEqual(im.installed_apps.find((a) => a.id === "remind").permissions, { notifications: true, camera: false });
   });
 }
+
+test("install_app returns the declared list and the stored answers", async () => {
+  const sid = "pm-install";
+  assert.ok((await call("/session", { session: sid })).ok);
+  const r = await act(sid, { action: "install_app", id: "tidewatch", permissions: { location: false } });
+  assert.deepEqual(r.declared, ["notifications", "location"], JSON.stringify(r));
+  assert.deepEqual(r.permissions, { notifications: true, location: false });
+  const plain = await act(sid, { action: "install_app", id: "tide" });
+  assert.deepEqual(plain.declared, []);
+});
