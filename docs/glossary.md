@@ -120,3 +120,10 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Schedule (for an app).** A window of days and hours when an app shows on the phone's home screen. Outside the window the app is hidden but still installed. See [Phone apps](phone-apps.md#arrange-the-home-screen).
 
 **Phone clock.** The time the simulated phone uses for schedules. `set_phone_time` sets it so a test can check what shows on a Saturday morning. See [Phone apps](phone-apps.md#arrange-the-home-screen).
+**Signing seed.** The secret key that signs your releases. Every installed app pins its matching public key and accepts only updates signed with it. Shipvo never holds your seed, so back it up (see [Moving to a new machine](new-machine.md)).
+
+**Publish token.** A key that lets one machine or CI job publish releases for your app. `shipvo app create` issues a new one and revokes the old one.
+
+**Shell.** The app build you install from a store. It carries the runtime and your public key. Over-the-air updates change the code inside it.
+
+**Home-screen layout (`placement`).** How an app sits on the phone's home screen: pinned, hidden, its position and the days and hours it shows. `export_phone_apps` carries it and `import_phone_apps` restores it.

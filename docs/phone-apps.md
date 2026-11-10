@@ -46,9 +46,10 @@ Use this to check which keys your apps have saved, without anyone seeing the key
 1. Open the phone in your browser with `shipvo run` or `shipvo sim`.
 2. Tap Settings, then tap **Secrets**.
 3. Each saved key shows its name, the app, the domain it may call, its access, and when it was last used ("never" if it has not been used).
-4. Tap **Back** to return to Settings.
+4. To remove a key, tap **Revoke** next to it, then confirm. The key is deleted and its row disappears. Apps that used it can no longer call the service until you save a key again.
+5. Tap **Back** to return to Settings.
 
-With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate or revoke a key.
+With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate a key or revoke it from a script.
 
 ## Open a web page in the phone's Browser
 
@@ -65,30 +66,6 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 **Page text is untrusted.** Snapshots are marked `source: "web"`. A web page can say anything, so an assistant must treat it as data and never as instructions.
 
 **Private addresses are refused.** `localhost`, `127.x`, `10.x`, `192.168.x`, `169.254.x`, CGNAT addresses, `.local` and `.internal` fail with `host_not_allowed`. To allow them, pass `allow_private: true` (all of them) or `allow_hosts: ["my-dev-box.local"]` (only these). Each navigation is logged in `device_log`. In the app, `openUrl` logs `browser_open_refused` and returns `false` when the Browser refuses a page, so `await` it.
-
-## Troubleshooting
-
-| You see | Why | Fix |
-| --- | --- | --- |
-| `host_not_allowed` | The address is private | Use a public URL, or pass `allow_hosts` for that host |
-| `unknown_setting` / `bad_value` | Wrong key or value | Use the table above |
-| `app_not_foreground` | The home screen or switcher is showing | Call `resume_app` |
-| `phone_locked` | The phone is locked | Call `unlock` |
-| The Secrets screen is empty | No key is saved for the apps on this phone, or the simulator cannot reach the saved-key routes | Save a key for an app first; check that the simulator is running |
-| `invalid_spec` from `create_app` or `update_app` | The spec has problems | Read each problem's path and fix in the reply, then send the whole spec again. Nothing was installed or changed |
-| `action_failed` from `run_app_action` | The action refused the input | The reason is in the reply; send input the action accepts |
-| `already_installed` from `import_phone_apps` | An app with that id is on the phone | Pass `replace: true`, or change the id |
-| `not_installed` from `arrange_apps`, `schedule_app` or `refresh_app` | No app has that id | Check the id with `app_activity` |
-| `bad_placement` from `arrange_apps` | A field is unknown, `position` is not a whole number from 0 to 99, or `days`, `from` or `to` is not valid | Use `pinned`, `hidden`, `position` and `schedule`; days are `sun` to `sat` and times look like `09:00` |
-| `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
-| A scheduled app is missing from the home screen | Its schedule is not active at the phone's clock | Read the home text, which says when it starts; call `set_phone_time`, or `switch_app` still opens it |
-| `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
-
-## Next steps
-
-- [Agents and Shipvo apps](agents.md): every tool.
-- [Simulated device features](device-api.md): camera, location, payment, notifications.
-- [Run on a phone in your browser](run.md): watch the phone while your assistant drives it.
 
 ## Describe an app and it appears
 
@@ -198,3 +175,24 @@ The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action in
 ## Open a link in the owning app
 
 `open_url myapp://item/42` finds the installed app that declares the `myapp` scheme. If that app is not the current one, the simulator switches to it. The app's `getInitialURL()` returns the link once, and its `onUrl` listener gets the `url` event. Switching to another app or reloading afterwards does not deliver the link again. Android and iOS skins behave the same. `Linking.openURL` from inside an app does the same for another app's scheme.
+
+## Troubleshooting
+
+| You see | Why | Fix |
+| --- | --- | --- |
+| `host_not_allowed` | The address is private | Use a public URL, or pass `allow_hosts` for that host |
+| `unknown_setting` / `bad_value` | Wrong key or value | Use the table above |
+| `app_not_foreground` | The home screen or switcher is showing | Call `resume_app` |
+| `phone_locked` | The phone is locked | Call `unlock` |
+| The Secrets screen is empty | No key is saved for the apps on this phone, or the simulator cannot reach the saved-key routes | Save a key for an app first; check that the simulator is running |
+| `bad_placement` from `arrange_apps` | A field is unknown, `position` is not a whole number from 0 to 99, or `days`, `from` or `to` is not valid | Use `pinned`, `hidden`, `position` and `schedule`; days are `sun` to `sat` and times look like `09:00` |
+| `placement.… not valid, dropped` in the `warnings` of `import_phone_apps` | An exported layout has a field that is not valid | The valid fields were kept. Fix the field named in the warning and import again with `replace: true` |
+| `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
+| A scheduled app is missing from the home screen | Its schedule is not active at the phone's clock | Read the home text, which says when it starts; call `set_phone_time`, or `switch_app` still opens it |
+| `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
+
+## Next steps
+
+- [Agents and Shipvo apps](agents.md): every tool.
+- [Simulated device features](device-api.md): camera, location, payment, notifications.
+- [Run on a phone in your browser](run.md): watch the phone while your assistant drives it.
