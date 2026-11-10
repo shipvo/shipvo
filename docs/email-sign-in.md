@@ -60,3 +60,17 @@ Agents use three tools. Each takes the `session` from `open_app`.
 ## Android and iOS
 
 The inbox, the tools and `phone.inbox` are the same on the Android and iOS phones. With MCP, open the session with `platform: "android"` or `platform: "ios"` in `open_app` and follow the same steps.
+
+## Troubleshooting
+
+- **`inbox_timeout`**: no mail matched within the timeout. Check that the mock rule's URL and method match the request the app sends, and that your `subject` text appears in the mail's subject. Call `inbox_read` (or `phone.inbox.list()`) to see what did arrive.
+- **`inbox_no_code`**: the mail has no 4 to 8 digit number. Read it with `list()` and check the `text`, or use `links` for a magic link.
+- **Status 550 from `inbox.shipvo.test/send`**: the `to` address is not this session's address. Use the value from `address()` or `inbox_read`.
+- **An old code comes back**: call `clear()` (or `inbox_clear`) before asking the app for a new code.
+- **Another session cannot see the mail**: this is by design. Each session reads only its own inbox.
+
+## Next steps
+
+- [Agents](agents.md): every MCP tool, including `inbox_wait`, `inbox_read` and `inbox_clear`.
+- [Testing](testing.md): typed tests with `@shipvo/test`.
+- [Network calls on the hosted phone](phone-network.md): how `mockNetwork` rules answer requests.

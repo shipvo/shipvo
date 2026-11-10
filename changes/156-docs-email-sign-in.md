@@ -1,0 +1,1 @@
+- Docs: new page [Test an email sign-in on Android and iOS](../docs/email-sign-in.md) now in the docs menu, with troubleshooting and next steps. The record-a-demo-video example gains a troubleshooting section.

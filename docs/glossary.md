@@ -6,6 +6,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Airplane mode (in the simulator).** A switch that turns the phone's network off. The app's calls to the internet then fail, as they do on a real phone, so you can see what your customers see with no signal.
 
+**Session inbox.** A private mailbox that each test or assistant session gets, with its own address. An app can email a sign-in code or link to it, and the test reads it there. Nothing leaves your machine. See [Test an email sign-in](email-sign-in.md).
+
 **Deep link.** A web-style address, such as `myapp://item/42`, that opens a particular screen in an app. In Shipvo Phone it opens the app that owns the address and takes you to that screen once.
 
 **App spec.** A JSON file that describes an app's screens, buttons and data in plain terms. Shipvo checks it, shows it the same on Android and iOS, and lets an assistant use it. See [App spec](spec-blocks.md).

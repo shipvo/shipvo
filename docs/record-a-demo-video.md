@@ -6,9 +6,9 @@ For founders working through an AI assistant. You get a short MP4 of your app wi
 
 - The simulator is running (`shipvo sim`) and your assistant is connected to `@shipvo/mcp`.
 - `ffmpeg` and `ffprobe` on your PATH, and `python3` for music.
-- Music works today only from a repo checkout, because the mixer script `scripts/video/bgmusic.py` is not in the npm package. With an npm install, set `SHIPVO_BGMUSIC` to the path of a copy of that script, or `record_stop` fails with `music_unavailable`. Narration alone needs neither.
+- Music uses the mixer script `scripts/video/bgmusic.py` from a repo checkout. With an npm install, set `SHIPVO_BGMUSIC` to the path of a copy of that script, or `record_stop` fails with `music_unavailable`. Narration alone needs neither.
 - `npm i -D playwright && npx playwright install chromium`.
-- For narration, a `.wav` file with your voice, for example `narration.wav`. Without a music service, set `SHIPVO_MUSIC_FILE` to a local track (an mp3). Otherwise a track is picked from Jamendo, which needs network access. The Jamendo path was not run for this page; the example used a local track.
+- For narration, a `.wav` file with your voice, for example `narration.wav`. Without a music service, set `SHIPVO_MUSIC_FILE` to a local track (an mp3). Otherwise a track is picked from Jamendo, which needs network access. The example below uses a local track.
 
 ## Ask your assistant
 
@@ -71,6 +71,16 @@ codec_name=aac
 codec_type=audio
 duration=0.733
 ```
+
+## Troubleshooting
+
+- **`recorder_unavailable`**: run `npm i -D playwright && npx playwright install chromium`, then record again.
+- **`encode_failed`**: ffmpeg is missing or failed. Run `ffmpeg -version`; if it prints nothing, install ffmpeg.
+- **`music_unavailable`**: set `SHIPVO_BGMUSIC` to the path of `bgmusic.py`, or leave music out and use narration only.
+- **`frame_unreachable`**: start `shipvo sim` or `shipvo run` first.
+- **`recording_active`**: a recording is already running. Call `record_stop` first.
+
+The full list of codes is in [Record a demo video of the phone](record.md#troubleshooting).
 
 ## Next steps
 
