@@ -16,7 +16,15 @@ It writes a new seed to `root-seed.txt` (owner-only permissions, never overwritt
 
 1. Copy `root-seed.txt` to an offline place: a password manager or a vault. Then delete the file from the machine.
 2. Give the root public key to your build: pass it as `rootKey` to the `@shipvo/runtime` config plugin, and set `minSequence` to `0` for a first build. The same value goes on Android and iOS.
-3. Register the same public key with the control plane while signed in as the owner: `PUT /rotation/<app>/root` with `{ "root_key": "<public key>" }`.
+3. Register the same public key with the control plane as the owner. Use the `controlPlane` and `appId` values from `shipvo.json`, and your owner token (the key `shipvo login` saves, or `SHIPVO_OWNER_TOKEN`):
+
+```bash
+curl -X PUT "<controlPlane>/rotation/<appId>/root" \
+  -H "authorization: Bearer $SHIPVO_OWNER_TOKEN" -H "content-type: application/json" \
+  -d '{"root_key":"<root public key>"}'
+```
+
+   It answers `{"ok":true,...}`. Publish tokens and agent tokens are refused.
 
 Never put the root seed in CI, in git or in chat. Anyone who holds it can rotate your release key.
 
@@ -32,7 +40,7 @@ npx -y @shipvo/cli keygen --out new-seed.txt
 
 It prints `public key: <value>`. Keep `new-seed.txt` as your new release seed (see [Moving to a new machine](new-machine.md) for backups).
 
-**b. Sign the rotation offline.**
+**b. Sign the rotation offline.** Run this in the app folder, because the command reads the app id from `shipvo.json`.
 
 ```bash
 npx -y @shipvo/cli keys rotate sign --root-seed-file root-seed.txt \
@@ -53,13 +61,13 @@ npx -y @shipvo/cli keys rotate upload rotation.json
 
 `upload` needs a signed-in owner session. Publish tokens and agent tokens are refused by the control plane.
 
-**d. Publish with the new key.** Use `new-seed.txt` as `SHIPVO_SIGNING_SEED_FILE` (or put it at `.shipvo/seed.txt`) and update the `SHIPVO_SIGNING_SEED` secret in CI. Then delete the root seed file again.
+**d. Publish with the new key.** Use `new-seed.txt` as `SHIPVO_SIGNING_SEED_FILE` (or put it at `.shipvo/seed.txt`) and update the `SHIPVO_SIGNING_SEED` secret in CI. Replace the CI secret in the same step, so the old key cannot publish again. Then delete the root seed file again.
 
 Phones switch to the new release key when they fetch the statement. Until then they still trust the old key, so replace a leaked key in your CI secrets right away.
 
-## If the root key is lost or leaked
+## Back up the root key
 
-Rotation cannot fix this over the air, because the app trusts nothing else. Generate a new root key and a new release key, build a new shell with both, and ask users to install it from the store. Create the root key early and back it up.
+The root key is what lets Android and iOS phones accept a new release key, so keep two offline copies of the seed. To replace the root key itself, generate a new root key and a new release key, then ship a new shell with both.
 
 ## Commands
 
