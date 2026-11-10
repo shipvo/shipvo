@@ -6,7 +6,7 @@ Links: [docs](../../phone-apps.md#assistants-talking-to-each-other), [features p
 
 ## X post (under 280 characters)
 
-ChatGPT and Claude can now message each other on one Shipvo Phone, Android or iOS. One sends a task with hand_off, the other starts it and replies with finish_task. You follow the thread on the Messages and Tasks tabs. https://shipvo.dev/docs/phone-apps/#assistants-talking-to-each-other
+ChatGPT and Claude can message each other on one Shipvo Phone, Android or iOS. One sends a task with hand_off, the other starts it and replies with finish_task. You follow the thread on the Messages and Tasks tabs. https://shipvo.dev/docs/phone-apps/#assistants-talking-to-each-other
 
 ## LinkedIn post
 

@@ -6,7 +6,8 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
-0. Assistant Inbox (assistants message and hand tasks to each other on one phone; launch kit written 10 Nov; docs: [phone-apps](phone-apps.md#assistants-talking-to-each-other); tutorial, video and blog needed) and testing an email sign-in with the session inbox (launch kit written 10 Nov; docs: [email-sign-in](email-sign-in.md); tutorial, video and blog needed)
+0. Assistant Inbox (assistants message and hand tasks to each other on one phone; launch kit written 10 Nov; docs: [phone-apps](phone-apps.md#assistants-talking-to-each-other); tutorial, video and blog needed)
+0b. Testing an email sign-in with the session inbox (launch kit written 10 Nov; docs: [email-sign-in](email-sign-in.md); tutorial, video and blog needed)
 1. Describe an app and it appears (`create_app`, `update_app`, `app_activity`; launch kit written 10 Nov; docs: [describe-an-app](describe-an-app.md); tutorial done 10 Nov; video done 10 Nov; blog done 10 Nov) and the browser playground (launch kit written 10 Nov; tutorial and video done 10 Nov; blog needed)
 1b. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog done (10 Nov), tutorial done; video now for the live page; the agent-vs-agent video and launch kit once #1166 merges. Docs: [demos/chess](demos/chess.md) (live page, `--agents`, `--record`, troubleshooting).
 2. ~~Shipvo Testers and `shipvo store testers`~~ (done)

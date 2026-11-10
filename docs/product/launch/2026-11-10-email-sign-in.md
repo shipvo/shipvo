@@ -12,7 +12,7 @@ Does your app sign in with an emailed code or magic link? Every Shipvo session n
 
 Testing an email sign-in usually means a real mailbox, a shared test account and a flaky wait.
 
-Every Shipvo session now has its own private inbox with its own address, for example `s-1a2b3c4d5e6f@inbox.shipvo.test`. Nothing leaves your machine.
+Every Shipvo session now has its own private inbox with its own address, for example `s-1a2b3c4d5e6f@inbox.shipvo.test`. Mail is kept in memory only, not written to disk or logs, and removed when the session ends.
 
 In a typed test:
 - Type the address into the app's email field.
