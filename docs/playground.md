@@ -27,7 +27,7 @@ The sidebar opens one panel at a time. Each panel has its own link, so you can s
 2. Pick `screen` and press **Run tool**. You see the screen as a list of labelled elements, each with a `ref` such as `e1`.
 3. Pick `tap`, keep `e1` or type another `ref` from the list, and press **Run tool**. The phone reacts.
 4. Pick `type`, set a `ref` for a text field and some text, and press **Run tool**.
-5. Pick `device_log` to see what the app reported.
+5. Pick `device_log` to see what the app reported. The result appears in the result box, as it does for every tool.
 
 The console offers `screen`, `tap`, `type` and `device_log`. They take the same arguments and return the same shapes as the MCP tools in [Agents](agents.md).
 
