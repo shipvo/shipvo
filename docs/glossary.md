@@ -16,6 +16,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Assistant.** An AI helper such as Claude or ChatGPT. With Shipvo it can open your app and use it like a customer.
 
+**CSV.** A plain text table: the first line names the columns and each line after it is a row, with commas between values. Spreadsheets open it. A spec app makes one with `csv()`. See [Export data as CSV](spec-blocks.md#export-data-as-csv).
+
 **Command.** One line of text you type in the terminal and run by pressing Enter.
 
 **Control plane.** The Shipvo service that keeps your releases and decides who gets them. You can use the hosted one or run your own.
