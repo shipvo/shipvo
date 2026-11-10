@@ -70,9 +70,9 @@ Measured on 2026-11-07 with `node scripts/lumi/bench.mjs --budgets 50,200 --seed
 
 ## Troubleshooting
 
-- **`tide-and-tackle skipped: pass --sim <url> or --start-sim to run it on a simulator.`** The sample app runs only on a simulator. Add `--start-sim --platform android` (or `ios`), or `--sim <url>` for one that is already running.
+- **`tide-and-tackle skipped: pass --sim <url> or --start-sim to run it on a simulator.`** The sample app runs on a simulator. Add `--start-sim --platform android` (or `ios`), or `--sim <url>` for one that is already running.
 - **`tide-and-tackle` shows `0` steps and `0/5` flows.** The simulator at the `--sim` address did not answer. Check the URL and that the simulator is running, then run again.
-- **`--ranker on: no trained model in this build. Run node scripts/lumi/train.mjs and build.`** No trained model ships, so only `--ranker off` (the default) works until you train one. See [Lumi action ranker](lumi-ranker.md).
+- **`--ranker on: no trained model in this build. Run node scripts/lumi/train.mjs and build.`** Train a model with `node scripts/lumi/train.mjs`, rebuild, then run with `--ranker on`. `--ranker off` is the default. See [Lumi action ranker](lumi-ranker.md).
 - **`Cannot find module` for the CLI or schema**: run the two build commands in step 1 first.
 - **Your numbers differ from the table.** Use the same `--seed` and `--budgets`. The same seed gives the same output, so a difference means the walker or the apps changed since 2026-11-07.
 
