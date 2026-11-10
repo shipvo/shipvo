@@ -475,3 +475,50 @@ for (const style of ["android", "ios"]) {
     { const _r = await act(b, { action: "restore_phone", backup: wire, replace: true }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
   });
 }
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: with a spec app open (no device layer) the phone keeps the reminder itself, at the phone time, and it can be dismissed`, async () => {
+    const sid = `sp-remsys-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "gifts", spec: GIFTS, style })).ok, true);
+    assert.equal((await act(sid, { action: "set_time", at: "2026-11-14T09:00:00" })).ok, true);
+    await act(sid, { action: "set_reminder", title: "Pay rent", in_minutes: 5 });
+    await act(sid, { action: "set_time", at: "2026-11-14T09:05:00" });
+    const got = (await act(sid, { action: "notifications" })).notifications.filter((n) => n.title === "Pay rent");
+    assert.equal(got.length, 1); assert.match(got[0].id, /^sys\d+$/); assert.equal(got[0].app, "Reminders");
+    assert.equal(new Date(got[0].at).toISOString().slice(0, 16), new Date("2026-11-14T09:05:00").toISOString().slice(0, 16));
+    assert.deepEqual((await act(sid, { action: "list_reminders" })).fired.map((f) => [f.title, f.delivered]), [["Pay rent", true]]);
+    assert.equal((await act(sid, { action: "dismiss_notification", id: got[0].id })).ok, true);
+    assert.equal((await act(sid, { action: "notifications" })).notifications.filter((n) => n.title === "Pay rent").length, 0);
+    assert.equal((await act(sid, { action: "dismiss_notification", id: got[0].id })).code, "not_found");
+  });
+}
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: a reminder arrives as a notification when the phone clock reaches it, with the app closed`, async () => {
+    const sid = `sp-rem-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "set_time", at: "2026-11-14T09:00:00" })).ok, true);
+    const set = await act(sid, { action: "set_reminder", title: "Call Ada", body: "About the invoice", in_minutes: 10 });
+    assert.equal(set.ok, true); assert.equal(set.reminder.at, "2026-11-14T09:10");
+    await act(sid, { action: "press_home" });
+    assert.equal((await act(sid, { action: "notifications" })).notifications.length, 0);
+    await act(sid, { action: "set_time", at: "2026-11-14T09:09:00" });
+    assert.equal((await act(sid, { action: "notifications" })).notifications.length, 0);
+    await act(sid, { action: "set_time", at: "2026-11-14T09:10:00" });
+    const got = (await act(sid, { action: "notifications" })).notifications;
+    assert.equal(got.length, 1); assert.equal(got[0].title, "Call Ada"); assert.equal(got[0].body, "About the invoice"); assert.equal(got[0].data.reminder, set.reminder.id);
+    const list = await act(sid, { action: "list_reminders" });
+    assert.deepEqual(list.reminders, []); assert.deepEqual(list.fired.map((f) => [f.title, f.delivered]), [["Call Ada", true]]);
+    // a daily reminder comes back the next day; cancelling stops it
+    const d = await act(sid, { action: "set_reminder", title: "Standup", at: "2026-11-14T09:30", repeat: "daily" });
+    await act(sid, { action: "set_time", at: "2026-11-14T09:30:00" });
+    await act(sid, { action: "set_time", at: "2026-11-15T09:30:00" });
+    assert.equal((await act(sid, { action: "notifications" })).notifications.filter((n) => n.title === "Standup").length, 2);
+    assert.equal((await act(sid, { action: "cancel_reminder", id: d.reminder.id })).cancelled, true);
+    await act(sid, { action: "set_time", at: "2026-11-16T09:30:00" });
+    assert.equal((await act(sid, { action: "notifications" })).notifications.filter((n) => n.title === "Standup").length, 2);
+    const bad = await act(sid, { action: "set_reminder", title: "x" });
+    assert.equal(bad.ok, false); assert.equal(bad.code, "bad_time");
+  });
+}

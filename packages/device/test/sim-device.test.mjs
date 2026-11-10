@@ -57,6 +57,13 @@ test("notifications: blocked while permission is not granted, delivered after", 
   assert.equal(got.length, 1, "unsubscribed listener hears nothing");
 });
 
+test("notifications: the phone's own notification (a reminder) arrives without an app's permission", () => {
+  dev.reset({ platform: "ios" }); deny("notifications");
+  assert.equal(dev.push({ title: "Call Ada", body: "" }), null);
+  const id = dev.push({ title: "Call Ada", body: "" }, { system: true });
+  assert.equal(typeof id, "string");
+  assert.deepEqual(dev.notifications().map((n) => n.title), ["Call Ada"]);
+});
 test("notifications: opening from the shade calls the open handler; unknown id returns false", () => {
   dev.reset(); grant("notifications");
   const opened = [];

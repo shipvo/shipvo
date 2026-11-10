@@ -192,3 +192,36 @@ describe("wake-up tools", () => {
     await c.close(); srv.close();
   }, 30000);
 });
+
+describe("reminder tools", () => {
+  it("pass the reminder to the simulator and return its id and next time", async () => {
+    const seen: any[] = [];
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      if (body.action === "set_reminder") return res.end(JSON.stringify(body.title ? { ok: true, reminder: { id: "r1", title: body.title, body: "", at: "2026-11-14T09:10", repeat: body.repeat ?? "none" } } : { ok: false, code: "bad_title", error: "a reminder needs a title" }));
+      if (body.action === "list_reminders") return res.end(JSON.stringify({ ok: true, reminders: [{ id: "r1", title: "Call Ada", at: "2026-11-14T09:10" }], fired: [] }));
+      res.end(JSON.stringify({ ok: true, cancelled: true }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const names = (await c.listTools()).tools.map((t) => t.name);
+    for (const n of ["set_reminder", "list_reminders", "cancel_reminder"]) expect(names).toContain(n);
+    const ok: any = await c.callTool({ name: "set_reminder", arguments: { session: "s", title: "Call Ada", in_minutes: 10, repeat: "daily" } });
+    expect(JSON.parse(ok.content[0].text)).toMatchObject({ id: "r1", title: "Call Ada", repeat: "daily" });
+    expect(seen.at(-1)).toMatchObject({ action: "set_reminder", session: "s", title: "Call Ada", in_minutes: 10, repeat: "daily" });
+    const bad: any = await c.callTool({ name: "set_reminder", arguments: { session: "s", title: "" } });
+    expect(bad.isError).toBe(true); expect(bad.content[0].text).toContain("bad_title");
+    const l: any = await c.callTool({ name: "list_reminders", arguments: { session: "s" } });
+    expect(JSON.parse(l.content[0].text).reminders[0].id).toBe("r1");
+    const k: any = await c.callTool({ name: "cancel_reminder", arguments: { session: "s", id: "r1" } });
+    expect(JSON.parse(k.content[0].text)).toEqual({ cancelled: true });
+    await c.close(); srv.close();
+  }, 30000);
+});

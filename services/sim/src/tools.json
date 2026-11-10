@@ -690,6 +690,35 @@
     }
   },
   {
+    "name": "cancel_reminder",
+    "description": "Cancel a reminder by id. Returns whether it existed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "check_for_update",
     "description": "Ask the update source for a newer release: checks its signature and hash and downloads it. Ends in ready, or idle with reason verify_failed or download_failed (the release is never applied). Fails with no_update when nothing newer exists or no source is set. Simulated; each state change is logged in device_log.",
     "inputSchema": {
@@ -1429,6 +1458,31 @@
     "inputSchema": {
       "type": "object",
       "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "list_reminders",
+    "description": "The reminders waiting on the phone (id, title, next time, repeat) and the last ones that fired with whether each was delivered.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3023,6 +3077,56 @@
       "required": [
         "session",
         "at"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "set_reminder",
+    "description": "Set a reminder on the phone: at the time you give (on the phone's clock, see set_phone_time) a notification with the title and body arrives, whether or not an app is open. Give at (a time like 2026-11-14T09:00) or in_minutes, not both. repeat is none, daily or weekly. With Do Not Disturb or Focus on, it is kept in the notification shade without a banner. It arrives whatever the app notification permissions say, as a phone's own reminders do. Read what arrived with notifications. Fails with bad_time, bad_title, too_long, bad_repeat or too_many.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "title": {
+          "type": "string",
+          "description": "What to remind (up to 200 characters)"
+        },
+        "body": {
+          "type": "string",
+          "description": "More detail (up to 1000 characters)"
+        },
+        "at": {
+          "type": "string",
+          "description": "Phone-clock time such as 2026-11-14T09:00"
+        },
+        "in_minutes": {
+          "type": "number",
+          "description": "Minutes from now on the phone's clock (0 to 525600)"
+        },
+        "repeat": {
+          "type": "string",
+          "enum": [
+            "none",
+            "daily",
+            "weekly"
+          ]
+        }
+      },
+      "required": [
+        "session",
+        "title"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
