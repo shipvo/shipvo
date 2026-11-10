@@ -52,6 +52,23 @@ After `apply_update` a new release has to boot without a page error. After 3 fai
 pnpm --filter @shipvo/sim exec node --test update-live.test.mjs
 ```
 
-Limits: web bundles only (one `index.html`), and no patch (bsdiff) simulation. In `shipvo run`, the frame page draws the banner from a `pn:update` message; the MCP tools do not feed it yet.
+The simulator runs web bundles (one `index.html`). In `shipvo run`, the frame page draws the banner from a `pn:update` message.
 
 The simulator refuses a signed release that is not newer than every release the session knows: the running one (`13` and `r13` both count as 13), the previous one, ones it ran before and blocked ones. This stops an old signed release being replayed. If the app has no release number and the session has seen none, any validly signed release counts as new.
+
+## Troubleshooting
+
+| You see | Why | Fix |
+| --- | --- | --- |
+| `check_for_update` fails with `no_update` | No newer release exists, or no update source is set | Start the simulator with `--update-url` and `--update-key`, then publish a newer release |
+| State is `idle` with reason `verify_failed` | The signature or the bundle hash does not match | Check that `--update-key` is the public key from `shipvo.json`, then publish again |
+| State is `idle` with reason `download_failed` | The source did not serve the bundle at `<web.base>/<web.entry>` | Open that URL in a browser and fix the path in the pointer |
+| `apply_update` fails with `not_ready` | Nothing is held. A check has not ended in `ready` | Run `check_for_update` first and read the state |
+| A release you published is not offered | It is not newer than every release the session knows, or it is blocked | Publish a higher release number |
+| State is `reverted` with reason `crash_loop` | The release raised a page error on 3 boots in a row | Fix the page error and publish a new release. The blocked one is not offered again |
+
+## Next steps
+
+- [CLI guide](cli.md): publish, promote and roll back real releases.
+- [Agents](agents.md): every MCP tool, including the update tools.
+- [Spike results](spike-results.md): the measured crash-loop rule.
