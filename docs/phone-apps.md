@@ -118,15 +118,23 @@ Any spec app can turn a collection into CSV with the `csv()` function. Return it
 
 The first line holds the column names. Fields with commas, quotes or line breaks are quoted, and lists such as tags are joined with `; `. Leave the column list out to export every field. Spreadsheets treat a cell that starts with `=`, `+`, `-` or `@` as a formula. For text that other people typed, map the field first, for example `data.entries.map(r, {'note': has(r.note) && r.note.startsWith('=') ? "'" + r.note : (has(r.note) ? r.note : '')})`, then pass that list to `csv()`.
 
-## Save data as a file
+## Save data into a collection
 
-The `saveFile` step stores text as a file in one of the app's collections. Pair it with `csv()` to save an export the person can find later. The step needs the `files` device permission, and works the same on Android and iOS.
+The object form of `saveFile` stores text as a file in one of the app's collections. Pair it with `csv()` to save an export the person can find later. The step needs the `files` device permission, and works the same on Android and iOS.
 
 ```json
 { "do": [ { "saveFile": { "to": "files", "name": "diary.csv", "mime": "text/csv", "content": "{{ csv(data.entries) }}" } } ] }
 ```
 
 Each file gets the next `id` and the fields `name`, `kind` (`file`), `mime` (default `text/plain`), `size` in bytes, `content` and `added`. Read the content back with `parseCsv()` to import it.
+
+## Save as a file
+
+A `saveFile` step keeps text as a named file on the phone. It needs the `files` device permission, on Android and iOS alike. Saving again with the same name replaces the file.
+
+```json
+{ "actions": { "save_diary": { "description": "Save the diary as diary.csv.", "input": {}, "do": [ { "saveFile": "diary.csv", "content": "{{ csv(data.entries, ['date', 'title']) }}", "mime": "text/csv" }, { "toast": "Saved diary.csv" } ] } } }
+```
 
 ## Import data from CSV
 
@@ -250,6 +258,8 @@ Give an assistant a URL and the phone calls it when something new arrives. Call 
 
 The body is small JSON, for example `{"to":"claude","event":"message","summary":"1 new message for claude on the phone","messages":["m3"],"tasks":[],"at":"..."}`. It never contains the message text: the woken assistant reads that with `check_inbox`. Each call carries `x-shipvo-signature: t=<unix seconds>,v1=<hex>`, where `v1` is the HMAC-SHA256 of `"<t>.<body>"` with your secret. Leave `secret` out and the phone generates one and returns it once. A call that fails is retried twice, and every delivery, with its status and the number of tries, is in `device_log`. Private and local addresses are refused unless you pass `allow_private: true` for a service you run yourself. Anything already waiting when you register does not wake the assistant; only later arrivals do.
 
+To tell the person instead, for a chat that no URL can start (a ChatGPT or Claude chat that is open in a browser tab), point the URL at a push or chat service and set `format`. `text` sends one plain line, which a push service such as ntfy shows as a notification. `slack` sends `{"text": "..."}` for a Slack-style incoming webhook. Either way the line reads `ChatGPT has 1 new message on the phone. Open your chat with ChatGPT to pick it up.` and the request is still signed. Nothing is sent until you register.
+
 Which mechanism fits which assistant:
 
 | You want | Use |
@@ -257,6 +267,7 @@ Which mechanism fits which assistant:
 | An assistant that calls any phone tool to see what is waiting | The `Inbox:` line at the start of every tool result |
 | An assistant in the middle of a turn to listen for the other one | `wait_for_event` |
 | An assistant outside a turn to start work when a message arrives | `register_wakeup` with a URL that starts it |
+| A chat that no URL can start | `register_wakeup` with `format: "text"` or `"slack"`, so you get a notification and open the chat |
 
 ### Things to do with two assistants on one phone
 
