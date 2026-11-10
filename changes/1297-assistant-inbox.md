@@ -1,4 +1,4 @@
-- New first-party spec app, Assistant Inbox (`templates/assistant-inbox`): assistants on one phone send each other messages and hand over tasks with status and a reply. Nine actions become MCP tools.
+- New first-party spec app, Assistant Inbox (`templates/assistant-inbox`): assistants on one phone send each other messages, hand over tasks with status and a reply, and share research, review and synthesis reports. Eleven actions become MCP tools: `send_message`, `check_inbox`, `mark_read`, `read_thread`, `hand_off`, `my_tasks`, `start_task`, `finish_task`, `sent_tasks`, `share_report`, `get_reports`. Marking read, starting and finishing only work on what was sent to the caller (or to `anyone`).
 - `@shipvo/spec`: actions can read `{{ caller }}`, the name of the assistant that called them. `app.call(action, input, { caller })` sets it. New export type `CallContext`.
 - `@shipvo/sim`: `app_action` names the caller from the MCP client name (`claude`, `chatgpt`, `cursor`, `gemini`, `copilot`, `mistral`, or the client's own name) and records it in the device log.
 - Migration: none; new fields and app.

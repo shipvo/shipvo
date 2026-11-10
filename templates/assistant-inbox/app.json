@@ -301,7 +301,7 @@
       ]
     },
     "mark_read": {
-      "description": "Mark a message as read, by its id.",
+      "description": "Mark a message sent to you (or to 'anyone') as read, by its id.",
       "input": {
         "id": {
           "type": "text"
@@ -310,7 +310,7 @@
       "do": [
         {
           "update": "messages",
-          "where": "item.id == input.id",
+          "where": "item.id == input.id && (caller == '' || item.to == caller || item.to == 'anyone')",
           "value": {
             "read": true
           }
@@ -406,7 +406,7 @@
       ]
     },
     "start_task": {
-      "description": "Say you have started a handed-off task, by its id. The sender sees the status change.",
+      "description": "Say you have started a task handed to you, by its id. The sender sees the status change.",
       "input": {
         "id": {
           "type": "text"
@@ -415,7 +415,7 @@
       "do": [
         {
           "update": "handoffs",
-          "where": "item.id == input.id && item.status == 'open'",
+          "where": "item.id == input.id && item.status == 'open' && (caller == '' || item.to == caller || item.to == 'anyone')",
           "value": {
             "status": "doing"
           }
@@ -426,7 +426,7 @@
       ]
     },
     "finish_task": {
-      "description": "Finish a handed-off task and leave the result for the sender, by its id.",
+      "description": "Finish a task handed to you and leave the result for the sender, by its id.",
       "input": {
         "id": {
           "type": "text"
@@ -439,7 +439,7 @@
       "do": [
         {
           "update": "handoffs",
-          "where": "item.id == input.id",
+          "where": "item.id == input.id && (caller == '' || item.to == caller || item.to == 'anyone')",
           "value": {
             "status": "done",
             "reply": "{{ input.reply }}"

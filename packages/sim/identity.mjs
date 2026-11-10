@@ -4,8 +4,8 @@ const KNOWN = [
   [/claude|anthropic/i, "claude"],
   [/chatgpt|openai|gpt/i, "chatgpt"],
   [/cursor/i, "cursor"],
-  [/gemini|google/i, "gemini"],
-  [/copilot|github|vscode/i, "copilot"],
+  [/gemini/i, "gemini"],
+  [/copilot/i, "copilot"],
   [/mistral|le-?chat/i, "mistral"],
 ];
 

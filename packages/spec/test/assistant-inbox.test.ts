@@ -75,6 +75,20 @@ describe("Assistant Inbox spec app", () => {
     expect(p.call("sent_tasks", {}, "chatgpt").out.value.tasks).toEqual([]);
   });
 
+  it("an assistant cannot read-mark, start or finish what was sent to someone else", () => {
+    const p = phone();
+    p.call("send_message", { to: "claude", body: "private" }, "chatgpt");
+    p.call("hand_off", { to: "claude", title: "Claude's job" }, "chatgpt");
+    p.call("mark_read", { id: "m1" }, "cursor");
+    p.call("start_task", { id: "h1" }, "cursor");
+    p.call("finish_task", { id: "h1", reply: "stolen" }, "cursor");
+    expect(p.call("check_inbox", {}, "claude").out.value.messages).toHaveLength(1);
+    const t = p.call("my_tasks", {}, "claude").out.value.tasks[0];
+    expect([t.status, t.reply]).toEqual(["open", ""]);
+    p.call("finish_task", { id: "h1", reply: "done" }, "claude");
+    expect(p.call("my_tasks", {}, "claude").out.value.tasks).toEqual([]);
+  });
+
   it("an explicit name wins, and a caller with no name is 'unknown'", () => {
     const p = phone();
     p.call("send_message", { from: "Cursor", to: "claude", body: "hi" }, "chatgpt");
