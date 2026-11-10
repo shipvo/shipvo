@@ -107,3 +107,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Open a build from a link (`build_url` on `POST /session`, error codes) | [test-your-build](test-your-build.md#open-a-build-from-a-link) | | | |
 | Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
 | Watch link on the hosted phone (`open_app` `platform`, `watch_url`) | [agents](agents.md#watch-link-on-the-hosted-phone) | | | |
+| Arrange the home screen and set the phone clock (`arrange_apps`, `set_phone_time`) | [phone-apps](phone-apps.md) | | | |
+| Phone frame page `/phone?session=` with Store and installed apps | [phone-apps](phone-apps.md) | | | |
+| Watch link on the hosted phone (`watch_url`, read-only, sign in to take over) | [agents](agents.md#watch-link-on-the-hosted-phone) | | | |
+| Hosted MCP sign-in with URL client ids (Client ID Metadata Documents) | [agents](agents.md) | | | |

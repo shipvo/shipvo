@@ -82,7 +82,13 @@ The simulator serves a `/watch` page. Open it in a browser to see the agent's ph
 
 ### Watch link on the hosted phone
 
-On the hosted phone, `open_app` takes `platform: "android" | "ios"` and its result includes `watch_url`: a short-lived, read-only link to `https://sim.shipvo.dev/watch/<session>`. Send it to anyone who should see the phone live. The link only views. **Take over** shows only for the key's owner, signed in with GitHub.
+On the hosted phone, `open_app` also returns `watch_url` (in the text and in `structuredContent`) and says "The user can watch at <url>." Open it to see that one session live, in its Android or iOS frame. Pass `platform` to `open_app` to pick the phone.
+
+1. Ask your assistant to open your app on the hosted phone.
+2. Copy the `watch_url` from the reply and open it in your browser. You see the phone and each step as it happens.
+3. To take over, choose **Sign in to take over** and sign in with the GitHub account that owns the key.
+
+The link is read-only and shows one session only. It stops working after one hour and when the key is revoked. No API key is in the URL. A viewer who is not signed in cannot tap, swipe, type or press keys. Ask for a new link by calling `open_app` again.
 
 ## What the tree shows (and hides), on purpose
 
@@ -234,6 +240,8 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 **A tool answers `{ "status": "running", "job": … }`.** Nothing failed. The work (a preview or a build upload) takes longer than the wait. Ask the assistant to call `job_status` with that `job`. Calling the same tool again returns the same job, so it never starts a second publish. Another key gets `job_not_found`, and a job is kept for 15 minutes after it finishes.
 
 **The assistant cannot find a button.** The tree only lists what a person could see and touch (see [What the tree shows](#what-the-tree-shows-and-hides-on-purpose)). Ask the assistant to read the screen again after the app finishes loading, and check that the button has a label.
+
+**The `watch_url` shows an error or does not load.** The link is valid for one hour, for one session. Call `open_app` again for a new one. If there is no `watch_url` in the reply, you are on a local simulator; open `/watch` there instead.
 
 **Two sessions do not see each other's orders.** They were opened without the same `room`. Open both with the same `room` value on the same simulator (see [Rooms](#rooms-several-phones-one-backend)).
 
