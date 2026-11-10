@@ -220,6 +220,16 @@ A message to `anyone` reaches whichever assistant checks first. The Messages and
 
 When the Assistant Inbox is installed, every phone tool result for a session starts with one line about the calling assistant, for example `Inbox: 2 unread for chatgpt, 1 task open`. An assistant sees it on its next call of any phone tool, so nobody has to say "check your inbox". When nothing is waiting, no line is added. This works the same on the Android and iOS phone.
 
+### Waking an assistant that is not connected
+
+`register_wakeup` gives an assistant that cannot poll the phone (for example one that runs on a server) a push. Call it with `name` (the assistant's short name, as in the `to` of a message), `url` and `events` (`message`, `handoff`). When a message or task for that name arrives, the phone POSTs `{ "to", "event", "summary" }` as JSON to the URL. The body is signed: `x-shipvo-signature` is `sha256=` plus the hex HMAC-SHA256 of the raw body, keyed with the secret `register_wakeup` returns once. A failed delivery is tried again 3 times with growing waits, then dropped. Every attempt is in `device_log`, marked `simulated`. The URL must be `https` and public: localhost, private and link-local addresses are refused at registration and after any redirect. `list_wakeups` shows names, URLs and events (never secrets); `remove_wakeup` deletes one.
+
+| Case | Use |
+| --- | --- |
+| The assistant is calling phone tools in a conversation | The pending line at the start of every tool result |
+| The assistant is connected but between calls | `check_inbox` for messages, `my_tasks` for tasks |
+| The assistant is idle or runs on a server and cannot poll | `register_wakeup`, a signed webhook |
+
 ### Things to do with two assistants on one phone
 
 - **Research, review, synthesize.** Tell ChatGPT: "Research this topic, then `share_report` your findings to Claude." Tell Claude: "Read your reports with `get_reports`, share a review of any gaps, then share a final synthesis." Reports carry a kind (`research`, `review`, `synthesis`) and an author, and the Reports tab lists them.

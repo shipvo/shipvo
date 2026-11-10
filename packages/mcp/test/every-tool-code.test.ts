@@ -46,6 +46,7 @@ beforeAll(async () => {
     res.writeHead(200, { "content-type": "application/json" });
     const body = raw ? JSON.parse(raw) : {};
     if (req.url === "/sessions") return res.end(JSON.stringify({ ok: true, sessions: [] }));
+    if (req.url === "/act" && String(body.session).startsWith("wake-")) return res.end(JSON.stringify({ ok: false, code: String(body.session).slice(5), error: "refused", screen: null }));
     if (req.url === "/act") return res.end(JSON.stringify({ ok: false, code: "no_session", error: `no session '${body.session}': call /session first`, screen: null }));
     res.end(JSON.stringify({ ok: true }));
   });
@@ -91,5 +92,18 @@ describe("every session tool", () => {
     }
     await c.close();
     expect(bad).toEqual([]);
+  });
+
+  it("passes the wake-up error codes through as typed codes", async () => {
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${port}`, PN_CONTROL: "http://127.0.0.1:1" };
+    delete env.PN_APPS;
+    const c = new Client({ name: "test", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    for (const code of ["bad_name", "bad_event", "bad_url", "private_address", "too_many_wakeups", "no_wakeup"]) {
+      const r: any = await c.callTool({ name: code === "no_wakeup" ? "remove_wakeup" : "register_wakeup", arguments: { session: "wake-" + code, name: "claude", url: "https://x.test", events: ["message"] } });
+      expect(r.isError, code).toBe(true);
+      expect(r.structuredContent?.code, code).toBe(code);
+    }
+    await c.close();
   });
 });

@@ -402,6 +402,12 @@ use(server, tools.inbox_wait,
   async ({ session, subject, from, timeout_ms }) => { need(session); const r = await act({ session, action: "inbox_wait", subject, from, timeout_ms }) as Act & { address?: string; message?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ address: r.address, message: r.message }, null, 2)); });
 use(server, tools.inbox_read,
   async ({ session, subject, from }) => { need(session); const r = await act({ session, action: "inbox_read", subject, from }) as Act & { address?: string; messages?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ address: r.address, messages: r.messages }, null, 2)); });
+use(server, tools.register_wakeup,
+  async ({ session, name, url, events }) => { need(session); const r = await act({ session, action: "register_wakeup", name, url, events }) as Act & { wakeup?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ ...(r.wakeup as object), note: "Keep the secret: it is shown only now. Verify x-shipvo-signature as sha256= plus the hex HMAC-SHA256 of the raw body." }, null, 2)); });
+use(server, tools.list_wakeups,
+  async ({ session }) => { need(session); const r = await act({ session, action: "list_wakeups" }) as Act & { wakeups?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ wakeups: r.wakeups }, null, 2)); });
+use(server, tools.remove_wakeup,
+  async ({ session, name }) => { need(session); const r = await act({ session, action: "remove_wakeup", name }) as Act & { removed?: string }; if (!r.ok) return result(session, r); return text(JSON.stringify({ removed: r.removed })); });
 use(server, tools.inbox_clear,
   async ({ session }) => { need(session); const r = await act({ session, action: "inbox_clear" }) as Act & { cleared?: number }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cleared: r.cleared })); });
 use(server, tools.notifications, 

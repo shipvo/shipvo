@@ -1166,6 +1166,108 @@
     }
   },
   {
+    "name": "list_wakeups",
+    "description": "List the wake-up webhooks registered on this phone: name, url and events. Secrets are never shown.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "register_wakeup",
+    "description": "Get woken when something arrives for an assistant that cannot poll the phone. When a message or task for `name` arrives in the Assistant Inbox and its kind is in `events` (message, handoff), the phone POSTs { to, event, summary } as JSON to `url` with an x-shipvo-signature header: sha256= and the hex HMAC-SHA256 of the body, keyed with the secret this call returns once. A failing receiver is tried again 3 times with growing waits, then dropped. The url must be https and public: localhost, private and link-local addresses are refused, also after a redirect. Registering a name again replaces it and returns a new secret. Fails with bad_name, bad_event, bad_url, private_address or too_many_wakeups. Every attempt is logged in device_log as simulated.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "name": {
+          "type": "string",
+          "description": "The assistant's short name, as in the `to` of a message (for example claude)"
+        },
+        "url": {
+          "type": "string",
+          "description": "https URL that receives the POST"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "message",
+              "handoff"
+            ]
+          },
+          "description": "Which events wake it"
+        }
+      },
+      "required": [
+        "session",
+        "name",
+        "url",
+        "events"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "remove_wakeup",
+    "description": "Remove the wake-up webhook registered for a name. Fails with no_wakeup when there is none.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name used in register_wakeup"
+        }
+      },
+      "required": [
+        "session",
+        "name"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "inbox_clear",
     "description": "Empty this session's private inbox. Returns how many messages were removed.",
     "inputSchema": {
