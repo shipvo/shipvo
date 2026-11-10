@@ -104,6 +104,11 @@ npx eas-cli build:version:set -p ios
 
 Then `npx eas-cli submit -p ios --profile shipvo-ios` (or `-p android`) after a build finishes.
 
+## Troubleshooting
+
+- **`eas-cli submit` asks for a profile.** Pass the profile the template creates: `--profile shipvo-ios` or `--profile shipvo-android`.
+- **iOS says the build number was already used.** Set it with `npx eas-cli build:version:set -p ios`, then build again.
+
 ## Next steps
 
 - [Store path](store.md): take the signed builds to Google Play and the App Store.

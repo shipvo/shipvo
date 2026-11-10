@@ -15,16 +15,13 @@ Step-by-step tutorials for people who have never used a terminal. Each one ends 
 | [Make a shop with your own products](your-own-shop.md) | Create a shop from the template, put in your products and prices, check the cart and run a practice release | about two minutes of commands, plus time to write your products | Beginner |
 | [Get your 12 testers](get-your-12-testers.md) | Join Shipvo Testers, add the group to your Play closed test and share your opt-in link | about 15 minutes, then 14 days of waiting | Beginner |
 
-Taking payments is not a tutorial yet: the shop template has no payment step.
-
 ## Run your app
 
 | Tutorial | You will | Time | Level |
 | --- | --- | --- | --- |
 | [Play chess on two phones](chess-on-two-phones.md) | Start an Android phone and an iPhone-style phone side by side, play a move on one and see it on the other, then watch a full game | about 15 minutes | Beginner |
+| [Change your app and watch the phone update as you save](watch-your-app-update.md) | Change a product name and price, see the phone reload on each save, and fix a typo from a plain message | about 10 minutes | Beginner |
 | [See your app on a phone in your browser](run-your-app-on-a-phone.md) | Start a simulated Android or iPhone with one command, tap through your app, see the system sheet and stop it | about 10 minutes | Beginner |
-
-Letting your assistant drive this same phone is not a tutorial yet: attaching is not available yet.
 
 ## Test
 

@@ -86,6 +86,33 @@ function fieldName(spec, form, shown) {
   return found ?? shown;
 }
 
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+/** Plain lines that say what changed between two specs: screens, actions, data and settings added, removed or changed. */
+export function diffSpec(a, b) {
+  const out = [];
+  const parts = [
+    ["screen", Object.fromEntries((a?.screens ?? []).map((x) => [x.id, x])), Object.fromEntries((b?.screens ?? []).map((x) => [x.id, x]))],
+    ["action", a?.actions ?? {}, b?.actions ?? {}],
+    ["data", a?.data ?? {}, b?.data ?? {}],
+    ["state", a?.state ?? {}, b?.state ?? {}],
+  ];
+  for (const [kind, x, y] of parts) {
+    for (const k of Object.keys(y)) if (!(k in x)) out.push(`added ${kind} '${k}'`);
+    for (const k of Object.keys(x)) if (!(k in y)) out.push(`removed ${kind} '${k}'`);
+    for (const k of Object.keys(y)) if (k in x && !same(x[k], y[k])) out.push(`changed ${kind} '${k}'`);
+  }
+  if (!same(a?.app, b?.app)) out.push("changed app details");
+  if (!same(a?.permissions, b?.permissions)) out.push("changed permissions");
+  return out;
+}
+
+/** What a spec has, in one line: used for the first entry in an app's history. */
+export function describeSpec(spec) {
+  const n = (v) => Array.isArray(v) ? v.length : Object.keys(v ?? {}).length;
+  return `${n(spec?.screens)} screens, ${n(spec?.actions)} actions, ${n(spec?.data)} data sources`;
+}
+
 export class SpecHost {
   /**
    * `timers` is { setInterval, clearInterval } and `context(session, id)` returns the runner context for an app
@@ -157,7 +184,7 @@ export class SpecHost {
     const devicePermissions = { ...permissions };   // shared with the running app: setPermissions changes it in place
     const made = createApp(spec, { style, reduceMotion, devicePermissions, ...(data ? { data } : {}), ...(state ? { state } : {}) });
     if (!made.ok) return { ok: false, errors: made.errors };
-    this.running.set(key(session, id), { app: made.app, spec, style, reduceMotion, devicePermissions, version: 1, history: [{ version: 1, at: Date.now() }] });
+    this.running.set(key(session, id), { app: made.app, spec, style, reduceMotion, devicePermissions, version: 1, history: [{ version: 1, at: Date.now(), changes: [`created: ${describeSpec(spec)}`] }] });
     this.schedule(session, id);
     return { ok: true, warnings: made.app.render().warnings ?? [] };
   }
@@ -176,7 +203,7 @@ export class SpecHost {
     const made = createApp(spec, { style: cur.style, reduceMotion: cur.reduceMotion, devicePermissions: cur.devicePermissions, data: keep(collections, cur.app.data), state: keep(stateKeys, cur.app.state) });
     if (!made.ok) return { ok: false, errors: made.errors };
     const from = cur.version;
-    this.running.set(key(session, id), { ...cur, app: made.app, spec, version: from + 1, history: [...cur.history, { version: from + 1, at: Date.now() }] });
+    this.running.set(key(session, id), { ...cur, app: made.app, spec, version: from + 1, history: [...cur.history, { version: from + 1, at: Date.now(), changes: diffSpec(cur.spec, spec) }] });
     this.schedule(session, id);
     return { ok: true, version: from + 1, from, warnings: made.app.render().warnings ?? [] };
   }
@@ -198,6 +225,15 @@ export class SpecHost {
   /** Sets one permission answer for a running app. The next action sees it. */
   // An unknown app is ignored on purpose: the person may toggle Settings for an app that is not running yet.
   setPermission(session, id, permission, allowed) { const r = this.running.get(key(session, id)); if (r) r.devicePermissions[permission] = allowed; }
+
+  /** Every version of an app with what changed in it, newest last. */
+  history(session, id) { return (this.running.get(key(session, id))?.history ?? []).map((h) => ({ version: h.version, at: h.at, changes: h.changes ?? [] })); }
+
+  /** The app's http data sources and how often each refreshes (seconds, or null when only refresh_app fetches it). */
+  sources(session, id) {
+    const r = this.running.get(key(session, id));
+    return Object.entries(r?.spec?.data ?? {}).filter(([, s]) => s?.source === "http").map(([name, s]) => ({ name, refresh: typeof s.refresh === "number" ? s.refresh : null }));
+  }
 
   version(session, id) { return this.running.get(key(session, id))?.version ?? null; }
 

@@ -29,7 +29,7 @@ import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.
 import { SettingsError } from "./settings.mjs";
 import { SpecHost } from "./spec-host.mjs";
 import { fetchBuild, BuildCacheError } from "./build-cache.mjs";
-import { AppsError, DEVICE_PERMISSIONS, setPermission, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, pinApp, hideApp, arrangeApp, describeApps, installedIconsHtml, storeCss } from "./apps.mjs";
+import { AppsError, DEVICE_PERMISSIONS, setPermission, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, describeApps, pinApp, hideApp, arrangeApp, cleanPlacement, installedIconsHtml, storeCss } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
@@ -330,6 +330,19 @@ async function screen(page) {
 
 function log(id, action, ok, extra = {}) { appendFileSync(join(DIR, `${id}.json.log`), JSON.stringify({ at: Date.now(), name: action, ok, ...extra }) + "\n"); }
 
+/** Which parts of an imported layout were rejected, as path suffixes with the reason. Valid input that is only normalised (true to 1, default times, "Sat" to "sat") is not reported. */
+function droppedPlacement(raw, cleaned) {
+  if (raw == null) return [];
+  if (typeof raw !== "object" || Array.isArray(raw)) return [": not valid, ignored (expected an object)"];
+  const out = [];
+  for (const k of Object.keys(raw)) {
+    if (!["pinned", "hidden", "position", "schedule"].includes(k)) out.push(`.${k}: not recognised, ignored`);
+    else if (raw[k] == null || ((k === "pinned" || k === "hidden") && raw[k] === false)) continue;
+    else if (!cleaned || !(k in cleaned)) out.push(`.${k}: not valid, dropped`);
+  }
+  return out;
+}
+
 async function act(id, body) {
   const s = sessions.get(id); if (!s) throw new SimError("no_session", `no session '${id}': call /session first`);
   const { page } = s;
@@ -399,9 +412,11 @@ async function act(id, body) {
       return { where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, warnings: made.warnings, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Home screen layout: pin, hide, reorder and schedule an installed app.
+    case "schedule_app": case "clear_schedule":   // the same schedule as arrange_apps, under the names an assistant looks for
     case "arrange_apps": {
-      const { id: appId, ...patch } = body; delete patch.action; delete patch.session;
-      try { arrangeApp(s.apps, String(appId ?? ""), patch); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
+      const { id: appId, ...rest } = body; delete rest.action; delete rest.session;
+      const patch = body.action === "clear_schedule" ? { schedule: null } : body.action === "schedule_app" ? { schedule: { days: body.days, from: body.from, to: body.to } } : rest;
+      try { arrangeApp(s.apps, String(appId ?? ""), patch, body.action); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       return { installed_apps: s.apps.installed_apps, home: `Home screen\n${describeApps(s.apps, nowOf(s))}`, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // The phone's clock, for schedules. at: an ISO time like 2026-11-14T09:00:00, or null for the real time.
@@ -415,7 +430,7 @@ async function act(id, body) {
       const want = Array.isArray(body.ids) ? body.ids.map(String) : null;
       const specs = s.apps.installed_apps.filter((a) => a.kind === "spec");
       if (want) for (const w of want) if (!specs.some((a) => a.id === w)) throw new SimError("not_installed", `'${w}' is not a spec app on this phone`);
-      const apps = specs.filter((a) => !want || want.includes(a.id)).map((a) => ({ id: a.id, name: a.name, ...specHost.snapshot(sidOf(s), a.id), ...(a.permissions ? { permissions: { ...a.permissions } } : {}) }));
+      const apps = specs.filter((a) => !want || want.includes(a.id)).map((a) => ({ id: a.id, name: a.name, ...specHost.snapshot(sidOf(s), a.id), ...(a.placement ? { placement: a.placement } : {}), ...(a.permissions ? { permissions: { ...a.permissions } } : {}) }));
       return { format: "shipvo.phone-apps/v0", apps };
     }
     // Put exported apps on the phone. Every spec is checked first and nothing is installed if any is wrong.
@@ -437,16 +452,19 @@ async function act(id, body) {
       if (problems.length) throw new SimError("invalid_spec", problems.join("\n"));
       if (body.replace !== true) for (const a of list) if (s.apps.installed_apps.some((x) => x.id === a.id)) throw new SimError("already_installed", `'${a.id}' is already installed. Pass replace: true to overwrite it.`);
       for (const a of list) { const ex = s.apps.installed_apps.find((x) => x.id === a.id); if (ex && ex.kind !== "spec") throw new SimError("already_installed", `'${a.id}' is an installed store app and cannot be replaced.`); }
+      const warnings = [];
       for (const a of list) {
         const ex = s.apps.installed_apps.find((x) => x.id === a.id);
         if (ex) { uninstallApp(s.apps, a.id, s.nav); specHost.drop(sidOf(s), a.id); }
         const perms = declaredAnswers(a.spec, a.permissions);
         const made = specHost.create(sidOf(s), a.id, a.spec, { style: a.style === "ios" ? "ios" : "android", data: a.data ?? undefined, state: a.settings ?? undefined, permissions: perms });
         const nm = String(a.name ?? a.spec?.app?.name ?? a.id).replace(/[<>"'\\]/g, "").slice(0, 40);
-        s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec", ...(Object.keys(perms).length ? { permissions: perms } : {}) });
+        const placement = a.placement == null ? null : cleanPlacement(a.placement);
+        for (const w of droppedPlacement(a.placement, placement)) warnings.push(`apps[${list.indexOf(a)}].placement${w}`);
+        s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec", ...(placement ? { placement } : {}), ...(Object.keys(perms).length ? { permissions: perms } : {}) });
         s.apps.log.push({ at: Date.now(), name: "import_apps", app: a.id, source: "real", version: "1", replaced: !!ex });
       }
-      return { imported: list.map((a) => a.id), installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
+      return { imported: list.map((a) => a.id), installed_apps: s.apps.installed_apps, ...(warnings.length ? { warnings } : {}), screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Edit in place: a new spec is a new version. Data and state the person entered carry over; a bad spec changes nothing.
     // Fetch a spec app's http data sources now. Reloads the open screen only when the data changed.
@@ -467,9 +485,22 @@ async function act(id, body) {
       if (!up.ok) throw new SimError("invalid_spec", up.errors.slice(0, 20).map((e) => `${e.path || "/"}: ${e.message}${e.fix ? ` (${e.fix})` : ""}`).join("\n"));
       entry.version = String(up.version);
       if (typeof body.name === "string" && body.name.trim()) entry.name = body.name.replace(/[<>"'\\]/g, "").slice(0, 40);
-      s.apps.log.push({ at: Date.now(), name: "update_app", app: appId, from: String(up.from), version: String(up.version), source: "real" });
+      s.apps.log.push({ at: Date.now(), name: "update_app", app: appId, from: String(up.from), version: String(up.version), changes: specHost.history(sidOf(s), appId).at(-1)?.changes ?? [], source: "real" });
       if (s.apps.current_app === appId && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
       return { version: up.version, installed_apps: s.apps.installed_apps, warnings: up.warnings, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
+    }
+    // What was built and changed on the phone: for each spec app its versions with what changed, its live sources and its events.
+    case "app_activity": {
+      const only = body.id ? String(body.id) : null;
+      const sid = sidOf(s);
+      const apps = s.apps.installed_apps.filter((a) => a.kind === "spec" && (!only || a.id === only));
+      if (only && !apps.length) throw new SimError("not_installed", `'${only}' is not a spec app on this phone`);
+      const limit = Math.max(1, Math.min(200, Number(body.limit) || 50));
+      return { apps: apps.map((a) => ({
+        id: a.id, name: a.name, version: specHost.version(sid, a.id) ?? (Number(a.version) || 1),
+        history: specHost.history(sid, a.id), sources: specHost.sources(sid, a.id),
+        events: s.apps.log.filter((e) => e.app === a.id && e.source === "real").slice(-limit),
+      })) };
     }
     // Arrange the home screen: pinned apps lead, hidden apps leave the home screen and app list but keep their data.
     case "pin_app": case "hide_app": {
@@ -673,7 +704,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, refresh_app, arrange_apps, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
