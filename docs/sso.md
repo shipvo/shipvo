@@ -7,7 +7,7 @@ People sign in to the dashboard with your identity provider and get the role the
 1. Choose a short org name, for example `acme`. It appears in the sign-in links.
 2. At your identity provider, register the control plane. For OIDC, register `https://<control-plane>/sso/<org>/callback` as the redirect URI. For SAML, open `https://<control-plane>/saml/<org>/metadata` and give the entity id and ACS URL to the provider.
 3. Store the client secret (OIDC) as a Worker secret and set `SSO_ORGS` (OIDC) or `SAML_ORGS` (SAML), as shown below.
-4. Open `https://<control-plane>/sso/<org>/start` (or `/saml/<org>/start`). After you sign in you see `{ "ok": true, "org": ..., "role": ..., "email": ..., "expires_at": ... }`.
+4. Open `https://<control-plane>/sso/<org>/start` (or `/saml/<org>/start`). After you sign in, both OIDC and SAML return `{ "ok": true, "org": ..., "role": ..., "email": ..., "expires_at": ... }`.
 
 ## Routes
 
