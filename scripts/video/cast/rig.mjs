@@ -47,6 +47,8 @@ export const VISEMES = {
   MBP:  { w: 26, h: 1,  r: 0 },
   FV:   { w: 30, h: 5,  r: 0 },
 };
+/** Mouth levels from dialogue.py -> viseme names. */
+const LEVEL_VISEME = ["rest", "I", "E", "A"];
 const LETTER_TO_VISEME = { a: "A", e: "E", i: "I", o: "O", u: "U", y: "I", m: "MBP", b: "MBP", p: "MBP", f: "FV", v: "FV", w: "U", q: "U" };
 
 /** Turn text into timed visemes. Vowels and lip letters make shapes; other consonants are skipped. Spaces make short rests. */
@@ -98,7 +100,9 @@ export function createCharacter(def, { seed = 0 } = {}) {
       const look = trackValue(st.look, t, { x: 0, y: 0 });
       // mouth: blend between the viseme under t and the next one over 60 ms
       let mouth = VISEMES.rest, name = "rest";
-      for (const s of st.say) if (t >= s.at && t < s.end) { name = s.v; mouth = mix(VISEMES.rest, VISEMES[s.v], EASE.outCubic(clamp01((t - s.at) / .06))); }
+      const lv = api.mouthFn ? api.mouthFn(t) : null; // recorded voice: 0 closed, 1 small, 2 open, 3 wide (dialogue.py)
+      if (lv != null) { name = LEVEL_VISEME[lv] || "rest"; mouth = VISEMES[name]; }
+      else for (const s of st.say) if (t >= s.at && t < s.end) { name = s.v; mouth = mix(VISEMES.rest, VISEMES[s.v], EASE.outCubic(clamp01((t - s.at) / .06))); }
       // blink every ~3.4 s, offset by seed; 0.16 s long
       const period = 3.4, off = (seed * 0.77) % period, ph = ((t + off) % period);
       const blink = ph < .16 ? Math.sin(Math.PI * ph / .16) : 0;

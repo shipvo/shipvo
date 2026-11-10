@@ -75,3 +75,16 @@ test("parallax moves near layers more than far ones", () => {
   const [far, near] = out.match(/translate\(([-\d.]+)/g).filter((_, i) => i % 2 === 0).map((s) => +s.slice(10));
   assert.ok(near < far);
 });
+
+test("mouthFn drives the recorded-voice visemes and falls back to say()", () => {
+  const c = mara();
+  c.mouthFn = (t) => Math.floor(t);
+  assert.equal(c.state(0.5).viseme, "rest");
+  assert.equal(c.state(1.5).viseme, "I");
+  assert.equal(c.state(2.5).viseme, "E");
+  assert.equal(c.state(3.5).viseme, "A");
+  const d = mara(); d.say([{ v: "O", d: 1 }], { at: 0 });
+  assert.equal(d.state(.5).viseme, "O"); // unset
+  d.mouthFn = () => null;
+  assert.equal(d.state(.5).viseme, "O"); // null falls through to say()
+});
