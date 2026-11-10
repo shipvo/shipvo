@@ -917,3 +917,14 @@ server.on("upgrade", (req, socket) => {
 server.keepAliveTimeout = 300_000; server.headersTimeout = 310_000; server.requestTimeout = 0;
 server.listen(PORT, () => console.log(`Shipvo UI simulator on http://localhost:${PORT} (sessions in ${DIR})`));
 launchBrowser();
+// SIGTERM and SIGINT stop the server the same way: close the browser and the listener, then exit.
+let stopping = false;
+function shutdown() {
+  if (stopping) return;
+  stopping = true;
+  const force = setTimeout(() => process.exit(0), 5000); force.unref();
+  server.closeAllConnections?.();
+  server.close();
+  browserReady.then((b) => b.close()).catch(() => {}).finally(() => process.exit(0));
+}
+for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, shutdown);
