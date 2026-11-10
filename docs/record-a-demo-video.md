@@ -72,6 +72,17 @@ codec_type=audio
 duration=0.733
 ```
 
+## Troubleshooting
+
+| What you see | What it means | What to do |
+| --- | --- | --- |
+| `recorder_unavailable` | The tool that films the phone is not installed | Ask your assistant to run `npm i -D playwright && npx playwright install chromium`, then try again |
+| `frame_unreachable` | The phone is not running | Start it with `shipvo sim` or `shipvo run`, then record again |
+| `encode_failed` | `ffmpeg` is missing | Install ffmpeg, then record again |
+| `narration_unreadable` or `music_failed` | The voice file or music step failed | Your silent video is kept. Fix the file path or install `python3`, then add sound again |
+
+Every error code is explained in [Record a demo video of the phone](record.md#troubleshooting).
+
 ## Next steps
 
 - [Record a demo video of the phone](record.md): all options and error codes.

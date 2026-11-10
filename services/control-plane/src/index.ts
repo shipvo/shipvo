@@ -10,7 +10,7 @@ import { auth } from "./auth";
 import { sso } from "./sso";
 import { samlRoutes } from "./saml-routes";
 import { rotationRoutes } from "./rotation";
-import { listRotations } from "./rotation-store";
+import { listRotations, listRotationLog } from "./rotation-store";
 import { vaultRoutes } from "./vault";
 import { peopleRoutes } from "./people";
 import { phoneRoutes } from "./phone";
@@ -615,7 +615,9 @@ app.delete("/app/:id/api/halt-config", async (c) => {
   return c.json({ enabled: false });
 });
 
-/** Audit rows for one app, newest first. ?limit= (default 50, max 200), ?before=<id>. Owner or the app's publish token. */
+/** Audit rows for one app, newest first. ?limit= (default 50, max 200), ?before=<id>. Owner or the app's publish token.
+ *  Key-rotation rows (from key_rotation_log) are merged in by `at` (ties: higher id first) and returned only on the first page (no `before`),
+ *  because `before` is a row id of the audit table. */
 app.get("/audit/:app", async (c) => {
   const appId = c.req.param("app");
   if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
@@ -629,7 +631,15 @@ app.get("/audit/:app", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT id, app_id, at, actor, actor_kind, action, release, release_id, before, after FROM audit_log WHERE app_id = ?${bq !== undefined ? " AND id < ?" : ""} ORDER BY id DESC LIMIT ?`,
   ).bind(...(bq !== undefined ? [appId, Number(bq), n] : [appId, n])).all();
-  return c.json({ app: appId, rows: results ?? [] }, 200, { "cache-control": "no-store" });
+  let rows: any[] = results ?? [];
+  if (bq === undefined) {
+    const rot = (await listRotationLog(c.env.DB, appId, n)).filter((r) => typeof r.sequence === "number").map((r) => ({
+      id: r.id, app_id: r.app_id, at: r.at, actor: r.actor, actor_kind: r.actor_kind, action: "key-rotation",
+      release: null, release_id: null, before: null, after: JSON.stringify({ sequence: r.sequence, valid_from: r.valid_from }),
+    }));
+    if (rot.length) rows = [...rows, ...rot].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : b.id - a.id)).slice(0, n);
+  }
+  return c.json({ app: appId, rows }, 200, { "cache-control": "no-store" });
 });
 
 app.route("/auth", auth);
