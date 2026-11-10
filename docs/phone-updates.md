@@ -1,5 +1,7 @@
 # OTA updates on the phone
 
+This page is for developers and for assistants testing updates. You get the update states, the three tools, and a runnable test of publish, apply and roll back on the simulated phone.
+
 Publish a release, watch it land on the simulated phone, apply it, and see a bad one roll back. No device needed. Everything here is simulated: nothing real is installed, and `device_log` marks each step `simulated`.
 
 ## What the phone shows
