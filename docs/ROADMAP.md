@@ -83,10 +83,11 @@ The planner keeps this list current: the epics in flight, newest owner direction
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
 - 2026-11-10: Playground Many phones (1 to 12 Android and iOS phones) with a shareable link and Copy link, and an Agent panel with a tool console and Watch Lumi ([Playground](playground.md), #1323, #1335, #1290)
-- 2026-11-10: `job_status` and `wait_ms` for slow MCP tools such as `publish_preview` and `upload_build` ([Agents](agents.md#slow-tools-and-job_status), #1314)
 - 2026-11-10: Network profile tools, `setNetwork` in the test API and `network` in phone.json ([Phone network](phone-network.md), #1338)
+- 2026-11-10: Secrets screen in the phone's Settings lists saved keys, metadata only ([Phone apps](phone-apps.md#see-saved-keys-in-settings), #1350)
 - 2026-11-10: Pin and hide apps on the home screen, export and import a phone's apps, and search the Store with `find_apps` ([Phone apps](phone-apps.md), #1330, #1329, #1315)
 - 2026-11-10: Saved-key routes (list, rotate, revoke, use log) in the control plane and the simulator, and key rotations in the pointer response ([Self-hosting](self-hosting.md#saved-key-routes-vault), #1298, #1334, #1336)
+- 2026-11-09: `job_status` and `wait_ms` for slow MCP tools such as `publish_preview` and `upload_build` ([Agents](agents.md#slow-tools-and-job_status), #1314)
 - 2026-11-09: Describe an app and it appears, edit it in place with `update_app` ([Phone apps](phone-apps.md), #1301, #1302)
 - 2026-11-09: SAML sign-in routes in the control plane ([Single sign-on](sso.md), #1272)
 - 2026-11-08: Wallet, Calendar, Files and Photos, and Shop first-party spec apps ([Phone apps](phone-apps.md#first-party-apps), #1275, #1252, #1299, #1300)
