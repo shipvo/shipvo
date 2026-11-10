@@ -15,7 +15,7 @@ function phone() {
       const r = createApp(spec, { data: saved as never, now: NOW });
       if (!r.ok) throw new Error(JSON.stringify(r.errors));
       const out = r.app.call(t.action, input, { caller }) as any;
-      if (out.ok) saved = { messages: r.app.data.messages, handoffs: r.app.data.handoffs };
+      if (out.ok) saved = { messages: r.app.data.messages, handoffs: r.app.data.handoffs, reports: r.app.data.reports };
       return { out, app: r.app };
     }
   };
@@ -30,7 +30,7 @@ describe("Assistant Inbox spec app", () => {
 
   it("gives every action a tool and labels every control", () => {
     const names = toolsFromSpec(spec).map((t) => t.name).sort();
-    expect(names).toEqual(["check_inbox", "finish_task", "hand_off", "mark_read", "my_tasks", "read_thread", "send_message", "sent_tasks", "start_task"]);
+    expect(names).toEqual(["check_inbox", "finish_task", "get_reports", "hand_off", "mark_read", "my_tasks", "read_thread", "send_message", "sent_tasks", "share_report", "start_task"]);
     const r = createApp(spec)!;
     if (!r.ok) throw new Error("bad spec");
     const t = r.app.render();
@@ -105,6 +105,23 @@ describe("Assistant Inbox spec app", () => {
     expect(p.call("my_tasks", { to: "chatgpt" }).out.value.tasks).toEqual([]);
     const done = p.call("sent_tasks", { from: "Claude" }).out.value.tasks[0];
     expect([done.status, done.reply]).toEqual(["done", "Passed. Order TT-1001 created."]);
+  });
+
+  it("one researches, the other reviews and synthesizes", () => {
+    const p = phone();
+    p.call("hand_off", { to: "chatgpt", title: "Research mobile-money fees in Cameroon", detail: "Three providers, with sources." }, "claude");
+    p.call("share_report", { to: "claude", title: "Fees: first pass", body: "MTN 1.5%, Orange 1.2%, Express Union flat.", kind: "research" }, "chatgpt");
+    p.call("finish_task", { id: "h1", reply: "Report r1 shared." }, "chatgpt");
+
+    const seen = p.call("get_reports", {}, "claude").out.value.reports;
+    expect(seen.map((r: any) => [r.id, r.author, r.kind, r.title])).toEqual([["r1", "chatgpt", "research", "Fees: first pass"]]);
+    expect(p.call("get_reports", {}, "chatgpt").out.value.reports).toEqual([]);
+
+    p.call("share_report", { to: "chatgpt", title: "Review of r1", body: "Orange figure has no source. Ask for it.", kind: "review" }, "claude");
+    p.call("share_report", { to: "anyone", title: "Fees: final", body: "Synthesis of r1 with the review applied.", kind: "synthesis" }, "claude");
+    expect(p.call("get_reports", { kind: "review" }, "chatgpt").out.value.reports.map((r: any) => r.id)).toEqual(["r2"]);
+    expect(p.call("get_reports", { kind: "synthesis" }, "cursor").out.value.reports.map((r: any) => [r.id, r.author])).toEqual([["r3", "claude"]]);
+    expect(p.call("get_reports", { author: "claude" }, "chatgpt").out.value.reports.map((r: any) => r.id)).toEqual(["r2", "r3"]);
   });
 
   it("the screens show messages and tasks as they arrive", () => {

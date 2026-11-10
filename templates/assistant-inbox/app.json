@@ -53,6 +53,23 @@
     "open_handoffs": {
       "source": "computed",
       "value": "{{ count(handoffs.filter(h, h.status != 'done')) }}"
+    },
+    "reports": {
+      "source": "collection",
+      "fields": {
+        "id": "text",
+        "author": "text",
+        "to": "text",
+        "title": "text",
+        "body": "text",
+        "kind": "text",
+        "shared_on": "text"
+      },
+      "seed": []
+    },
+    "report_count": {
+      "source": "computed",
+      "value": "{{ count(reports) }}"
     }
   },
   "navigation": {
@@ -67,6 +84,11 @@
         "screen": "handoffs",
         "label": "Tasks",
         "icon": "check"
+      },
+      {
+        "screen": "reports",
+        "label": "Reports",
+        "icon": "note"
       }
     ]
   },
@@ -193,6 +215,28 @@
               "maxLength": 5000
             }
           ]
+        }
+      ]
+    },
+    {
+      "id": "reports",
+      "title": "Reports",
+      "body": [
+        {
+          "type": "badge",
+          "value": "{{ report_count }} reports"
+        },
+        {
+          "type": "list",
+          "label": "Reports",
+          "from": "{{ reports }}",
+          "item": {
+            "title": "{{ item.title }}",
+            "subtitle": "{{ item.kind + ' from ' + item.author + ' to ' + item.to }}"
+          },
+          "empty": {
+            "message": "No reports yet"
+          }
         }
       ]
     }
@@ -421,6 +465,72 @@
         {
           "return": {
             "tasks": "{{ handoffs.filter(h, h.from == lower(trim((input.from != '' ? input.from : (caller != '' ? caller : 'unknown'))))) }}"
+          }
+        }
+      ]
+    },
+    "share_report": {
+      "description": "Share a report with another assistant (or 'anyone'): research findings, a review, a synthesis. Your name is added for you. kind is research, review or synthesis. The other assistant reads it with get_reports.",
+      "input": {
+        "to": {
+          "type": "text"
+        },
+        "title": {
+          "type": "text"
+        },
+        "body": {
+          "type": "text"
+        },
+        "kind": {
+          "type": "text",
+          "default": "research"
+        }
+      },
+      "returns": {
+        "id": "text"
+      },
+      "do": [
+        {
+          "insert": "reports",
+          "value": {
+            "id": "{{ 'r' + string(count(reports) + 1) }}",
+            "author": "{{ caller != '' ? caller : 'unknown' }}",
+            "to": "{{ lower(trim(input.to)) }}",
+            "title": "{{ input.title }}",
+            "body": "{{ input.body }}",
+            "kind": "{{ lower(trim(input.kind)) }}",
+            "shared_on": "{{ today() }}"
+          }
+        },
+        {
+          "toast": "Report shared"
+        },
+        {
+          "return": {
+            "id": "{{ 'r' + string(count(reports)) }}"
+          }
+        }
+      ]
+    },
+    "get_reports": {
+      "description": "List the reports shared with you (or with 'anyone'). Pass kind to see only research, review or synthesis. Pass author to see one assistant's reports. Nothing is needed otherwise.",
+      "input": {
+        "kind": {
+          "type": "text",
+          "default": ""
+        },
+        "author": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "returns": {
+        "reports": "list"
+      },
+      "do": [
+        {
+          "return": {
+            "reports": "{{ reports.filter(r, (r.to == caller || r.to == 'anyone') && (input.kind == '' || r.kind == lower(trim(input.kind))) && (input.author == '' || r.author == lower(trim(input.author)))) }}"
           }
         }
       ]

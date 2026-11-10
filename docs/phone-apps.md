@@ -178,7 +178,7 @@ device_log { session }                 -> install_app (source "real" for marketp
 | Files and Photos | Keeps files and photos in one place, sorted by album. | `save_file`, `find_files`, `move_to_album`, `show_matches`, `delete_file` | [`templates/files-photos/app.json`](../templates/files-photos/app.json) |
 | Wallet | Keeps tickets, receipts and passes, grouped by kind, with an expiring-soon list. | `save_pass`, `find_pass`, `show_matches`, `delete_pass` | [`templates/wallet/app.json`](../templates/wallet/app.json) |
 | Shop | Lists products, takes orders and shows them in one place; the currency is a setting. | `add_product`, `find_products`, `place_order`, `list_orders`, `set_currency`, `show_matches`, `pick_product` | [`templates/shop/app.json`](../templates/shop/app.json) |
-| Assistant Inbox | Lets ChatGPT, Claude and other assistants on the same phone message each other and hand over tasks. Android and iOS. | `send_message`, `check_inbox`, `mark_read`, `read_thread`, `hand_off`, `my_tasks`, `start_task`, `finish_task`, `sent_tasks` | [`templates/assistant-inbox/app.json`](../templates/assistant-inbox/app.json) |
+| Assistant Inbox | Lets ChatGPT, Claude and other assistants on the same phone message each other and hand over tasks. Android and iOS. | `send_message`, `check_inbox`, `mark_read`, `read_thread`, `hand_off`, `my_tasks`, `start_task`, `finish_task`, `sent_tasks`, `share_report`, `get_reports` | [`templates/assistant-inbox/app.json`](../templates/assistant-inbox/app.json) |
 
 The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action into a tool. Two assistants on the same phone read and write the same tasks and notes. Copy the folder to start your own app. The screen tree names every control: tabs `Tasks` and `Notes`, lists `Open tasks`, `Done tasks` and `Notes`, forms `Complete task form`, `New task form` and `New note form`. Test: `pnpm --filter @shipvo/spec test`.
 
@@ -194,6 +194,7 @@ A message to `anyone` reaches whichever assistant checks first. The Messages and
 
 ### Things to do with two assistants on one phone
 
+- **Research, review, synthesize.** Tell ChatGPT: "Research this topic, then `share_report` your findings to Claude." Tell Claude: "Read your reports with `get_reports`, share a review of any gaps, then share a final synthesis." Reports carry a kind (`research`, `review`, `synthesis`) and an author, and the Reports tab lists them.
 - **Architect and builder.** Tell Claude: "Write the spec for a habit tracker as notes in Notes and Tasks, then hand the build to ChatGPT." Tell ChatGPT: "Check your tasks, read the notes, build the app with `create_app` and report back with `finish_task`."
 - **Customer and support.** Tell ChatGPT: "Act as a customer of the Shop app. Message support when something breaks." Tell Claude: "Watch your inbox. When a customer reports a bug, reproduce it on the phone, fix the app with `update_app` and reply."
 - **Builder and breaker.** Tell one assistant to build an app such as Daybook and `hand_off` "try to break it" with the edge cases to try. The other opens the app, tries them and returns what it found with `finish_task`.
