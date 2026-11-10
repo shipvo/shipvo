@@ -55,6 +55,8 @@ Run: [CI run 42355471525](https://github.com/shipvo/shipvo/actions/runs/42355471
 
 While `shipvo run` is open it watches your project. When you save a file, it rebuilds the web copy in the background and reloads the app inside the phone. You stay on the same screen address. The terminal prints one line per rebuild, for example `rebuilt in 2.1 s`. As soon as a save is seen, the terminal prints `Rebuilding...` and the page shows a small "Updating…" hint until the new build loads.
 
+After the first build, rebuilds keep the bundler's cache, so only the files you changed are processed again. The same applies to `shipvo sim --watch`.
+
 If a rebuild fails (a typo in your code, say), the phone keeps your last good version. The terminal prints the error, and a small red bar under the phone shows it too. Save a fix and the bar goes away and the phone reloads.
 
 The tests in `packages/cli/test/run-live-reload.test.ts` edit a fixture app and check the Android and iOS frames in Chromium, and they print the save-to-visible time for each.

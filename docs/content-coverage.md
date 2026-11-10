@@ -106,3 +106,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Spec `calendar` and `map` blocks (month, week, agenda, pins, `onSelect`) | [spec-blocks](spec-blocks.md#calendars-and-maps) | | | |
 | Open a build from a link (`build_url` on `POST /session`) | [test-your-build](test-your-build.md#open-a-build-from-a-link) | | | |
 | Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
+| Spec data sources refresh on an interval (`refresh`) | [spec-blocks](spec-blocks.md#data-that-refreshes) | | | |
+| Hosted `open_app` returns `watch_url` (read-only live link, Take over for the key's owner) | [agents](agents.md#watch-the-agents-phone) | | | |
+| Faster rebuild after a save in `shipvo run` and `shipvo sim --watch` | [run](run.md#edit-and-save-the-phone-updates) | | | |
+| Arrange the home screen (`arrange_apps`, `set_phone_time`) and the `/phone` frame page | [phone-apps](phone-apps.md) | | | |

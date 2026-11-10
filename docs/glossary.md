@@ -106,3 +106,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Calendar block.** A part of an app spec that shows dated rows as a month, a week or an agenda. See [App spec](spec-blocks.md#calendars-and-maps).
 
 **Map block.** A part of an app spec that draws rows with a latitude and longitude as pins on a canvas. It loads no map tiles. See [App spec](spec-blocks.md#calendars-and-maps).
+
+**Refresh.** A setting on an app spec data source that makes the simulator load it again every so many seconds (30 or more) while the app is installed. See [App spec](spec-blocks.md#data-that-refreshes).
+
+**Watch link.** A read-only link, valid for one hour, that shows a hosted phone live in your browser. The hosted `open_app` returns it as `watch_url`. See [Agents](agents.md#watch-the-agents-phone).

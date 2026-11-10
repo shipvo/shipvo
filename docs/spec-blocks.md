@@ -240,6 +240,28 @@ A data source can call a service with a key you saved once in the secret form. T
 | `secret_revoked` | The key was revoked. | Save it again; saving clears the revocation. |
 | `secret_domain` | The key is saved for a different service than the URL's host. No request was sent. | Save the key for this domain, or fix the URL. |
 
+## Data that refreshes
+
+A pinned or long-open app should not show stale data. Add `refresh` to an `http` data source: the number of seconds between refreshes, 30 or more.
+
+```json
+"permissions": { "network": ["api.example.com"] },
+"data": {
+  "rates": { "source": "http", "get": "https://api.example.com/rates", "refresh": 60 }
+}
+```
+
+While the app is installed on a simulated phone (Android or iOS), the simulator runs the source again on that interval. It uses the same cost limits, domain checks and trimming as the first load. The new value is written into the app's data, so the open screen and its labelled tree show it. No tap or assistant call is needed.
+
+- A failed refresh keeps the last value. A source never overlaps itself.
+- Refreshing stops when the app is uninstalled or the session ends. Updating the spec restarts the timers with the new settings.
+- A source that uses a saved key refreshes only when the host supplies the key; a host with no vault refreshes it without one.
+
+| Error | Fix |
+| --- | --- |
+| `10 is below the minimum 30.` (`$.data.rates.refresh`) | Use 30 or more. |
+| `refresh is only for http data sources.` | Remove `refresh`, or change the source to `http`. |
+
 ## Errors you may see
 
 `validate` returns the JSON path and a fix for each error.
@@ -263,6 +285,7 @@ A data source can call a service with a key you saved once in the secret form. T
 - **A week or month view shows no events.** The view only lists events inside the days it shows. Set `at` to a day in the period you want, or use `agenda`.
 - **A translation does not show.** The key must match the text exactly, including capitals and spaces, and `language` must be the same code you used in `strings` (`fr`, not `fr-FR`). Pass `locale` separately for money and dates.
 - **A vector shape is missing.** An unknown `shape` is an error; a colour that is not hex, a name or `url(#id)` draws as `none`; a path with other characters draws nothing.
+- **A source does not refresh.** Check `refresh` is 30 or more and the source is `http`. The app must be installed on a phone session; a one-off `renderScreen` loads data once.
 - **State is empty before the first change.** Declare a `default` for each `state` value. Declared defaults are present from the start.
 
 ## Next steps
