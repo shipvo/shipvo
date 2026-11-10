@@ -164,4 +164,31 @@ describe("wake-up tools", () => {
     expect(out2.count).toBe(1); expect(out2.results[0].snippet).toBe("Amina Diallo");
     await c.close(); srv.close();
   }, 30000);
+  it("backup_phone returns the backup and restore_phone sends it back with replace", async () => {
+    const seen: any[] = [];
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      if (body.action === "backup_phone") return res.end(JSON.stringify({ ok: true, backup: { format: "shipvo.phone-backup/v0", apps: [], store_apps: [], settings: {}, clipboard: "" } }));
+      if (body.backup?.format !== "shipvo.phone-backup/v0") return res.end(JSON.stringify({ ok: false, code: "bad_backup", error: "format" }));
+      res.end(JSON.stringify({ ok: true, restored: { apps: ["notes"], store_apps: [], settings: [], clipboard: true }, skipped: ["tide"] }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const b: any = await c.callTool({ name: "backup_phone", arguments: { session: "s" } });
+    const backup = JSON.parse(b.content[0].text);
+    expect(backup.format).toBe("shipvo.phone-backup/v0");
+    const r: any = await c.callTool({ name: "restore_phone", arguments: { session: "s2", backup, replace: true } });
+    expect(seen.at(-1)).toMatchObject({ action: "restore_phone", session: "s2", replace: true, backup: { format: "shipvo.phone-backup/v0" } });
+    expect(JSON.parse(r.content[0].text)).toEqual({ restored: { apps: ["notes"], store_apps: [], settings: [], clipboard: true }, skipped: ["tide"] });
+    const bad: any = await c.callTool({ name: "restore_phone", arguments: { session: "s2", backup: { format: "x" } } });
+    expect(bad.isError).toBe(true); expect(bad.content[0].text).toContain("bad_backup");
+    await c.close(); srv.close();
+  }, 30000);
 });
