@@ -1,2 +1,2 @@
-- docs: "Test your app with an assistant" and "Moving to a new machine" now say who they are for, show the expected output, and have Troubleshooting and Next steps sections; glossary gains "Signing seed".
+- docs: "Test your app with an assistant" now says who it is for, and its check section is renamed Troubleshooting. "Moving to a new machine" now says who it is for, shows the expected `keys import` output and adds a `shipvo doctor` check.
 - Migration: none.

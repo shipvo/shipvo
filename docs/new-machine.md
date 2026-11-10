@@ -42,6 +42,7 @@ You should see:
 
 ```text
 Signing key for "<your app>" restored to .shipvo/seed.txt (matches shipvo.json).
+Next: `shipvo login` then `shipvo app create` to get a publish token on this machine.
 ```
 
 Check it worked:
