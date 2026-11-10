@@ -72,6 +72,19 @@ codec_type=audio
 duration=0.733
 ```
 
+## Troubleshooting
+
+| What you see | Why | What to do |
+| --- | --- | --- |
+| `recorder_unavailable` | Playwright or Chromium is not installed. | Run `npm i -D playwright && npx playwright install chromium`, then record again. |
+| `music_unavailable` | You installed from npm, which does not include the mixer script. | Set `SHIPVO_BGMUSIC` to a copy of `scripts/video/bgmusic.py`, or record from a repo checkout. The silent video is kept. |
+| `music_failed` | The mix failed, for example `python3` is missing. | Install `python3` and run the recording again. |
+| `narration_unreadable` | The path to the `.wav` is wrong or the file is not audio. | Check the path from the folder your assistant runs in. The silent video is kept. |
+| `encode_failed` | `ffmpeg` is not installed. | Install `ffmpeg` and `ffprobe`, then record again. |
+| The video is shorter than your narration | The narration is cut to the video length. | Add real steps and waits to the demo, then record again. `notes` in the result says when this happened. |
+
+All error codes are in [Record a demo video of the phone](record.md#troubleshooting).
+
 ## Next steps
 
 - [Record a demo video of the phone](record.md): all options and error codes.
