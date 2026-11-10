@@ -192,3 +192,14 @@ test("refresh() keeps the last data and names the source when a fetch fails", as
   assert.equal(out.errors[0].source, "price");
   assert.match(out.errors[0].message, /failed/);
 });
+
+test("history records what each version changed and sources() lists the http sources with their interval", () => {
+  const { host } = setup();
+  assert.deepEqual(host.history("s", "app").map((h) => h.changes), [["created: 1 screens, 0 actions, 1 data sources"]]);
+  assert.deepEqual(host.sources("s", "app"), [{ name: "price", refresh: 60 }]);
+  const next = spec({ refresh: 90 });
+  next.screens = [...next.screens, { id: "about", title: "About", body: [{ type: "text", value: "Hi" }] }];
+  assert.equal(host.update("s", "app", next).ok, true);
+  assert.deepEqual(host.history("s", "app").at(-1).changes, ["added screen 'about'", "changed data 'price'"]);
+  assert.deepEqual(host.sources("s", "app"), [{ name: "price", refresh: 90 }]);
+});
