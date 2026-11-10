@@ -1,0 +1,1 @@
+- docs: new page "Test an email sign-in" with expected output, troubleshooting and next steps; it is in the docs sidebar and `llms.txt`, and the glossary has "Session inbox".

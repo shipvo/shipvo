@@ -131,3 +131,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Prefixed element refs after a restart (`f1e2`, `p1e5`; `stale_ref`) | [agents](agents.md) | | | |
 | Spec `csv()` function to export a collection | [phone-apps](phone-apps.md), [app-spec](design/app-spec.md) | | | |
 | Roll back safely with a state version (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
+| Private email inbox per session (`inbox_wait`, `inbox_read`, `inbox_clear`, `phone.inbox`) for emailed-code and magic-link sign-in | [email-sign-in](email-sign-in.md) | | | |
+| Assistant Inbox first-party app (`send_message`, `hand_off`, `share_report`; automatic `caller`) | [phone-apps](phone-apps.md) | | | |
+| `csv()` in app specs | [phone-apps](phone-apps.md) | | | |

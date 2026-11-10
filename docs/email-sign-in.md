@@ -1,8 +1,8 @@
 # Test an email sign-in on Android and iOS
 
-Many apps sign in with a code or a link sent by email. Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
+This page is for anyone testing an app that signs in with a code or a link sent by email, whether you write the test yourself or ask an AI assistant to do it. You will get a test or an agent run that requests the email, reads the code, and finishes the sign-in on Android and iOS.
 
-The inbox works the same on the Android and iOS phones.
+Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved. The inbox works the same on the Android and iOS phones.
 
 ## How it works
 
@@ -57,6 +57,34 @@ Agents use three tools. Each takes the `session` from `open_app`.
 
 `inbox_clear` empties the inbox between attempts.
 
+## What you will see
+
+`inbox_read` (or `phone.inbox.list()`) returns the address and the mail so far. After the sign-in request in the example above, one message is there:
+
+```json
+{ "address": "s-1a2b3c4d5e6f@inbox.shipvo.test",
+  "messages": [ { "id": "m1", "from": "login@example.test", "subject": "Your sign-in code",
+                  "text": "Your code is 482913. It expires in 10 minutes.",
+                  "codes": ["482913"], "links": [], "received_at": "2026-11-10T09:00:00.000Z" } ] }
+```
+
+## Troubleshooting
+
+| You see | Why | What to do |
+| --- | --- | --- |
+| `inbox_timeout` | No mail matched `subject` or `from` before `timeout` ran out. The message names the address it waited on | Check the app used the address from `inbox.address()`. Call `inbox_read` with no filter to see what did arrive, then loosen the filter. Filters match part of the text and ignore case |
+| `inbox_no_code` | The mail has no standalone 4 to 8 digit number | Read `text` from `waitFor`. A code inside a longer number or a word is not picked up. Links are not codes: use `links` |
+| Status 550 from `inbox.shipvo.test/send` | The `to` address is not this session's address | Send to the address `inbox.address()` returns. Each session has its own |
+| `session_ended` | The session closed while you were waiting | Open a new session and request the mail again. The inbox does not carry over |
+| An old code is returned | An earlier mail in the same session still matches | Call `inbox_clear` before each sign-in attempt |
+| `bad_timeout` | `timeout_ms` is outside 0 to 25000 | Use a value in that range |
+
 ## Android and iOS
 
 The inbox, the tools and `phone.inbox` are the same on the Android and iOS phones. With MCP, open the session with `platform: "android"` or `platform: "ios"` in `open_app` and follow the same steps.
+
+## Next steps
+
+- [Test with an assistant](test-with-an-assistant.md): connect Claude, ChatGPT or Cursor to the phone.
+- [Test your app in CI](testing.md): run this test on every pull request.
+- [Agents and tools](agents.md): every MCP tool, including the three inbox tools.
