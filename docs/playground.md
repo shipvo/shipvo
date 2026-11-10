@@ -21,7 +21,7 @@ Pick a panel from the feature list to try one feature.
 2. **Device API.** Set location, camera, biometrics, payment, notification and airplane mode, and see the sample app show each result. See [Device API](device-api.md).
 3. **Agent tools.** The panel has a tool console and a **Watch Lumi** button.
    - In the console, pick a tool (`screen`, `tap`, `type` or `device_log`), fill in its arguments and press Run. The result appears as JSON below. Run `screen` first: it lists the labelled elements with refs such as `e1`. Then `tap` with `ref` set to `e1` adds the first product to the cart.
-   - **Watch Lumi** runs [Lumi](lumi.md) on the sample app. It adds three items to the cart and shows a caption for each tap.
+   - **Watch Lumi** runs [Lumi](lumi.md) on the sample app. It adds three items to the cart per run and shows a caption for each tap.
    - These are the same tools your assistant uses over MCP. See [Agents](agents.md).
 4. **Many phones.** Shows 1 to 12 phones side by side. Set the number and choose Android, iOS or both. The page starts with 4 phones, Android and iOS together. Numbers outside 1 to 12 are moved to the nearest valid number.
 
@@ -45,11 +45,11 @@ A number above 12 becomes 12 and a number below 1 becomes 1. Any other value for
 
 - **A panel stays empty.** Reload the page. The phones load after the page, and each one takes a moment.
 - **The tool console says an element is not found.** Run `screen` again. Refs are per screen, so a ref from before you changed screen may not exist now.
-- **Lumi ran twice and the cart shows six items.** Reload the page for a fresh cart, then run it again.
+- **Lumi ran twice and the cart shows six items (three per run).** Reload the page for a fresh cart, then run it again.
 - **Your link opens with a different number of phones.** Check that `phones` is between 1 and 12 and that `mix` is `android`, `ios` or `both`.
 
 ## Next steps
 
 - Run the same app on your own machine: [Build your first app](getting-started.md).
-- See many phones from your own project: [Run on a phone in your browser](run.md).
+- Run your own app on a phone in your browser: [Run on a phone](run.md).
 - Let an assistant drive a phone: [Agents](agents.md).

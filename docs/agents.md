@@ -81,13 +81,17 @@ The simulator serves a `/watch` page. Open it in a browser to see the agent's ph
 
 ## Slow tools and `job_status`
 
-`publish_preview` and `upload_build` can take longer than some clients wait for one tool call. Both take an optional `wait_ms` (default 20000). If the work finishes within that time you get the usual result. If not, you get `{ "status": "running", "job": "<id>" }`.
+`publish_preview` and `upload_build` can take longer than some clients wait for one tool call. Both take an optional `wait_ms` (default 20000, at most 55000). If the work finishes within that time you get the usual result. If not, you get `{ "status": "running", "job": "<id>" }`.
 
 1. Call `job_status` with `{ "job": "<id>", "wait_ms": 20000 }`.
-2. It returns `running`, `done` with the result, or `failed` with a typed error `{ code, error }`. With `wait_ms` it waits for the job to finish.
+2. It returns `running`, `done` with the result, or `failed` with a typed error `{ code, error }`. With `wait_ms` (at most 55000) it waits for the job to finish. Without `wait_ms` it returns at once. The default of 20000 applies to the tools, not to `job_status`.
 3. If your agent calls `publish_preview` again while the job runs, it gets the same job, so a retry never starts a second publish.
 
-Jobs belong to the key that started them and are kept for 15 minutes after they finish.
+Jobs belong to the key that started them and are kept for 15 minutes after they finish. For an unknown, expired or foreign job id, `job_status` returns the typed error `job_not_found`.
+
+## Trace context
+
+If your agent sends a W3C `traceparent` in the `_meta` of a tool call, Shipvo records its trace id with that call in the session's tool-call log and echoes `traceparent` in the result `_meta`. A malformed value is ignored. `tracestate` and `baggage` are never read or stored.
 
 ## What the tree shows (and hides), on purpose
 
