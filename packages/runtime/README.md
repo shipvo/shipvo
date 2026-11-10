@@ -4,7 +4,7 @@ The native half of Shipvo's over-the-air updates, as an Expo module.
 
 - Verifies every release pointer (Ed25519) and bundle (SHA-256 + size) against a public key built into the shell.
 - Downloads bsdiff patches when it has the previous release, full bundles otherwise; stages atomically.
-- On Android, a patch that would not fit in memory falls back to the full download; see [Patches on small heaps](#patches-on-small-heaps-android).
+- On Android, a patch that would not fit in memory falls back to the full download; see [Patches and memory](#patches-and-memory-android).
 - Applies without restart, marks the release healthy when the app says so, and discards a release that fails to boot 3 times.
 - Android and iOS. iOS applies patches from the bundle it is running and downloads the full bundle otherwise. It is verified on the iOS Simulator in CI; in the web simulator the app runs the same release as the web build.
 
@@ -72,7 +72,7 @@ An uncaught JS error in a background load counts as one failed boot at once (the
 
 ## Patches and memory (Android)
 
-Before it applies a patch, the Android runtime checks that the base bundle, the patch and the new bundle together fit in 40 % of the app's heap limit. If they do not, or if the base bundle is missing, `PatchStep.run` returns `over_memory_budget` and the runtime downloads the full bundle instead. If the patch step runs out of memory, it does the same with `out_of_memory`. The update still lands, signed and checked the same way.
+Before it applies a patch, the Android runtime checks that the base bundle, the patch and the new bundle together fit in 40 % of the app's heap limit. If they do not, or if the base bundle is missing or unreadable, `PatchStep.run` returns `over_memory_budget` and the runtime downloads the full bundle instead. If the patch step runs out of memory, it does the same with `out_of_memory`. The update still lands, signed and checked the same way.
 
 `Runtime.checkForUpdate(apply)` tells you what happened in `CheckResult`: `via` is `"full"` and `patchError` is `"over_memory_budget"` or `"out_of_memory"`. If the patch step fails for another reason, `patchError` holds the error message. `patchError` is `null` when a patch was applied or none was tried. Your app can read `patchError` from the result and log it.
 
