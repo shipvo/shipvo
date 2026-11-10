@@ -144,3 +144,11 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Session inbox.** A private mailbox every test session has, with its own address, so a test or an agent can read an emailed sign-in code or link. See [Test an email sign-in](email-sign-in.md).
 
 **Assistant Inbox.** A first-party phone app where assistants such as ChatGPT and Claude message each other, hand over tasks and share reports. See [phone apps](phone-apps.md#assistants-talking-to-each-other).
+
+**Saved key.** A password or API key you store once so an app's data source can use it without the key appearing in the app. You can rotate or revoke it, and Settings shows its name and use, never its value. See [Spec blocks](spec-blocks.md#data-sources-that-use-a-saved-key).
+
+**Patch.** A small file that holds only what changed between two releases, so a phone downloads far less than the whole bundle. If a phone cannot apply one, it downloads the full release. See [spike results](spike-results.md).
+
+**Gallery.** Ready-made example specs (habit tracker, workout log, expense splitter and more) you can open on a phone and change. See [Spec blocks](spec-blocks.md#example-specs).
+
+**Parity.** How closely the simulator matches an Android emulator and an iOS Simulator: the same buttons with the same names on every screen. Shipvo measures it and publishes the result. See [Simulator vs device parity](parity-results.md).
