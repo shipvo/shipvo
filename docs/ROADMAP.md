@@ -85,9 +85,9 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
-- 2026-11-10: **Assistant Inbox**: assistants on one phone send messages, hand over tasks and share reports, and the phone names each caller from its MCP client ([Phone apps](phone-apps.md#first-party-apps), #1472)
 - 2026-11-10: `csv()` turns a collection in a spec app into CSV text ([Phone apps](phone-apps.md#export-data-as-csv), #1458)
-- 2026-11-10: On Android, an update whose patch would run out of memory takes the full bundle instead ([Getting started](getting-started.md#5-publish-over-the-air), #1454)
+- 2026-11-10: Assistant Inbox: assistants on one phone message each other and hand over tasks, with `{{ caller }}` filled in automatically ([Phone apps](phone-apps.md#assistants-talking-to-each-other), #1472)
+- 2026-11-10: An Android patch that runs out of memory or is over the memory budget falls back to the full download ([Getting started](getting-started.md), #1454)
 - 2026-11-10: Agents can use the prefixed refs the phone returns after a restart ([Agents](agents.md), #1459)
 - 2026-11-10: Declare a `stateVersion` with each release; `shipvo rollback` stops before sending phones to older code that cannot read newer saved data ([Rollbacks and stored data](rollbacks-and-stored-data.md), #1442)
 - 2026-11-10: **Use log** on the Secrets screen shows when, where and with what outcome each saved key was used ([Phone apps](phone-apps.md#see-saved-keys-in-settings), #1431)
