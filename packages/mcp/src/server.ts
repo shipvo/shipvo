@@ -24,6 +24,7 @@ import { Recorder, RecorderError } from "./recorder.js";
 import { connectDriver, findLiveRun, type Driver, type RunInfo } from "./attach.js";
 import { BuildError, hostedKey, resolveBuild, uploadBuild } from "./build-upload.js";
 import { findProjectDir, hasDesktop, localShipvo, runUrl, startRun } from "./launch.js";
+import { JobStore, type JobView } from "./jobs.js";
 import { satisfied, sameTree, type WaitFor, type Waited } from "./wait.js";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
@@ -65,19 +66,20 @@ async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
   }
 }
 // The marketplace list for the phone's Store: the control plane's public apps. PN_STORE_FIXTURE=1 uses a local list (tests, offline demos).
-type StoreApp = { id: string; name: string; url: string; version: string };
+type StoreApp = { id: string; name: string; url: string; version: string; description?: string; tags?: string[]; countries?: string[]; languages?: string[]; currencies?: string[] };
 const STORE_FIXTURE: StoreApp[] = [
   { id: "tide", name: "Tide & Tackle", url: "fixture://tide", version: "1.0.0" },
   { id: "notes", name: "Pocket Notes", url: "fixture://notes", version: "0.3.1" },
   { id: "weather", name: "Harbour Weather", url: "fixture://weather", version: "2.1.0" },
+  { id: "splitly", name: "Splitly", url: "fixture://splitly", version: "1.2.0", description: "Split bills with friends and settle up.", tags: ["bills", "expenses", "money"], currencies: ["EUR", "GBP"], languages: ["en", "fr"] },
 ];
 async function storeApps(): Promise<{ ok: true; apps: StoreApp[]; fixture: boolean } | { ok: false; code: "store_unreachable"; error: string }> {
   if (process.env.PN_STORE_FIXTURE === "1") return { ok: true, apps: STORE_FIXTURE, fixture: true };
   try {
     const r = await fetch(`${CONTROL}/apps/public`, { signal: AbortSignal.timeout(simTimeoutMs()) });
     if (!r.ok) throw new Error(`status ${r.status}`);
-    const list = ((await r.json()) as { apps?: { app_id: string; name?: string; latest_release?: number }[] }).apps ?? [];
-    return { ok: true, fixture: false, apps: list.map((a) => ({ id: a.app_id, name: a.name ?? a.app_id, url: a.latest_release != null ? `app://${a.app_id}@r${a.latest_release}` : `app://${a.app_id}@latest`, version: a.latest_release != null ? `r${a.latest_release}` : "latest" })) };
+    const list = ((await r.json()) as { apps?: { app_id: string; name?: string; latest_release?: number; description?: string; tags?: string[]; countries?: string[]; languages?: string[]; currencies?: string[] }[] }).apps ?? [];
+    return { ok: true, fixture: false, apps: list.map((a) => ({ id: a.app_id, name: a.name ?? a.app_id, description: a.description, tags: a.tags, countries: a.countries, languages: a.languages, currencies: a.currencies, url: a.latest_release != null ? `app://${a.app_id}@r${a.latest_release}` : `app://${a.app_id}@latest`, version: a.latest_release != null ? `r${a.latest_release}` : "latest" })) };
   } catch (e) { return { ok: false, code: "store_unreachable", error: `the marketplace at ${CONTROL} did not answer (${(e as Error).message}). Try again when the network is back.` }; }
 }
 const recorder = new Recorder();
@@ -174,7 +176,19 @@ const SERVER_VERSION: string = (() => { try { return JSON.parse(readFileSync(new
 // MCP 2026-07-28 caching hint on tools/list. The list depends on the per-request scope headers, so it is private to the caller.
 const TOOLS_LIST_TTL_MS = 60_000;
 const SUPPORTED_VERSIONS = ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
+// Slow tools run as jobs. The store lives in the process (not per request) so the remote server, which builds
+// a new McpServer for every request, still finds a job on the next call. Jobs are scoped to the API key.
+type Done = { text: string; structured: Record<string, unknown> };
+const jobs = new JobStore<Done>();
+const failure = (code: string, error: string) => ({ ...text(`Error [${code}]: ${error}`), isError: true as const, structuredContent: { ok: false, code, error } });
+// The tool result for a job view: the tool's own result when done, a handle while running, a typed error when failed.
+const jobReply = (v: JobView<Done>) =>
+  v.status === "done" ? { ...text(v.result.text), structuredContent: v.result.structured }
+  : v.status === "running" ? { ...text(JSON.stringify({ status: "running", job: v.job, note: "Still running. Call job_status with this job to read the result; calling this tool again returns the same job." }, null, 2)), structuredContent: { status: "running", job: v.job } }
+  : { ...failure(v.error.code, v.error.error), structuredContent: { ok: false, status: "failed", job: v.job, ...v.error } };
+const codedError = (code: string, message: string) => Object.assign(new Error(message), { code });
 function makeServer(ctx: Ctx = {}) {
+const principal = ctx.key ?? "local";
 const server = new McpServer({ name: "shipvo", version: SERVER_VERSION }, { instructions:
 `You can use Shipvo apps the way a person uses them on a phone, without a phone.
 Call open_app to get a session and the first screen. The screen is an accessibility tree: every button, field and text, with a [ref=eN]. Act with tap/type/scroll/back using refs, and read the screen that comes back each time.
@@ -275,15 +289,18 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, 
 };
 use(server, tools.open_app, openApp);
 // Build the project here and upload it for the hosted phone. Needs the project on disk, so stdio only.
-use(server, tools.upload_build, async ({ dir, app, skip_build }) => {
+use(server, tools.upload_build, async ({ dir, app, skip_build, wait_ms }) => {
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot upload builds");
   if (ctx.remote) return result("", { ok: false, code: "stdio_only", error: "upload_build reads your project, so it runs only in the local server: add the stdio server (npx @shipvo/mcp) next to this one" });
-  try {
-    if (keyApps && app && !keyApps.includes(app)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
-    const b = await uploadBuild({ dir, app, skipBuild: skip_build });
-    if (keyApps && !keyApps.includes(b.app)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
-    return { ...text(`build: ${b.id}\napp: ${b.app}\nexpires: ${b.expires_at}\nsize: ${b.bytes} bytes\n\nOpen it on the hosted phone: open_app("${b.app}@build:${b.id}")`), structuredContent: { ...b } };
-  } catch (e) { return result("", { ok: false, code: e instanceof BuildError ? e.code : "upload_failed", error: (e as Error).message }); }
+  if (keyApps && app && !keyApps.includes(app)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
+  const work = async (): Promise<Done> => {
+    let b;
+    try { b = await uploadBuild({ dir, app, skipBuild: skip_build }); }
+    catch (e) { throw codedError(e instanceof BuildError ? e.code : "upload_failed", (e as Error).message); }
+    if (keyApps && !keyApps.includes(b.app)) throw codedError("unknown_app", `this key opens: ${keyApps.join(", ")}`);
+    return { text: `build: ${b.id}\napp: ${b.app}\nexpires: ${b.expires_at}\nsize: ${b.bytes} bytes\n\nOpen it on the hosted phone: open_app("${b.app}@build:${b.id}")`, structured: { ...b } };
+  };
+  return jobReply(await jobs.start(principal, JSON.stringify(["upload_build", dir ?? null, app ?? null, !!skip_build]), work, wait_ms));
 });
 // Attach to the live `shipvo run` phone in this project. The app defaults to the one in .shipvo/run.json.
 use(server, tools.attach_session, async ({ app, session }) => {
@@ -392,6 +409,14 @@ use(server, tools.list_store_apps, async () => {
   const r = await storeApps();
   if (!r.ok) return result("", r);
   return { ...text(JSON.stringify(r.apps, null, 2)), structuredContent: { apps: r.apps } };
+});
+use(server, tools.find_apps, async ({ session, query, country, language, currency, limit }) => {
+  need(session);
+  const st = await storeApps();
+  if (!st.ok) return result(session, st);
+  const r = await act({ session: session, action: "find_apps", query, country, language, currency, limit, catalog: st.apps }) as Act & { apps?: unknown[] };
+  if (!r.ok) return result(session, r);
+  return { ...text(JSON.stringify(r.apps ?? [], null, 2)), structuredContent: { apps: r.apps ?? [] } };
 });
 use(server, tools.install_app, 
   async ({ session, id }) => { need(session); const st = await storeApps(); return result(session, await act({ session, action: "install_app", id, ...(st.ok ? { catalog: st.apps } : {}) })); });
@@ -512,15 +537,23 @@ use(server, tools.record_stop, async ({ music, narration }) => {
 });
 
 // Publish the app's web build to here.now (no account) through the CLI, which builds, wraps and checks for secrets.
-use(server, tools.publish_preview, 
-  async () => {
-    if (ctx.scope && ctx.scope !== "owner" && ctx.scope !== "test") throw new Error(`this key has scope "${ctx.scope}": it cannot publish a preview`);
-    const cwd = process.env.PN_APP_DIR || process.cwd();
-    const out = await new Promise<string>((resolve, reject) => execFile("npx", ["-y", "@shipvo/cli", "preview", "--json"], { cwd, timeout: 600000, maxBuffer: 4 << 20 }, (err, so, se) => (err ? reject(new Error(String(se || err.message).trim().split("\n").slice(-3).join(" "))) : resolve(so))));
+use(server, tools.publish_preview, async ({ wait_ms }) => {
+  if (ctx.scope && ctx.scope !== "owner" && ctx.scope !== "test") throw new Error(`this key has scope "${ctx.scope}": it cannot publish a preview`);
+  const cwd = process.env.PN_APP_DIR || process.cwd();
+  const work = async (): Promise<Done> => {
+    const out = await new Promise<string>((resolve, reject) => execFile("npx", ["-y", "@shipvo/cli", "preview", "--json"], { cwd, timeout: 600000, maxBuffer: 4 << 20 }, (err, so, se) => (err ? reject(codedError("preview_failed", String(se || err.message).trim().split("\n").slice(-3).join(" "))) : resolve(so))));
     const r = JSON.parse(out.trim().split("\n").pop() ?? "{}");
     const sc = { url: r.url as string, claimUrl: (r.claimUrl ?? null) as string | null, expiresAt: (r.expiresAt ?? null) as string | null };
-    return { ...text(JSON.stringify({ ...sc, note: "Public link, expires in 24 hours unless claimUrl is opened and the owner signs in to here.now. Share claimUrl byte for byte." }, null, 2)), structuredContent: sc };
-  });
+    return { text: JSON.stringify({ ...sc, note: "Public link, expires in 24 hours unless claimUrl is opened and the owner signs in to here.now. Share claimUrl byte for byte." }, null, 2), structured: sc };
+  };
+  return jobReply(await jobs.start(principal, JSON.stringify(["publish_preview", cwd]), work, wait_ms));
+});
+use(server, tools.job_status, async ({ job, wait_ms }) => {
+  const v = await jobs.status(principal, job, wait_ms ?? 0);
+  if (!v) return failure("job_not_found", "no such job for this key. It may have expired (jobs are kept for 15 minutes after they finish): start the tool again.");
+  if (v.status === "done") { const sc = { status: "done", job: v.job, result: v.result.structured }; return { ...text(JSON.stringify(sc, null, 2)), structuredContent: sc }; }
+  return jobReply(v);
+});
 
 // Owner side: the same typed commands the admin at /app/<id>/admin uses.
 use(server, tools.owner_describe, async ({ app }) => {

@@ -1,0 +1,1 @@
+- `scripts`: `scripts/first-run/continuous.mjs` joins the first-run JSON from one job into one init-to-applied timeline for Android and iOS, and refuses mixed commits or platforms.

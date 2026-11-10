@@ -91,6 +91,7 @@ A frame page without a session (`shipvo run`) lists the marketplace apps and ins
 
 | Tool | What it does | Typed errors |
 | --- | --- | --- |
+| `find_apps` | Searches the Store by need, country, language and currency; install a result with `install_app` or `request_app_install` | `store_unreachable` |
 | `list_store_apps` | Lists the marketplace apps (id, name, bundle URL, version) from the control plane | `store_unreachable` |
 | `install_app { id }` | Fetches the app's bundle and installs it; its icon appears on the home screen | `unknown_app`, `already_installed`, `store_app_unreachable`, `too_large`, `host_not_allowed` |
 | `switch_app { id }` | Opens an installed app; it becomes `current_app` | `not_installed` |
@@ -100,7 +101,7 @@ A frame page without a session (`shipvo run`) lists the marketplace apps and ins
 
 Installing a marketplace app is real. `install_app` fetches the app's published bundle (`app://<id>@rN`, `@latest` or an `http(s)` URL) through the same host guard and size cap as `build_url`, and keeps its `sha256` and `bytes` on the installed app. `device_log` marks the install `source: "real"` and includes the `sha256`. If the bundle cannot be fetched the app is not installed and the error is `store_app_unreachable` (or `too_large` or `host_not_allowed`). Switching and uninstalling record state changes in `device_log`. Fixture apps (`fixture://…`) have no bundle, so their installs are marked `simulated`.
 
-If the marketplace cannot be reached, `list_store_apps` returns `store_unreachable` and does not guess. `install_app` then falls back to the phone's own Store list. Set `PN_STORE_FIXTURE=1` on the MCP server to use a local list of three apps (`tide`, `notes`, `weather`) with no network.
+If the marketplace cannot be reached, `list_store_apps` returns `store_unreachable` and does not guess. `install_app` then falls back to the phone's own Store list. Set `PN_STORE_FIXTURE=1` on the MCP server to use a local list of four apps (`tide`, `notes`, `weather`, `splitly`) with no network.
 
 Switching sets `current_app` and brings the app to the front. If the app's bundle URL starts with `http`, the session loads it. Other URLs (such as the fixture's) only change state.
 
