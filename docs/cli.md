@@ -366,6 +366,7 @@ These come from fixed issues in this repository.
 - [Test your app in CI](testing.md), including `shipvo test --repair` and `--report`.
 - [Store details and screenshots](store.md).
 - [Self-host the control plane](self-hosting.md).
+- [Rollbacks and stored data](rollbacks-and-stored-data.md): `stateVersion` and `--allow-state-downgrade`.
 - [Glossary](glossary.md) for the words used here.
 
 ## `--json` for `publish`, `promote`, `rollback` and `auto-halt`
@@ -383,7 +384,7 @@ These four commands take `--json` and print the same `{ ok, code, summary, data,
 | `rollback --dry-run` | `dry_run` | the same with `dry_run: true` |
 | `auto-halt` | `auto_halt_show`, `auto_halt_on`, `auto_halt_off`, `dry_run` | `{ enabled, threshold, min_reports, dry_run, changed }` (`threshold` and `min_reports` are `null` when off) |
 
-Failure codes: `usage`, `failed`, `policy_refused`, `no_bundle`, `not_found`, `no_pointer`, `tests_failed`, `blocked`, `report_unreadable`, `no_credentials`, `auth_failed`, `remote_failed`. On failure `data` is `{}` and `summary` is the error message.
+Failure codes: `usage`, `failed`, `policy_refused`, `no_bundle`, `not_found`, `no_pointer`, `tests_failed`, `blocked`, `report_unreadable`, `no_credentials`, `auth_failed`, `remote_failed`, `state_downgrade` (see [Rollbacks and stored data](rollbacks-and-stored-data.md)). On failure `data` is `{}` and `summary` is the error message.
 
 Without `--json`, `publish` and `rollback` print a single plain sentence.
 
