@@ -1,0 +1,1 @@
+- Docs: Auto-halt explains held releases (fresh installs and bursts, approve or deny). The CodePush migration page says who it is for and adds troubleshooting and next steps. The adapters page now lists where each rule runs and links next steps.
