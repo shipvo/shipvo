@@ -71,4 +71,22 @@ describe("per-app spend limit", () => {
     expect(rows.map((r: any) => r.action)).toEqual(["spend_limit_set", "spend_refused"]);
     expect(JSON.parse(rows[1].detail)).toMatchObject({ limit: 100, spent: 0, amount: 500 });
   });
+  it("two calls at once cannot pass the limit together", async () => {
+    const { env, me, call, session, sql } = await setup();
+    await call("/phone/apps/tide/spend-limit", "PUT", session, { amount: 1000, currency: "USD" });
+    const rs = await Promise.all([authorizeSpend(env, pay(me, 600)), authorizeSpend(env, pay(me, 600))]);
+    expect(rs.filter((r) => r.ok).length).toBe(1);
+    expect(sql.prepare("SELECT SUM(amount) AS s FROM phone_spend").get().s).toBe(600);
+  });
+  it("old-currency spend does not count against a new currency limit", async () => {
+    const { env, me, call, session } = await setup();
+    await call("/phone/apps/tide/spend-limit", "PUT", session, { amount: 500, currency: "USD" });
+    expect(await authorizeSpend(env, pay(me, 500))).toEqual({ ok: true });
+    await call("/phone/apps/tide/spend-limit", "PUT", session, { amount: 500, currency: "EUR" });
+    expect(await authorizeSpend(env, { ...pay(me, 500), currency: "EUR" })).toEqual({ ok: true });
+  });
+  it("rejects period week with 400", async () => {
+    const { call, session } = await setup();
+    expect((await call("/phone/apps/tide/spend-limit", "PUT", session, { amount: 5, currency: "USD", period: "week" })).status).toBe(400);
+  });
 });

@@ -15,9 +15,10 @@ export async function getLimit(env: SpendEnv, person: number, app: string): Prom
   return { amount: r?.amount ?? 0, currency: r?.currency ?? "USD", period: "month" };
 }
 
-/** Money spent by the app this month, from the use log. */
+/** Money spent by the app this month, in the limit's currency, from the spend ledger. */
 export async function spentThisMonth(env: SpendEnv, person: number, app: string, now = new Date()): Promise<number> {
-  const r: any = await env.DB.prepare("SELECT COALESCE(SUM(amount), 0) AS s FROM phone_spend WHERE person_id = ? AND app_id = ? AND at >= ?").bind(person, app, monthStart(now)).first();
+  const { currency } = await getLimit(env, person, app);
+  const r: any = await env.DB.prepare("SELECT COALESCE(SUM(amount), 0) AS s FROM phone_spend WHERE person_id = ? AND app_id = ? AND currency = ? AND at >= ?").bind(person, app, currency, monthStart(now)).first();
   return r?.s ?? 0;
 }
 
@@ -35,14 +36,15 @@ export type SpendResult = { ok: true } | { ok: false; code: "spend_limit"; limit
  * Allowed: the amount is recorded. Refused: the refusal is audited and nothing is recorded as spent.
  */
 export async function authorizeSpend(env: SpendEnv, q: { person: number; app: string; amount: number; currency: string; secret?: string }, now = new Date()): Promise<SpendResult> {
+  const bad = !Number.isInteger(q.amount) || q.amount <= 0;
+  // Check and record in one statement, so two calls at once cannot both pass. No limit row gives NULL: nothing is inserted.
+  const ins = bad ? { meta: { changes: 0 } } : await env.DB.prepare(
+    "INSERT INTO phone_spend (person_id, app_id, secret_name, amount, currency, at) SELECT ?,?,?,?,?,? WHERE (SELECT COALESCE(SUM(amount),0) FROM phone_spend WHERE person_id=? AND app_id=? AND currency=? AND at>=?) + ? <= (SELECT amount FROM phone_spend_limits WHERE person_id=? AND app_id=? AND currency=?)")
+    .bind(q.person, q.app, q.secret ?? null, q.amount, q.currency, now.toISOString(),
+      q.person, q.app, q.currency, monthStart(now), q.amount, q.person, q.app, q.currency).run();
+  if (ins.meta.changes > 0) return { ok: true };
   const limit = await getLimit(env, q.person, q.app);
   const spent = await spentThisMonth(env, q.person, q.app, now);
-  const bad = !Number.isInteger(q.amount) || q.amount <= 0;
-  if (bad || q.currency !== limit.currency || spent + q.amount > limit.amount) {
-    await audit(env, q.person, q.app, "spend_refused", { limit: limit.amount, spent, amount: q.amount, currency: q.currency }, now);
-    return { ok: false, code: "spend_limit", limit: limit.amount, spent };
-  }
-  await env.DB.prepare("INSERT INTO phone_spend (person_id, app_id, secret_name, amount, currency, at) VALUES (?,?,?,?,?,?)")
-    .bind(q.person, q.app, q.secret ?? null, q.amount, q.currency, now.toISOString()).run();
-  return { ok: true };
+  await audit(env, q.person, q.app, "spend_refused", { limit: limit.amount, spent, amount: q.amount, currency: q.currency }, now);
+  return { ok: false, code: "spend_limit", limit: limit.amount, spent };
 }
