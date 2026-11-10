@@ -130,3 +130,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Android patch falls back to full download on out-of-memory (`out_of_memory`, `over_memory_budget`) | [adapters](adapters.md) | | | |
 | `state_version` and rollback guard (`--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
 | `csv()` spec function | [phone-apps](phone-apps.md#export-data-as-csv) | | | |
+| Roll back safely with a state version (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
