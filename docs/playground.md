@@ -20,14 +20,14 @@ Pick a panel from the feature list to try one feature.
 1. **Signed updates.** Publish a signed update, stage it to 10% and then 100% of phones, crash it and watch the rollback. The signature result, cohort counts and crash-loop threshold come from the real signer, verifier, cohort bands and runtime code, recorded when the site was built. See [the CLI guide](cli.md) for the same steps on your app.
 2. **Device API.** Set location, camera, biometrics, payment, notification and airplane mode, and see the sample app show each result. See [Device API](device-api.md).
 3. **Agent tools.** The panel has a tool console and a **Watch Lumi** button.
-   - In the console, pick a tool (`screen`, `tap`, `type` or `device_log`), fill in its arguments and press Run. The result appears as JSON below. Run `screen` first: it lists the labelled elements with refs such as `e1`. Then `tap` with `ref` set to `e1` adds the first product to the cart.
-   - **Watch Lumi** runs [Lumi](lumi.md) on the sample app. It adds three items to the cart per run and shows a caption for each tap.
+   - In the console, pick a tool (`screen`, `tap`, `type` or `device_log`), fill in its arguments and press Run. The result appears as JSON below. Run `screen` first: it lists the labelled elements with refs such as `e1`. Then `tap` with `ref` set to `e1` taps the element with that ref.
+   - **Watch Lumi** runs [Lumi](lumi.md) on the sample app. It adds items to the cart and shows a caption for each tap.
    - These are the same tools your assistant uses over MCP. See [Agents](agents.md).
 4. **Many phones.** Shows 1 to 12 phones side by side. Set the number and choose Android, iOS or both. The page starts with 4 phones, Android and iOS together. Numbers above 12 become 12 and numbers below 1 become 1.
 
 ## Share a setup with a link
 
-Many phones reads its settings from the address, so you can send a setup to someone else. Press **Copy link** to copy the current one. You can also write it by hand:
+Many phones reads its settings from the address, so you can send a setup to someone else. Press **Copy link** to copy the current one, including the `dark` setting. You can also write it by hand:
 
 ```text
 https://shipvo.dev/playground/?phones=6&mix=both&dark=1#many
