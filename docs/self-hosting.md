@@ -1,6 +1,6 @@
 # Self-hosting the control plane
 
-The control plane is one Cloudflare Worker (Hono) with a KV namespace and a D1 database. It serves signed release pointers and bundles from the edge, stores content, orders and telemetry, and hosts the per-app admin and owner API. Free-tier Cloudflare is enough to start.
+The control plane is one Cloudflare Worker (Hono) with a KV namespace and a D1 database. It serves signed release pointers and bundles from the edge, stores content, orders and telemetry, and hosts the per-app admin and owner API. This page is for anyone who wants to run their own control plane. You get a working update server on your own Cloudflare account, or on your machine with Docker.
 
 ## Deploy
 
@@ -37,11 +37,11 @@ node ../../scripts/selfhost-smoke.mjs   # in another terminal; prints PASS
 
 On start, the container applies the files in `migrations/` to a local D1 database and adds a local developer key (`SHIPVO_LOCAL_DEV_KEY`, default `sv_test_localdev`). The smoke script uses that key to create an app, publish a signed pointer and read it back. Set the variable to something else if other people can reach your machine, and pass the same value to the script. The value may only contain letters, digits, `_` and `-`. When you change it, the container revokes the earlier local developer key on the next start. The smoke script needs Node 18 or later on the host.
 
-What the local setup is for:
-- Trying the control plane on your machine. It has no public URL and no TLS. The port is bound to `127.0.0.1` only.
+What the local setup gives you:
+- The port is bound to `127.0.0.1`, so only your machine can reach it.
 - Data lives in the Docker volume `control-plane-data` (`/data` in the container). `docker compose down -v` deletes it.
-- `ADMIN_PASSWORD` and `OWNER_TOKEN` are not set and GitHub login needs the internet, so the smoke script exercises the create-app, publish and read-pointer routes.
-- For production, use the Cloudflare deploy above.
+- The routes the smoke script uses: create an app, publish a signed pointer, read it back. `ADMIN_PASSWORD` and `OWNER_TOKEN` are not set, and GitHub login needs the network.
+- For a public URL with TLS, use the Cloudflare deploy above.
 
 ## D1 Free plan limits
 
@@ -203,6 +203,8 @@ The shell carries the Ed25519 public key and the control plane URL as native man
 | `docker compose up` works but the smoke script fails to sign in | The script and the container use different `SHIPVO_LOCAL_DEV_KEY` values | Pass the same value to both. It may only hold letters, digits, `_` and `-` |
 | Data is gone after restarting the container | `docker compose down -v` deletes the `control-plane-data` volume | Use `docker compose down` without `-v`, or restore a backup (see [Restore](#restore)) |
 | Phones keep the current release and the pointer answers 404 `release_halted` | [Auto-halt](auto-halt.md) stopped the live release | Publish a new release; it clears the effect |
+| `restore` refuses to run | The volume already holds data | Run `docker compose down -v` first, then restore into the empty volume |
+| `selfhost-upgrade-check.mjs verify` exits 1 | The earlier pointer is no longer served | Read the message it prints, then follow [Roll back](#roll-back) |
 | A call returns 403 `forbidden` with an `action` and a `role` | The publish token's role does not allow that action | Use a token with a role that does (see [Roles](#roles)), or the owner token |
 | Dashboards show fewer events than expected and `telemetry_dropped_today` in `/health` is above 0 | D1 refused some telemetry writes (see above) | Wait for the daily reset or move to a paid plan. Release pointers keep flowing |
 | `set_alert_webhook` answers `bad_webhook_url` | The URL is `http://` or contains a user name or password | Use an `https://` URL without credentials |
