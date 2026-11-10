@@ -384,7 +384,7 @@ final class RuntimeTests: XCTestCase {
     XCTAssertNil(load(s), "fourth load falls back to the embedded bundle")
     XCTAssertEqual(s.blockedRelease, 5); XCTAssertEqual(s.pendingRelease, 0)
     XCTAssertFalse(FileManager.default.fileExists(atPath: path))
-    XCTAssertTrue(s.consumeEvents().contains("crash_loop_revert:5"))
+    XCTAssertTrue(s.consumeEvents().contains { $0 == "crash_loop_revert:5:cold" || $0 == "crash_loop_revert:5:reload" })
     let again = try await Updater.check(s)
     XCTAssertEqual(again["status"] as? String, "none", "a release this device refused is not fetched again")
   }
@@ -407,7 +407,7 @@ final class RuntimeTests: XCTestCase {
     }
     XCTAssertNil(load(s), "the next launch reverts to the previous release (missing file, so the embedded bundle)")
     XCTAssertEqual(s.currentRelease, 3); XCTAssertEqual(s.blockedRelease, 5)
-    XCTAssertTrue(s.consumeEvents().contains("crash_loop_revert:5"))
+    XCTAssertTrue(s.consumeEvents().contains { $0 == "crash_loop_revert:5:cold" || $0 == "crash_loop_revert:5:reload" })
   }
 
   func testReloadBeforeMarkHealthyKeepsTheCount() async throws {
@@ -430,7 +430,7 @@ final class RuntimeTests: XCTestCase {
       ShipvoBundleSelector.noteHealthy(); ShipvoBundleSelector.markStableIfHealthy(s)
     }
     XCTAssertEqual(s.currentRelease, 5); XCTAssertEqual(s.blockedRelease, 0)
-    XCTAssertFalse(s.consumeEvents().contains("crash_loop_revert:5"))
+    XCTAssertFalse(s.consumeEvents().contains { $0.hasPrefix("crash_loop_revert:5") })
   }
 
   func testNewAppBinaryDiscardsOldBundles() async throws {

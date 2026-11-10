@@ -1,0 +1,3 @@
+- `@shipvo/runtime`: a `crash_loop_revert` event now says which load it happened in (`cold` or `reload`). The native event is `crash_loop_revert:<release>:<kind>` and the telemetry report carries `load_kind`, so a revert after an in-place reload can be told apart from a cold start.
+- `@shipvo/schema`: `Telemetry` has an optional `load_kind`.
+- Migration: none. Older shells send events without a kind, and `load_kind` is left out.

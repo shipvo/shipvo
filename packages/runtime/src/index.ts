@@ -109,11 +109,11 @@ export function reportRuntimeEvents(): string[] {
     const rn = require("react-native");
     if (rn.Platform?.OS === "android" && typeof rn.Platform.Version === "number") androidApi = rn.Platform.Version;
   } catch {}
-  forwardRuntimeEvents(events, (event, release) => {
+  forwardRuntimeEvents(events, (event, release, loadKind) => {
     try {
       // Same payload the sample app sent before this moved here: device_class is fixed to "low", android_api is set on Android only.
       const body = { schema_version: "1.0", app_id: appId, release: release ?? state.runningRelease ?? 0, event,
-        device_class: "low", android_api: androidApi };
+        device_class: "low", android_api: androidApi, ...(loadKind ? { load_kind: loadKind } : {}) };
       const post = (b: string) => Promise.resolve(fetch(`${baseUrl}/t`, { method: "POST", headers: { "content-type": "application/json" },
         body: b })).catch(() => {});
       const id = identity;

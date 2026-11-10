@@ -117,7 +117,7 @@ enum ShipvoBundleSelector {
 
     if let pending = s.pendingPath {
       if s.trialBoots >= maxBoots || !exists(pending) {
-        s.addEvent("crash_loop_revert:\(s.pendingRelease)")
+        s.addEvent("crash_loop_revert:\(s.pendingRelease):\(Store.loadsInProcess <= 1 ? "cold" : "reload")")
         s.block(s.pendingRelease)
         remove(pending)
         s.pendingPath = nil; s.pendingRelease = 0; s.trialBoots = 0
@@ -133,7 +133,7 @@ enum ShipvoBundleSelector {
       if !countsAtSelection(visible: visible) {
         deferredRelease = s.currentRelease; deferredIsTrial = false
       } else if countCurrentBoot(s) {
-        s.addEvent("crash_loop_revert:\(s.currentRelease)")
+        s.addEvent("crash_loop_revert:\(s.currentRelease):\(Store.loadsInProcess <= 1 ? "cold" : "reload")")
         s.block(s.currentRelease)
         revertToPrevious(s)
         return currentOrEmbedded(s)
