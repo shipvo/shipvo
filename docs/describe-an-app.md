@@ -10,7 +10,7 @@ For founders and developers who want a small app on a phone, without writing Rea
 ## Make an app, step by step
 
 1. **Ask in plain words.** For example: "Make a gift ideas app on the phone. I want to write who each idea is for." The agent writes the spec for you. You do not need to read it.
-2. **Watch the icon appear.** The agent calls `create_app`. The spec is checked first. If it is valid, the app gets an icon on the home screen and opens.
+2. **Watch the icon appear.** The agent calls `create_app`. The spec is checked first. If it is valid, the app gets an icon on the home screen of the Android or iOS phone and opens.
 3. **Use it.** Tap, type, scroll. Every control has a name, so your agent can use the app too.
 4. **Ask for a change.** "Add an About screen." The agent calls `update_app`. The open screen changes at once, and the gift ideas you typed are still there.
 5. **See what changed.** Ask "What did you change?" The agent calls `app_activity` and answers with lines such as `added screen 'about'`.
@@ -28,7 +28,7 @@ If step 2 fails, the agent gets a list of problems, each with where it is and ho
 | `app_activity { session, id?, limit? }` | Versions with plain change lines, data sources, and events (create, update, action, data refresh). |
 | `export_phone_apps` / `import_phone_apps` | Copy spec apps, with their data and layout, to another phone. |
 
-The `id` you pass to `create_app` uses lowercase letters, digits and dashes, up to 40 characters. The `app.id` inside the spec follows the spec schema and is a separate rule.
+The `id` you pass to `create_app` uses lowercase letters, digits and dashes, up to 40 characters, and it starts with a letter or digit. The `app.id` inside the spec follows the spec schema and is a separate rule.
 
 Every call is logged in `device_log`. Details for each tool are in [phone apps](phone-apps.md#describe-an-app-and-it-appears). The spec format is in [app spec](design/app-spec.md), and every block you can use is in [spec blocks](spec-blocks.md). Five complete examples are in `packages/spec/gallery`.
 
@@ -111,7 +111,7 @@ fix: Add "label": a short name that people and agents see, for example "Add goal
 ## Troubleshooting
 
 - **`invalid_spec`.** Read the `path` and `fix` of each problem. Common ones: a button or field without a `label`, an `app.id` that is not a lowercase letter followed by lowercase letters, digits or dashes (2 to 63 characters in all), a name used in `{{ }}` that is not in `data`, or palette text with too little contrast.
-- **`bad_app_id`.** The id has a character the phone does not accept, such as a capital letter, a space or an underscore. The `create_app` id may use lowercase letters, digits and dashes, up to 40 characters. A valid id is `gift-ideas`. This is a separate rule from the `app.id` in the spec.
+- **`bad_app_id`.** The id has a character the phone does not accept, such as a capital letter, a space or an underscore. The `create_app` id may use lowercase letters, digits and dashes, up to 40 characters, and it starts with a letter or digit, so `-gifts` is refused. A valid id is `gift-ideas`. This is a separate rule from the `app.id` in the spec.
 - **`already_installed`.** An app with that id is on the phone. Use `update_app` to change it, or uninstall it first.
 - **`not_installed` from `update_app` or `app_activity`.** The id is not an app made with `create_app`. Check the id on the home screen or with `list_apps`.
 - **`action_failed`.** The action refused the input. The reason is in the error: for example a required field was empty.
