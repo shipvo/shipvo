@@ -1,1 +1,1 @@
-- docs: the `build_url` error codes on the test-your-build page, and the `watch_url` link on the hosted phone on the agents page.
+- docs: the `build_url` error codes on the test-your-build page.
