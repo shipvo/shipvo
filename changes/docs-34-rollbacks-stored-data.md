@@ -1,0 +1,2 @@
+- Docs: new page "Rollbacks and stored data" (`stateVersion`, `--allow-state-downgrade`) with options and troubleshooting, linked from the glossary.
+- Docs: Troubleshooting added to the demo video worked example; CodePush guide links to the stored-data rollback check.

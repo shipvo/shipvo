@@ -37,6 +37,7 @@ const NAV = [
   ]},
   { group: "Ship", pages: [
     { slug: "cli-commands", src: "docs/cli.md", title: "CLI guide", desc: "Every Shipvo command with examples: init, preview, publish policy checks, auto-halt and audit export, and fixes for common errors." },
+    { slug: "rollbacks-and-stored-data", src: "docs/rollbacks-and-stored-data.md", title: "Rollbacks and stored data", desc: "Declare a state version so a rollback never sends Android and iOS phones to code that cannot read their saved data." },
     { slug: "migrate-from-codepush", src: "docs/migrate-from-codepush.md", title: "Migrate from CodePush", desc: "Move a React Native app from react-native-code-push to Shipvo signed over-the-air updates, step by step, with real dry-run output." },
     { slug: "migrate-from-eas-update", src: "docs/migrate-from-eas-update.md", title: "Migrate from EAS Update", desc: "Move an Expo app from EAS Update to Shipvo signed over-the-air updates with shipvo migrate --plan and --apply, step by step." },
     { slug: "store", src: "docs/store.md", title: "Store details and screenshots", desc: "Draft Google Play and App Store details from shipvo.json and check screenshot sizes before you submit. Nothing is uploaded." },
