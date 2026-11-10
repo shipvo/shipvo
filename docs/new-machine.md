@@ -49,3 +49,17 @@ So back it up once, today, even if you are not moving.
 ## Teams
 
 Do not share the seed over chat. Put it in the CI secrets (`SHIPVO_SIGNING_SEED`) and let CI publish, or keep it in a shared vault your team already trusts. Each person runs their own `shipvo login` and `shipvo app create`; publish tokens are per machine.
+
+## Troubleshooting
+
+| You see | Why | Fix |
+| --- | --- | --- |
+| `keys import` says the seed does not match the public key | The seed is from another app, or `shipvo.json` was changed. | Import the seed you exported from this app. `shipvo doctor` checks the match. |
+| `shipvo doctor` fails "signing key matches shipvo.json publicKey" | The seed on this machine is missing or wrong. | Run `shipvo keys import`, or set `SHIPVO_SIGNING_SEED`. |
+| Publishing fails after `login` | The publish token is from the old machine. | Run `shipvo app create` to get a token for this machine. |
+
+## Next steps
+
+- [CLI guide](cli.md): every `keys` command.
+- [Self-hosting](self-hosting.md): where your updates are stored.
+- [Glossary](glossary.md): signing seed, publish token and shell in plain words.

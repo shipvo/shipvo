@@ -1,0 +1,2 @@
+- docs: new "Calendars and maps" section in the app spec page (`calendar` and `map` blocks, runnable example, options, errors); "Open a build from a URL" section in Test your build (`build_url` errors); three glossary terms.
+- Migration: none; documentation only.

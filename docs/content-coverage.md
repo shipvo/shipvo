@@ -104,3 +104,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | SAML sign-in for the control plane | [sso](sso.md) | | | |
 | W3C `traceparent` recorded from MCP tool calls | [mcp](../packages/mcp/README.md) | | | |
 | Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
+| Spec `calendar` and `map` blocks (month, week, agenda; pins from data; `onSelect`) | [spec-blocks](spec-blocks.md#calendars-and-maps) | | | |
+| Arrange the home screen and set the phone's clock (`arrange_apps`, `set_phone_time`, `placement` in `phone.json`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
+| `/phone?session=<name>` frame page for a live session's Store and apps | [phone-apps](phone-apps.md#install-apps-and-switch-between-them) | | | |
+| Build cache for `build_url` (`bad_url`, `host_not_allowed`, `too_large`, `unreachable`) | [test-your-build](test-your-build.md) | | | |

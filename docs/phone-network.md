@@ -75,3 +75,25 @@ Each change is recorded in `device_log` as simulated.
 ```
 
 The phone starts with that profile. An unknown name fails the session with `bad_profile` and says which names exist.
+
+## Troubleshooting
+
+When the proxy refuses a call, the reply is JSON with an `error` and the `x-shipvo-net-error` header carries the same code. The same code is in `device_log`.
+
+| You see | Why | Fix |
+| --- | --- | --- |
+| `host_not_allowed` | The host is not on the app's allow-list, or a redirect left the list. | Ask the owner to add the host with `set_network_allow`. Use `*.example.com` for subdomains. |
+| `blocked_address` | The host resolves to a private, loopback, link-local or metadata address. | Call a public host. |
+| `port_not_allowed` | The URL uses a port other than 80 or 443. | Use the default port. |
+| `credentials_in_url` | The URL has `user:pass@`. | Send an `authorization` header instead. |
+| `rate_limited` or `request_too_large` or `response_too_large` | The call went over a per-session limit. | Send fewer or smaller calls, then try again. |
+| `timeout` or `dns_failed` | The host did not answer or the name did not resolve. | Check the address from a browser. |
+| `unknown_profile` | The profile name is not in the table above. | Use `online`, `offline`, `2g`, `3g`, `slow-4g`, `spotty` or `low-end-4g`. |
+| `bad_profile` when the phone starts | `network` in `phone.json` is not one of those names. | Fix the name; the error lists the valid ones. |
+| An `authorization` header disappears | A redirect left the declared host. | Call the final host directly. |
+
+## Next steps
+
+- [Simulated device features](device-api.md#network-profiles): the same profiles from the device API.
+- [Simulated phone](phone-apps.md): `phone.json` and the other phone settings.
+- [Typed tests](testing.md): write the offline flow as a test.

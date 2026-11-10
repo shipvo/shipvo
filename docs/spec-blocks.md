@@ -115,6 +115,8 @@ app.select("Period", "year");          // { ok: false, error: '"year" is not one
 | `kanban` | Cards in columns | `label`, `from`, `columns`, `column`, `title`, `detail`, `onMove` |
 | `timeline` | Dated entries, newest day first | `label`, `from`, `date`, `title`, `detail` |
 | `vector` | A small drawing that follows your data | `label`, `value`, `width`, `height`, `shapes`, `motion` |
+| `calendar` | Events from data as a month, week or agenda | `label`, `from`, `date`, `title`, `detail`, `view`, `at`, `onSelect` |
+| `map` | Pins from data on a canvas | `label`, `from`, `lat`, `lng`, `title`, `onSelect` |
 
 In the screen tree, a toggle reads `Failed payment alerts: off` or `: on`, a segmented control reads `Period: week`, and a progress block reads `Monthly goal: 40%`. Assistants and `@shipvo/test` find them by those names.
 
@@ -136,6 +138,82 @@ A `kanban` block shows the rows of a data source as cards in columns. A `timelin
 - `app.move("Buy bait", "done")` moves a card by its title and runs `onMove`. It answers `ok: false` if the card or the column does not exist.
 
 The validator reports a bad column list, a card in a column the board does not have, a missing or invalid date, and an undeclared `onMove` action, each with a path and a fix.
+
+## Calendars and maps
+
+A `calendar` block shows the rows of a data source as events. A `map` block shows them as pins. Both need a `label` and a `from` (the name of a source in `data`); the rest are expressions that run once per row as `item`. Both draw the same on the Android and iPhone skins.
+
+Save this as `trip.json`:
+
+```json
+{
+  "spec": "shipvo.app/v0",
+  "app": { "id": "trip", "name": "Trip", "description": "Plans and places for a trip." },
+  "state": { "picked": { "type": "text", "default": "" } },
+  "data": {
+    "events": { "source": "collection", "fields": { "id": "text", "name": "text", "at": "text" }, "seed": [
+      { "id": "e1", "name": "Flight to Lisbon", "at": "2026-11-10T09:30" },
+      { "id": "e2", "name": "Dinner", "at": "2026-11-12T19:00" }
+    ] },
+    "places": { "source": "collection", "fields": { "id": "text", "name": "text", "lat": "number", "lng": "number" }, "seed": [
+      { "id": "p1", "name": "Hotel", "lat": 38.72, "lng": -9.14 },
+      { "id": "p2", "name": "Castle", "lat": 38.71, "lng": -9.13 }
+    ] }
+  },
+  "actions": { "pick": { "description": "Remember a pick.", "input": { "id": { "type": "text" } }, "do": [{ "set": "picked", "value": "{{ input.id }}" }] } },
+  "screens": [{ "id": "home", "title": "Trip", "body": [
+    { "type": "calendar", "label": "Plans", "view": "agenda", "from": "events", "date": "{{ item.at }}", "title": "{{ item.name }}",
+      "onSelect": { "action": "pick", "input": { "id": "{{ item.id }}" } } },
+    { "type": "map", "label": "Places", "from": "places", "lat": "{{ item.lat }}", "lng": "{{ item.lng }}", "title": "{{ item.name }}",
+      "onSelect": { "action": "pick", "input": { "id": "{{ item.id }}" } } }
+  ] }]
+}
+```
+
+Check it, draw it and tap a pin:
+
+```ts
+import { readFileSync } from "node:fs";
+import { validate, renderScreen, describeTree, createApp } from "@shipvo/spec";
+
+const spec = JSON.parse(readFileSync("trip.json", "utf8"));
+console.log(validate(spec));                       // { errors: [], warnings: [] }
+const r = renderScreen(spec, { style: "ios" });
+if (r.ok) console.log(describeTree(r.tree));
+const made = createApp(spec);
+if (made.ok) { made.app.press("Hotel"); console.log(made.app.state); }   // { picked: 'p1' }
+```
+
+Expected output:
+
+```text
+main "Trip"
+  list "Plans"
+    group "2026-11-10"
+      button "Flight to Lisbon"
+    group "2026-11-12"
+      button "Dinner"
+  group "Places"
+    button "Hotel"
+    button "Castle"
+```
+
+Calendar options:
+
+- `date` is `2026-11-07` or `2026-11-07T09:30` (seconds are allowed). Events sort by date.
+- `view` is `month` (the default), `week` (Monday first) or `agenda` (a list of the days that have events).
+- `at` is the day the month or week is built around, as `2026-11-07` or an expression. Without it the first event's day is used. Events outside the shown month or week are not drawn.
+- `detail` is optional text after the title. `empty` takes `{ "message": "..." }` for when nothing is shown.
+
+Map options:
+
+- `lat` is a number from -90 to 90 and `lng` is a number from -180 to 180.
+- The map is a canvas that fits all pins in view. It makes no network calls and has no street tiles, so tests run the same offline. One pin sits in the middle.
+
+Both blocks:
+
+- Each event or pin is in the screen tree by its title, so an assistant or `@shipvo/test` finds it by name. With `onSelect` each one is a `button`, and `app.press("Hotel")` runs the action with `{{ item }}` set to that row. Without `onSelect` each is a `listitem`.
+- A bad `view`, an event date that is not a date, or a pin latitude or longitude out of range is a validation error with a JSON path and a fix. An undeclared `onSelect` action is an error too.
 
 ## Vector drawings
 
@@ -232,6 +310,9 @@ A data source can call a service with a key you saved once in the secret form. T
 - **`toggle` or `select` answers `ok: false`.** The label does not match a control on the current screen, or the option is not in `options`. Labels are case-sensitive.
 - **`Card column "later" is not a board column.`** A row has a column value that is not in `columns`. Use one of the listed names or add the column.
 - **`Entry date "tomorrow" is not a date.`** Use `2026-11-07` or `2026-11-07T09:30`.
+- **`Calendar view "year" is not supported.`** Use `month`, `week` or `agenda`.
+- **`Pin latitude 120 is not valid.`** Latitude is -90 to 90 and longitude is -180 to 180. Check that you did not swap them.
+- **A calendar shows no events.** In `month` and `week` view only the month or week of `at` is drawn. Set `at` to a day in range, or use `agenda`.
 - **A translation does not show.** The key must match the text exactly, including capitals and spaces, and `language` must be the same code you used in `strings` (`fr`, not `fr-FR`). Pass `locale` separately for money and dates.
 - **A vector shape is missing.** An unknown `shape` is an error; a colour that is not hex, a name or `url(#id)` draws as `none`; a path with other characters draws nothing.
 - **State is empty before the first change.** Declare a `default` for each `state` value. Declared defaults are present from the start.

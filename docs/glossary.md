@@ -102,3 +102,13 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Right-to-left (RTL).** Languages such as Arabic and Hebrew that read from right to left. A spec with `strings` for that language lays out right to left. See [App spec](spec-blocks.md#translations-and-right-to-left).
 
 **Playground.** The page at shipvo.dev/playground where a sample app runs on an Android phone and an iPhone in your browser, so you can try Shipvo before you install it.
+
+**Calendar block.** A part of an app spec that shows dated rows from your data as a month, a week or a list of days. Tap an event and the app runs an action. See [App spec](spec-blocks.md#calendars-and-maps).
+
+**Map block.** A part of an app spec that shows rows with a latitude and longitude as pins on a plain canvas. It loads no map tiles, so it looks the same offline. See [App spec](spec-blocks.md#calendars-and-maps).
+
+**Placement.** Where an app sits on the phone's home screen: pinned, hidden, in a set position, or shown only on certain days and hours. See [Phone apps](phone-apps.md#arrange-the-home-screen).
+
+**Signing seed.** The secret that proves an update comes from you. Phones that have your app only accept updates signed with it. Shipvo never holds it, so back it up. See [Moving to a new machine](new-machine.md).
+
+**Publish token.** A key that lets one machine upload releases for your app. Each machine has its own. `shipvo app create` makes a new one. See [Moving to a new machine](new-machine.md).

@@ -82,6 +82,13 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: `calendar` and `map` app spec blocks: events as a month, week or agenda, and pins on a canvas, on Android and iOS skins ([Calendars and maps](spec-blocks.md#calendars-and-maps), #1353)
+- 2026-11-10: `arrange_apps` pins, hides, positions and schedules apps on the home screen, and `set_phone_time` sets the phone's clock ([Phone apps](phone-apps.md#arrange-the-home-screen), #1349)
+- 2026-11-10: `/phone?session=<name>` draws a live session's Store and installed apps in an Android or iOS frame ([Phone apps](phone-apps.md#install-apps-and-switch-between-them), #1337)
+- 2026-11-10: Network profile tools, the `setNetwork` test API and `network` in `phone.json` ([Network profiles](phone-network.md), #1338)
+- 2026-11-09: MCP tool calls record the W3C `traceparent` ([@shipvo/mcp](../packages/mcp/README.md), #1288)
+- 2026-11-09: `shipvo sim` accepts Client ID Metadata Documents and sends `iss` on redirects ([Agents](agents.md), #1286)
+- 2026-11-09: `POST /session` with a `build_url` fetches your build into a size-capped build cache and replies with the build id ([Test your build](test-your-build.md), #1273, #1287)
 - 2026-11-10: Playground Many phones: 1 to 12 Android and iOS phones with a shareable link ([Getting started](getting-started.md#try-it-in-your-browser-first), #1323, #1335)
 - 2026-11-10: Secrets screen in the phone's Settings lists saved keys, metadata only ([Phone apps](phone-apps.md#see-saved-keys-in-settings), #1350)
 - 2026-11-10: Pin and hide apps on the home screen, export and import a phone's apps, and search the Store with `find_apps` ([Phone apps](phone-apps.md), #1330, #1329, #1315)
@@ -92,6 +99,7 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 - 2026-11-08: Wallet, Calendar, Files and Photos, and Shop first-party spec apps ([Phone apps](phone-apps.md#first-party-apps), #1275, #1252, #1299, #1300)
 - 2026-11-08: App spec `vector` block, `motion`, translations, locale formatting and right-to-left ([App spec](spec-blocks.md#vector-drawings), #1271, #1274)
 - 2026-11-08: Playground Device API and over-the-air update panels, Android and iOS ([Getting started](getting-started.md#try-it-in-your-browser-first), #1276, #1278)
+- 2026-11-07: `shipvo store policy` writes a privacy policy from what your app does ([Store path](store.md), #1260)
 - 2026-11-07: `kanban` and `timeline` app spec blocks, with `App.move` and an `onMove` action, on Android and iOS skins ([Boards and timelines](spec-blocks.md#boards-and-timelines), #1245)
 - 2026-11-07: The hosted MCP serves OAuth discovery and dynamic client registration, so clients can sign in themselves ([Agents](agents.md), #1216)
 - 2026-11-07: `/watch` shows the agent's phone live, in its Android or iOS frame ([Agents](agents.md#watch-the-agents-phone), #1217)
