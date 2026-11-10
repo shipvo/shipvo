@@ -114,6 +114,8 @@ app.select("Period", "year");          // { ok: false, error: '"year" is not one
 | `segmented` | One choice from a few | `label`, `bind` to an `enum` state value, `options` |
 | `kanban` | Cards in columns | `label`, `from`, `columns`, `column`, `title`, `detail`, `onMove` |
 | `timeline` | Dated entries, newest day first | `label`, `from`, `date`, `title`, `detail` |
+| `calendar` | Events in a month, a week or an agenda | `label`, `from`, `date`, `title`, `detail`, `view`, `at`, `onSelect` |
+| `map` | Pins on a canvas | `label`, `from`, `lat`, `lng`, `title`, `onSelect` |
 | `vector` | A small drawing that follows your data | `label`, `value`, `width`, `height`, `shapes`, `motion` |
 | `calendar` | Events from data as a month, week or agenda | `label`, `from`, `date`, `title`, `detail`, `view`, `at`, `onSelect` |
 | `map` | Pins from data on a canvas | `label`, `from`, `lat`, `lng`, `title`, `onSelect` |
@@ -312,6 +314,7 @@ A data source can call a service with a key you saved once in the secret form. T
 - **`Entry date "tomorrow" is not a date.`** Use `2026-11-07` or `2026-11-07T09:30`.
 - **`Calendar view "year" is not supported.`** Use `month`, `week` or `agenda`.
 - **`Pin latitude 120 is not valid.`** Latitude is -90 to 90 and longitude is -180 to 180. Check that you did not swap them.
+- **`Event date "soon" is not a date.`** Use `2026-11-07` or `2026-11-07T09:30` in the source's seed rows.
 - **A calendar shows no events.** In `month` and `week` view only the month or week of `at` is drawn. Set `at` to a day in range, or use `agenda`.
 - **A translation does not show.** The key must match the text exactly, including capitals and spaces, and `language` must be the same code you used in `strings` (`fr`, not `fr-FR`). Pass `locale` separately for money and dates.
 - **A vector shape is missing.** An unknown `shape` is an error; a colour that is not hex, a name or `url(#id)` draws as `none`; a path with other characters draws nothing.
