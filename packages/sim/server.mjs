@@ -29,7 +29,7 @@ import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.
 import { SettingsError } from "./settings.mjs";
 import { SpecHost } from "./spec-host.mjs";
 import { fetchBuild, BuildCacheError } from "./build-cache.mjs";
-import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, describeApps, pinApp, hideApp, arrangeApp, installedIconsHtml, storeCss } from "./apps.mjs";
+import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, describeApps, pinApp, hideApp, arrangeApp, cleanPlacement, installedIconsHtml, storeCss } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
@@ -398,13 +398,9 @@ async function act(id, body) {
     // Home screen layout: pin, hide, reorder and schedule an installed app.
     case "schedule_app": case "clear_schedule":   // the same schedule as arrange_apps, under the names an assistant looks for
     case "arrange_apps": {
-      const { id: appId, ...patch } = body; delete patch.action; delete patch.session;
-      if (body.action === "clear_schedule") { for (const k of Object.keys(patch)) delete patch[k]; patch.schedule = null; }
-      else if (body.action === "schedule_app") {
-        const { days, from, to } = patch; for (const k of Object.keys(patch)) delete patch[k];
-        patch.schedule = { days, from, to };
-      }
-      try { arrangeApp(s.apps, String(appId ?? ""), patch); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
+      const { id: appId, ...rest } = body; delete rest.action; delete rest.session;
+      const patch = body.action === "clear_schedule" ? { schedule: null } : body.action === "schedule_app" ? { schedule: { days: body.days, from: body.from, to: body.to } } : rest;
+      try { arrangeApp(s.apps, String(appId ?? ""), patch, body.action); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       return { installed_apps: s.apps.installed_apps, home: `Home screen\n${describeApps(s.apps, nowOf(s))}`, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // The phone's clock, for schedules. at: an ISO time like 2026-11-14T09:00:00, or null for the real time.
@@ -418,7 +414,7 @@ async function act(id, body) {
       const want = Array.isArray(body.ids) ? body.ids.map(String) : null;
       const specs = s.apps.installed_apps.filter((a) => a.kind === "spec");
       if (want) for (const w of want) if (!specs.some((a) => a.id === w)) throw new SimError("not_installed", `'${w}' is not a spec app on this phone`);
-      const apps = specs.filter((a) => !want || want.includes(a.id)).map((a) => ({ id: a.id, name: a.name, ...specHost.snapshot(sidOf(s), a.id) }));
+      const apps = specs.filter((a) => !want || want.includes(a.id)).map((a) => ({ id: a.id, name: a.name, ...specHost.snapshot(sidOf(s), a.id), ...(a.placement ? { placement: a.placement } : {}) }));
       return { format: "shipvo.phone-apps/v0", apps };
     }
     // Put exported apps on the phone. Every spec is checked first and nothing is installed if any is wrong.
@@ -445,7 +441,7 @@ async function act(id, body) {
         if (ex) { uninstallApp(s.apps, a.id, s.nav); specHost.drop(sidOf(s), a.id); }
         const made = specHost.create(sidOf(s), a.id, a.spec, { style: a.style === "ios" ? "ios" : "android", data: a.data ?? undefined, state: a.settings ?? undefined });
         const nm = String(a.name ?? a.spec?.app?.name ?? a.id).replace(/[<>"'\\]/g, "").slice(0, 40);
-        s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec" });
+        s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec", ...(cleanPlacement(a.placement) ? { placement: cleanPlacement(a.placement) } : {}) });
         s.apps.log.push({ at: Date.now(), name: "import_apps", app: a.id, source: "real", version: "1", replaced: !!ex });
       }
       return { imported: list.map((a) => a.id), installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
