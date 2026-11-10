@@ -1,0 +1,1 @@
+- test: when the simulator is not running, every test now fails with "Cannot reach the simulator at <url>. Start it with: npx shipvo sim" instead of a raw ECONNREFUSED.

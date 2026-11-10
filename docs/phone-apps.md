@@ -209,6 +209,16 @@ uninstall_app { session, id: "notes" } -> back on the home screen
 device_log { session }                 -> install_app (source "real" for marketplace apps, with the bundle sha256), switch_app, uninstall_app
 ```
 
+## Search across the phone
+
+`search_phone` finds text anywhere on the phone in one call: rows in every app's data (Notes and Tasks, Calendar, Files and Photos, Wallet, Shop, Assistant Inbox and any app you built) and notifications. It works the same on Android and iOS.
+
+```json
+{ "session": "demo", "query": "marigold", "limit": 10 }
+```
+
+Each result has the app, the collection, the row id, the field that matched, a short snippet and the full row. The match is not case sensitive and a row gives one result. Set `app` to an app id to look in one app, or to `notifications`. `limit` is 1 to 100 (default 20) and `truncated` says when more matched. Nothing is changed.
+
 ## First-party apps
 
 | App | What it does | Actions (MCP tools) | Spec |
