@@ -191,17 +191,24 @@ class ShipvoRuntimeModule : Module() {
         val baseSha = if (baseFile != null) (s.currentSha ?: Verify.sha256Hex(baseFile).also { s.currentSha = it }) else s.embeddedSha()
         var match: JSONObject? = null
         for (i in 0 until patches.length()) { val p = patches.getJSONObject(i); if (p.getString("from_sha256") == baseSha) { match = p; break } }
-        if (match != null) {
-          val patchBytes = http(resolve(s, match.getString("url")), null).let { c ->
-            require(c.responseCode == 200) { "patch HTTP ${c.responseCode}" }
-            c.inputStream.use { it.readBytes() }.also { c.disconnect() }
+        val chosen = match
+        if (chosen != null) {
+          val baseSize = baseFile?.length() ?: s.embeddedSize()
+          // Over the memory budget: skip the patch and take the resumable, streamed full download.
+          val outcome = PatchStep.run(baseSize, chosen.getLong("size"), wantSize) {
+            val patchBytes = http(resolve(s, chosen.getString("url")), null).let { c ->
+              require(c.responseCode == 200) { "patch HTTP ${c.responseCode}" }
+              c.inputStream.use { it.readBytes() }.also { c.disconnect() }
+            }
+            require(patchBytes.size.toLong() == chosen.getLong("size") && Verify.sha256Hex(patchBytes) == chosen.getString("sha256")) { "patch hash mismatch" }
+            val base = baseFile?.readBytes() ?: s.embeddedBundle() ?: error("no base bundle")
+            val out = Patch.apply(base, patchBytes)
+            require(out.size.toLong() == wantSize && Verify.sha256Hex(out) == wantSha) { "patched bundle hash mismatch" }
+            out
           }
-          require(patchBytes.size.toLong() == match.getLong("size") && Verify.sha256Hex(patchBytes) == match.getString("sha256")) { "patch hash mismatch" }
-          val base = baseFile?.readBytes() ?: s.embeddedBundle() ?: error("no base bundle")
-          val out = Patch.apply(base, patchBytes)
-          require(out.size.toLong() == wantSize && Verify.sha256Hex(out) == wantSha) { "patched bundle hash mismatch" }
-          tmp.writeBytes(out)
-          via = "patch"; bytesDownloaded = patchBytes.size.toLong()
+          val decision = PatchStep.decide(outcome, chosen.getLong("size"))
+          via = decision.via; patchError = decision.patchError; bytesDownloaded = decision.bytesDownloaded
+          if (outcome.bytes != null) tmp.writeBytes(outcome.bytes) else tmp.delete()
         }
       } catch (e: Exception) { patchError = e.message; tmp.delete() }
     }
