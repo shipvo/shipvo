@@ -209,6 +209,17 @@ A person may paste an API key into the chat. The model would then pass it to a t
 
 The model has already seen the key by the time the check runs, so the advice is to rotate it.
 
+## Per-app spend limit (slice 5a of #843)
+
+The person sets a monthly limit for each installed app. Code: `services/control-plane/src/spend.ts`, `phone.ts`, migration `0025_spend_limit.sql`. Tests: `services/control-plane/test/spend-limit.test.ts`.
+
+| Threat | What stops it | Test |
+|---|---|---|
+| An app or assistant moves money without the person's say | The limit is 0 until the person sets it. A money action over the limit is refused with `spend_limit` (with `limit` and `spent`) before any call is made. | "defaults to 0 and refuses a money action"; "passes under the limit and refuses the call that would pass it" |
+| The assistant raises its own limit | The limit routes refuse an assistant token with 403. Only a signed-in person session can read or set a limit. | "an assistant token gets 403, the person can set it" |
+| A change or refusal goes unseen | Each change and each refusal writes a row to `phone_spend_audit` (person, app, action, detail, time). | "writes audit rows for set and refuse" |
+| Old spending hides the budget, or one currency pays another | Spend is summed for the current month only, in the limit's currency. Another currency is refused. | "does not count last month and refuses another currency" |
+
 ## How to check these claims
 
 Every path and test name above can be found with `rg`, for example:
