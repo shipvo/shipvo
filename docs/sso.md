@@ -1,6 +1,13 @@
 # Single sign-on (OIDC)
 
-People sign in to the dashboard with your identity provider and get the role their claims map to.
+People sign in to the dashboard with your identity provider and get the role their claims map to. This page is for the person who runs the control plane and has access to the identity provider. You will set up OIDC or SAML, and people will sign in with the company account they already use.
+
+## Set it up
+
+1. Choose a short org name, for example `acme`. It appears in the sign-in links.
+2. At your identity provider, register the control plane. For OIDC, register `https://<control-plane>/sso/<org>/callback` as the redirect URI. For SAML, open `https://<control-plane>/saml/<org>/metadata` and give the entity id and ACS URL to the provider.
+3. Store the client secret (OIDC) as a Worker secret and set `SSO_ORGS` (OIDC) or `SAML_ORGS` (SAML), as shown below.
+4. Open `https://<control-plane>/sso/<org>/start` (or `/saml/<org>/start`). After you sign in, both OIDC and SAML return `{ "ok": true, "org": ..., "role": ..., "email": ..., "expires_at": ... }`.
 
 ## Routes
 
@@ -54,3 +61,17 @@ Set `SAML_ORGS` on the control plane to a JSON object keyed by org:
 ```
 
 `certificate` is the identity provider's signing certificate. The `mapping` works as in the OIDC section. A response with the wrong issuer or audience, an expired or reused assertion, a bad signature, or an unknown or missing request id gets a plain message and no session.
+
+## Troubleshooting
+
+- **"Single sign-on is not set up for this organization"** (or the SAML version): the org name in the link is not a key in `SSO_ORGS` or `SAML_ORGS`. Check the spelling.
+- **"Your account has no role in Shipvo. Ask an admin."**: no group or email domain in `mapping` matches this person. Add the group or domain, then sign in again.
+- **"The sign-in state does not match" or "already used or has expired"**: each sign-in link works once, and a SAML request lasts 10 minutes. Start again from `/start`.
+- **"The identity provider refused the sign-in code"**: the code was used already, or the redirect URI at the provider is not exactly the callback URL above.
+- **"The ID token was not accepted (...)"** or **"The sign-in response was not accepted (...)"**: the reason in brackets names the check that failed, such as the issuer, the audience, the expiry or the signature. Compare `issuer`, `audience` and `certificate` with the provider's values.
+- **"Start the sign-in from Shipvo, not from the identity provider"** (SAML): open `/saml/<org>/start` rather than the tile in the provider's app list.
+
+## Next steps
+
+- [Self-hosting](self-hosting.md) to deploy the control plane.
+- [Threat model](threat-model.md) for how sessions and tokens are protected.
