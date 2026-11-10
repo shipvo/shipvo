@@ -237,7 +237,6 @@ Add `refresh` to an `http` data source to run it again on a timer while the app 
 - Only public `http` and `https` hosts are called, and redirects are not followed.
 - Call `refresh_app` with the app id to run every `http` source now and skip the cache. See [phone apps](phone-apps.md).
 - The timer stops when the app is removed or replaced.
-- The `refresh_app` sim tool runs the same fetch once, on demand.
 
 | Error path | Meaning | Fix |
 | --- | --- | --- |
