@@ -136,4 +136,3 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Assistant Inbox (`send_message`, `check_inbox`, `hand_off`, `{{ caller }}`) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | |
 | Patch falls back to full download on small heaps (Android, `patchError`) | [runtime](../packages/runtime/README.md#patches-on-small-heaps-android) | | | |
 | Permissions detected from camera, scanner and file blocks | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
-| Private email inbox per session (`inbox_read`, `inbox_wait`, `inbox_clear`, `phone.inbox`) for email-code and magic-link sign-in | [email-sign-in](email-sign-in.md) | | | |

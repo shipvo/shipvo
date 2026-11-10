@@ -68,7 +68,7 @@ The inbox, the tools and `phone.inbox` are the same on the Android and iOS phone
 | You see | Cause | Fix |
 | --- | --- | --- |
 | `inbox_timeout` | No mail matched `subject` or `from` before `timeout` ends | Check the app really called the stubbed request. Use `list()` (or `inbox_read`) to see what arrived, and loosen `subject`. Raise `timeout` (at most 25000 ms). |
-| `inbox_no_code` | The mail has no 4 to 8 digit number | Read `text` from `waitFor`, and fix the stub's mail text. For a link, use `links[0]`. |
+| `inbox_no_code` | The mail has no 4 to 8 digit number | Read `text` from `waitFor`, and put a 4 to 8 digit number in the stub's mail text. For a link, use `links[0]`. |
 | Status 550 from `/send` | The mail was addressed to someone other than the session's own address | Send to the address from `address()` or `inbox_read`. |
 | Mail from an earlier attempt is picked up | The inbox keeps mail until the session ends | Call `clear()` (or `inbox_clear`) before each attempt. |
 | The address changed | A new session has a new address | Read the address again after every `open_app`. |
