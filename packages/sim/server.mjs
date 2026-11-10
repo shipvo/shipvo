@@ -661,7 +661,10 @@ async function act(id, body) {
       try { return { ...(await settingsAction(page, body)) }; } catch (e) { if (e instanceof SettingsError) throw new SimError(e.code, e.message); throw e; }
     }
     case "read_share": { const share = s.pendingShare ?? null; if (body.clear !== false) s.pendingShare = null; return { share }; }
-    case "receive_share": { const handled = await page.evaluate((p) => globalThis.__pnDevice?.receiveShare(p), { message: body.message, url: body.url }); await page.waitForTimeout(400); return { handled: !!handled }; }
+    case "receive_share": {
+      for (const k of ["message", "url"]) if (body[k] !== undefined && typeof body[k] !== "string") throw new SimError("bad_share", `${k} must be a string`);
+      if (!body.message && !body.url) throw new SimError("empty_share", "receive_share needs a message or a url");
+      const handled = await page.evaluate((p) => globalThis.__pnDevice?.receiveShare(p), { message: body.message, url: body.url }); await page.waitForTimeout(400); return { handled: !!handled }; }
     case "push_notification": return { ...(await pushNotification(page, body)), screen: await screen(page) };
     case "notifications": return { notifications: await page.evaluate(() => globalThis.__pnDevice?.notifications() ?? []), screen: await screen(page) };
     case "open_notification": { s.shade.open = "none"; const ok = await page.evaluate((nid) => globalThis.__pnDevice?.openNotification(nid), body.id); if (!ok) throw new Error("no such notification"); await page.waitForTimeout(400); break; }
@@ -747,7 +750,7 @@ async function act(id, body) {
       });
       return { diag: r, screen: await screen(page) };
     }
-    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await syncMedia(page); s.shade.open = "none"; break;
+    case "device_reset": s.pendingShare = null; await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await syncMedia(page); s.shade.open = "none"; break;
     // Uncaught page errors since the last call to this action. Reading them clears the list.
     case "errors": return { errors: s.errors.splice(0), screen: await screen(page) };
     // Rendered size in CSS px of each ref on the current screen: { sizes: { ref: [width, height] } }. Refs that are gone are left out.

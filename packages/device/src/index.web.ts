@@ -387,7 +387,7 @@ export const Share = {
     return { action: "sharedAction" };
   },
 };
-/** Hand a share to the app in the foreground: the one-shot `url` path of `openUrl` (listeners and the `pn:url` event), plus a `pn:share` event. True if a listener took the url. */
+/** Hand a share to the app in the foreground: the one-shot `url` path of `openUrl` (listeners and the `pn:url` event), plus a `pn:share` event. With only a `message`, the `pn:share` event is the only notification, so listen for it. True if a listener took the url. */
 export function receiveShare(p: SharePayload): boolean {
   window.dispatchEvent(new CustomEvent("pn:share", { detail: { message: p.message ?? null, url: p.url ?? null } }));
   log("share_received", { message: p.message ?? null, url: p.url ?? null });
