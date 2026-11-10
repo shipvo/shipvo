@@ -37,7 +37,7 @@ The JS API every adapter must back is the `Native` type in `packages/runtime/src
 | 12 | **Promotion and stability.** `markHealthy` promotes a pending release only if it is the one running. The boot counter is cleared only after the app stays up 30 seconds, or goes to the background cleanly. An uncaught JS error cancels that (`noteCrash`). | Android: `packages/runtime/android/src/main/java/dev/shipvo/runtime/BootRules.kt` (`onHealthy`, `markStableIfHealthy`), `packages/runtime/android/src/main/java/dev/shipvo/runtime/ShipvoRuntimeModule.kt`. iOS: `BundleSelector.promoteIfRunning`, `BundleSelector.markStableIfHealthy`. JS hook: `installCrashHook` in `packages/runtime/src/index.ts`. | Per platform (the crash hook is shared) |
 | 13 | **New shell resets state.** When the installed app version differs from the one the stored bundles were fetched under, all stored bundles and counters are deleted. | Android: `Store.resetForNewShell`. iOS: `Store.resetForNewShell`. | Per platform |
 | 14 | **Rollback.** An app-called `rollback` drops the pending release, blocks the current one, and reverts to the previous one. | Android: `rollback` in `packages/runtime/android/src/main/java/dev/shipvo/runtime/ShipvoRuntimeModule.kt`, `ShipvoHostHandler.revertToPrevious`. iOS: `packages/runtime/ios/ShipvoRuntimeModule.swift`, `BundleSelector.revertToPrevious`. | Per platform |
-| 15 | **Rejection events.** A typed 404 from the control plane (`hermes_bytecode_mismatch`, `native_module_missing`, `native_module_version`) returns `status: "none"` with a `reason`. Android queues `pointer_rejected:<reason>` once, not once per check. | Android: `PointerQuery.rejectionEvent`. iOS returns the reason; I did not find the queued event there. | Per platform |
+| 15 | **Rejection events.** A typed 404 from the control plane (`hermes_bytecode_mismatch`, `native_module_missing`, `native_module_version`) returns `status: "none"` with a `reason`. Android and iOS return the reason to the caller. Android also queues `pointer_rejected:<reason>` once, not once per check. | Android: `PointerQuery.rejectionEvent`. iOS: `Updater.swift`. | Per platform |
 
 Telemetry event names are in `packages/schema/src/index.ts` (`Telemetry.event`).
 
@@ -59,7 +59,7 @@ On the device, per platform (Android and iOS each have their own code):
 - Rules 2 to 5.
 - Rule 6: the device side (the bytecode header check and sending the versions).
 - Rules 9 to 14.
-- Rule 15: the device reads the typed 404 reason on both platforms. The queued `pointer_rejected:<reason>` event exists on Android only.
+- Rule 15: the device reads the typed 404 reason on Android and iOS and returns it with `status: "none"`.
 
 The device sends `?hbc=` and `?nm=` and reads the typed 404 answer.
 
