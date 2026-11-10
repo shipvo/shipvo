@@ -14,6 +14,9 @@ export type PressResult =
   | { ok: false; errors: Record<string, string> }
   | { ok: false; error: string };
 
+/** Who is calling. `caller` is the assistant's name (for example "claude" or "chatgpt"); actions read it as `{{ caller }}`. Empty when a person taps the screen. */
+export interface CallContext { caller?: string }
+
 export interface App {
   /** The screen on top of the history. */
   readonly screen: string;
@@ -26,7 +29,7 @@ export interface App {
   /** Validates the form. If every field is fine, runs the submit action with the values as its input. */
   submit(form: string): PressResult;
   /** Runs an action by name, the way a generated MCP tool does. Fills in defaults and refuses missing input. */
-  call(action: string, input?: Record<string, unknown>): PressResult;
+  call(action: string, input?: Record<string, unknown>, context?: CallContext): PressResult;
   /** Presses a button by its label (or id). */
   press(button: string): PressResult;
   /** Turns a toggle on or off, by its label. Writes the state value it is bound to. */
@@ -85,14 +88,33 @@ function coerce(f: FormField, value: unknown): unknown {
   return f.type === "number" ? Number(value) : value;
 }
 
-/** The device permissions an action needs, from its steps: a `notify` step needs notifications. Only `notify` is enforced today; blocks that use other device features follow in #1361. Looks inside `then` and `else`. */
+/** The device permission a block type needs, if any. */
+const BLOCK_DEVICE: Record<string, string> = { camera: "camera", scanner: "camera", file: "files" };
+
+/** Adds the permissions of the blocks in a list, looking inside `children`. */
+function blockNeeds(blocks: unknown, need: Set<string>): void {
+  if (!Array.isArray(blocks)) return;
+  for (const b of blocks) {
+    if (!b || typeof b !== "object") continue;
+    const p = BLOCK_DEVICE[String((b as Obj).type)];
+    if (p) need.add(p);
+    blockNeeds((b as Obj).children, need);
+  }
+}
+
+/** The device permissions an action needs, from its steps: a `notify` step needs notifications, and a `navigate` step to a screen with a camera, scanner or file block needs camera or files. Looks inside `then` and `else`. */
 export function actionDeviceNeeds(spec: unknown, action: string): string[] {
   const need = new Set<string>();
+  const screens: unknown[] = Array.isArray((spec as Obj)?.screens) ? (spec as Obj).screens : [];
   const walk = (steps: unknown) => {
     if (!Array.isArray(steps)) return;
     for (const st of steps) {
       if (!st || typeof st !== "object") continue;
       if ("notify" in st) need.add("notifications");
+      if (typeof (st as Obj).navigate === "string") {
+        const target = screens.find((x) => (x as Obj)?.id === (st as Obj).navigate) as Obj | undefined;
+        blockNeeds(target?.body, need);
+      }
       walk((st as Obj).then);
       walk((st as Obj).else);
     }
@@ -172,7 +194,7 @@ export function createApp(spec: unknown, options: CreateAppOptions = {}): { ok: 
     return { done: false };
   };
 
-  const runAction = (name: string, input: Obj): PressResult => {
+  const runAction = (name: string, input: Obj, callerName = ""): PressResult => {
     const a = s.actions?.[name];
     if (!a) return { ok: false, error: `There is no action "${name}".` };
     for (const [k, def] of Object.entries<Obj>(a.input ?? {})) {
@@ -186,7 +208,7 @@ export function createApp(spec: unknown, options: CreateAppOptions = {}): { ok: 
     try {
       toast = "";
       current();
-      const r = run(a.do ?? [], { ...last.scope(), input });
+      const r = run(a.do ?? [], { ...last.scope(), input, caller: callerName });
       return { ok: true, value: r.done ? r.value : undefined };
     } catch (e) {
       return { ok: false, error: `action_failed: ${e instanceof Error ? e.message : String(e)}` };
@@ -233,7 +255,7 @@ export function createApp(spec: unknown, options: CreateAppOptions = {}): { ok: 
       if (r.ok) delete drafts[key];
       return r;
     },
-    call: (action, input = {}) => runAction(action, { ...input }),
+    call: (action, input = {}, context) => runAction(action, { ...input }, context?.caller ?? ""),
     press(button) {
       if ((button === "Back" || (button === "Close" && top().sheet)) && history.length > 1) { toast = ""; return back(); }
       const b = find("button", button);
