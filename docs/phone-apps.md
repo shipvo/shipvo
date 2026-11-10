@@ -145,7 +145,7 @@ Switching sets `current_app` and brings the app to the front. If the app's bundl
 
 The Store's install card lists every device permission an app declares (for example `notifications` or `location`), with an Allow or Deny switch for each. Your answers are kept per app in `installed_apps[].permissions`, saved in `phone.json` (`apps[].permissions`) and carried by `export_phone_apps` and `import_phone_apps`. Settings has one switch per app and permission, so you can change an answer later. `install_app` returns `declared` and `permissions`.
 
-An action that needs a denied permission (a `notify` step needs `notifications`) returns `permission_denied` naming the permission, and nothing else in the action runs. The sim action `set_app_permission { id, permission, allowed }` sets an answer; it returns `not_declared` for a permission the app did not declare.
+An action that needs a denied permission (a `notify` step needs `notifications`; a `navigate` step to a screen with a `camera` or `scanner` block needs `camera`, and a `file` block needs `files`, including blocks nested in `children`) returns `permission_denied` naming the permission, and nothing else in the action runs. The sim action `set_app_permission { id, permission, allowed }` sets an answer; it returns `not_declared` for a permission the app did not declare.
 
 ### Start from a `phone.json`
 
@@ -203,6 +203,8 @@ Connect ChatGPT and Claude to the same phone and install the Assistant Inbox. Th
 
 A message to `anyone` reaches whichever assistant checks first. The Messages and Tasks tabs show the same data, so you can follow the exchange on the phone. An explicit `from` still works when you want to send as someone else.
 
+`mark_read`, `start_task` and `finish_task` return `{ updated, reason }`. If the id is not found, is not addressed to the calling assistant, or the task is already started or done, you get `updated: false` with the reason and nothing changes. A finished task keeps its first reply. Two clients of one assistant share a name, so either can act on that assistant's messages. A client that connects with no name has no guard.
+
 ### Things to do with two assistants on one phone
 
 - **Research, review, synthesize.** Tell ChatGPT: "Research this topic, then `share_report` your findings to Claude." Tell Claude: "Read your reports with `get_reports`, share a review of any gaps, then share a final synthesis." Reports carry a kind (`research`, `review`, `synthesis`) and an author, and the Reports tab lists them.
@@ -231,6 +233,7 @@ A message to `anyone` reaches whichever assistant checks first. The Messages and
 | `placement.… not valid, dropped` in the `warnings` of `import_phone_apps` | An exported layout has a field that is not valid | The valid fields were kept. Fix the field named in the warning and import again with `replace: true` |
 | `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
 | A scheduled app is missing from the home screen | Its schedule is not active at the phone's clock | Read the home text, which says when it starts; call `set_phone_time`, or `switch_app` still opens it |
+| `updated: false` from `mark_read`, `start_task` or `finish_task` | The id is wrong, the message is for another assistant, or the task is already started or done | Read the `reason`, list yours with `check_inbox` or `my_tasks`, and use an id from there |
 | `permission_denied` from an app action | You denied the permission the action needs | Allow it in Settings, in the app's permission row, then run the action again |
 | `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
 
