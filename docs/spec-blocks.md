@@ -304,6 +304,7 @@ The Settings app lists the keys you saved, with metadata only (the key itself is
 - **A week or month view shows no events.** The view only lists events inside the days it shows. Set `at` to a day in the period you want, or use `agenda`.
 - **A translation does not show.** The key must match the text exactly, including capitals and spaces, and `language` must be the same code you used in `strings` (`fr`, not `fr-FR`). Pass `locale` separately for money and dates.
 - **A vector shape is missing.** An unknown `shape` is an error; a colour that is not hex, a name or `url(#id)` draws as `none`; a path with other characters draws nothing.
+- **A refreshed value never changes.** Check that `refresh` is 30 or more and the source is `http`. A failed refresh keeps the last value, so check the domain is in `permissions.network`.
 - **State is empty before the first change.** Declare a `default` for each `state` value. Declared defaults are present from the start.
 
 ## Next steps
