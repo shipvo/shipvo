@@ -8,7 +8,7 @@ Read the design in [Key rotation: model and wire format](design/key-rotation.md)
 
 ## Before you start
 
-- A Shipvo app with a `shipvo.json` (see [Getting started](getting-started.md)).
+- A Shipvo app with a `shipvo.json` (see [Getting started](getting-started.md)). Step 1 does not need it; step 3 does.
 - The root public key built into your app (step 2). Without it, an app ignores rotations.
 - For the upload step: `shipvo login` as the app owner. Tokens cannot upload.
 
@@ -23,7 +23,7 @@ npx -y @shipvo/cli keys root --out root-seed.txt
 You see:
 
 ```text
-Root public key (pin this value): L4oIYuB2kk801yCIV/4NmeC/dp/1N4XIJA3/NfXGGGk=
+Root public key (pin this value): <base64 public key>
 Root seed written to /path/root-seed.txt (mode 0600). Store it offline, in a password manager or vault, then delete this file from this machine. Anyone with it can rotate your release key.
 ```
 
@@ -45,7 +45,7 @@ Then register the same public key with the control plane once (`PUT /rotation/<a
 
 ## 3. Sign a rotation (offline)
 
-Make a new release key first (`shipvo keygen`), then sign a statement that names its public key:
+Run this in your app folder: it reads the app id from `shipvo.json`. Make a new release key first (`shipvo keygen`), then sign a statement that names its public key:
 
 ```bash
 npx -y @shipvo/cli keys rotate sign --root-seed-file root-seed.txt \
@@ -88,4 +88,4 @@ Expected: `Uploaded. Phones switch when they next fetch it.` Phones check the ro
 - [Moving to a new machine](new-machine.md): back up the release seed.
 - [CLI guide](cli.md): every `keys` command and its `--json` output.
 - [Key rotation design](design/key-rotation.md): the rules phones apply.
-- [Threat model](threat-model.md).
+- [Threat model](threat-model.md): which attacks signing and rotation stop.
