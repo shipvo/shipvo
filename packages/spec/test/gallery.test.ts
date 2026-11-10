@@ -7,11 +7,17 @@ const files = readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
 const inputs: Record<string, [string, Record<string, unknown>]> = {
   "habit-tracker": ["check_in", { habit: "Read", day: "2026-11-10", count: 2 }],
   "workout-log": ["log_set", { exercise: "Squat", reps: 5, weight: 60 }],
+  "expense-splitter": ["add_expense", { who: "Ana", what: "Taxi", amount: 12 }],
+  "trip-checklist": ["add_item", { name: "Passport", group: "Documents", qty: 1 }],
+  flashcards: ["add_card", { deck: "Spanish", front: "Hello", back: "Hola" }],
 };
 
 const expected: Record<string, { row: Record<string, unknown>; text: string }> = {
   "habit-tracker": { row: { habit: "Read", day: "2026-11-10", count: 2 }, text: "Check-ins: 2" },
   "workout-log": { row: { exercise: "Squat", reps: 5, weight: 60 }, text: "300" },
+  "expense-splitter": { row: { who: "Ana", what: "Taxi", amount: 12 }, text: "Total 12" },
+  "trip-checklist": { row: { name: "Passport", group: "Documents", qty: 1 }, text: "Items to pack: 1" },
+  flashcards: { row: { deck: "Spanish", front: "Hello", back: "Hola" }, text: "Cards: 1" },
 };
 
 function screenText(spec: unknown, data: Record<string, unknown>): string {
