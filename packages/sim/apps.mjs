@@ -137,6 +137,11 @@ export function setPermission(st, id, permission, allowed) {
   note(st, "set_permission", id, { permission, allowed }); return st;
 }
 
+/** The phone as a phone.json profile: installed apps with their permission answers, and the settings. loadProfile reads it back. */
+export function exportProfile(st) {
+  return { apps: st.installed_apps.map((a) => ({ id: a.id, name: a.name, url: a.url, version: a.version, ...(a.permissions && Object.keys(a.permissions).length ? { permissions: { ...a.permissions } } : {}) })), ...(Object.keys(st.settings ?? {}).length ? { settings: { ...st.settings } } : {}) };
+}
+
 /** The consent card for an install: one row per declared permission, each with a switch that reads Allowed or Denied (Allowed to start). */
 export function consentCardHtml(app) {
   const rows = (app.declared ?? []).map((p) => `<div class="sf-perm" role="group" aria-label="${esc(p)}"><b>${esc(p)}</b><button type="button" role="switch" data-part="consent-switch" data-perm="${esc(p)}" aria-checked="true" aria-label="${esc(p)} for ${esc(app.name)}: allowed">Allowed</button></div>`).join("");
@@ -318,12 +323,19 @@ if(!mp||/^fixture:/.test(a.url)){installApp(st,id,st.store,undefined,given);retu
 var bad=function(){return new Error("The app could not be fetched")};
 return bundle(a).then(function(u){return fetch(u).then(function(r){if(!r.ok||Number(r.headers.get("content-length"))>MAXB)throw bad();return r.arrayBuffer()}).then(function(buf){if(buf.byteLength>MAXB)throw bad();return sha(buf).then(function(h){urls[id]=u;installApp(st,id,st.store,{sha256:h,bytes:buf.byteLength},given)})})})}
 var ss=q("settings-screen"),pbox=null;
-function drawPerms(){if(!ss||ss.hidden)return;if(!pbox){pbox=document.createElement("div");pbox.setAttribute("data-part","permission-rows");pbox.setAttribute("role","group");pbox.setAttribute("aria-label","App permissions");ss.insertBefore(pbox,q("settings-close"))}pbox.innerHTML=permissionRowsHtml(st)}
+var remote=null;
+function paintPerms(list){pbox.innerHTML=permissionRowsHtml({installed_apps:list})}
+function drawPerms(){if(!ss||ss.hidden)return;if(!pbox){pbox=document.createElement("div");pbox.setAttribute("data-part","permission-rows");pbox.setAttribute("role","group");pbox.setAttribute("aria-label","App permissions");ss.insertBefore(pbox,q("settings-close"))}
+var sid=window.__shipvoSession;
+if(!sid){paintPerms(st.installed_apps);return}
+paintPerms(remote||[]);fetch("/phone/apps?session="+encodeURIComponent(sid)).then(function(x){return x.json()}).then(function(j){if(j&&j.ok&&j.installed_apps){remote=j.installed_apps;paintPerms(remote)}}).catch(function(){})}
 function open(on){sc.hidden=!on;if(on){msg="";drawStore();sc.focus({preventScroll:true});loadStore().then(drawStore)}}
 drawHome();setInterval(drawHome,30000);
 r.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
 if(t.closest('[data-part="settings-icon"],[data-part="settings-gear"]')){setTimeout(drawPerms,0);return}
-var ps=t.closest('[data-part="perm-switch"]');if(ps){try{setPermission(st,ps.getAttribute("data-app"),ps.getAttribute("data-perm"),ps.getAttribute("aria-checked")!=="true")}catch(x){}drawPerms();return}
+var ps=t.closest('[data-part="perm-switch"]');if(ps){var pid=ps.getAttribute("data-app"),pp=ps.getAttribute("data-perm"),pw=ps.getAttribute("aria-checked")!=="true",sid=window.__shipvoSession;
+if(sid){ps.setAttribute("aria-checked",String(pw));fetch("/act",{method:"POST",body:JSON.stringify({session:sid,action:"set_app_permission",id:pid,permission:pp,allowed:pw})}).then(function(x){return x.json()}).then(function(j){if(j&&j.ok&&j.installed_apps)remote=j.installed_apps;drawPerms()}).catch(drawPerms)}
+else{try{setPermission(st,pid,pp,pw)}catch(x){}drawPerms()}return}
 if(t.closest('[data-part="store-icon"]'))return open(true);
 if(t.closest('[data-part="store-close"]'))return open(false);
 var cs=t.closest('[data-part="consent-switch"]');if(cs){var on=cs.getAttribute("aria-checked")!=="true";given[cs.getAttribute("data-perm")]=on;cs.setAttribute("aria-checked",String(on));cs.setAttribute("aria-label",cs.getAttribute("data-perm")+" for "+(card?card.name:"")+": "+(on?"allowed":"denied"));cs.textContent=on?"Allowed":"Denied";return}

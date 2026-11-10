@@ -226,6 +226,9 @@ export class SpecHost {
   // An unknown app is ignored on purpose: the person may toggle Settings for an app that is not running yet.
   setPermission(session, id, permission, allowed) { const r = this.running.get(key(session, id)); if (r) r.devicePermissions[permission] = allowed; }
 
+  /** Makes a running app's permission answers exactly `answers` (after an update that declares other permissions). */
+  syncPermissions(session, id, answers) { const r = this.running.get(key(session, id)); if (!r) return; for (const k of Object.keys(r.devicePermissions)) delete r.devicePermissions[k]; Object.assign(r.devicePermissions, answers); }
+
   /** Every version of an app with what changed in it, newest last. */
   history(session, id) { return (this.running.get(key(session, id))?.history ?? []).map((h) => ({ version: h.version, at: h.at, changes: h.changes ?? [] })); }
 

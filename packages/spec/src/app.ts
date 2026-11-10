@@ -85,7 +85,7 @@ function coerce(f: FormField, value: unknown): unknown {
   return f.type === "number" ? Number(value) : value;
 }
 
-/** The device permissions an action needs, from its steps: a `notify` step needs notifications. Looks inside `then` and `else`. */
+/** The device permissions an action needs, from its steps: a `notify` step needs notifications. Only `notify` is enforced today; blocks that use other device features follow in #1361. Looks inside `then` and `else`. */
 export function actionDeviceNeeds(spec: unknown, action: string): string[] {
   const need = new Set<string>();
   const walk = (steps: unknown) => {

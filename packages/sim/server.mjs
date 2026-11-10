@@ -29,7 +29,7 @@ import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.
 import { SettingsError } from "./settings.mjs";
 import { SpecHost } from "./spec-host.mjs";
 import { fetchBuild, BuildCacheError } from "./build-cache.mjs";
-import { AppsError, DEVICE_PERMISSIONS, setPermission, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, describeApps, pinApp, hideApp, arrangeApp, cleanPlacement, installedIconsHtml, storeCss } from "./apps.mjs";
+import { AppsError, DEVICE_PERMISSIONS, setPermission, exportProfile, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, describeApps, pinApp, hideApp, arrangeApp, cleanPlacement, installedIconsHtml, storeCss } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
@@ -484,6 +484,10 @@ async function act(id, body) {
       const up = specHost.update(sidOf(s), appId, body.spec);
       if (!up.ok) throw new SimError("invalid_spec", up.errors.slice(0, 20).map((e) => `${e.path || "/"}: ${e.message}${e.fix ? ` (${e.fix})` : ""}`).join("\n"));
       entry.version = String(up.version);
+      // A new version may ask for other device permissions: new ones start allowed (as on install), kept ones keep the person's answer, dropped ones go.
+      const perms = declaredAnswers(body.spec, entry.permissions);
+      if (Object.keys(perms).length) entry.permissions = perms; else delete entry.permissions;
+      specHost.syncPermissions(sidOf(s), appId, perms);
       if (typeof body.name === "string" && body.name.trim()) entry.name = body.name.replace(/[<>"'\\]/g, "").slice(0, 40);
       s.apps.log.push({ at: Date.now(), name: "update_app", app: appId, from: String(up.from), version: String(up.version), changes: specHost.history(sidOf(s), appId).at(-1)?.changes ?? [], source: "real" });
       if (s.apps.current_app === appId && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
@@ -526,7 +530,9 @@ async function act(id, body) {
       const id = String(body.id ?? "");
       try { setPermission(s.apps, id, String(body.permission ?? ""), body.allowed); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       specHost.setPermission(sidOf(s), id, String(body.permission), body.allowed);
-      return { id, permissions: s.apps.installed_apps.find((a) => a.id === id).permissions, installed_apps: s.apps.installed_apps };
+      // `profile` is the phone.json form of the phone with these answers: save it and start a new session with it (phone) to keep them.
+      // A Store app (not a spec app) has no running host, so its answer is stored and enforces nothing until it runs.
+      return { id, permissions: s.apps.installed_apps.find((a) => a.id === id).permissions, installed_apps: s.apps.installed_apps, profile: exportProfile(s.apps) };
     }
     case "install_app": case "uninstall_app": case "switch_app": {
       const id = String(body.id ?? "");

@@ -64,6 +64,56 @@ for (const style of ["android", "ios"]) {
     assert.equal(bad.code, "not_declared");
   });
 
+  test(`${style}: the Settings switch in the phone page changes what the app may do`, async () => {
+    const sid = `ps-${style}`;
+    assert.ok((await call("/session", { session: sid })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "remind", spec: REMIND, style, permissions: { notifications: false } })).ok, true);
+    assert.equal((await ping(sid, "remind")).code, "permission_denied");
+    const { chromium } = createRequire(import.meta.url)("playwright");
+    const b = await chromium.launch();
+    try {
+      const page = await b.newPage();
+      await page.goto(`http://localhost:${PORT}/phone?session=${sid}&skin=${style}`);
+      await page.click('[data-part="settings-icon"]');
+      const sw = page.locator('[data-part="perm-switch"][data-app="remind"][data-perm="notifications"]');
+      await sw.waitFor();
+      assert.equal(await sw.getAttribute("aria-checked"), "false");
+      await sw.click();
+      await page.waitForFunction(() => document.querySelector('[data-part="perm-switch"][data-perm="notifications"]')?.getAttribute("aria-checked") === "true");
+      assert.equal((await ping(sid, "remind")).ok, true);
+      await sw.click();
+      await page.waitForFunction(() => document.querySelector('[data-part="perm-switch"][data-perm="notifications"]')?.getAttribute("aria-checked") === "false");
+      const again = await ping(sid, "remind");
+      assert.equal(again.ok, false); assert.equal(again.code, "permission_denied");
+    } finally { await b.close(); }
+  });
+
+  test(`${style}: an updated spec gets answers for new permissions and loses dropped ones`, async () => {
+    const sid = `pu-${style}`;
+    assert.ok((await call("/session", { session: sid })).ok);
+    await act(sid, { action: "create_app", id: "remind", spec: REMIND, style, permissions: { camera: false } });
+    const next = { ...REMIND, permissions: { device: ["notifications", "location"] } };
+    const up = await act(sid, { action: "update_app", id: "remind", spec: next });
+    assert.equal(up.ok, true, JSON.stringify(up));
+    assert.deepEqual(up.installed_apps.find((a) => a.id === "remind").permissions, { notifications: true, location: true });
+    const set = await act(sid, { action: "set_app_permission", id: "remind", permission: "location", allowed: false });
+    assert.equal(set.ok, true, JSON.stringify(set));
+    assert.equal((await act(sid, { action: "set_app_permission", id: "remind", permission: "camera", allowed: true })).code, "not_declared");
+  });
+
+  test(`${style}: answers survive a saved profile and a new session`, async () => {
+    const sid = `pr-${style}`, next = `pn-${style}`;
+    for (const x of [sid, next]) assert.ok((await call("/session", { session: x })).ok);
+    await act(sid, { action: "create_app", id: "remind", spec: REMIND, style });
+    const r = await act(sid, { action: "set_app_permission", id: "remind", permission: "camera", allowed: false });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    const saved = JSON.parse(JSON.stringify(r.profile));
+    await call("/end", { session: next });
+    assert.ok((await call("/session", { session: next, phone: saved })).ok);
+    const apps = await act(next, { action: "phone_apps" });
+    assert.deepEqual(apps.installed_apps.find((a) => a.id === "remind").permissions, { notifications: true, camera: false });
+  });
+
   test(`${style}: answers persist through export and import`, async () => {
     const sid = `pe-${style}`, other = `pf-${style}`;
     for (const x of [sid, other]) assert.ok((await call("/session", { session: x })).ok);
@@ -85,3 +135,32 @@ test("install_app returns the declared list and the stored answers", async () =>
   const plain = await act(sid, { action: "install_app", id: "tide" });
   assert.deepEqual(plain.declared, []);
 });
+
+// The embedded frame (statusClientScript) with a session id sends the switch to the server and redraws from its reply.
+for (const style of ["android", "ios"]) {
+  test(`${style}: an embedded frame posts set_app_permission and shows what the server answers`, async () => {
+    const { chromium } = createRequire(import.meta.url)("playwright");
+    const { renderFrame, statusClientScript } = await import("./frame.mjs");
+    const b = await chromium.launch();
+    try {
+      const page = await b.newPage();
+      const posts = [];
+      let apps = [{ id: "remind", name: "Remind Me", permissions: { notifications: false } }];
+      await page.route("**/phone/apps*", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, installed_apps: apps }) }));
+      await page.route("**/act", (r) => { const body = JSON.parse(r.request().postData()); posts.push(body); if (body.allowed === true && posts.length === 2) return r.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: false, error: "no" }) }); apps = [{ ...apps[0], permissions: { notifications: body.allowed } }]; r.fulfill({ contentType: "application/json", body: JSON.stringify({ ok: true, installed_apps: apps }) }); });
+      const f = renderFrame({ skin: style, screen: `<iframe id="app" srcdoc="&lt;p&gt;hi&lt;/p&gt;"></iframe>` });
+      const html = `<!doctype html><script>window.__shipvoSession="s1"</script><style>${f.css}</style>${f.html}<script>${statusClientScript("app", style, { apps: [] })}</script>`;
+      await page.route("http://sim.test/", (r) => r.fulfill({ contentType: "text/html", body: html }));
+      await page.goto("http://sim.test/");
+      await page.evaluate(() => document.querySelector('[data-part="settings-icon"]').click());
+      const sw = '[data-part="perm-switch"][data-perm="notifications"]';
+      await page.waitForSelector(sw, { state: "attached" });
+      await page.evaluate((s) => document.querySelector(s).click(), sw);
+      await page.waitForFunction((s) => document.querySelector(s).getAttribute("aria-checked") === "true", sw);
+      assert.deepEqual(posts[0], { session: "s1", action: "set_app_permission", id: "remind", permission: "notifications", allowed: true });
+      await page.evaluate((s) => document.querySelector(s).click(), sw);   // turn it off again: server accepts
+      await page.waitForFunction((s) => document.querySelector(s).getAttribute("aria-checked") === "false", sw);
+      assert.equal(posts.length, 2);
+    } finally { await b.close(); }
+  });
+}
