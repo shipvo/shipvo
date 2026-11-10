@@ -49,6 +49,9 @@ export class PhoneError extends Error { constructor(message: string, readonly co
 export type MockResponse = { /** Delivered to the session's own inbox (`phone.inbox`) when this rule answers a request, as a real server would email it. */ mail?: { from?: string; subject: string; text: string }; status: number; body?: string | Record<string, unknown> | unknown[] | null; headers?: Record<string, string>; delayMs?: number };
 /** A string `url` must equal the full request URL. A RegExp is tested against it. Without `method`, any method matches. The first matching rule wins. */
 export type MockRule = { url: string | RegExp; method?: string } & MockResponse;
+export type A11yIssue = { ref: string; role: string; code: "missing_label" | "small_target"; message: string };
+const A11Y_PRESSABLE = ["button", "link", "tab", "checkbox", "switch", "radio", "menuitem", "option"];
+const A11Y_INPUT = ["textbox", "searchbox", "spinbutton", "combobox"];
 type Reply = { ok: boolean; profile?: string; code?: string; screen?: string | null; error?: string; path?: string; notifications?: Notification[]; log?: unknown[]; capabilities?: unknown; release?: string | number; delivered?: boolean; id?: string };
 
 /** A simulated phone running your app. Every action returns once the screen has settled, and updates `screen`. */
@@ -109,6 +112,23 @@ export class Phone {
   async back(): Promise<this> { await this.act("back"); return this; }
   async refresh(): Promise<this> { await this.act("screen"); return this; }
 
+  /**
+   * Check the current screen for controls TalkBack and VoiceOver users cannot use: `missing_label` (a control with no
+   * accessible name) and `small_target` (a pressable under 48 dp wide or high on the Android style, 44 pt on the iPhone style).
+   */
+  async a11yAudit(): Promise<{ issues: A11yIssue[] }> {
+    const r = (await this.act("sizes")) as Reply & { sizes?: Record<string, [number, number]>; skin?: string };
+    const min = r.skin === "ios" ? 44 : 48, unit = r.skin === "ios" ? "pt" : "dp";
+    const issues: A11yIssue[] = [];
+    for (const n of this.nodes()) {
+      const pressable = A11Y_PRESSABLE.includes(n.role);
+      if (!pressable && !A11Y_INPUT.includes(n.role)) continue;
+      if (!n.name.trim()) issues.push({ ref: n.ref, role: n.role, code: "missing_label", message: `${n.role} ${n.ref} has no accessible name: give it a label so TalkBack and VoiceOver can read it.` });
+      const z = r.sizes?.[n.ref];
+      if (pressable && z && (z[0] < min || z[1] < min)) issues.push({ ref: n.ref, role: n.role, code: "small_target", message: `${n.role} ${n.ref} is ${z[0]} x ${z[1]} ${unit}; the minimum is ${min} ${unit} wide and high.` });
+    }
+    return { issues };
+  }
   /** Wait until the text appears (default 5 s). On timeout the error carries the last screen. */
   async waitFor(text: string | RegExp, opts: { timeout?: number; interval?: number } = {}): Promise<this> {
     const end = Date.now() + (opts.timeout ?? 5000);

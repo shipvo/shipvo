@@ -35,6 +35,31 @@
     }
   },
   {
+    "name": "a11y_audit",
+    "description": "Check the current screen for controls TalkBack and VoiceOver users cannot use. Lists every button, link, field or other control with no accessible name (missing_label) and every tap target under the platform minimum (small_target: 48 dp wide or high on the Android style, 44 pt on the iPhone style). Each issue has ref, role, code and message. Fails with sizes_unavailable when the simulator cannot report sizes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "apply_update",
     "description": "Apply the ready release: the app restarts on the new bundle, like restart. After 3 boots that throw, the phone goes back to the old release and the state is reverted with reason crash_loop. Fails with not_ready unless the state is ready. Simulated; logged in device_log.",
     "inputSchema": {
@@ -3168,6 +3193,37 @@
       "readOnlyHint": false,
       "destructiveHint": false,
       "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "wait_for_event",
+    "description": "Wait until something new arrives for you in the Assistant Inbox app on this phone: a message or a task. Returns when a message or task you have not been told about yet is waiting (at once if one already is), and `nothing yet` after timeout_ms (up to 25000, default 25000) when not. structuredContent.pending lists the new message ids and task ids. When it returns an event, read it with check_inbox or my_tasks, then call wait_for_event again to listen for the next one: items already returned do not wake you again.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 25000,
+          "description": "How long to wait, in ms (default 25000)"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
     },
     "execution": {
       "taskSupport": "forbidden"

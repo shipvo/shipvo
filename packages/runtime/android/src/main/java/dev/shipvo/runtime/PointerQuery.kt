@@ -20,6 +20,9 @@ internal object PointerQuery {
     return if (q.isEmpty()) path else path + "?" + q.joinToString("&")
   }
 
+  /** Android pointers carry no `platform`; a pointer marked for any other platform (such as `ios`) is refused. */
+  fun isForAndroid(platform: String?): Boolean = platform == null || platform == "android"
+
   /** The typed reason in a 404 body, or null for any other answer. */
   fun mismatchReason(body: String?): String? {
     val m = Regex("\"error\"\\s*:\\s*\"([a-z_]+)\"").find(body ?: return null) ?: return null

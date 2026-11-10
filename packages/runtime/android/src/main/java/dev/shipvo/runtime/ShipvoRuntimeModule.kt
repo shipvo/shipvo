@@ -165,6 +165,7 @@ class ShipvoRuntimeModule : Module() {
     val bodyStr = envelope.getString("body")
     require(Verify.ed25519(bodyStr.toByteArray(Charsets.UTF_8), envelope.getString("signature"), rotation.currentReleaseKey())) { "pointer signature invalid" }
     val body = JSONObject(bodyStr)
+    require(PointerQuery.isForAndroid(if (body.has("platform") && !body.isNull("platform")) body.getString("platform") else null)) { "pointer is not for Android" }
     require(body.getString("app_id") == s.appId && body.getInt("shell_major") == s.shellMajor) { "pointer for another app/shell" }
     val release = body.getInt("release")
     if (release <= known) return mapOf("status" to "none")
