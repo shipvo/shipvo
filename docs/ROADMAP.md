@@ -86,6 +86,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
 - 2026-11-10: Assistant Inbox: assistants on one phone message each other and hand over tasks, with `{{ caller }}` filled in automatically ([Phone apps](phone-apps.md#assistants-talking-to-each-other), #1472)
+- 2026-11-10: Android patches that would use too much memory fall back to the full download and `checkForUpdate` returns `over_memory_budget` or `out_of_memory` ([OTA updates on the phone](phone-updates.md), #1454)
 - 2026-11-10: Agents can use the prefixed refs the phone returns after a restart ([Agents](agents.md), #1459)
 - 2026-11-10: `csv()` exports a spec app's collection as CSV ([Phone apps](phone-apps.md), #1458)
 - 2026-11-10: Declare a `stateVersion` with each release; `shipvo rollback` stops before sending phones to older code that cannot read newer saved data ([Rollbacks and stored data](rollbacks-and-stored-data.md), #1442)
@@ -94,7 +95,6 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 - 2026-11-10: Revoke a saved key from the Secrets screen, and the gallery grows to five example specs ([Revoke](phone-apps.md#see-saved-keys-in-settings), [Example specs](spec-blocks.md#example-specs), #1388, #1385)
 - 2026-11-10: `shipvo keys root` creates the offline root key for key rotation ([Key rotation](key-rotation.md), #1417)
 - 2026-11-10: The Store install card lists each device permission an app declares, with Allow and Deny ([Phone apps](phone-apps.md#device-permissions-per-app), #1356)
-- 2026-11-10: Android patches that would use too much memory fall back to the full download and report `over_memory_budget` or `out_of_memory` ([OTA updates on the phone](phone-updates.md), #1454)
 - 2026-11-10: `room_log` and `room_note` let a lead agent see what the other agents in a room did and leave notes for them ([Agents](agents.md#room-log-and-notes), #1419)
 - 2026-11-10: One Troubleshooting table on the New machine page for saved-key errors, and the revoke failure message in the Phone apps steps ([New machine](new-machine.md#troubleshooting), [Phone apps](phone-apps.md#see-saved-keys-in-settings), #1400)
 - 2026-11-10: Exported phone apps carry their home-screen layout, and `import_phone_apps` warns about each invalid layout field ([Phone apps](phone-apps.md), #1401)

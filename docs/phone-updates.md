@@ -71,7 +71,7 @@ The simulator refuses a signed release that is not newer than every release the 
 
 ## Large patches on Android
 
-An update that arrives as a patch is rebuilt in memory. When the base, the patch and the result would not fit comfortably, the runtime downloads the full bundle instead, and `checkForUpdate` returns `via: "full"` with `patchError` set to `over_memory_budget` or `out_of_memory`. Nothing for you to fix: the release is verified the same way. See [@shipvo/runtime](../packages/runtime/README.md#patches-and-memory-android).
+An update that arrives as a patch is rebuilt in memory. When the base, the patch and the new bundle would use more than 40% of the app's heap limit, the runtime downloads the full bundle instead, and `checkForUpdate` returns `via: "full"` with `patchError` set to `over_memory_budget` or `out_of_memory`. Nothing for you to fix: the release is verified the same way. See [@shipvo/runtime](../packages/runtime/README.md#patches-on-small-heaps-android).
 
 ## Next steps
 
