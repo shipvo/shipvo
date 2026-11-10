@@ -400,7 +400,7 @@ async function act(id, body) {
     // The phone's clock, for schedules. at: an ISO time like 2026-11-14T09:00:00, or null for the real time.
     case "set_time": {
       if (body.at == null) s.clockMs = null;
-      else { const t = Date.parse(String(body.at)); if (Number.isNaN(t)) throw new SimError("bad_time", "at must be a time like 2026-11-14T09:00:00, or null"); s.clockMs = t; }
+      else { const t = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?/.test(String(body.at)) ? Date.parse(String(body.at)) : NaN; if (Number.isNaN(t)) throw new SimError("bad_time", "at must be a time like 2026-11-14T09:00:00, or null"); s.clockMs = t; }
       return { now: nowOf(s).toString(), home: `Home screen\n${describeApps(s.apps, nowOf(s))}`, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Edit in place: a new spec is a new version. Data and state the person entered carry over; a bad spec changes nothing.

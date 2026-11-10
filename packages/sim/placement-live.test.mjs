@@ -63,6 +63,9 @@ test("pin, hide and position change the order; errors are typed; changes are in 
   assert.equal((await act("pl2", { action: "arrange_apps", id: "ghost", pinned: true })).code, "not_installed");
   assert.equal((await act("pl2", { action: "arrange_apps", id: "mail", position: -3 })).code, "bad_placement");
   assert.equal((await act("pl2", { action: "set_time", at: "tomorrow-ish" })).code, "bad_time");
+  assert.equal((await act("pl2", { action: "set_time", at: "2026-11-14" })).code, "bad_time");
+  assert.equal((await act("pl2", { action: "set_time", at: "1" })).code, "bad_time");
+  assert.equal((await act("pl2", { action: "set_time", at: "2026-11-14T09:00" })).ok, true);
   const log = (await act("pl2", { action: "device_log" })).log.filter((e) => e.name === "arrange_apps");
   assert.ok(log.length >= 3 && log[0].app === "mail");
 });
@@ -97,7 +100,10 @@ for (const skin of ["android", "ios"]) {
       await p.evaluate(() => window.postMessage({ type: "pn:nav", where: "home" }, "*"));
       const names = () => p.locator('[data-part="installed-app"]').evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
       assert.deepEqual(await names(), ["Planner", "Mail"]);
-      await p.clock.runFor(120000);
+      await p.locator('[data-part="installed-app"]').first().focus();
+      await p.clock.runFor(30000);   // 17:59:30: nothing changed, so focus stays on the icon
+      assert.equal(await p.evaluate(() => document.activeElement?.getAttribute("data-part")), "installed-app");
+      await p.clock.runFor(90000);
       assert.deepEqual(await names(), ["Mail"]);
     } finally { await b.close(); }
   });

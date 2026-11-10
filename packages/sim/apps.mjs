@@ -257,7 +257,8 @@ var st;try{st=loadProfile(${JSON.stringify({ ...seed, marketplace: undefined })}
 st.settings={};
 var box=document.createElement("div");box.className="sf-apps";box.setAttribute("data-part","installed-apps");home.appendChild(box);
 var msg="";
-function drawHome(){box.innerHTML=installedIconsHtml(st,new Date())}
+var lastHome=null;
+function drawHome(){var h=installedIconsHtml(st,new Date());if(h===lastHome)return;lastHome=h;box.innerHTML=h}
 function drawStore(){q("store-rows").innerHTML=storeRowsHtml(st)+(msg?'<p class="sf-store-msg" role="status">'+esc(msg)+'</p>':"")}
 function loadStore(){if(!mp)return Promise.resolve();return fetch(mp.replace(/\\/$/,"")+"/apps/public").then(function(r){return r.json()}).then(function(j){var l=(j&&j.apps)||[];if(l.length)st.store=l.map(function(a){return entry({id:a.app_id,name:a.name||a.app_id,version:a.latest_release!=null?"r"+a.latest_release:"latest",url:"app://"+a.app_id+(a.latest_release!=null?"@r"+a.latest_release:"@latest")})})}).catch(function(){})}
 // Without a session the page fetches the app itself. The marketplace answers with CORS open, so a page on any origin can read it.
