@@ -14,6 +14,8 @@ export function isPrivateAddress(ip) {
   const v = ip.toLowerCase();
   const m4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v);
   if (m4) return isPrivateAddress(m4[1]);
+  const mh = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(v); // the form URL parsing produces
+  if (mh) { const n = (parseInt(mh[1], 16) << 16) | parseInt(mh[2], 16); return isPrivateAddress([n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join(".")); }
   if (isIP(v) === 4) {
     const [a, b] = v.split(".").map(Number);
     return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || a >= 224;
