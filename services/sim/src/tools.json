@@ -2991,7 +2991,7 @@
   },
   {
     "name": "set_reminder",
-    "description": "Set a reminder on the phone: at the time you give (on the phone's clock, see set_phone_time) a notification with the title and body arrives, whether or not an app is open. Give at (a time like 2026-11-14T09:00) or in_minutes, not both. repeat is none, daily or weekly. With Do Not Disturb or Focus on, it is kept in the notification shade without a banner. If notification permission is off it is recorded as not delivered. Read what arrived with notifications. Fails with bad_time, bad_title, too_long, bad_repeat or too_many.",
+    "description": "Set a reminder on the phone: at the time you give (on the phone's clock, see set_phone_time) a notification with the title and body arrives, whether or not an app is open. Give at (a time like 2026-11-14T09:00) or in_minutes, not both. repeat is none, daily or weekly. With Do Not Disturb or Focus on, it is kept in the notification shade without a banner. It arrives whatever the app notification permissions say, as a phone's own reminders do. Read what arrived with notifications. Fails with bad_time, bad_title, too_long, bad_repeat or too_many.",
     "inputSchema": {
       "type": "object",
       "properties": {

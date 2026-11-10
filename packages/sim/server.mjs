@@ -655,6 +655,12 @@ async function act(id, body) {
     // Simulated device: what the phone "has" and what happens to it. See @shipvo/device.
     case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); await syncMedia(page); break;
     case "open_notifications": case "open_control_center": case "close_panels": case "toggle_tile": case "dismiss_notification": {
+      // A reminder the phone kept itself (no app page took it) is swiped away here.
+      if (body.action === "dismiss_notification" && /^sys\d+$/.test(String(body.id ?? ""))) {
+        const i = (s.sysNotes ?? []).findIndex((n) => n.id === body.id);
+        if (i < 0) throw new SimError("not_found", `no notification '${body.id}'`);
+        s.sysNotes.splice(i, 1); return { dismissed: body.id };
+      }
       try { return { ...(await shadeAction(page, s.shade, body)) }; } catch (e) { if (e instanceof ShadeError) throw new SimError(e.code, e.message); throw e; }
     }
     case "get_settings": case "set_setting": {
@@ -703,7 +709,7 @@ async function act(id, body) {
         // The app page takes it when it has a device layer (banner, shade, DND). With no app page the phone keeps it itself, so it is never lost.
         const got = await pushNotification(s.page, note, { system: true }).catch(() => ({ delivered: false }));
         if (got.delivered) return got;
-        (s.sysNotes ??= []).push({ id: `sys${s.sysNotes.length + 1}`, at: Date.now(), app: "Reminders", ...note });
+        (s.sysNotes ??= []).push({ id: `sys${(s.sysSeq = (s.sysSeq ?? 0) + 1)}`, at: nowOf(s).getTime(), app: "Reminders", ...note });
         return { delivered: true };
       });
       if (!s.reminderTimer) { s.reminderTimer = setInterval(() => { s.reminders.tick().catch(() => {}); }, 1000); s.reminderTimer.unref?.(); }
@@ -762,7 +768,7 @@ async function act(id, body) {
       });
       return { diag: r, screen: await screen(page) };
     }
-    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await syncMedia(page); s.shade.open = "none"; break;
+    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await syncMedia(page); s.shade.open = "none"; s.sysNotes = []; break;
     // Uncaught page errors since the last call to this action. Reading them clears the list.
     case "errors": return { errors: s.errors.splice(0), screen: await screen(page) };
     // Rendered size in CSS px of each ref on the current screen: { sizes: { ref: [width, height] } }. Refs that are gone are left out.
