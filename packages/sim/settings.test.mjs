@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { settingPatch, readSettings, describeSettings, SettingsError, SETTING_KEYS, settingsHtml, secretRowsHtml, loadSecrets, revokeSecret, applyRevoke, settingsClientScript } from "./settings.mjs";
+import { settingPatch, readSettings, describeSettings, SettingsError, SETTING_KEYS, settingsHtml, secretRowsHtml, loadSecrets, revokeSecret, rotateSecret, rotateLinkHtml, applyRevoke, settingsClientScript } from "./settings.mjs";
 import { renderFrame } from "./frame.mjs";
 import { settingsAction } from "./settings-actions.mjs";
 
@@ -123,4 +123,19 @@ test("a failed revoke keeps the row and shows a message", () => {
   applyRevoke("cancelled", rows[0], el, err, "EMPTY");
   assert.equal(err.hidden, true);
   assert.equal(rows[0].removed, false);
+});
+
+test("rotate shows a one-time ticket link and no key value", async () => {
+  const calls = [];
+  const fetchFn = async (u, o) => { calls.push([u, o.method]); return { ok: true, json: async () => ({ ticket: "t1", url: "https://x.dev/vault/t/t1", expires_in: 600, app: "shop", name: "stripe", value: "sk_live_SECRET" }) }; };
+  assert.match(secretRowsHtml([{ name: "stripe", app: "shop" }]), /data-part="secret-rotate" data-app="shop" data-name="stripe"/);
+  const url = await rotateSecret(fetchFn, { app: "shop", name: "stripe" });
+  assert.deepEqual(calls, [["/vault-ui/keys/shop/stripe/rotate", "POST"]]);
+  const html = rotateLinkHtml(url);
+  assert.match(html, /href="https:\/\/x\.dev\/vault\/t\/t1"/);
+  assert.doesNotMatch(html, /sk_live_SECRET/);
+  assert.equal(await rotateSecret(async () => ({ ok: false }), { app: "a", name: "b" }), null);
+  assert.equal(await rotateSecret(async () => ({ ok: true, json: async () => ({ url: "javascript:x" }) }), { app: "a", name: "b" }), null);
+  assert.match(rotateLinkHtml(null), /Could not rotate/);
+  assert.match(settingsClientScript(), /secret-rotate/);
 });

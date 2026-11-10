@@ -54,7 +54,7 @@ export function settingsHtml() {
 export function secretRowsHtml(keys) {
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   if (!Array.isArray(keys) || !keys.length) return `<p class="sf-empty" data-part="secrets-empty">No saved keys yet. Keys you save for apps on this phone show up here.</p>`;
-  return keys.map((k) => `<div class="sf-krow" role="listitem" data-part="secret-row"><b data-field="name">${esc(k.name)}</b><span data-field="app">App: ${esc(k.app)}</span><span data-field="domain">Domain: ${esc(k.domain)}</span><span data-field="access">Access: ${esc(k.access)}</span><span data-field="last_used_at">Last used: ${k.last_used_at ? esc(k.last_used_at) : "never"}</span><button type="button" class="sf-revoke" data-part="secret-revoke" data-app="${esc(k.app)}" data-name="${esc(k.name)}" aria-label="Revoke ${esc(k.name)}">Revoke</button></div>`).join("");
+  return keys.map((k) => `<div class="sf-krow" role="listitem" data-part="secret-row"><b data-field="name">${esc(k.name)}</b><span data-field="app">App: ${esc(k.app)}</span><span data-field="domain">Domain: ${esc(k.domain)}</span><span data-field="access">Access: ${esc(k.access)}</span><span data-field="last_used_at">Last used: ${k.last_used_at ? esc(k.last_used_at) : "never"}</span><button type="button" class="sf-revoke" data-part="secret-revoke" data-app="${esc(k.app)}" data-name="${esc(k.name)}" aria-label="Revoke ${esc(k.name)}">Revoke</button><button type="button" class="sf-revoke sf-rotate" data-part="secret-rotate" data-app="${esc(k.app)}" data-name="${esc(k.name)}" aria-label="Rotate ${esc(k.name)}">Rotate</button></div>`).join("");
 }
 
 /** Asks to confirm, then sends DELETE /vault-ui/keys/<app>/<name>. Returns "revoked", "cancelled" or "failed". Self-contained: the client script embeds it. */
@@ -64,6 +64,23 @@ export async function revokeSecret(fetchFn, confirmFn, key) {
     const r = await fetchFn(`/vault-ui/keys/${encodeURIComponent(key.app)}/${encodeURIComponent(key.name)}`, { method: "DELETE" });
     return r.ok ? "revoked" : "failed";
   } catch { return "failed"; }
+}
+
+/** Sends POST /vault-ui/keys/<app>/<name>/rotate. Returns the one-time ticket link, or null on failure. Never reads a key value. Self-contained: the client script embeds it. */
+export async function rotateSecret(fetchFn, key) {
+  try {
+    const r = await fetchFn(`/vault-ui/keys/${encodeURIComponent(key.app)}/${encodeURIComponent(key.name)}/rotate`, { method: "POST" });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return typeof j.url === "string" && /^https?:\/\//.test(j.url) ? j.url : null;
+  } catch { return null; }
+}
+
+/** Markup for the ticket link under a row after Rotate. Self-contained: the client script embeds it. */
+export function rotateLinkHtml(url) {
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  if (!url) return `<span data-part="secret-rotate-error" role="alert">Could not rotate this key. Try again.</span>`;
+  return `<span data-part="secret-rotate-note">Open this one-time link to save the new key:</span> <a data-part="secret-ticket" href="${esc(url)}" target="_blank" rel="noopener">${esc(url)}</a>`;
 }
 
 /** Updates the Secrets screen after a revoke. Removes the row and redraws the empty message after the last key; shows an error on failure. Self-contained: the client script embeds it. */
@@ -113,7 +130,7 @@ export const settingsCss = [
 /** Browser script for the frame page: opens Settings from the home icon or the shade gear, draws the rows, and writes changes to the app's `__pnDevice`. */
 export function settingsClientScript(iframeId = "app") {
   return `(function(){
-var SETTINGS=${JSON.stringify(SETTINGS)},SETTING_KEYS=${JSON.stringify(SETTING_KEYS)},LANGS=${JSON.stringify(LANGUAGES)},FONT=${JSON.stringify(FONT_SIZES)},settingPatch=${settingPatch.toString()},secretRowsHtml=${secretRowsHtml.toString()},loadSecrets=${loadSecrets.toString()},revokeSecret=${revokeSecret.toString()},applyRevoke=${applyRevoke.toString()},readSettings=${readSettings.toString()};
+var SETTINGS=${JSON.stringify(SETTINGS)},SETTING_KEYS=${JSON.stringify(SETTING_KEYS)},LANGS=${JSON.stringify(LANGUAGES)},FONT=${JSON.stringify(FONT_SIZES)},settingPatch=${settingPatch.toString()},secretRowsHtml=${secretRowsHtml.toString()},loadSecrets=${loadSecrets.toString()},revokeSecret=${revokeSecret.toString()},rotateSecret=${rotateSecret.toString()},rotateLinkHtml=${rotateLinkHtml.toString()},applyRevoke=${applyRevoke.toString()},readSettings=${readSettings.toString()};
 function SettingsError(c,m){var e=new Error(m);e.code=c;return e}
 var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
 var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("settings-screen");if(!sc)return;
@@ -136,6 +153,7 @@ r.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
 if(t.closest('[data-part="settings-icon"],[data-part="settings-gear"]')){show(true);return}
 if(t.closest('[data-part="settings-close"]')){show(false);return}
 if(t.closest('[data-part="settings-secrets"]')){openSecrets();return}
+var ro=t.closest('[data-part="secret-rotate"]');if(ro){var rr=ro.closest('[data-part="secret-row"]');rotateSecret(function(u,o){return fetch(u,Object.assign({credentials:"same-origin"},o))},{app:ro.getAttribute("data-app"),name:ro.getAttribute("data-name")}).then(function(url){var old=rr.querySelector('[data-part="secret-rotate-out"]');if(old)old.remove();var o=document.createElement("p");o.setAttribute("data-part","secret-rotate-out");o.innerHTML=rotateLinkHtml(url);rr.appendChild(o)});return}
 var rv=t.closest('[data-part="secret-revoke"]');if(rv){var kr=rv.closest('[data-part="secret-row"]'),rw=q("secrets-rows");
 revokeSecret(function(u,o){return fetch(u,Object.assign({credentials:"same-origin"},o))},function(m){return window.confirm(m)},{app:rv.getAttribute("data-app"),name:rv.getAttribute("data-name")}).then(function(res){applyRevoke(res,kr,rw,q("secrets-error"),secretRowsHtml([]))});return}
 if(t.closest('[data-part="secrets-back"]')){sec.hidden=true;sc.hidden=false;draw();return}
