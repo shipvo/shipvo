@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { settingPatch, readSettings, describeSettings, SettingsError, SETTING_KEYS, settingsHtml, secretRowsHtml, loadSecrets, revokeSecret, settingsClientScript } from "./settings.mjs";
+import { settingPatch, readSettings, describeSettings, SettingsError, SETTING_KEYS, settingsHtml, secretRowsHtml, loadSecrets, revokeSecret, applyRevoke, settingsClientScript } from "./settings.mjs";
 import { renderFrame } from "./frame.mjs";
 import { settingsAction } from "./settings-actions.mjs";
 
@@ -83,15 +83,44 @@ test("revoke asks to confirm, then sends DELETE", async () => {
   const calls = [], asked = [];
   const fetchFn = async (u, o) => { calls.push([u, o.method]); return { ok: true }; };
   assert.match(secretRowsHtml([{ name: "stripe", app: "shop" }]), /data-part="secret-revoke" data-app="shop" data-name="stripe"/);
-  assert.equal(await revokeSecret(fetchFn, (m) => { asked.push(m); return true; }, { app: "shop", name: "stripe" }), true);
+  assert.equal(await revokeSecret(fetchFn, (m) => { asked.push(m); return true; }, { app: "shop", name: "stripe" }), "revoked");
   assert.equal(asked.length, 1);
   assert.deepEqual(calls, [["/vault-ui/keys/shop/stripe", "DELETE"]]);
-  assert.equal(await revokeSecret(async () => ({ ok: false }), () => true, { app: "shop", name: "x" }), false);
+  assert.equal(await revokeSecret(async () => ({ ok: false }), () => true, { app: "shop", name: "x" }), "failed");
+  assert.equal(await revokeSecret(async () => { throw new Error("net"); }, () => true, { app: "shop", name: "x" }), "failed");
 });
 
 test("cancel sends nothing and keeps the row", async () => {
   const calls = [];
-  assert.equal(await revokeSecret(async (u) => { calls.push(u); return { ok: true }; }, () => false, { app: "shop", name: "stripe" }), false);
+  assert.equal(await revokeSecret(async (u) => { calls.push(u); return { ok: true }; }, () => false, { app: "shop", name: "stripe" }), "cancelled");
   assert.deepEqual(calls, []);
   assert.match(settingsClientScript(), /secret-revoke/);
+});
+
+function stubRows(n) {
+  const rows = Array.from({ length: n }, () => ({ removed: false, remove() { this.removed = true; } }));
+  const el = { innerHTML: "x", querySelector: () => rows.find((r) => !r.removed) || null };
+  return { rows, el };
+}
+
+test("a revoked row is removed and the empty message shows after the last key", () => {
+  const { rows, el } = stubRows(2);
+  const err = { hidden: true, textContent: "" };
+  assert.equal(applyRevoke("revoked", rows[0], el, err, "EMPTY"), "revoked");
+  assert.equal(rows[0].removed, true);
+  assert.equal(el.innerHTML, "x");
+  applyRevoke("revoked", rows[1], el, err, "EMPTY");
+  assert.equal(el.innerHTML, "EMPTY");
+});
+
+test("a failed revoke keeps the row and shows a message", () => {
+  const { rows, el } = stubRows(1);
+  const err = { hidden: true, textContent: "" };
+  assert.equal(applyRevoke("failed", rows[0], el, err, "EMPTY"), "failed");
+  assert.equal(rows[0].removed, false);
+  assert.equal(err.hidden, false);
+  assert.match(err.textContent, /Could not revoke this key/);
+  applyRevoke("cancelled", rows[0], el, err, "EMPTY");
+  assert.equal(err.hidden, true);
+  assert.equal(rows[0].removed, false);
 });

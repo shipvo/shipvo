@@ -47,7 +47,7 @@ export function describeSettings(values) {
 /** Markup for the Settings screen. Hidden until opened. The rows are drawn by the client script. */
 export function settingsHtml() {
   return `<div class="sf-settings" data-part="settings-screen" role="dialog" aria-label="Settings" tabindex="-1" hidden><h2 class="sf-sh">Settings</h2><div data-part="settings-rows" role="group" aria-label="Settings"></div><button type="button" class="sf-srow" data-part="settings-secrets">Secrets</button><button type="button" class="sf-close" data-part="settings-close">Close</button></div>`
-    + `<div class="sf-settings" data-part="secrets-screen" role="dialog" aria-label="Secrets" tabindex="-1" hidden><h2 class="sf-sh">Secrets</h2><div data-part="secrets-rows" role="list" aria-label="Saved keys"></div><button type="button" class="sf-close" data-part="secrets-back">Back</button></div>`;
+    + `<div class="sf-settings" data-part="secrets-screen" role="dialog" aria-label="Secrets" tabindex="-1" hidden><h2 class="sf-sh">Secrets</h2><p class="sf-error" data-part="secrets-error" role="alert" hidden></p><div data-part="secrets-rows" role="list" aria-label="Saved keys"></div><button type="button" class="sf-close" data-part="secrets-back">Back</button></div>`;
 }
 
 /** Markup for the saved-keys list. Shows only app, name, domain, access and last used, so a key value can never reach the page. Empty list gives the empty state. Self-contained: the client script embeds it. */
@@ -57,13 +57,26 @@ export function secretRowsHtml(keys) {
   return keys.map((k) => `<div class="sf-krow" role="listitem" data-part="secret-row"><b data-field="name">${esc(k.name)}</b><span data-field="app">App: ${esc(k.app)}</span><span data-field="domain">Domain: ${esc(k.domain)}</span><span data-field="access">Access: ${esc(k.access)}</span><span data-field="last_used_at">Last used: ${k.last_used_at ? esc(k.last_used_at) : "never"}</span><button type="button" class="sf-revoke" data-part="secret-revoke" data-app="${esc(k.app)}" data-name="${esc(k.name)}" aria-label="Revoke ${esc(k.name)}">Revoke</button></div>`).join("");
 }
 
-/** Asks to confirm, then sends DELETE /vault-ui/keys/<app>/<name>. Returns true only when the key was deleted. Self-contained: the client script embeds it. */
+/** Asks to confirm, then sends DELETE /vault-ui/keys/<app>/<name>. Returns "revoked", "cancelled" or "failed". Self-contained: the client script embeds it. */
 export async function revokeSecret(fetchFn, confirmFn, key) {
-  if (!confirmFn(`Revoke ${key.name} for ${key.app}? Apps can no longer use this key.`)) return false;
+  if (!confirmFn(`Revoke ${key.name} for ${key.app}? Apps can no longer use this key. This cannot be undone.`)) return "cancelled";
   try {
     const r = await fetchFn(`/vault-ui/keys/${encodeURIComponent(key.app)}/${encodeURIComponent(key.name)}`, { method: "DELETE" });
-    return !!r.ok;
-  } catch { return false; }
+    return r.ok ? "revoked" : "failed";
+  } catch { return "failed"; }
+}
+
+/** Updates the Secrets screen after a revoke. Removes the row and redraws the empty message after the last key; shows an error on failure. Self-contained: the client script embeds it. */
+export function applyRevoke(result, row, rowsEl, errorEl, emptyHtml) {
+  if (errorEl) { errorEl.hidden = true; errorEl.textContent = ""; }
+  if (result === "revoked") {
+    row.remove();
+    if (!rowsEl.querySelector('[data-part="secret-row"]')) rowsEl.innerHTML = emptyHtml;
+  } else if (result === "failed" && errorEl) {
+    errorEl.textContent = "Could not revoke this key. Try again.";
+    errorEl.hidden = false;
+  }
+  return result;
 }
 
 /** Loads the saved keys of each app through /vault-ui/keys. Returns metadata rows only. A failed app is skipped. */
@@ -92,7 +105,7 @@ export const settingsCss = [
   `.sf-settings{position:absolute;inset:0;z-index:8;overflow:auto;padding:48px 14px 14px;background:#10151c;color:#fff;font:15px system-ui,sans-serif}.sf-settings[hidden]{display:none}.sf-sh{margin:0 0 12px;font-size:22px}`,
   `.sf-srow{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;box-sizing:border-box;margin:6px 0;padding:12px;border:0;border-radius:14px;background:#2c3036;color:#fff;font:inherit;text-align:start}.sf-srow[role=switch]::after{content:"Off";opacity:.7}.sf-srow[aria-checked=true]::after{content:"On";color:#4da3ff;font-weight:700}`,
   `.sf-group2{margin:6px 0;padding:8px 12px;border-radius:14px;background:#2c3036}.sf-group2 b{display:block;margin-bottom:6px}.sf-opts{display:flex;flex-wrap:wrap;gap:6px}.sf-opt{padding:8px 12px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff;font:inherit}.sf-opt[aria-checked=true]{background:#4da3ff;color:#001;border-color:#4da3ff}`,
-  `.sf-krow{display:flex;flex-direction:column;gap:2px;margin:6px 0;padding:12px;border-radius:14px;background:#2c3036}.sf-krow span{opacity:.8;font-size:13px}.sf-empty{margin:12px 0;opacity:.8}.sf-revoke{align-self:flex-start;margin-top:6px;padding:6px 14px;border:1px solid #ff6b6b;border-radius:999px;background:transparent;color:#ff6b6b;font:inherit}[data-skin="ios"] .sf-revoke{border:0;background:#3a1c1c}[data-skin="ios"] .sf-krow{border-radius:10px;background:#1c1c1e}`,
+  `.sf-krow{display:flex;flex-direction:column;gap:2px;margin:6px 0;padding:12px;border-radius:14px;background:#2c3036}.sf-krow span{opacity:.8;font-size:13px}.sf-empty{margin:12px 0;opacity:.8}.sf-error{margin:6px 0;padding:10px 12px;border-radius:10px;background:#3a1c1c;color:#ffb3b3}.sf-error[hidden]{display:none}.sf-revoke{align-self:flex-start;margin-top:6px;padding:13px 16px;min-height:44px;border:1px solid #ff6b6b;border-radius:999px;background:transparent;color:#ff6b6b;font:inherit}[data-skin="ios"] .sf-revoke{border:0;background:#3a1c1c}[data-skin="ios"] .sf-krow{border-radius:10px;background:#1c1c1e}`,
   `.sf-gear{margin:0 8px 8px 0;padding:8px 16px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff}`,
   `.sf-settings :focus-visible,.sf-gear:focus-visible{outline:3px solid #4da3ff;outline-offset:2px}`,
 ].join("\n");
@@ -100,7 +113,7 @@ export const settingsCss = [
 /** Browser script for the frame page: opens Settings from the home icon or the shade gear, draws the rows, and writes changes to the app's `__pnDevice`. */
 export function settingsClientScript(iframeId = "app") {
   return `(function(){
-var SETTINGS=${JSON.stringify(SETTINGS)},SETTING_KEYS=${JSON.stringify(SETTING_KEYS)},LANGS=${JSON.stringify(LANGUAGES)},FONT=${JSON.stringify(FONT_SIZES)},settingPatch=${settingPatch.toString()},secretRowsHtml=${secretRowsHtml.toString()},loadSecrets=${loadSecrets.toString()},revokeSecret=${revokeSecret.toString()},readSettings=${readSettings.toString()};
+var SETTINGS=${JSON.stringify(SETTINGS)},SETTING_KEYS=${JSON.stringify(SETTING_KEYS)},LANGS=${JSON.stringify(LANGUAGES)},FONT=${JSON.stringify(FONT_SIZES)},settingPatch=${settingPatch.toString()},secretRowsHtml=${secretRowsHtml.toString()},loadSecrets=${loadSecrets.toString()},revokeSecret=${revokeSecret.toString()},applyRevoke=${applyRevoke.toString()},readSettings=${readSettings.toString()};
 function SettingsError(c,m){var e=new Error(m);e.code=c;return e}
 var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
 var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("settings-screen");if(!sc)return;
@@ -114,7 +127,7 @@ else{h+='<div class="sf-group2" role="radiogroup" aria-label="'+esc(s.label)+'">
 var keep=document.activeElement&&document.activeElement.getAttribute&&document.activeElement.getAttribute("data-setting"),kv=document.activeElement&&document.activeElement.getAttribute&&document.activeElement.getAttribute("data-value");
 rows.innerHTML=h;if(keep){var again=rows.querySelector('[data-setting="'+keep+'"]'+(kv?'[data-value="'+kv+'"]':''));if(again)again.focus({preventScroll:true})}}
 var sec=q("secrets-screen");
-function openSecrets(){if(!sec)return;sec.hidden=false;sc.hidden=true;var rows=q("secrets-rows");rows.innerHTML=secretRowsHtml([]);
+function openSecrets(){if(!sec)return;var er=q("secrets-error");if(er)er.hidden=true;sec.hidden=false;sc.hidden=true;var rows=q("secrets-rows");rows.innerHTML=secretRowsHtml([]);
 var ids=[].map.call(r.querySelectorAll('[data-part="installed-app"]'),function(b){return b.getAttribute("data-app")});
 loadSecrets(function(u){return fetch(u,{credentials:"same-origin"})},ids).then(function(k){rows.innerHTML=secretRowsHtml(k)});sec.focus({preventScroll:true})}
 var back=null;
@@ -124,7 +137,7 @@ if(t.closest('[data-part="settings-icon"],[data-part="settings-gear"]')){show(tr
 if(t.closest('[data-part="settings-close"]')){show(false);return}
 if(t.closest('[data-part="settings-secrets"]')){openSecrets();return}
 var rv=t.closest('[data-part="secret-revoke"]');if(rv){var kr=rv.closest('[data-part="secret-row"]'),rw=q("secrets-rows");
-revokeSecret(function(u,o){return fetch(u,Object.assign({credentials:"same-origin"},o))},function(m){return window.confirm(m)},{app:rv.getAttribute("data-app"),name:rv.getAttribute("data-name")}).then(function(ok){if(ok){kr.remove();if(!rw.querySelector('[data-part="secret-row"]'))rw.innerHTML=secretRowsHtml([])}});return}
+revokeSecret(function(u,o){return fetch(u,Object.assign({credentials:"same-origin"},o))},function(m){return window.confirm(m)},{app:rv.getAttribute("data-app"),name:rv.getAttribute("data-name")}).then(function(res){applyRevoke(res,kr,rw,q("secrets-error"),secretRowsHtml([]))});return}
 if(t.closest('[data-part="secrets-back"]')){sec.hidden=true;sc.hidden=false;draw();return}
 var row=t.closest("[data-setting]");if(row){var d=dev();if(!d)return;var k=row.getAttribute("data-setting"),s=SETTINGS[k],val=s.kind==="boolean"?row.getAttribute("aria-checked")!=="true":row.getAttribute("data-value");
 try{d.set(settingPatch(k,val))}catch(x){}draw()}});
