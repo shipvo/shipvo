@@ -262,6 +262,10 @@ A data source can call a service with a key you saved once in the secret form. T
 - **`toggle` or `select` answers `ok: false`.** The label does not match a control on the current screen, or the option is not in `options`. Labels are case-sensitive.
 - **`Card column "later" is not a board column.`** A row has a column value that is not in `columns`. Use one of the listed names or add the column.
 - **`Entry date "tomorrow" is not a date.`** Use `2026-11-07` or `2026-11-07T09:30`.
+- **`Calendar view "year" is not supported.`** Use `month`, `week` or `agenda`.
+- **`Event date "soon" is not a date.`** Use `2026-11-07` or `2026-11-07T09:30` in the source's seed rows.
+- **`Pin latitude 95 is not valid.`** Latitude runs from -90 to 90 and longitude from -180 to 180.
+- **A week or month view shows no events.** The view only lists events inside the days it shows. Set `at` to a day in the period you want, or use `agenda`.
 - **A translation does not show.** The key must match the text exactly, including capitals and spaces, and `language` must be the same code you used in `strings` (`fr`, not `fr-FR`). Pass `locale` separately for money and dates.
 - **`Event date "tomorrow" is not a date.` or `Pin latitude 95 is not valid.`** Fix the value in the `seed` rows. Use `2026-11-07` or `2026-11-07T09:30`, latitude -90 to 90 and longitude -180 to 180.
 - **A calendar event does not show.** In `month` and `week` view only the days of the month or week around `at` are drawn. Set `at`, or use `view: "agenda"` to list every event.

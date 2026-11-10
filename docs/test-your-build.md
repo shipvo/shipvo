@@ -65,6 +65,10 @@ A bad address leaves no session behind. The reply carries one of these codes:
 
 A build is private to your account. A key from another account gets `build_not_found`, the same answer as for a build that never existed. A build is deleted when it expires.
 
+## Open a build from a link
+
+The simulator's `POST /session` also takes a `build_url`: a link to a `.tar.gz` of your built app. The simulator fetches it into its build cache, unpacks it (an archive that contains links is refused) and serves it at `/b/<id>/`. The reply has `build`: the id you sent, or the content id. `open_app("<app>@build:<id>")` sends it for you. The host must be on the same allow-list the phone's Browser uses. If the fetch fails, the reply is `{ ok: false, code, error }` and no session is created.
+
 ## Errors
 
 | Code | Meaning | What to do |

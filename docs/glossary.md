@@ -93,6 +93,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Build id.** The short name Shipvo gives a copy of your app you uploaded for the hosted phone. You open it as `myapp@build:<id>`. It is private to you and deleted when it expires. See [Test your build on the hosted phone](test-your-build.md).
 
+**Watch link.** A web address, valid for one hour, that shows one hosted phone session live and read-only. `open_app` returns it as `watch_url`. See [Agents](agents.md#watch-link-on-the-hosted-phone).
+
 **Room.** A name you give `open_app` so two phones share one backend, for example a buyer and a shop owner. See [Agents](agents.md#rooms-several-phones-one-backend).
 
 **Vector block.** A small drawing in an app spec, made of shapes (rectangles, circles, lines, text) whose size and colour follow your data. A battery bar is one. See [App spec](spec-blocks.md#vector-drawings).
@@ -102,3 +104,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Right-to-left (RTL).** Languages such as Arabic and Hebrew that read from right to left. A spec with `strings` for that language lays out right to left. See [App spec](spec-blocks.md#translations-and-right-to-left).
 
 **Playground.** The page at shipvo.dev/playground where a sample app runs on an Android phone and an iPhone in your browser, so you can try Shipvo before you install it.
+
+**Calendar block.** A part of an app spec that shows dated rows as a month, a week or an agenda. See [App spec](spec-blocks.md#calendars-and-maps).
+
+**Map block.** A part of an app spec that draws rows with a latitude and longitude as pins on a canvas. It loads no map tiles. See [App spec](spec-blocks.md#calendars-and-maps).
