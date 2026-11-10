@@ -124,7 +124,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Signing seed backup and restore on a new machine (`shipvo keys export`, `shipvo keys import`) | [new-machine](new-machine.md) | | | |
 | See what an agent built and changed in a spec app (`app_activity`) | [phone-apps](phone-apps.md#see-what-was-built-and-changed) | | | |
 | Fetch an app's live data now (`refresh_app`) | [phone-apps](phone-apps.md#fetch-live-data-now) | | | |
-| Show or hide an app on a time window (`schedule_app`, `clear_schedule`, `timezone`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
 | Show or hide an app on a time window, in any time zone (`schedule_app` with `timezone`, `clear_schedule`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
 | Network proxy refusal codes (`x-shipvo-net-error`) | [phone-network](phone-network.md#troubleshooting) | | | |
 | Room log and notes (`room_log`, `room_note`): a lead agent sees what the others did | [agents](agents.md#room-log-and-notes) | | | |
