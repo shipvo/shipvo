@@ -23,7 +23,7 @@ describe("toolsFromSpec", () => {
     expect(sum.inputSchema.required).toBeUndefined();
     expect((sum.inputSchema.properties as any).period).toEqual({ type: "string", enum: ["day", "week", "month"], default: "day" });
     expect(sum.description).toBe("Revenue, new customers and failed payments for a period.");
-    expect(sum.errors.map((e) => e.code)).toEqual(["invalid_input", "action_failed"]);
+    expect(sum.errors.map((e) => e.code)).toEqual(["invalid_input", "permission_denied", "action_failed"]);
   });
 
   it("resolves collisions with reserved names deterministically", () => {
