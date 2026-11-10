@@ -80,4 +80,4 @@ The inbox, the tools and `phone.inbox` are the same on the Android and iOS phone
 - [Testing](testing.md) for `mockNetwork` and the rest of the typed test API.
 - [Agents](agents.md) for the other tools an assistant can call on the phone.
 - [Phone apps](phone-apps.md) for the apps on the phone that send and read mail.
-- [Network calls on the hosted phone](phone-network.md): how `mockNetwork` rules answer requests.
+- [Network calls on the hosted phone](phone-network.md): how `mockNetwork` rules answer requests, including rules with a `mail` field that deliver mail to the inbox.
