@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { settingPatch, readSettings, describeSettings, SettingsError, SETTING_KEYS, settingsHtml, secretRowsHtml, loadSecrets, revokeSecret, rotateSecret, rotateLinkHtml, rotateClick, applyRevoke, settingsClientScript } from "./settings.mjs";
+import { settingPatch, readSettings, describeSettings, SettingsError, SETTING_KEYS, settingsHtml, secretRowsHtml, loadSecrets, revokeSecret, rotateSecret, rotateLinkHtml, rotateClick, loadUseLog, useLogHtml, useLogClick, applyRevoke, settingsClientScript } from "./settings.mjs";
 import { renderFrame } from "./frame.mjs";
 import { settingsAction } from "./settings-actions.mjs";
 
@@ -163,4 +163,29 @@ test("clicking Rotate adds one output, a second click replaces it, and the butto
   assert.equal(kids.length, 1);
   assert.match(kids[0].html, /t2/);
   assert.match(settingsClientScript(), /rotateClick\(ro,/);
+});
+
+test("use log lists time, app, host and outcome; empty says not used yet", async () => {
+  const calls = [];
+  const fetchFn = async (u) => { calls.push(u); return { ok: true, json: async () => ({ uses: [{ at: "2026-11-10T09:00:00Z", app: "shop", host: "api.stripe.com", outcome: "allowed" }, { at: "2026-11-10T10:00:00Z", app: "shop", host: "evil.example", outcome: "blocked" }] }) }; };
+  assert.match(secretRowsHtml([{ name: "stripe", app: "shop" }]), /data-part="secret-uselog" data-app="shop" data-name="stripe"/);
+  const uses = await loadUseLog(fetchFn, { app: "shop", name: "stripe" });
+  assert.deepEqual(calls, ["/vault-ui/keys/shop/stripe/uses"]);
+  const html = useLogHtml(uses);
+  for (const s of ["datetime=\"2026-11-10T09:00:00Z\"", "10 Nov 2026, 09:00 UTC", "App: shop", "Host: api.stripe.com", "Outcome: allowed", "Host: evil.example", "Outcome: blocked"]) assert.ok(html.includes(s), s);
+  const empty = useLogHtml(await loadUseLog(async () => ({ ok: true, json: async () => ({ uses: [] }) }), { app: "a", name: "b" }));
+  assert.match(empty, /Not used yet\./);
+  assert.match(useLogHtml(null), /Could not load/);
+  assert.match(settingsClientScript(), /useLogClick\(ul,/);
+  const kids = [];
+  const row = { querySelector: () => kids[0] || null, appendChild: (k) => kids.push(k) };
+  const doc = { createElement: () => ({ setAttribute() {}, remove() { kids.length = 0; } }) };
+  const attrs = {};
+  const btn = { disabled: false, setAttribute: (n, v) => { attrs[n] = v; }, getAttribute: (n) => (n === "data-app" ? "shop" : "stripe") };
+  await useLogClick(btn, row, fetchFn, doc);
+  assert.equal(kids.length, 1);
+  assert.equal(attrs["aria-expanded"], "true");
+  await useLogClick(btn, row, fetchFn, doc);
+  assert.equal(kids.length, 0);
+  assert.equal(attrs["aria-expanded"], "false");
 });
