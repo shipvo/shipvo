@@ -1,2 +1,0 @@
-- Docs: Getting started explains that an Android update falls back to the full bundle when a patch is too big for memory; the content ledger and the roadmap list the Assistant Inbox, `caller`, `csv()` and the rollback guard.
-- Migration: none.
