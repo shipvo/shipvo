@@ -1,9 +1,9 @@
 {
   "spec": "shipvo.app/v0",
   "app": {
-    "id": "expense-splitter",
-    "name": "Expense splitter",
-    "description": "Add shared expenses and see who paid how much."
+    "id": "expense-tracker",
+    "name": "Expense tracker",
+    "description": "Add expenses and see who paid how much."
   },
   "theme": {
     "mode": "light",
@@ -30,10 +30,6 @@
     "total": {
       "source": "computed",
       "value": "{{ sum(expenses.map(e, e.amount)) }}"
-    },
-    "perPerson": {
-      "source": "computed",
-      "value": "{{ count(unique(expenses.map(e, e.payer))) == 0 ? 0 : sum(expenses.map(e, e.amount)) / count(unique(expenses.map(e, e.payer))) }}"
     }
   },
   "screens": [
@@ -45,10 +41,6 @@
           "type": "text",
           "variant": "title",
           "value": "Total {{ money(total, 'USD') }}"
-        },
-        {
-          "type": "badge",
-          "value": "Each pays {{ money(perPerson, 'USD') }}"
         },
         {
           "type": "chart",

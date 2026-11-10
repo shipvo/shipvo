@@ -79,6 +79,23 @@
           ]
         },
         {
+          "type": "form",
+          "label": "Pack item form",
+          "submit": {
+            "label": "Pack item",
+            "action": "pack_item"
+          },
+          "fields": [
+            {
+              "name": "name",
+              "type": "text",
+              "label": "Item to tick off",
+              "required": true,
+              "maxLength": 200
+            }
+          ]
+        },
+        {
           "type": "list",
           "label": "Still to pack",
           "from": "{{ sortBy(left, 'group') }}",
@@ -116,6 +133,26 @@
         },
         {
           "toast": "Item added"
+        }
+      ]
+    },
+    "pack_item": {
+      "description": "Tick off the item with this name as packed.",
+      "input": {
+        "name": {
+          "type": "text"
+        }
+      },
+      "do": [
+        {
+          "update": "items",
+          "where": "item.name == input.name",
+          "value": {
+            "packed": true
+          }
+        },
+        {
+          "toast": "Item packed"
         }
       ]
     }

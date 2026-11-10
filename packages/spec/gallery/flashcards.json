@@ -3,7 +3,7 @@
   "app": {
     "id": "flashcards",
     "name": "Flashcards",
-    "description": "Make cards and mark each one known or not yet."
+    "description": "Make cards and mark each one known."
   },
   "theme": {
     "mode": "light",
@@ -76,6 +76,23 @@
           ]
         },
         {
+          "type": "form",
+          "label": "Mark known form",
+          "submit": {
+            "label": "Mark known",
+            "action": "mark_known"
+          },
+          "fields": [
+            {
+              "name": "front",
+              "type": "text",
+              "label": "Front of the card",
+              "required": true,
+              "maxLength": 200
+            }
+          ]
+        },
+        {
           "type": "list",
           "label": "Cards to learn",
           "from": "{{ todo }}",
@@ -112,6 +129,26 @@
         },
         {
           "toast": "Card added"
+        }
+      ]
+    },
+    "mark_known": {
+      "description": "Mark the card with this front as known.",
+      "input": {
+        "front": {
+          "type": "text"
+        }
+      },
+      "do": [
+        {
+          "update": "cards",
+          "where": "item.front == input.front",
+          "value": {
+            "known": true
+          }
+        },
+        {
+          "toast": "Card marked known"
         }
       ]
     }

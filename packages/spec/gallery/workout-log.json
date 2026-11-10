@@ -6,13 +6,13 @@
     "description": "Log sets and see your volume by exercise."
   },
   "theme": {
-    "mode": "light",
+    "mode": "dark",
     "palette": {
-      "primary": "#0B5FFF",
-      "text": "#111827",
-      "background": "#FFFFFF",
-      "surface": "#F3F4F6",
-      "muted": "#4B5563"
+      "primary": "#6EA8FF",
+      "text": "#F3F4F6",
+      "background": "#0B1220",
+      "surface": "#1F2937",
+      "muted": "#9CA3AF"
     },
     "radius": "lg",
     "density": "comfortable"
