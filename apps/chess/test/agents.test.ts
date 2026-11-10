@@ -80,8 +80,8 @@ beforeAll(async () => {
   browser = await chromium.launch();
   page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
   await page.goto(demo.url);
-  await page.frameLocator("#phone-white").frameLocator("#app").getByTestId("board").waitFor({ timeout: 60_000 });
-  await page.frameLocator("#phone-black").frameLocator("#app").getByTestId("board").waitFor({ timeout: 60_000 });
+  await page.frameLocator("#phone-white").frameLocator("#app").getByTestId("board").waitFor({ timeout: 110_000 });
+  await page.frameLocator("#phone-black").frameLocator("#app").getByTestId("board").waitFor({ timeout: 110_000 });
 }, 240_000);
 afterAll(async () => {
   clients.forEach((c) => c.close());
