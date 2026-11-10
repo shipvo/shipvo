@@ -43,10 +43,11 @@ export class SpecHost {
   constructor() { this.running = new Map(); }
 
   /** Starts an app from a spec. Resolves { ok: true } or { ok: false, errors } with a JSON path and a fix for each problem. */
-  create(session, id, spec, { style = "android", reduceMotion = false, data, state } = {}) {
-    const made = createApp(spec, { style, reduceMotion, ...(data ? { data } : {}), ...(state ? { state } : {}) });
+  create(session, id, spec, { style = "android", reduceMotion = false, data, state, permissions = {} } = {}) {
+    const devicePermissions = { ...permissions };   // shared with the running app: setPermissions changes it in place
+    const made = createApp(spec, { style, reduceMotion, devicePermissions, ...(data ? { data } : {}), ...(state ? { state } : {}) });
     if (!made.ok) return { ok: false, errors: made.errors };
-    this.running.set(key(session, id), { app: made.app, spec, style, reduceMotion, version: 1, history: [{ version: 1, at: Date.now() }] });
+    this.running.set(key(session, id), { app: made.app, spec, style, reduceMotion, devicePermissions, version: 1, history: [{ version: 1, at: Date.now() }] });
     return { ok: true, warnings: made.app.render().warnings ?? [] };
   }
 
@@ -61,7 +62,7 @@ export class SpecHost {
     const keep = (names, from) => Object.fromEntries(Object.entries(from).filter(([k]) => names.includes(k)));
     const collections = Object.entries(spec?.data ?? {}).filter(([, v]) => v?.source === "collection").map(([k]) => k);
     const stateKeys = Object.keys(spec?.state ?? {});
-    const made = createApp(spec, { style: cur.style, reduceMotion: cur.reduceMotion, data: keep(collections, cur.app.data), state: keep(stateKeys, cur.app.state) });
+    const made = createApp(spec, { style: cur.style, reduceMotion: cur.reduceMotion, devicePermissions: cur.devicePermissions, data: keep(collections, cur.app.data), state: keep(stateKeys, cur.app.state) });
     if (!made.ok) return { ok: false, errors: made.errors };
     const from = cur.version;
     this.running.set(key(session, id), { ...cur, app: made.app, spec, version: from + 1, history: [...cur.history, { version: from + 1, at: Date.now() }] });
@@ -81,6 +82,9 @@ export class SpecHost {
     const names = Object.entries(r.spec?.data ?? {}).filter(([, v]) => v?.source === "collection").map(([k]) => k);
     return { style: r.style, spec: structuredClone(r.spec), data: structuredClone(Object.fromEntries(names.filter((n) => n in r.app.data).map((n) => [n, r.app.data[n]]))), settings: structuredClone(r.app.state) };
   }
+
+  /** Sets one permission answer for a running app. The next action sees it. */
+  setPermission(session, id, permission, allowed) { const r = this.running.get(key(session, id)); if (r) r.devicePermissions[permission] = allowed; }
 
   version(session, id) { return this.running.get(key(session, id))?.version ?? null; }
 

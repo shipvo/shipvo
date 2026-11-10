@@ -28,7 +28,7 @@ import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.
 import { SettingsError } from "./settings.mjs";
 import { SpecHost } from "./spec-host.mjs";
 import { fetchBuild, BuildCacheError } from "./build-cache.mjs";
-import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, pinApp, hideApp, describeApps, installedIconsHtml, storeCss } from "./apps.mjs";
+import { AppsError, DEVICE_PERMISSIONS, setPermission, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, pinApp, hideApp, describeApps, installedIconsHtml, storeCss } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
@@ -238,6 +238,8 @@ async function reapplyNetProfile(s, page) {
   if (s.netProfile) await page.evaluate((n) => globalThis.__pnDevice?.set?.({ networkProfile: n }), s.netProfile).catch(() => {});
 }
 const specHost = new SpecHost();
+/** One answer per device permission a spec declares: the person's (`given`), or allowed when none was given. */
+const declaredAnswers = (spec, given) => Object.fromEntries((Array.isArray(spec?.permissions?.device) ? spec.permissions.device : []).filter((p) => DEVICE_PERMISSIONS.includes(p)).map((p) => [p, typeof given?.[p] === "boolean" ? given[p] : true]));
 const sidOf = (s) => [...sessions].find(([, v]) => v === s)?.[0];
 // The bundle a Store listing points at: app://<id>[@rN] is the published web artifact; an http(s) URL is fetched as given.
 // Same host guard and size cap as build_url. Resolves { sha256, bytes }, or throws SimError store_app_unreachable / too_large / host_not_allowed.
@@ -380,10 +382,11 @@ async function act(id, body) {
       const appId = String(body.id ?? "");
       if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(appId)) throw new SimError("bad_app_id", "id: lowercase letters, digits and dashes, up to 40, starting with a letter or digit");
       if (s.apps.installed_apps.some((a) => a.id === appId)) throw new SimError("already_installed", `'${appId}' is already installed. Uninstall it with uninstall_app first.`);
-      const made = specHost.create(sidOf(s), appId, body.spec, { style: body.style === "ios" ? "ios" : "android" });
+      const perms = declaredAnswers(body.spec, body.permissions);
+      const made = specHost.create(sidOf(s), appId, body.spec, { style: body.style === "ios" ? "ios" : "android", permissions: perms });
       if (!made.ok) throw new SimError("invalid_spec", made.errors.slice(0, 20).map((e) => `${e.path || "/"}: ${e.message}${e.fix ? ` (${e.fix})` : ""}`).join("\n"));
       const nm = String(body.name ?? body.spec?.app?.name ?? appId).replace(/[<>"'\\]/g, "").slice(0, 40);
-      s.apps.installed_apps.push({ id: appId, name: nm, url: `spec://${appId}`, version: "1", kind: "spec" });
+      s.apps.installed_apps.push({ id: appId, name: nm, url: `spec://${appId}`, version: "1", kind: "spec", ...(Object.keys(perms).length ? { permissions: perms } : {}) });
       s.apps.log.push({ at: Date.now(), name: "create_app", app: appId, source: "real", version: "1" });
       if (body.open !== false) {
         // If opening fails, the app is not left installed or running.
@@ -397,7 +400,7 @@ async function act(id, body) {
       const want = Array.isArray(body.ids) ? body.ids.map(String) : null;
       const specs = s.apps.installed_apps.filter((a) => a.kind === "spec");
       if (want) for (const w of want) if (!specs.some((a) => a.id === w)) throw new SimError("not_installed", `'${w}' is not a spec app on this phone`);
-      const apps = specs.filter((a) => !want || want.includes(a.id)).map((a) => ({ id: a.id, name: a.name, ...specHost.snapshot(sidOf(s), a.id) }));
+      const apps = specs.filter((a) => !want || want.includes(a.id)).map((a) => ({ id: a.id, name: a.name, ...specHost.snapshot(sidOf(s), a.id), ...(a.permissions ? { permissions: { ...a.permissions } } : {}) }));
       return { format: "shipvo.phone-apps/v0", apps };
     }
     // Put exported apps on the phone. Every spec is checked first and nothing is installed if any is wrong.
@@ -422,9 +425,10 @@ async function act(id, body) {
       for (const a of list) {
         const ex = s.apps.installed_apps.find((x) => x.id === a.id);
         if (ex) { uninstallApp(s.apps, a.id, s.nav); specHost.drop(sidOf(s), a.id); }
-        const made = specHost.create(sidOf(s), a.id, a.spec, { style: a.style === "ios" ? "ios" : "android", data: a.data ?? undefined, state: a.settings ?? undefined });
+        const perms = declaredAnswers(a.spec, a.permissions);
+        const made = specHost.create(sidOf(s), a.id, a.spec, { style: a.style === "ios" ? "ios" : "android", data: a.data ?? undefined, state: a.settings ?? undefined, permissions: perms });
         const nm = String(a.name ?? a.spec?.app?.name ?? a.id).replace(/[<>"'\\]/g, "").slice(0, 40);
-        s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec" });
+        s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec", ...(Object.keys(perms).length ? { permissions: perms } : {}) });
         s.apps.log.push({ at: Date.now(), name: "import_apps", app: a.id, source: "real", version: "1", replaced: !!ex });
       }
       return { imported: list.map((a) => a.id), installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
@@ -456,10 +460,18 @@ async function act(id, body) {
       const res = specHost.call(sidOf(s), appId, String(body.action_name ?? ""), body.input && typeof body.input === "object" ? body.input : {});
       s.apps.log.push({ at: Date.now(), name: "app_action", app: appId, action: String(body.action_name ?? ""), source: "real" });
       if (s.apps.current_app === appId && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
+      if (res.ok === false && /^permission_denied:/.test(res.error)) throw new SimError("permission_denied", res.error.replace(/^permission_denied:\s*/, ""));
       if (res.ok === false) throw new SimError("action_failed", res.error);
       return { value: res.value ?? null, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
     }
     // Installed apps. Errors are typed: unknown_app, already_installed, not_installed. Logged in device_log: source "real" (with the bundle sha256) for a fetched bundle, "simulated" for a fixture app.
+    // One toggle per app and permission, the same as the Settings screen.
+    case "set_app_permission": {
+      const id = String(body.id ?? "");
+      try { setPermission(s.apps, id, String(body.permission ?? ""), body.allowed); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
+      specHost.setPermission(sidOf(s), id, String(body.permission), body.allowed);
+      return { id, permissions: s.apps.installed_apps.find((a) => a.id === id).permissions, installed_apps: s.apps.installed_apps };
+    }
     case "install_app": case "uninstall_app": case "switch_app": {
       const id = String(body.id ?? "");
       try {
@@ -469,7 +481,7 @@ async function act(id, body) {
           if (found && s.apps.installed_apps.some((a) => a.id === id)) throw new AppsError("already_installed", `'${id}' is already installed`);   // before any download
           // A listing with a real URL is fetched first: the install keeps the bundle's sha256 and size, and fails if the bundle cannot be fetched.
           const real = found && !/^fixture:/i.test(String(found.url ?? "")) ? await fetchAppBundle(found) : undefined;
-          installApp(s.apps, id, catalog, real);
+          installApp(s.apps, id, catalog, real, body.permissions);
         }
         else if (body.action === "uninstall_app") { uninstallApp(s.apps, id, s.nav); specHost.drop(sidOf(s), id); }
         else {
@@ -632,7 +644,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, pin_app, hide_app, export_apps, import_apps, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

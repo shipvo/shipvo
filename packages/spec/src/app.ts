@@ -85,8 +85,27 @@ function coerce(f: FormField, value: unknown): unknown {
   return f.type === "number" ? Number(value) : value;
 }
 
+/** The device permissions an action needs, from its steps: a `notify` step needs notifications. Looks inside `then` and `else`. */
+export function actionDeviceNeeds(spec: unknown, action: string): string[] {
+  const need = new Set<string>();
+  const walk = (steps: unknown) => {
+    if (!Array.isArray(steps)) return;
+    for (const st of steps) {
+      if (!st || typeof st !== "object") continue;
+      if ("notify" in st) need.add("notifications");
+      walk((st as Obj).then);
+      walk((st as Obj).else);
+    }
+  };
+  walk((spec as Obj)?.actions?.[action]?.do);
+  return [...need].sort();
+}
+
+/** `devicePermissions` maps a device permission to the person's answer. `false` denies it. A permission with no answer is allowed. */
+export type CreateAppOptions = RenderOptions & { devicePermissions?: Record<string, boolean> };
+
 /** Starts an app at its first screen (or `options.screen`). Invalid specs are refused with the validator's errors. */
-export function createApp(spec: unknown, options: RenderOptions = {}): { ok: true; app: App } | { ok: false; errors: Issue[] } {
+export function createApp(spec: unknown, options: CreateAppOptions = {}): { ok: true; app: App } | { ok: false; errors: Issue[] } {
   const first = renderInternal(spec, options);
   if (!first.result.ok) return { ok: false, errors: first.result.errors };
   const s = spec as Obj;
@@ -142,6 +161,7 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
       } else if (typeof st.delete === "string") {
         data[st.delete] = coll(st.delete).filter((item) => !(!st.where || test(st.where, { ...scope, item })));
       } else if (typeof st.set === "string") state[st.set.replace(/^state\./, "")] = ev(st.value, scope);
+      else if ("notify" in st) { /* shown by the phone; the permission was checked before the action ran */ }
       else if (typeof st.toast === "string") toast = String(ev(st.toast, scope));
       else if (typeof st.navigate === "string") go(st.navigate, ev(st.params ?? {}, scope) as Obj, st.presentation);
       else if (typeof st.if === "string") {
@@ -161,6 +181,8 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
         else return { ok: false, error: `invalid_input: ${k} is required.` };
       }
     }
+    const denied = actionDeviceNeeds(spec, name).find((p) => options.devicePermissions?.[p] === false);
+    if (denied) return { ok: false, error: `permission_denied: the action "${name}" needs the "${denied}" permission, and the person denied it.` };
     try {
       toast = "";
       current();
