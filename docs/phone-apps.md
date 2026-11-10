@@ -219,6 +219,24 @@ device_log { session }                 -> install_app (source "real" for marketp
 
 Each result has the app, the collection, the row id, the field that matched, a short snippet and the full row. The match is not case sensitive and a row gives one result. Set `app` to an app id to look in one app, or to `notifications`. `limit` is 1 to 100 (default 20) and `truncated` says when more matched. Nothing is changed.
 
+## Wi-Fi, mobile data and airplane mode
+
+`set_connectivity` turns Wi-Fi, mobile data or airplane mode on or off for the whole phone, as quick settings do on Android and iOS. `get_connectivity` reads the switches and the network every app sees.
+
+```json
+{ "session": "demo", "airplane": true }
+```
+
+- Airplane mode turns Wi-Fi and mobile data off. Wi-Fi can come back on during it, and the phone is online again over Wi-Fi. Leaving airplane mode brings the radios back as they were.
+- Apps you built read the network in expressions as `network.online` and `network.type` (`wifi`, `cellular` or `none`). The open app's screen is drawn again when it changes.
+- While the phone is offline, apps' web data does not load: scheduled refreshes wait, and `refresh_app` says the phone is offline.
+- The Wi-Fi, mobile data and airplane tiles in the shade and Control Center, and `set_network_profile` with `offline`, change the same network.
+- Each change is in `device_log` as `connectivity`.
+
+```json
+{ "type": "text", "value": "{{ network.online ? 'Synced' : 'Offline: changes stay on the phone' }}" }
+```
+
 ## First-party apps
 
 | App | What it does | Actions (MCP tools) | Spec |

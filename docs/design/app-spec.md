@@ -121,7 +121,7 @@ Screen-independent values the app keeps while running (filters, selected tab, fo
 
 Expressions inside `{{ }}` are [CEL, the Common Expression Language](https://cel.dev) (decided 6 Nov 2026), evaluated with [`@bufbuild/cel`](https://github.com/bufbuild/cel-es). CEL has no loops or recursion, cannot reach the network or anything undeclared, and its evaluation cost is bounded. Every expression is type-checked during validation against the app's data, state and route types, so a wrong field name is an error with a suggestion before anything runs.
 
-- Names in scope: `data.<name>` (or the bare name for data entries), `state.<name>`, `item` (inside list templates), `input` (inside actions), `result` (after a `call` step), `route.params`, `now`, `person` (locale, time zone, language).
+- Names in scope: `data.<name>` (or the bare name for data entries), `state.<name>`, `item` (inside list templates), `input` (inside actions), `result` (after a `call` step), `route.params`, `now`, `person` (locale, time zone, language), `network` (`online`, and `type`: `wifi`, `cellular` or `none`).
 - CEL macros for lists: `charges.filter(c, c.status == 'succeeded')`, `charges.map(c, c.amount)`, `charges.exists(c, c.status == 'failed')`, `charges.all(c, c.paid)`.
 - Shipvo function library, registered with types so the checker knows them:
   - numbers and lists: `sum(list<num>)`, `avg`, `min`, `max`, `count(list)`, `unique(list, field?)`, `sortBy(list, field, 'asc'|'desc')`, `groupBy(list, field)`, `first`, `last`, `take(list, n)`;

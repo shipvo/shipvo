@@ -442,3 +442,38 @@ test("import_apps does not warn about a valid hand-written layout, and names eac
   const str = await act("pl-h", { action: "import_apps", replace: true, apps: [app("pinned")] });
   assert.deepEqual(str.warnings, ["apps[0].placement: not valid, ignored (expected an object)"]);
 });
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: Wi-Fi, mobile data and airplane mode change what apps read, and http data does not load offline`, async () => {
+    const NET = {
+      spec: "shipvo.app/v0",
+      app: { id: "netwatch", name: "Net Watch" },
+      permissions: { network: ["api.example.com"] },
+      data: { price: { source: "http", get: "https://api.example.com/p", select: "price" } },
+      screens: [{ id: "home", title: "Home", body: [{ type: "text", value: "{{ network.online ? 'Online on ' + network.type : 'Offline' }}" }] }],
+    };
+    const sid = `sp-net-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "netwatch", spec: NET, style })).ok, true);
+    const shows = async (text) => { const r = await act(sid, { action: "screen" }); assert.match(r.screen, new RegExp(text), r.screen); };
+    assert.deepEqual((await act(sid, { action: "get_connectivity" })).connectivity, { wifi: true, mobile_data: true, airplane: false, online: true, type: "wifi" });
+    await shows("Online on wifi");
+    assert.equal((await act(sid, { action: "set_connectivity", wifi: false })).connectivity.type, "cellular");
+    await shows("Online on cellular");
+    const air = await act(sid, { action: "set_connectivity", airplane: true });
+    assert.deepEqual(air.connectivity, { wifi: false, mobile_data: false, airplane: true, online: false, type: "none" });
+    await shows("Offline");
+    const r = await act(sid, { action: "refresh_app", id: "netwatch" });
+    assert.deepEqual(r.updated, []); assert.match(r.errors[0].message, /^offline/);
+    assert.equal((await act(sid, { action: "set_connectivity", mobile_data: true })).code, "airplane_on");
+    assert.equal((await act(sid, { action: "set_connectivity", wifi: true })).connectivity.online, true);
+    assert.deepEqual((await act(sid, { action: "set_connectivity", airplane: false })).connectivity, { wifi: false, mobile_data: true, airplane: false, online: true, type: "cellular" });
+    await act(sid, { action: "set_network_profile", profile: "offline" });
+    assert.equal((await act(sid, { action: "get_connectivity" })).connectivity.online, false);
+    await shows("Offline");
+    await act(sid, { action: "set_network_profile", profile: "online" });
+    assert.equal((await act(sid, { action: "set_connectivity" })).code, "bad_value");
+    const log = (await act(sid, { action: "device_log" })).log.filter((e) => e.name === "connectivity");
+    assert.equal(log.length, 4); assert.equal(log[1].to.airplane, true);
+  });
+}
