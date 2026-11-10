@@ -47,7 +47,7 @@ Use this to check which keys your apps have saved, without anyone seeing the key
 2. Tap Settings, then tap **Secrets**.
 3. Each saved key shows its name, the app, the domain it may call, its access, and when it was last used ("never" if it has not been used).
 4. To remove a key, tap **Revoke** under it and confirm the prompt "Revoke <name> for <app>?". The key is deleted, apps can no longer use it, and the row disappears. This cannot be undone. Revoking the last key brings back "No saved keys yet."
-5. To replace a key, tap **Rotate** under it. The screen shows a one-time link; open it to save the new key. The old key stays until you revoke it. If rotating fails, the screen shows "Could not rotate this key. Try again."
+5. To replace a key, tap **Rotate** under it. The screen shows a one-time link; open it to save the new key. If rotating fails, the screen shows "Could not rotate this key. Try again."
 6. Tap **Back** to return to Settings.
 
 If a revoke does not go through, the screen shows "Could not revoke this key. Try again." and the row stays; tap **Revoke** again. With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate a key or revoke it from code.
