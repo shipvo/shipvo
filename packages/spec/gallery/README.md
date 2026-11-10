@@ -9,3 +9,11 @@ Example specs for `shipvo.app/v0`. Copy one and change it. Each file passes the 
 | [Expense splitter](expense-splitter.json) | collection, computed total | `add_expense` | paid by, for what, amount | bar | expenses |
 | [Trip checklist](trip-checklist.json) | collection, computed count | `add_item` | item, group, quantity | bar | packing list |
 | [Flashcards](flashcards.json) | collection, computed count | `add_card` | deck, question, answer | bar | cards |
+
+Specs with a board, a calendar or a map:
+
+| Spec | Block | Data sources | Actions | Form |
+| --- | --- | --- | --- | --- |
+| [Reading board](reading-board.json) | `kanban` (To read, Reading, Done) | collection, computed pages | `add_book`, `move_book` | title, author, pages |
+| [Meal planner](meal-planner.json) | `calendar` (week) | collection, computed count | `add_meal` | meal, day, note |
+| [Favourite places](favourite-places.json) | `map` | collection, computed count | `add_place` | name, latitude, longitude |

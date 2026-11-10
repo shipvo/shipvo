@@ -14,6 +14,33 @@ Short videos for people who are new to Shipvo. Each one has captions and a writt
 
 <details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Awakening" by Celestial Aeon Project (<a href="https://www.jamendo.com">Jamendo</a>, <a href="http://creativecommons.org/licenses/by-nc-sa/2.5/">CC BY-NC-SA 2.5</a>). Source: <a href="https://www.jamendo.com/track/26436">https://www.jamendo.com/track/26436</a></details>
 
+#### Short cut for phones (9:16)
+
+<video controls preload="metadata" playsinline tabindex="0" data-title="S1 · E1 · From a chat to an app (vertical)" data-length="38 s" poster="/videos/chat-to-app-ad-vertical.jpg" src="/media/videos/chat-to-app-ad-vertical-63d5ddf7.mp4"><track kind="captions" src="/videos/chat-to-app-ad-vertical.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+
+38 seconds, 1080 by 1920, cut from the main film for phone feeds: the shop with no customers, the ask in a chat, the assistant's order on the real app, the orders list and the busy shop at sunset.
+
+[Captions (.vtt)](/videos/chat-to-app-ad-vertical.vtt)
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Something Sacred" by Kellee Maize (<a href="https://www.jamendo.com">Jamendo</a>, <a href="https://creativecommons.org/licenses/by-nc-nd/3.0/">CC BY-NC-ND 3.0</a>). Source: <a href="https://www.jamendo.com/track/521021">https://www.jamendo.com/track/521021</a></details>
+
+<details>
+<summary>Transcript (short cut)</summary>
+
+Mara: Nobody comes in.
+
+Jun: Wait, I can fix that.
+
+Pip: Found it. Ordering now.
+
+Mara: Another one?
+
+Mara: Three orders!
+
+Every assistant can use your app. shipvo.dev
+
+</details>
+
 <details>
 <summary>Transcript</summary>
 
