@@ -22,6 +22,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Control plane.** The Shipvo service that keeps your releases and decides who gets them. You can use the hosted one or run your own.
 
+**Crash-loop revert.** What the phone does when a new release keeps crashing on start: after 3 failed runs it drops that release, blocks it and goes back to the one before. See [Crash-loop revert on Android](android-crash-loop-paths.md).
+
 **Eval (agent evaluation).** A scored try-out for an assistant. You give it a task, such as buying one tote bag, and Shipvo records every step and checks the result. See [Score an agent](eval.md).
 
 **Dry run.** A practice run. Shipvo does all the work of a release but sends nothing to anyone.
