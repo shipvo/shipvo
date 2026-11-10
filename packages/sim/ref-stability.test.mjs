@@ -8,7 +8,7 @@ import { mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { cases, ONE, TWO } from "./ref-stability.cases.mjs";
+import { cases, ONE, TWO, refOf } from "./ref-stability.cases.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const PORT = pickPort(8800, 300);
@@ -47,3 +47,22 @@ after(async () => {
 });
 
 for (const [name, run] of cases) test(name, () => run({ open, act }));
+
+// After a restart the page is a new document and its refs get a prefix (f1e2; p1e2 on other reloads). Those refs must drive tap and scroll,
+// and a ref from before the restart must fail with stale_ref instead of acting on another element.
+test("restart: prefixed refs from the new screen drive tap and scroll; refs from before it are stale", async () => {
+  const first = await open("restart-refs");
+  const before = refOf(first, 'button "Item 3"');
+  const r = await act("restart-refs", { action: "restart" });
+  assert.ok(r.ok, r.error);
+  const ref = refOf(r.screen, 'button "Item 3"');
+  assert.match(ref, /^(?:p\d+|f\d+)?e\d+$/);   // the form the sim gives after a restart (f1e2); the MCP tools take the same set
+  const tapped = await act("restart-refs", { action: "tap", ref });
+  assert.ok(tapped.ok, tapped.error);
+  assert.match(tapped.screen, /clicked Item 3/);
+  const scrolled = await act("restart-refs", { action: "scroll", direction: "down", ref: refOf(tapped.screen, 'button "Item 4"') });
+  assert.ok(scrolled.ok, scrolled.error);
+  const stale = await act("restart-refs", { action: "tap", ref: before });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.code, "stale_ref");
+});
