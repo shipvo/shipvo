@@ -212,3 +212,45 @@ test("a home-screen screenshot shows the created app's icon", async () => {
   // The phone with the extra app has a different home screen from the one without.
   assert.notEqual(await shot("sp-shot-b"), await shot("sp-shot-a"));
 });
+
+test("export_apps then import_apps on a fresh phone restores spec, data and settings, Android and iOS, with the same screen", async () => {
+  const withToggle = (id) => { const g = structuredClone(GIFTS); g.app.id = id; g.state = { alerts: { type: "bool", default: false } }; g.screens[0].body.push({ type: "toggle", label: "Gift alerts", bind: "state.alerts" }); return g; };
+  assert.ok((await call("/session", { session: "ex-a" })).ok);
+  assert.equal((await act("ex-a", { action: "create_app", id: "gifts-a", spec: withToggle("gifts-a"), style: "android" })).ok, true);
+  assert.equal((await act("ex-a", { action: "create_app", id: "gifts-i", spec: withToggle("gifts-i"), style: "ios", open: false })).ok, true);
+  for (const id of ["gifts-a", "gifts-i"]) {
+    await act("ex-a", { action: "switch_app", id });
+    await fetch(`http://localhost:${PORT}/spec/ex-a/${id}/op`, { method: "POST", body: JSON.stringify({ op: "toggle", label: "Gift alerts" }) });
+    await act("ex-a", { action: "app_action", id, action_name: "add_gift", input: { name: `Kite ${id}` } });   // reloads the open app
+  }
+  // refs carry a frame number and a toast fades, so compare the screen without them
+  const shows = async (sid, id) => { await act(sid, { action: "switch_app", id }); await act(sid, { action: "press_home" }); await act(sid, { action: "switch_app", id }); return (await act(sid, { action: "screen" })).screen.replace(/ \[ref=[^\]]*\]/g, "").split("\n").filter((l) => !/status "/.test(l)).join("\n"); };
+  const before = { a: await shows("ex-a", "gifts-a"), i: await shows("ex-a", "gifts-i") };
+  const ex = await act("ex-a", { action: "export_apps" });
+  assert.equal(ex.ok, true, JSON.stringify(ex));
+  assert.deepEqual(ex.apps.map((a) => [a.id, a.style]), [["gifts-a", "android"], ["gifts-i", "ios"]]);
+  assert.match(JSON.stringify(ex), /Kite gifts-a/);
+  assert.doesNotMatch(JSON.stringify(ex), /sk-|vault_value|"value":"secret/i);
+  const one = await act("ex-a", { action: "export_apps", ids: ["gifts-i"] });
+  assert.deepEqual(one.apps.map((a) => a.id), ["gifts-i"]);
+
+  assert.ok((await call("/session", { session: "ex-b" })).ok);
+  const im = await act("ex-b", { action: "import_apps", apps: JSON.parse(JSON.stringify(ex.apps)) });
+  assert.equal(im.ok, true, JSON.stringify(im));
+  assert.equal(await shows("ex-b", "gifts-a"), before.a);
+  assert.equal(await shows("ex-b", "gifts-i"), before.i);
+  // existing ids fail unless replace
+  const dup = await act("ex-b", { action: "import_apps", apps: ex.apps });
+  assert.equal(dup.code, "already_installed");
+  assert.equal((await act("ex-b", { action: "import_apps", apps: ex.apps, replace: true })).ok, true);
+  assert.equal(await shows("ex-b", "gifts-a"), before.a);
+});
+
+test("import_apps with a bad spec installs nothing and lists every problem with its path", async () => {
+  assert.ok((await call("/session", { session: "ex-bad" })).ok);
+  const bad = [{ id: "one", spec: { spec: "shipvo.app/v0", screens: [] } }, { id: "Bad Id", spec: GIFTS }, { id: "two", spec: { spec: "shipvo.app/v0", screens: [] } }];
+  const r = await act("ex-bad", { action: "import_apps", apps: [{ id: "ok", spec: GIFTS }, ...bad] });
+  assert.equal(r.code, "invalid_spec");
+  assert.match(r.error, /apps\[1\]\.spec/); assert.match(r.error, /apps\[2\]\.id/); assert.match(r.error, /apps\[3\]\.spec/);
+  assert.deepEqual((await act("ex-bad", { action: "export_apps" })).apps, []);
+});
