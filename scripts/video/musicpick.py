@@ -276,7 +276,7 @@ def main():
         sys.exit("no track in the corpus matches this brief; loosen 'want' or 'avoid'")
     rows = []
     for s1, r in cands:
-        # Owner decision (5 Nov 2026): any Jamendo track may be used, always credited; the licence is not a filter.
+        # Owner decision (6 Nov 2026): any Jamendo track may be used, always credited; the licence is not a filter.
         try:
             f = features(r["id"], a.outdir)
         except Exception as e:
