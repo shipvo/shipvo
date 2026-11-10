@@ -1,0 +1,2 @@
+- `@shipvo/mcp`: new tools `room_log`, `room_note` and `room_report` give a lead agent a log of what each session in a room did, a place for notes, and one summary per session. Docs: "Test with a team of agents".
+- Migration: none; new tools.

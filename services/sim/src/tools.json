@@ -1736,6 +1736,99 @@
     }
   },
   {
+    "name": "room_log",
+    "description": "Read the log of a room: what each session did (time, session, agent, tool, target and the change line) and the notes agents posted, oldest first. Pass `since` (the cursor from the last call) to get only newer entries. Read-only. Use it as the lead agent to watch sub-agents.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "room": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Room name given to open_app"
+        },
+        "since": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Cursor from the last room_log call; omit for everything"
+        }
+      },
+      "required": [
+        "room"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "room_note",
+    "description": "Post a short plain-text note to a room (for example 'Buyer: order placed, id 42'). Other agents read it in room_log; room_report includes it under the session. A note starting with 'Finding' counts as a finding. Up to 500 characters.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "room": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Room name given to open_app"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The note, up to 500 characters"
+        },
+        "session": {
+          "type": "string",
+          "description": "The session this note is about; omit for a note from the lead"
+        }
+      },
+      "required": [
+        "room",
+        "text"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "room_report",
+    "description": "One summary per session in a room: steps, seconds, errors, findings, last screen title and its own notes, plus the orders in the room's shared backend. Read-only. Use it as the lead agent to collect results.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "room": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Room name given to open_app"
+        }
+      },
+      "required": [
+        "room"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "run_app_action",
     "description": "Run one action of an app made with create_app, by name, with its input (for example add_task with { title }). The action changes the app's data the same way tapping its form does, and the open screen shows the result. Fails with not_installed (no such spec app) or action_failed (the action refused the input, with the reason).",
     "inputSchema": {

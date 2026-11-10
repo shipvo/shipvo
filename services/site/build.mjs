@@ -54,6 +54,7 @@ const NAV = [
     { slug: "timeline", src: "docs/timeline.md", title: "Behaviour timeline", desc: "See every release and pull request check run in one list, with flows, findings and screens, and compare any two points on Android and iOS." },
   ]},
   { group: "Agents", pages: [
+    { slug: "team-of-agents", src: "docs/test-with-a-team-of-agents.md", title: "Test with a team of agents", desc: "A lead agent runs sub-agents, one phone each, in one room: read the room log, post notes and collect a report per session." },
     { slug: "agents", src: "docs/agents.md", title: "Agents and Shipvo apps", desc: "How an AI agent sees and operates a Shipvo app over MCP: the accessibility tree, every tool, hosted access and public listings." },
     { slug: "record", src: "docs/record.md", title: "Record a demo video", desc: "Have your assistant record an MP4 of the phone with chapter markers using record_start, record_marker and record_stop, for store pages and bug reports." },
     { slug: "record-a-demo-video", src: "docs/record-a-demo-video.md", title: "Record a demo video: worked example", desc: "A worked example for founders: have your assistant record an MP4 of your app with chapters, music and a voice track." },

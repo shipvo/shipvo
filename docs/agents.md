@@ -53,6 +53,9 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `get_settings` · `set_setting` · `browser_open` · `browser_snapshot` · `browser_click` · `browser_type` · `browser_scroll` · `browser_back` · `browser_wait_for` · `browser_tabs` · `browser_close_tab` · `browser_screenshot` | Read and change the phone's system settings, and drive its separate web Browser. See [the phone's Browser and Settings](phone-apps.md) |
 | `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
 | `end_session(session)` | Ends the session. Reports steps taken, duration, the room, and the orders the app posted to its backend during the session. A room ends with its last session |
+| `room_log(room, since?)` | Read-only. What each session in a room did, oldest first: time, session, agent name, tool, target and the change line. Pass the `cursor` from the last call as `since` to get only newer entries |
+| `room_note(room, text, session?)` | Post a plain-text note (up to 500 characters) that other agents read in `room_log` |
+| `room_report(room)` | Read-only. One summary per session in the room: steps, seconds, errors, findings, last screen and its own notes, plus the orders in the room's shared backend |
 | `owner_describe(app)` · `owner_command(app, command, args)` | The app's owner API (content, prices, offers, orders, publish), with an owner token |
 
 ## Rooms: several phones, one backend
@@ -64,7 +67,7 @@ open_app("tide-and-tackle@latest", room: "demo")   // session s1, Android
 open_app("tide-and-tackle@latest", room: "demo", platform: "ios")   // session s2, iOS
 ```
 
-`list_sessions` shows the room of every session.
+`list_sessions` shows the room of every session. To run a team of agents in a room, see [Test with a team of agents](test-with-a-team-of-agents.md).
 
 ## Driving the live phone
 

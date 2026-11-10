@@ -25,6 +25,7 @@ import { connectDriver, findLiveRun, type Driver, type RunInfo } from "./attach.
 import { BuildError, hostedKey, resolveBuild, uploadBuild } from "./build-upload.js";
 import { findProjectDir, hasDesktop, localShipvo, runUrl, startRun } from "./launch.js";
 import { JobStore, type JobView } from "./jobs.js";
+import { RoomLogs, NOTE_MAX, clean, isFinding, line } from "./room.js";
 import { satisfied, sameTree, type WaitFor, type Waited } from "./wait.js";
 
 const SIM = (process.env.PN_SIM ?? "http://localhost:4545").replace(/\/$/, "");
@@ -124,6 +125,10 @@ const steps = new Map<string, Step[]>();
 // Tool calls per session with the caller's trace id (when it sent a valid traceparent). Dropped when the session ends.
 type CallEntry = { tool: string; at: string; traceId?: string };
 const callLog = new Map<string, CallEntry[]>();
+// Room log: every action of a session in a room, and the notes agents post. Lives in this process, like `sessions`.
+const roomLogs = new RoomLogs();
+// The change line of a session's latest action, read by the logger after the tool returns.
+const lastChange = new Map<string, string>();
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 // Action result with a "Change:" line on top. Compares this tree with the session's last one.
 // compact: on "content changed", return only the added/removed lines instead of the full tree.
@@ -132,6 +137,7 @@ const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?
   const prev = trees.get(sid);
   trees.set(sid, r.screen);
   const change = prev === undefined ? "unknown (no earlier screen to compare)" : classify(prev, r.screen, action);
+  lastChange.set(sid, change);
   if (o.step) steps.get(sid)?.push({ ...o.step, changed: prev === undefined ? undefined : change !== "none" });
   const head = [`Change: ${change}`];
   if (o.waited) head.push(`Waited: ${o.waited.matched ? "matched" : "timed out"} after ${o.waited.ms} ms`);
@@ -160,11 +166,26 @@ const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: Tool
     const sid = (args as { session?: unknown } | undefined)?.session;
     const log = typeof sid === "string" ? callLog.get(sid) : undefined;
     if (log) { log.push(entry()); if (log.length > 1000) log.splice(0, log.length - 1000); }
+    if (typeof sid === "string") lastChange.delete(sid);
+    const treeBefore = typeof sid === "string" ? trees.get(sid) : undefined;
+    const roomBefore = typeof sid === "string" ? sessions.get(sid)?.room : undefined;
     const out = inputHasKey(args) ? keyRefusal() : await (cb as (a: unknown, e: unknown) => unknown)(args, extra);
+    const room = typeof sid === "string" && !t.name.startsWith("room_") ? roomBefore : undefined;
+    if (room && typeof sid === "string") {
+      const a = args as { ref?: string; direction?: string };
+      const found = a.ref ? findTarget(treeBefore, a.ref) : undefined;
+      const target = a.ref ? (found ? `${found.role} "${found.text.slice(0, 40)}" [${a.ref}]` : `[${a.ref}]`) : a.direction ?? null;
+      const isErr = (out as { isError?: boolean } | undefined)?.isError === true;
+      roomLogs.add(room, { session: sid, agent: sessions.get(sid)?.client ?? null, tool: t.name, target, change: lastChange.get(sid) ?? null, ...(isErr ? { error: true } : {}) });
+    }
     if (t.name === "open_app") {
       // The session id is only known once the call returns.
       const opened = /^session: (\S+)/.exec((out as { content?: { text?: string }[] })?.content?.[0]?.text ?? "")?.[1];
-      if (opened && sessions.has(opened)) callLog.set(opened, [entry()]);
+      if (opened && sessions.has(opened)) {
+        callLog.set(opened, [entry()]);
+        const r = sessions.get(opened)!;
+        if (r.room) roomLogs.add(r.room, { session: opened, agent: r.client ?? null, tool: "open_app", target: r.app, change: "new screen" });
+      }
     }
     return trace && out && typeof out === "object" ? { ...out, _meta: { ...((out as { _meta?: object })._meta ?? {}), traceparent: trace.traceparent } } : out;
   };
@@ -498,6 +519,43 @@ use(server, tools.browser_screenshot, async ({ session }) => {
 
 use(server, tools.device_reset, 
   async ({ session, ...device }) => { need(session); return result(session, await act({ session, action: "device_reset", device })); });
+
+const ROOM_RE = /^[\w-]{1,64}$/;
+const badRoom = (room: string) => ROOM_RE.test(room) ? undefined : result("", { ok: false, code: "bad_room", error: "room must be 1 to 64 letters, digits, _ or -" });
+use(server, tools.room_log, async ({ room, since }) => {
+  const bad = badRoom(room); if (bad) return bad;
+  const { entries, cursor } = roomLogs.since(room, since ?? 0);
+  return { ...text(entries.length ? `${entries.map(line).join("\n")}\ncursor: ${cursor}` : `no new entries\ncursor: ${cursor}`), structuredContent: { room, entries, cursor } };
+});
+use(server, tools.room_note, async ({ room, text: body, session }) => {
+  const bad = badRoom(room); if (bad) return bad;
+  const t = clean(body);
+  if (!t) return result("", { ok: false, code: "empty_note", error: "the note is empty" });
+  const s = session ? sessions.get(session) : undefined;
+  if (session && s?.room !== room) return result("", { ok: false, code: "not_in_room", error: `session '${session}' is not in room '${room}'` });
+  const e = roomLogs.add(room, { session: session ?? "lead", agent: s?.client ?? server.server.getClientVersion()?.name ?? null, tool: "room_note", target: null, change: null, text: t });
+  return { ...text(`noted #${e.n}${body.length > NOTE_MAX ? ` (cut to ${NOTE_MAX} characters)` : ""}`), structuredContent: { entry: e } };
+});
+use(server, tools.room_report, async ({ room }) => {
+  const bad = badRoom(room); if (bad) return bad;
+  const log = roomLogs.all(room);
+  const listed = await sim("/sessions", {}).catch(() => undefined) as (Act & { sessions?: { session: string; room?: string | null; title?: string }[] }) | undefined;
+  const live = new Map((listed?.sessions ?? []).map((x) => [x.session, x]));
+  const ids = [...new Set([...sessions].filter(([, v]) => v.room === room).map(([k]) => k).concat(log.filter((e) => e.session !== "lead" && e.tool === "open_app").map((e) => e.session)))];
+  let orders: unknown[] = [];
+  try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/~${room}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
+  const report = ids.map((id) => {
+    const mine = log.filter((e) => e.session === id);
+    const notes = mine.filter((e) => e.tool === "room_note").map((e) => e.text!);
+    const acts = mine.filter((e) => e.tool !== "room_note");
+    const m = sessions.get(id);
+    const first = mine[0] ? Date.parse(mine[0].at) : Date.now(), last = mine.length ? Date.parse(mine[mine.length - 1]!.at) : first;
+    const t = trees.get(id);
+    return { session: id, agent: m?.client ?? mine[0]?.agent ?? null, app: m?.app ?? null, steps: acts.length, seconds: Math.round((last - first) / 1000), errors: acts.filter((e) => e.error).length, findings: notes.filter(isFinding), last_screen: live.get(id)?.title || (t ? titleOf(t) : "") || null, notes };
+  });
+  const body = { room, sessions: report, orders };
+  return { ...text(JSON.stringify(body, null, 2)), structuredContent: body };
+});
 
 use(server, tools.export_test, async ({ session }) => {
   const rec = steps.get(session), s = sessions.get(session);
