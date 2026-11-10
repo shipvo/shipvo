@@ -126,14 +126,14 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Show or hide an app on a time window (`schedule_app`, `clear_schedule`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
 | Network proxy refusal codes (`x-shipvo-net-error`) | [phone-network](phone-network.md#troubleshooting) | | | |
 | Room log and notes (`room_log`, `room_note`): a lead agent sees what the others did | [agents](agents.md#room-log-and-notes) | | | |
+| Held release when failures look fake (fresh installs or a burst; owner approves or denies) | [auto-halt](auto-halt.md#when-the-failures-look-like-an-attack) | | | |
 | Shop template warns when a price is in the wrong unit (`[shop]` message, failing test) | [your-own-shop](tutorials/your-own-shop.md#troubleshooting), [getting-started](getting-started.md#the-shop-checkout) | [your-own-shop](tutorials/your-own-shop.md) | | |
-| Android patch falls back to the full download on out-of-memory or over the memory budget (`patchError`) | [getting-started](getting-started.md) | | | |
-| Prefixed element refs after a restart (`f1e2`, `p1e5`; `stale_ref`) | [agents](agents.md) | | | |
-| Spec `csv()` function to export a collection | [phone-apps](phone-apps.md), [app-spec](design/app-spec.md) | | | |
+| Export a list as CSV from a spec app (`csv(rows, columns?)`) | [spec-blocks](spec-blocks.md#export-data-as-csv), [phone-apps](phone-apps.md#export-data-as-csv), [app-spec](design/app-spec.md) | | | |
+| Refs after a phone restart (`f1e2`, `p1e5`) work in `tap`, `type`, `scroll`, `wait_for` | [agents](agents.md#troubleshooting) | | | |
 | Roll back safely with a state version (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
 | Session inbox for emailed codes and magic links (`inbox_wait`, `inbox_read`, `inbox_clear`, `phone.inbox`) | [email-sign-in](email-sign-in.md), [agents](agents.md) | | | |
 | Assistant Inbox (`send_message`, `check_inbox`, `hand_off`, `{{ caller }}`) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | |
-| Patch falls back to full download on small heaps (Android, `patchError`) | [runtime](../packages/runtime/README.md#patches-on-small-heaps-android) | | | |
+| Patch falls back to full download on small heaps (Android, `patchError`) | [runtime](../packages/runtime/README.md#patches-on-small-heaps-android), [getting-started](getting-started.md) | | | |
 | Permissions detected from camera, scanner and file blocks | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
 | Key rotations in the audit log (`action: key-rotation`, `shipvo audit`) | [cli](cli.md#shipvo-audit), [key-rotation](key-rotation.md) | | | |
 | Key rotations in the audit log (`shipvo audit`, `action: key-rotation`) | [key-rotation](key-rotation.md#see-rotations-in-the-audit-log), [cli](cli.md#shipvo-audit) | | | |
