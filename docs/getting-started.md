@@ -169,9 +169,9 @@ To check a release before you have a control plane or token, run `shipvo publish
 
 If your first publish fails, run `shipvo doctor` first. It checks your Node version, `shipvo.json`, signing key match, control plane reachability, and `hermesBytecodeVersion` when present.
 
-Phones check while open, verify signature, hash and size, stage atomically, apply without a restart and mark the release healthy once the first screen renders. A release that fails to boot three times is discarded on that phone.
+Phones check while open, verify signature, hash and size, stage atomically, apply without a restart and mark the release healthy once the first screen renders. A release that fails to boot three times is discarded on that phone. `shipvo rollback --to 7` republishes release 7's code as a new release for everyone.
 
-**Patches never block an update.** On Android, the runtime checks the memory a patch needs (the old bundle, the patch and the new bundle together) against a share of the app's heap limit before it reads anything. If the patch is too big for that budget, or the phone runs out of memory while applying it, the runtime downloads the full bundle instead, and the same signature, hash and size checks run. The phone ends on the same release either way. Telemetry reports the reason in `patchError`: `over_memory_budget` or `out_of_memory`. `shipvo rollback --to 7` republishes release 7's code as a new release for everyone.
+**Patches never block an update.** On Android, the runtime checks the memory a patch needs (the old bundle, the patch and the new bundle together) against a share of the app's heap limit before it reads anything. If the patch is too big for that budget, or the phone runs out of memory while applying it, the runtime downloads the full bundle instead, and the same signature, hash and size checks run. The phone ends on the same release either way. Telemetry reports the reason in `patchError`: `over_memory_budget` or `out_of_memory`.
 
 To see whether the release reached phones, run `shipvo status [--app <id>] [--json]`. It reads the control plane's `/t/<app>/summary` and prints one row per recent release: counts for each telemetry event, and the median apply and cold start times in milliseconds. It prints "No telemetry yet" when phones have not reported. `--json` prints the endpoint's payload unchanged.
 
