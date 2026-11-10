@@ -69,14 +69,12 @@ The release key is the seed that `shipvo publish` signs with. Each installed app
 
 To replace a lost or leaked release key:
 
-1. Create a new release key.
+1. Create a new release key (see [key-rotation.md](key-rotation.md)).
 2. Run `shipvo keys rotate sign` with the root seed. It prints a statement signed by the root key that names the new release key, a `sequence` and a `validFrom` time. For an emergency, set `validFrom` to the signing time or earlier.
 3. Run `shipvo keys rotate upload` as a signed-in owner. The control plane checks the root signature and hands the statement out with the pointer. It only passes the statement on. Each phone checks it again.
 4. The Android and iOS runtimes check the root signature, the app id, and that the `sequence` is higher than the one they hold. When the phone's clock reaches `validFrom`, they switch to the new release key. From then on the leaked release key signs nothing the phone accepts.
 
 What a thief with only the release key can do: sign releases until each phone has the statement and has reached `validFrom`. A publish token or an agent token cannot make a statement, because phones check the root signature.
-
-If the root key is lost or leaked, rotation cannot fix it. Ship a new store build with a new root key.
 
 CLI commands: `keys root`, `keys rotate sign` and `keys rotate upload` ([cli.md](cli.md)).
 
