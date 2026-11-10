@@ -1,0 +1,2 @@
+- `@shipvo/store`: new export `engagementReport(rows, { now, windowDays, needed, recruit })` turns tester telemetry into a day count, per-tester active and quiet days, and plain-English warnings for the closed test.
+- Migration: none; new export.

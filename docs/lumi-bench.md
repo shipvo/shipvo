@@ -89,6 +89,9 @@ Measured on 2026-11-07 with `node scripts/lumi/bench.mjs --budgets 50,200 --seed
 
 ## Next steps
 
-- [Lumi](lumi.md): run Lumi on your own app with `shipvo lumi`.
-- [Lumi ranker](lumi-ranker.md): how the walker picks what to tap next.
+- [Lumi on Shipvo Phone](lumi.md): what Lumi does and how to run `shipvo lumi` on your app.
+- [Lumi ranker](lumi-ranker.md): the ranker and its measured effect on these apps.
+- [Test your app with Lumi](tutorials/test-your-app-with-lumi.md): a step-by-step tutorial.
+- [Testing](testing.md): turn what Lumi finds into typed tests.
 - [Parity results](parity-results.md): how closely the simulator matches Android and iOS.
+

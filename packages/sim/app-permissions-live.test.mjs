@@ -45,6 +45,12 @@ const REMIND = {
   actions: { ping: { do: [{ notify: { title: "Hello" } }, { set: "state.n", value: 1 }] } },
   screens: [{ id: "home", title: "Home", body: [{ type: "text", value: "Hi" }] }],
 };
+// The page flips the switch before the server has applied the change, so poll until the ping gives the expected answer.
+const pingUntil = async (sid, id, ok) => {
+  let last;
+  for (let i = 0; i < 50; i++) { last = await ping(sid, id); if (last.ok === ok) return last; await new Promise((r) => setTimeout(r, 100)); }
+  return last;
+};
 const ping = (sid, id) => act(sid, { action: "app_action", id, action_name: "ping", input: {} });
 
 for (const style of ["android", "ios"]) {
@@ -80,10 +86,10 @@ for (const style of ["android", "ios"]) {
       assert.equal(await sw.getAttribute("aria-checked"), "false");
       await sw.click();
       await page.waitForFunction(() => document.querySelector('[data-part="perm-switch"][data-perm="notifications"]')?.getAttribute("aria-checked") === "true");
-      assert.equal((await ping(sid, "remind")).ok, true);
+      assert.equal((await pingUntil(sid, "remind", true)).ok, true);
       await sw.click();
       await page.waitForFunction(() => document.querySelector('[data-part="perm-switch"][data-perm="notifications"]')?.getAttribute("aria-checked") === "false");
-      const again = await ping(sid, "remind");
+      const again = await pingUntil(sid, "remind", false);
       assert.equal(again.ok, false); assert.equal(again.code, "permission_denied");
     } finally { await b.close(); }
   });
