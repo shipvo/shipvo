@@ -145,7 +145,7 @@ Switching sets `current_app` and brings the app to the front. If the app's bundl
 
 The Store's install card lists every device permission an app declares (for example `notifications` or `location`), with an Allow or Deny switch for each. Your answers are kept per app in `installed_apps[].permissions`, saved in `phone.json` (`apps[].permissions`) and carried by `export_phone_apps` and `import_phone_apps`. Settings has one switch per app and permission, so you can change an answer later. `install_app` returns `declared` and `permissions`.
 
-An action that needs a denied permission (a `notify` step needs `notifications`; a `navigate` step to a screen with a `camera` or `scanner` block needs `camera`, and a `file` block needs `files`, including blocks nested in `children`) returns `permission_denied` naming the permission, and nothing else in the action runs. The sim action `set_app_permission { id, permission, allowed }` sets an answer; it returns `not_declared` for a permission the app did not declare.
+An action that needs a denied permission returns `permission_denied` naming the permission, and nothing else in the action runs. The phone works out the need from the action's steps. A `notify` step needs `notifications`. A `navigate` step also counts the screen it opens, including blocks nested in `children`: a `camera` or `scanner` block needs `camera`, and a `file` block needs `files`. The sim action `set_app_permission { id, permission, allowed }` sets an answer; it returns `not_declared` for a permission the app did not declare.
 
 ### Start from a `phone.json`
 
