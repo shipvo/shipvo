@@ -1,0 +1,2 @@
+- docs: new Playground page (shipvo.dev/docs/playground/) with the bar controls, the feature sidebar, the Many phones link parameters, troubleshooting and next steps.
+- docs: assistant-testing page explains the ChatGPT "couldn't complete MCP setup" message.

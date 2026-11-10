@@ -112,7 +112,7 @@ The simulator renders your app on the web and simulates the device. Everything s
 - You restarted the client after editing its config.
 - The app id is one your key can open: ask for `list_apps`.
 
-**ChatGPT says "The server couldn't complete MCP setup".** Use the URL with the key in the path (`https://sim.shipvo.dev/mcp/<key>`). The hosted server accepts the newer protocol version that ChatGPT's custom connector sends (`2026-07-28`) and answers with the newest version it speaks. If setup still fails, check that the key has not expired (`shipvo keys`).
+**ChatGPT says "The server couldn't complete MCP setup".** ChatGPT's connector names a newer MCP protocol version than older servers know. The hosted phone accepts it and answers with the newest version it speaks, so add the connector again with the `/mcp/<key>` URL from `shipvo mcp`. If it still fails, check the key has not expired (`shipvo keys`).
 
 **The first reply after a break is slow.** A sandbox sleeps after 30 idle minutes and wakes on the next call, so a slow first reply after a break is normal. Sessions survive reconnects: `list_sessions` shows what is still open.
 
