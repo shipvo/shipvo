@@ -58,14 +58,14 @@ npx -y @shipvo/cli keys rotate upload rotation.json
 
 ### See rotations in the audit log
 
-After `upload`, export the audit log. Rotations show up next to publishes and rollbacks as rows with `action` `key-rotation`. The `after` field holds the sequence and the time the new key starts:
+After `upload`, export the audit log. Rotations show up next to publishes and rollbacks as rows with `action` `key-rotation`. The `after` field holds the sequence and the time the new key starts, as JSON text:
 
 ```bash
 npx -y @shipvo/cli audit <app> --limit 20
 ```
 
 ```json
-{ "action": "key-rotation", "release": null, "after": { "sequence": 1, "valid_from": "2026-11-06T00:00:00Z" } }
+{ "action": "key-rotation", "release": null, "release_id": null, "before": null, "after": "{\"sequence\":1,\"valid_from\":\"2026-11-06T00:00:00Z\"}" }
 ```
 
 `shipvo audit` uses `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create`.
@@ -86,5 +86,5 @@ A new rotation is the newest row, so it shows in `shipvo audit <app> --limit 20`
 ## Next steps
 
 - [New machine and key backup](new-machine.md) for the release seed.
-- [CLI guide](cli.md) for the `--json` envelopes and `shipvo audit`.
+- [CLI guide](cli.md) for the `--json` envelopes and [`shipvo audit`](cli.md#shipvo-audit).
 - [Pointer response and rotations](self-hosting.md#pointer-response-and-key-rotations) for the wire format.

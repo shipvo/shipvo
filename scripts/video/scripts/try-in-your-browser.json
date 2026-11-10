@@ -1,0 +1,139 @@
+{
+  "slug": "try-in-your-browser",
+  "posterAt": 3,
+  "title": "Try Shipvo in your browser: a phone, device features and a rollback",
+  "tutorial": "docs/tutorials/try-shipvo-in-your-browser.md",
+  "voice": "af_heart",
+  "pushIn": true,
+  "retention": {
+    "hook": "0-3 s: a shop on a phone inside a browser page, headline 'Nothing to install'.",
+    "promise": "By 8 s: you tap a shop on Android and iOS, test a payment, and watch an update roll back, with no account.",
+    "openLoops": [
+      {
+        "question": "What happens to a bad update?",
+        "opens": "hook (about 6 s)",
+        "paysOff": "update scene (about 60 s), the phone goes back to version 1 by itself"
+      },
+      {
+        "question": "Can I try many phones at once?",
+        "opens": "update scene (about 62 s)",
+        "paysOff": "many scene (about 75 s), six phones from one link"
+      }
+    ],
+    "reHooks": [
+      "flash cards in every scene: 'No account' (hook), 'Android + iOS', 'Dark mode', 'Payment: approved', 'Signed', 'Rolled back', 'One link'"
+    ],
+    "payoff": "A bad update rolls back by itself, and a wall of phones opens from one link.",
+    "nextStep": "shipvo.dev/playground, then npx shipvo run android"
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "visual": "tpHook",
+      "min": 9,
+      "narration": "This phone runs in your browser. You installed nothing. By the end, you will have tapped a shop on Android and iOS, tested a payment, and watched a bad update roll back.",
+      "flashes": [
+        {
+          "at": 5.4,
+          "text": "No account"
+        }
+      ]
+    },
+    {
+      "id": "open",
+      "visual": "tpOpen",
+      "min": 10,
+      "narration": "Open shipvo dot dev, slash playground. A shop called Tide and Tackle appears. Tap Add on two products. The cart says two items.",
+      "caption": "Open shipvo.dev/playground. A shop called Tide and Tackle appears. Tap Add on two products. The cart says two items.",
+      "flashes": [
+        {
+          "at": 5.2,
+          "text": "Cart: 2 items"
+        }
+      ]
+    },
+    {
+      "id": "switch",
+      "visual": "tpSwitch",
+      "min": 13,
+      "narration": "Select iOS, and the same app shows on an iPhone. Select Android to go back. Now try dark mode and large text. The app stays readable.",
+      "flashes": [
+        {
+          "at": 4,
+          "text": "Android + iOS"
+        },
+        {
+          "at": 8.5,
+          "text": "Dark mode"
+        }
+      ]
+    },
+    {
+      "id": "device",
+      "visual": "tpDevice",
+      "min": 13,
+      "narration": "Real phones know where they are, and can pay. You choose the answer. Pick Lisbon for the location. Approve the payment. Turn airplane mode on. The app shows each choice.",
+      "flashes": [
+        {
+          "at": 6.2,
+          "text": "Payment: approved"
+        }
+      ]
+    },
+    {
+      "id": "update",
+      "visual": "tpUpdate",
+      "min": 17,
+      "narration": "Now the hard part. Publish a signed update. Shipvo checks the signature. It goes to a tenth of cohorts, then to all of them. Now crash it. Three starts in a row fail. On the fourth, the phone goes back to version one, by itself.",
+      "flashes": [
+        {
+          "at": 7.5,
+          "text": "Crash loop"
+        },
+        {
+          "at": 12.5,
+          "text": "Rolled back"
+        }
+      ]
+    },
+    {
+      "id": "many",
+      "visual": "tpMany",
+      "min": 12,
+      "narration": "Last, add more phones. Pick up to twelve, Android, iOS or both. Copy the link, and whoever opens it sees your setup.",
+      "flashes": [
+        {
+          "at": 3.5,
+          "text": "Android + iOS"
+        },
+        {
+          "at": 8,
+          "text": "One link"
+        }
+      ]
+    },
+    {
+      "id": "cta",
+      "visual": "tpCta",
+      "min": 10,
+      "narration": "That is a phone, a payment and a rollback, with no install. Try it at shipvo dot dev, slash playground. Next, see your own app on a phone with shipvo run.",
+      "caption": "That is a phone, a payment and a rollback, with no install. Try it at shipvo.dev/playground. Next, see your own app on a phone with shipvo run.",
+      "flashes": [
+        {
+          "at": 2.8,
+          "text": "No install"
+        },
+        {
+          "at": 6.2,
+          "text": "Tap it. Test it."
+        }
+      ]
+    }
+  ],
+  "music": {
+    "id": 116970,
+    "offset": 96.0,
+    "bed": 0.5,
+    "credits": "services/site/public/videos/try-in-your-browser.credits.json"
+  }
+}
