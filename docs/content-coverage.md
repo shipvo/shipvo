@@ -64,7 +64,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Phone home, recents, shade and power controls | [agents](agents.md), [phone-apps](phone-apps.md) | | | |
 | Lumi on Shipvo Phone (captions, reactions, first-run guide) | [lumi](lumi.md) | [test-your-app-with-lumi](tutorials/test-your-app-with-lumi.md) | | [lumi-tests-your-app-while-you-watch](../blog/lumi-tests-your-app-while-you-watch.md) |
 | `shipvo lumi` (test your app while you watch) | [lumi](lumi.md), [cli](cli.md) | [test-your-app-with-lumi](tutorials/test-your-app-with-lumi.md) | [Have Lumi test your app while you watch](videos.md#have-lumi-test-your-app-while-you-watch) | [lumi-tests-your-app-while-you-watch](../blog/lumi-tests-your-app-while-you-watch.md) |
-| Network profiles (`set_network_profile`, `device.net.type`) | [device-api](device-api.md#network-profiles) | | | |
+| Network profiles (`set_network_profile`, `device.net.type`) | [device-api](device-api.md#network-profiles), [phone-network](phone-network.md) | | | |
 | Behaviour timeline (compare releases and pull requests) | [timeline](timeline.md) | | | |
 | Run tests on a real emulator or simulator (`--device agent-device`) | [testing](testing.md#run-on-a-real-emulator-or-simulator-with-agent-device) | | | |
 | Notes and Tasks first-party app | [phone-apps](phone-apps.md) | | | |
@@ -96,6 +96,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Playground Many phones (1 to 12 phones, shareable `?phones=&mix=&dark=` link) and Agent panel (tool console, Watch Lumi) | [playground](playground.md) | | | |
 | Job handles for slow tools (`job_status`, `wait_ms` on `publish_preview` and `upload_build`) | [agents](agents.md#slow-tools-and-job_status), [cli](cli.md), [mcp](../packages/mcp/README.md) | | | |
 | W3C `traceparent` recorded from tool calls | [agents](agents.md#trace-context) | | | |
+| Job handles for slow tools (`job_status`, `wait_ms` on `publish_preview` and `upload_build`) | [cli](cli.md), [agents](agents.md), [mcp](../packages/mcp/README.md) | | | |
 | Saved-key routes: list, rotate, revoke and use log (`/vault/keys`, `/vault-ui/*` in the simulator) | [self-hosting](self-hosting.md#saved-key-routes-vault) | | | |
 | Key rotations in the pointer response (`rotations`) | [self-hosting](self-hosting.md#pointer-response-and-key-rotations) | | | |
 | Pin and hide apps on the home screen (`pin_app`, `hide_app`) | [phone-apps](phone-apps.md) | | | |
