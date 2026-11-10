@@ -345,6 +345,31 @@
     }
   },
   {
+    "name": "backup_phone",
+    "description": "Back up the whole phone as one JSON object, on Android and iOS: every app you built with its spec, data, settings, home-screen place and permission answers; every Store app with its listing and permission answers; the system settings; and the clipboard. Saved keys in the vault are never in it. Pass the object to restore_phone on this phone or another. Changes nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "browser_back",
     "description": "Go back one page in the phone browser. Returns the snapshot.",
     "inputSchema": {
@@ -658,6 +683,35 @@
     },
     "annotations": {
       "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "cancel_reminder",
+    "description": "Cancel a reminder by id. Returns whether it existed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
       "destructiveHint": false
     },
     "execution": {
@@ -1429,6 +1483,31 @@
     "inputSchema": {
       "type": "object",
       "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "list_reminders",
+    "description": "The reminders waiting on the phone (id, title, next time, repeat) and the last ones that fired with whether each was delivered.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2252,6 +2331,41 @@
     }
   },
   {
+    "name": "restore_phone",
+    "description": "Put a backup from backup_phone on this phone: apps with their data and layout, Store apps with their permission answers, system settings and the clipboard. Every part is checked first, and a bad backup changes nothing. Apps you built that are already on the phone need replace: true. A Store app that is already installed is skipped and listed in skipped.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "backup": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The backup object from backup_phone"
+        },
+        "replace": {
+          "type": "boolean",
+          "description": "Replace apps already on the phone (default false)"
+        }
+      },
+      "required": [
+        "session",
+        "backup"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "resume_app",
     "description": "Tap the app icon on the home screen, or its card in the app switcher: the app comes back (AppState \"active\") with its screen kept. Fails with app_in_foreground if it is already in front.",
     "inputSchema": {
@@ -3018,6 +3132,56 @@
       "required": [
         "session",
         "at"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "set_reminder",
+    "description": "Set a reminder on the phone: at the time you give (on the phone's clock, see set_phone_time) a notification with the title and body arrives, whether or not an app is open. Give at (a time like 2026-11-14T09:00) or in_minutes, not both. repeat is none, daily or weekly. With Do Not Disturb or Focus on, it is kept in the notification shade without a banner. It arrives whatever the app notification permissions say, as a phone's own reminders do. Read what arrived with notifications. Fails with bad_time, bad_title, too_long, bad_repeat or too_many.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "title": {
+          "type": "string",
+          "description": "What to remind (up to 200 characters)"
+        },
+        "body": {
+          "type": "string",
+          "description": "More detail (up to 1000 characters)"
+        },
+        "at": {
+          "type": "string",
+          "description": "Phone-clock time such as 2026-11-14T09:00"
+        },
+        "in_minutes": {
+          "type": "number",
+          "description": "Minutes from now on the phone's clock (0 to 525600)"
+        },
+        "repeat": {
+          "type": "string",
+          "enum": [
+            "none",
+            "daily",
+            "weekly"
+          ]
+        }
+      },
+      "required": [
+        "session",
+        "title"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"

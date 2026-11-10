@@ -277,8 +277,9 @@ export const device: Device = {
 const recent: Notification[] = [];
 let seq = 0;
 /** Deliver a notification to the app. Returns its id, or null when notification permission is not granted (nothing reaches the app). */
-function deliver(n: Omit<Notification, "id">): string | null {
-  if (state.permissions.notifications !== "granted") { log("notification_blocked", { title: n.title, permission: state.permissions.notifications }); return null; }
+function deliver(n: Omit<Notification, "id">, system = false): string | null {
+  // The phone's own notifications (reminders, alarms) do not need an app's notification permission.
+  if (!system && state.permissions.notifications !== "granted") { log("notification_blocked", { title: n.title, permission: state.permissions.notifications }); return null; }
   const full: Notification = { id: `n${Date.now().toString(36)}${(seq++).toString(36)}`, at: Date.now(), app: state.appName, ...n };
   // Do Not Disturb keeps the notification in the shade but shows no heads-up banner.
   showBanner(full, !state.dnd); log("notification", { ...full }); recvSubs.forEach((f) => f(full)); return full.id;
@@ -299,7 +300,7 @@ g.__pnDevice = {
   state,
   set(patch: Partial<DeviceState>) { if (typeof patch.clipboard === "string") copy(patch.clipboard); const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasNet = netKey(); Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, microphone: { ...state.microphone, ...(patch.microphone ?? {}) }, battery: { ...state.battery, ...(patch.battery ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (netKey() !== wasNet) netSubs.forEach((f) => f(isOnline())); announceSystem(sk); announceStatus(before, true, bs); },
   /** Push a notification to the app. Returns its id, or null when permission is not granted. */
-  push(n: Omit<Notification, "id">) { return deliver(n); },
+  push(n: Omit<Notification, "id">, o?: { system?: boolean }) { return deliver(n, o?.system === true); },
   log: () => state.log,
   /** Notifications delivered so far (the banner is gone after 5 s, like a heads-up on a phone; this is the notification shade). */
   notifications: () => recent.map((n) => ({ id: n.id, title: n.title, body: n.body, at: n.at, app: n.app, data: n.data })),

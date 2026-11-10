@@ -38,6 +38,8 @@ import { assistantName } from "./identity.mjs";
 import { pendingBanner, waitForNew } from "./banner.mjs";
 import { createWakeups, WakeupError } from "./wakeup.mjs";
 import { shareTargets, shareInput, ShareError } from "./share.mjs";
+import { createReminders, ReminderError } from "./reminders.mjs";
+import { makeBackup, checkBackup, BackupError } from "./backup.mjs";
 import { searchPhone, SearchError } from "./search.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
@@ -155,12 +157,12 @@ async function endSession(id) {
   specHost.dropSession(id);
   for (const p of s.peers ?? []) p.close(); closeWatchers(s);
   await (await s.browserP?.catch(() => undefined))?.close(); await s.ctx.close().catch(() => {});
-  s.inbox?.close(); s.wakeups?.close(); sessions.delete(id); leaveRoom(s, id); return true;
+  s.inbox?.close(); s.wakeups?.close(); clearInterval(s.reminderTimer); sessions.delete(id); leaveRoom(s, id); return true;
 }
 async function newSession(id, opts = {}) {
   const room = opts.room == null ? undefined : String(opts.room);
   if (room !== undefined && !/^[\w-]{1,64}$/.test(room)) throw new SimError("bad_room", "room must be 1 to 64 letters, digits, _ or -");
-  if (sessions.has(id)) { specHost.dropSession(id); const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); old.inbox?.close(); old.wakeups?.close(); sessions.delete(id); leaveRoom(old, id); }
+  if (sessions.has(id)) { specHost.dropSession(id); const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); old.inbox?.close(); old.wakeups?.close(); clearInterval(old.reminderTimer); sessions.delete(id); leaveRoom(old, id); }
   let target, buildId;
   if (opts.build_url != null) {
     // Fetch the build before anything else is created, so a bad URL leaves no session behind.
@@ -451,6 +453,7 @@ async function act(id, body) {
     case "set_time": {
       if (body.at == null) s.clockMs = null;
       else { const t = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?/.test(String(body.at)) ? Date.parse(String(body.at)) : NaN; if (Number.isNaN(t)) throw new SimError("bad_time", "at must be a time like 2026-11-14T09:00:00, or null"); s.clockMs = t; }
+      if (s.reminders) await s.reminders.tick();
       return { now: nowOf(s).toString(), home: `Home screen\n${describeApps(s.apps, nowOf(s))}`, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Copy every spec app out of the phone: spec, style, collection data and settings. Vault values are never held by the phone, so none can appear.
@@ -581,6 +584,38 @@ async function act(id, body) {
       await page.evaluate((v) => { if (globalThis.__pnDevice) return globalThis.__pnDevice.set({ clipboard: v }); try { globalThis.sessionStorage.setItem("pn.clipboard", v); } catch {} }, text).catch(() => {});
       return { text };
     }
+    // Whole-phone backup: spec apps (spec, data, settings, layout, permission answers), store apps (listing and permission answers),
+    // system settings and the clipboard. Changes nothing. Secrets in the vault are never in it.
+    case "backup_phone": {
+      const exported = await act(sidOf(s), { action: "export_apps" });
+      const storeApps = s.apps.installed_apps.filter((a) => a.kind !== "spec").map(({ sha256, bytes, ...rest }) => structuredClone(rest));
+      let settings; try { settings = (await settingsAction(page, { action: "get_settings" })).settings; } catch { settings = { ...(s.apps.settings ?? {}) }; }
+      const clipboard = await page.evaluate(() => { if (globalThis.__pnDevice) return globalThis.__pnDevice.state.clipboard; try { return globalThis.sessionStorage.getItem("pn.clipboard"); } catch { return null; } }).catch(() => null);
+      s.apps.log.push({ at: Date.now(), name: "backup_phone", apps: exported.apps.length, store_apps: storeApps.length, source: "real" });
+      return { backup: makeBackup({ apps: exported.apps, storeApps, settings, clipboard: clipboard ?? s.clipboard ?? "" }) };
+    }
+    // Put a backup on this phone. Every part is checked first; a bad backup changes nothing. Spec apps already on the phone need replace: true.
+    // A store app that is already installed is skipped and listed.
+    case "restore_phone": {
+      let b; try { b = checkBackup(body.backup); } catch (e) { if (e instanceof BackupError) throw new SimError(e.code, e.message); throw e; }
+      const imported = b.apps.length ? (await act(sidOf(s), { action: "import_apps", apps: b.apps, replace: body.replace === true })) : { imported: [] };
+      const installed = [], skipped = [], failed = [];
+      for (const a of b.storeApps) {
+        if (s.apps.installed_apps.some((x) => x.id === a.id)) { skipped.push(a.id); continue; }
+        try { await act(sidOf(s), { action: "install_app", id: a.id, catalog: [a], permissions: a.permissions }); installed.push(a.id); }
+        catch (e) { failed.push({ id: a.id, error: String(e?.message ?? e) }); }
+      }
+      const settings = [];
+      for (const [key, value] of Object.entries(b.settings)) {
+        try { await settingsAction(page, { action: "set_setting", key, value }); settings.push(key); } catch { s.apps.settings = { ...(s.apps.settings ?? {}), [key]: value }; settings.push(key); }
+      }
+      if (b.clipboard != null) {
+        s.clipboard = b.clipboard;
+        await page.evaluate((v) => { if (globalThis.__pnDevice) return globalThis.__pnDevice.set({ clipboard: v }); try { globalThis.sessionStorage.setItem("pn.clipboard", v); } catch {} }, b.clipboard).catch(() => {});
+      }
+      s.apps.log.push({ at: Date.now(), name: "restore_phone", apps: imported.imported.length, store_apps: installed.length, source: "real" });
+      return { restored: { apps: imported.imported, store_apps: installed, settings, clipboard: b.clipboard != null }, ...(skipped.length ? { skipped } : {}), ...(failed.length ? { failed } : {}), ...(imported.warnings ? { warnings: imported.warnings } : {}), installed_apps: s.apps.installed_apps };
+    }
     // Installed apps. Errors are typed: unknown_app, already_installed, not_installed. Logged in device_log: source "real" (with the bundle sha256) for a fetched bundle, "simulated" for a fixture app.
     // One toggle per app and permission, the same as the Settings screen.
     case "set_app_permission": {
@@ -684,13 +719,19 @@ async function act(id, body) {
     // Simulated device: what the phone "has" and what happens to it. See @shipvo/device.
     case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); await syncMedia(page); break;
     case "open_notifications": case "open_control_center": case "close_panels": case "toggle_tile": case "dismiss_notification": {
+      // A reminder the phone kept itself (no app page took it) is swiped away here.
+      if (body.action === "dismiss_notification" && /^sys\d+$/.test(String(body.id ?? ""))) {
+        const i = (s.sysNotes ?? []).findIndex((n) => n.id === body.id);
+        if (i < 0) throw new SimError("not_found", `no notification '${body.id}'`);
+        s.sysNotes.splice(i, 1); return { dismissed: body.id };
+      }
       try { return { ...(await shadeAction(page, s.shade, body)) }; } catch (e) { if (e instanceof ShadeError) throw new SimError(e.code, e.message); throw e; }
     }
     case "get_settings": case "set_setting": {
       try { return { ...(await settingsAction(page, body)) }; } catch (e) { if (e instanceof SettingsError) throw new SimError(e.code, e.message); throw e; }
     }
     case "push_notification": return { ...(await pushNotification(page, body)), screen: await screen(page) };
-    case "notifications": return { notifications: await page.evaluate(() => globalThis.__pnDevice?.notifications() ?? []), screen: await screen(page) };
+    case "notifications": return { notifications: [...(await page.evaluate(() => globalThis.__pnDevice?.notifications() ?? [])), ...(s.sysNotes ?? [])], screen: await screen(page) };
     case "open_notification": { s.shade.open = "none"; const ok = await page.evaluate((nid) => globalThis.__pnDevice?.openNotification(nid), body.id); if (!ok) throw new Error("no such notification"); await page.waitForTimeout(400); break; }
     case "open_url": {
       if (typeof body.url !== "string" || !body.url) throw new SimError("bad_url", "open_url needs a url, such as myapp://item/3");
@@ -724,6 +765,23 @@ async function act(id, body) {
       const seen = ((s.waitSeen ??= new Map()).get(me) ?? s.waitSeen.set(me, new Set()).get(me));
       const fresh = await waitForNew(() => specHost.dataOf(sidOf(s), "inbox"), me, seen, ms);
       return fresh ? { event: true, pending: fresh } : { event: false };
+    }
+    // Reminders: a notification at a time on the phone's clock, fired by the phone itself (app open or not). Do Not Disturb keeps it in the shade without a banner.
+    case "set_reminder": case "list_reminders": case "cancel_reminder": {
+      s.reminders ??= createReminders(() => nowOf(s).getTime(), async (r) => {
+        const note = { title: r.title, body: r.body, data: { reminder: r.id } };
+        // The app page takes it when it has a device layer (banner, shade, DND). With no app page the phone keeps it itself, so it is never lost.
+        const got = await pushNotification(s.page, note, { system: true }).catch(() => ({ delivered: false }));
+        if (got.delivered) return got;
+        (s.sysNotes ??= []).push({ id: `sys${(s.sysSeq = (s.sysSeq ?? 0) + 1)}`, at: nowOf(s).getTime(), app: "Reminders", ...note });
+        return { delivered: true };
+      });
+      if (!s.reminderTimer) { s.reminderTimer = setInterval(() => { s.reminders.tick().catch(() => {}); }, 1000); s.reminderTimer.unref?.(); }
+      try {
+        if (body.action === "set_reminder") return { reminder: s.reminders.add({ title: body.title, body: body.body, at: body.at, in_minutes: body.in_minutes, repeat: body.repeat }) };
+        if (body.action === "cancel_reminder") return { cancelled: s.reminders.cancel(body.id) };
+        return s.reminders.list();
+      } catch (e) { if (e instanceof ReminderError) throw new SimError(e.code, e.message); throw e; }
     }
     // Webhook wake-ups: POST a signed note to a URL when something new arrives for an assistant name. Every delivery is in device_log.
     case "register_wakeup": {
@@ -781,7 +839,7 @@ async function act(id, body) {
       });
       return { diag: r, screen: await screen(page) };
     }
-    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await syncMedia(page); s.shade.open = "none"; break;
+    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await syncMedia(page); s.shade.open = "none"; s.sysNotes = []; s.clipboard = ""; await page.evaluate(() => { try { globalThis.sessionStorage.removeItem("pn.clipboard"); } catch {} }).catch(() => {}); break;
     // Uncaught page errors since the last call to this action. Reading them clears the list.
     case "errors": return { errors: s.errors.splice(0), screen: await screen(page) };
     // Rendered size in CSS px of each ref on the current screen: { sizes: { ref: [width, height] } }. Refs that are gone are left out.
@@ -804,7 +862,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: search_phone, share_targets, share, get_clipboard, set_clipboard, screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: search_phone, share_targets, share, get_clipboard, set_clipboard, screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for, set_reminder, list_reminders, cancel_reminder, backup_phone, restore_phone`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
