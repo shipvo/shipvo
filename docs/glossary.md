@@ -16,6 +16,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Assistant.** An AI helper such as Claude or ChatGPT. With Shipvo it can open your app and use it like a customer.
 
+**CSV.** A plain text table: the first line names the columns and each line after it is a row, with commas between values. Spreadsheets open it. A spec app makes one with `csv()`. See [Export data as CSV](spec-blocks.md#export-data-as-csv).
+
 **Command.** One line of text you type in the terminal and run by pressing Enter.
 
 **Control plane.** The Shipvo service that keeps your releases and decides who gets them. You can use the hosted one or run your own.
@@ -136,6 +138,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Rotation statement.** A note signed by the root key that tells phones to trust a new release key. `shipvo keys rotate sign` makes it.
 
 **App permission.** A device permission (such as notifications or location) an app declares and you allow or deny on its install card or in Settings. See [phone apps](phone-apps.md#device-permissions-per-app).
+
+**Held release.** A release Shipvo did not halt on its own because the failures looked fake (mostly brand-new installs, or a sudden burst). It keeps serving until you approve the halt or deny the hold. See [Auto-halt](auto-halt.md#when-the-failures-look-like-an-attack).
 
 **Session inbox.** A private mailbox every test session has, with its own address, so a test or an agent can read an emailed sign-in code or link. See [Test an email sign-in](email-sign-in.md).
 
