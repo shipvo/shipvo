@@ -258,7 +258,7 @@ Fields with commas, quotes or line breaks are quoted, and a missing value is emp
 
 ## Example specs
 
-`packages/spec/gallery/` holds example specs to copy and change: a habit tracker, a workout log, an expense splitter, a trip checklist and flashcards. Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.
+`packages/spec/gallery/` holds example specs to copy and change: a habit tracker, a workout log, an expense splitter, a trip checklist and flashcards. Three more show the board, calendar and map blocks: a reading board (`kanban` with `move_book`), a meal planner (`calendar`, week view) and favourite places (`map`). Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.
 
 ## Data sources that use a saved key
 
