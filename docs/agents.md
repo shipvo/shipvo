@@ -52,6 +52,8 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `press_home` · `open_recents` · `resume_app` · `kill_app` | Home (app gets `AppState` background, home screen shows the app icon), app switcher card, bring the app back (`active`), swipe the card away (next open is a cold start). While away, tap, type, scroll, back, `open_url` and `open_notification` fail with `app_not_foreground`; `screenshot` shows the home screen or switcher |
 | `push_notification` · `notifications` · `open_notification` | Deliver, list and tap notifications |
 | `get_settings` · `set_setting` · `browser_open` · `browser_snapshot` · `browser_click` · `browser_type` · `browser_scroll` · `browser_back` · `browser_wait_for` · `browser_tabs` · `browser_close_tab` · `browser_screenshot` | Read and change the phone's system settings, and drive its separate web Browser. See [the phone's Browser and Settings](phone-apps.md) |
+| `create_app` · `update_app` · `run_app_action` · `refresh_app` · `app_activity` | Describe an app and it appears on the phone, Android or iOS style: build it from a spec, change it, run one of its actions, fetch its live data now, and read what was built and changed. See [Describe an app and it appears](phone-apps.md#describe-an-app-and-it-appears) |
+| `arrange_apps` · `pin_app` · `hide_app` · `schedule_app` · `clear_schedule` · `set_phone_time` · `export_phone_apps` · `import_phone_apps` | Place apps on the home screen, show them on a time window, set the phone's clock, and move a phone's apps and data to another phone. See [Arrange the home screen](phone-apps.md#arrange-the-home-screen) |
 | `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
 | `end_session(session)` | Ends the session. Reports steps taken, duration, the room, and the orders the app posted to its backend during the session. A room ends with its last session |
 | `owner_describe(app)` · `owner_command(app, command, args)` | The app's owner API (content, prices, offers, orders, publish), with an owner token |
@@ -245,6 +247,8 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 
 **Two sessions do not see each other's orders.** They were opened without the same `room`. Open both with the same `room` value on the same simulator (see [Rooms](#rooms-several-phones-one-backend)).
 
+**`create_app` answers `invalid_spec`.** Nothing was installed. Each problem in the reply has its path in the spec and a fix. Correct the spec and call `create_app` again ([app spec](design/app-spec.md)).
+
 **Your coding agent does not list the Shipvo tools.** Run `npx shipvo agents setup` in the app folder. It writes the MCP config for each coding agent it finds ([CLI guide](cli.md)). Restart the agent so it reads the new config.
 
 ## Next steps
@@ -253,4 +257,4 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 - [Turn a session into a test](#turn-a-session-into-a-test) and [Test your app in CI](testing.md).
 - [Score an agent on an app task](eval.md).
 - [Run on a phone](run.md): watch the assistant work in your browser.
-- [Phone apps](phone-apps.md): Settings, Browser, Store and updates on Shipvo Phone.
+- [Phone apps](phone-apps.md): Settings, Browser, Store and updates on Shipvo Phone, and apps your assistant describes into being.
