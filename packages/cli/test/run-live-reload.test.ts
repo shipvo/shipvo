@@ -96,19 +96,33 @@ describe.each(["android", "ios"] as const)("live reload on %s", (platform) => {
     } finally { await s.close(); }
   }, 60_000);
 
-  it("shows the error inside the window at 1000x600, above the phone", async () => {
-    const s = await session(platform, { width: 1000, height: 600 });
-    try {
-      s.edit("<<syntax error>>");
-      await s.page.waitForSelector("#banner:not([hidden])", { timeout: 15000 });
-      const r = await s.page.evaluate(() => {
-        const b = document.getElementById("banner")!.getBoundingClientRect(), t = document.getElementById("top")!.getBoundingClientRect(), p = document.getElementById("phone")!.getBoundingClientRect();
-        return { bTop: b.top, bBottom: b.bottom, tBottom: t.bottom, pTop: p.top, h: innerHeight };
-      });
-      expect(r.bTop).toBeGreaterThanOrEqual(0);
-      expect(r.bBottom).toBeLessThanOrEqual(r.h);
-      expect(r.bTop).toBeGreaterThanOrEqual(r.tBottom - 1);
-      expect(r.bBottom).toBeLessThanOrEqual(r.pTop + 1);
-    } finally { await s.close(); }
-  }, 60_000);
+  describe.each([
+    { name: "1000x600 with the device panel open", viewport: { width: 1000, height: 600 }, open: true },
+    { name: "1000x600 with the device panel closed", viewport: { width: 1000, height: 600 }, open: false },
+    { name: "390x844", viewport: { width: 390, height: 844 }, open: false },
+  ])("error bar at $name", ({ name, viewport, open }) => {
+    it("sits inside the window, below the title bar, above the phone and clear of the device panel", async () => {
+      const s = await session(platform, viewport);
+      try {
+        await s.page.evaluate((o: boolean) => { (document.getElementById("dpanel") as HTMLDetailsElement).open = o; }, open);
+        await wait(100);
+        s.edit("<<syntax error>>");
+        await s.page.waitForSelector("#banner:not([hidden])", { timeout: 15000 });
+        const r = await s.page.evaluate(() => {
+          const q = (id: string) => document.getElementById(id)!.getBoundingClientRect();
+          const b = q("banner"), t = q("top"), p = q("phone"), d = q("dpanel");
+          const hit = b.left < d.right && b.right > d.left && b.top < d.bottom && b.bottom > d.top;
+          return { bTop: b.top, bBottom: b.bottom, bLeft: b.left, bRight: b.right, tBottom: t.bottom, pTop: p.top, h: innerHeight, w: innerWidth, hit };
+        });
+        expect(r.bTop).toBeGreaterThanOrEqual(0);
+        expect(r.bBottom).toBeLessThanOrEqual(r.h);
+        expect(r.bLeft).toBeGreaterThanOrEqual(0);
+        expect(r.bRight).toBeLessThanOrEqual(r.w);
+        expect(r.bTop).toBeGreaterThanOrEqual(r.tBottom - 1);
+        expect(r.bBottom).toBeLessThanOrEqual(r.pTop + 1);
+        expect(r.hit).toBe(false);
+        if (SHOTS) await s.page.screenshot({ path: join(SHOTS, `${platform}-error-${name.replace(/[^a-z0-9]+/gi, "-")}.png`) });
+      } finally { await s.close(); }
+    }, 60_000);
+  });
 });

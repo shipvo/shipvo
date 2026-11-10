@@ -99,7 +99,7 @@ describe("frame page, shared renderer", () => {
     expect(h).toMatch(/\.tag\{[^}]*overflow-wrap:anywhere/);
     expect(h).not.toMatch(/\.tag\{position:fixed/);
     expect(h).toMatch(/\.banner\{position:fixed;[^}]*top:10px/);
-    expect(h).toContain("top+=b.offsetHeight+10");
+    expect(h).toContain("top=bt+b.offsetHeight+10");
     expect(h).toContain("window.fit&&fit()");
   });
   it("loadFrameRenderer resolves @shipvo/sim and returns a function", async () => {
