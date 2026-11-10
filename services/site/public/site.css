@@ -427,6 +427,10 @@ main p a:not(.btn):not(.card){text-decoration:underline;text-underline-offset:2p
   html body pre.term .term-copy{min-height:44px;min-width:64px}
   html body .edit{min-height:44px;display:inline-flex;align-items:center}
   html body .legal-nav a,html body .legal-links a{min-height:44px;min-width:44px;display:inline-flex;align-items:center}
+  html body .panel-grid .link{display:inline-flex;align-items:center;min-height:44px;min-width:44px}
+  html body .search{min-height:44px}
+  html body .search input{min-height:44px}
+  html body .dl a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;padding:0 14px}
   html body .foot-grid a,html body .foot-bottom a,html body .foot .logo,html body .prose a[href="/learn/videos/"]{min-height:44px;display:inline-flex;align-items:center}
 }
 @media(max-width:520px){
