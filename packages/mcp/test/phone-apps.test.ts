@@ -42,6 +42,13 @@ beforeAll(async () => {
       if (!body.spec?.screens?.length) return fail("invalid_spec", "$.screens: Must have at least one screen.");
       return ok();
     }
+    if (body.action === "export_apps") return res.end(JSON.stringify({ ok: true, format: "shipvo.phone-apps/v0", apps: [...installed].map(([id, name]) => ({ id, name, style: "android", spec: { screens: [{}] }, data: {}, settings: {} })) }));
+    if (body.action === "import_apps") {
+      const bad = (body.apps ?? []).findIndex((a: any) => !a.spec?.screens?.length);
+      if (bad >= 0) return fail("invalid_spec", `apps[${bad}].spec.screens: Must have at least one screen.`);
+      if (!body.replace && body.apps.some((a: any) => installed.has(a.id))) return fail("already_installed", "already");
+      for (const a of body.apps) installed.set(a.id, a.name); return ok();
+    }
     if (body.action === "create_app") {
       if (!body.spec?.screens?.length) return fail("invalid_spec", "$.screens: Must have at least one screen.");
       if (installed.has(body.id)) return fail("already_installed", "already");
@@ -110,6 +117,15 @@ describe("phone app tools", () => {
     expect((await call(c, "update_app", { session: s, id: "ghost", spec })).structuredContent.code).toBe("not_installed");
     expect((await call(c, "update_app", { session: s, id: "gifts", spec: { spec: "shipvo.app/v0", screens: [] } })).structuredContent.code).toBe("invalid_spec");
     expect((await call(c, "update_app", { session: s, id: "gifts", spec })).isError).toBeFalsy();
+    const ex = JSON.parse((await call(c, "export_phone_apps", { session: s, ids: ["gifts"] })).content[0].text);
+    expect(seen.at(-1)).toMatchObject({ action: "export_apps", ids: ["gifts"] });
+    expect(ex.apps[0]).toMatchObject({ id: "gifts", style: "android" });
+    const good = { id: "copy", name: "Copy", style: "ios", spec, data: {}, settings: {} };
+    expect((await call(c, "import_phone_apps", { session: s, apps: [good, { id: "x", spec: { screens: [] } }] })).structuredContent.code).toBe("invalid_spec");
+    expect((await call(c, "import_phone_apps", { session: s, apps: [good] })).isError).toBeFalsy();
+    expect((await call(c, "import_phone_apps", { session: s, apps: [good] })).structuredContent.code).toBe("already_installed");
+    expect((await call(c, "import_phone_apps", { session: s, apps: [good], replace: true })).isError).toBeFalsy();
+    expect(seen.at(-1)).toMatchObject({ action: "import_apps", replace: true });
     await c.close();
   });
   it("arrange_apps and set_phone_time send the layout and the time to the phone", async () => {
