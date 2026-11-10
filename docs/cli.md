@@ -374,6 +374,7 @@ These come from fixed issues in this repository.
 - [Test your app in CI](testing.md), including `shipvo test --repair` and `--report`.
 - [Store details and screenshots](store.md).
 - [Self-host the control plane](self-hosting.md).
+- [Rollbacks and stored data](rollbacks-and-stored-data.md): `stateVersion` and `--allow-state-downgrade`.
 - [Glossary](glossary.md) for the words used here.
 
 ## `--json` for `publish`, `promote`, `rollback` and `auto-halt`

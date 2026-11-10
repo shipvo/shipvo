@@ -32,7 +32,7 @@ If phones already run a higher `state_version` than release 5 declares (or relea
 Release 5 (android) has state_version 2, but phones already run state_version 3. Older code may not read data the newer release stored. Publish a fix forward, or pass --allow-state-downgrade to roll back anyway. The choice is recorded in the audit log.
 ```
 
-With `--json` the same stop is reported with the error code `state_downgrade`, and the suggested next command includes `--allow-state-downgrade`.
+With `--json` the same stop is reported with the error code `state_downgrade`, and the suggested next command includes `--allow-state-downgrade`. A rollback that goes ahead adds `data.state_downgrade`, a list of `{ platform, from, to }`.
 
 `shipvo rollback --to 5 --dry-run` runs the same check and also exits with code 1 on a downgrade, so you can use it as the check.
 
