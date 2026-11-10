@@ -1,0 +1,2 @@
+- Docs: new page "Rollbacks and stored data" (`stateVersion`, `--allow-state-downgrade`) with troubleshooting, a glossary entry, and a ChatGPT connector fix in the agents troubleshooting.
+- Migration: none.
