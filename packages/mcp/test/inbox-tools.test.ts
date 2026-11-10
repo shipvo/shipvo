@@ -130,9 +130,9 @@ describe("wake-up tools", () => {
     await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
     const names = (await c.listTools()).tools.map((t) => t.name);
     for (const n of ["register_wakeup", "list_wakeups", "clear_wakeup"]) expect(names).toContain(n);
-    const ok: any = await c.callTool({ name: "register_wakeup", arguments: { session: "s", name: "chatgpt", url: "https://example.com/h", events: ["message"] } });
+    const ok: any = await c.callTool({ name: "register_wakeup", arguments: { session: "s", name: "chatgpt", url: "https://example.com/h", events: ["message"], format: "text" } });
     expect(JSON.parse(ok.content[0].text)).toEqual({ name: "chatgpt", url: "https://example.com/h", events: ["message"], secret: "abc" });
-    expect(seen.at(-1)).toMatchObject({ action: "register_wakeup", session: "s", name: "chatgpt", url: "https://example.com/h", events: ["message"] });
+    expect(seen.at(-1)).toMatchObject({ action: "register_wakeup", session: "s", name: "chatgpt", url: "https://example.com/h", events: ["message"], format: "text" });
     const bad: any = await c.callTool({ name: "register_wakeup", arguments: { session: "s", name: "x", url: "http://127.0.0.1:9/h" } });
     expect(bad.isError).toBe(true); expect(bad.content[0].text).toContain("host_not_allowed");
     const l: any = await c.callTool({ name: "list_wakeups", arguments: { session: "s" } });

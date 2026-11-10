@@ -411,7 +411,7 @@ use(server, tools.wait_for_event,
     if (!r.ok) return result(session, r);
     return { ...text(r.event ? "Something is waiting for you. Read it with check_inbox or my_tasks." : "nothing yet"), structuredContent: { event: r.event === true, ...(r.pending ? { pending: r.pending } : {}) } }; });
 use(server, tools.register_wakeup,
-  async ({ session, name, url, events, secret, allow_private }) => { need(session); const r = await act({ session, action: "register_wakeup", name, url, events, secret, allow_private }) as Act & { wakeup?: unknown };
+  async ({ session, name, url, events, secret, format, allow_private }) => { need(session); const r = await act({ session, action: "register_wakeup", name, url, events, secret, format, allow_private }) as Act & { wakeup?: unknown };
     if (!r.ok) return result(session, r);
     return text(JSON.stringify(r.wakeup, null, 2)); });
 use(server, tools.list_wakeups,
