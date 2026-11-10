@@ -1,5 +1,6 @@
 // Live: create_app starts a spec app on the phone. The app has an icon, opens, shows its labelled controls, and
 // taps, typing and choices change it. Android and iOS skins.
+import { readFileSync } from "node:fs";
 import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
@@ -106,6 +107,18 @@ test("run_app_action changes the app's data and the open screen shows it; a bad 
   assert.equal(bad.code, "action_failed");
   const none = await act("sp-act", { action: "app_action", id: "ghost", action_name: "x" });
   assert.equal(none.code, "not_installed");
+});
+
+test("two assistants on one phone are told apart by the client name, with no name typed", async () => {
+  const INBOX = JSON.parse(readFileSync(new URL("../../templates/assistant-inbox/app.json", import.meta.url), "utf8"));
+  assert.ok((await call("/session", { session: "sp-who" })).ok);
+  assert.equal((await act("sp-who", { action: "create_app", id: "inbox", spec: INBOX })).ok, true);
+  const sent = await act("sp-who", { action: "app_action", id: "inbox", action_name: "send_message", input: { to: "claude", body: "Please test checkout." }, agent: "openai-mcp" });
+  assert.equal(sent.ok, true, JSON.stringify(sent));
+  const none = await act("sp-who", { action: "app_action", id: "inbox", action_name: "check_inbox", input: {}, agent: "openai-mcp" });
+  assert.deepEqual(none.value.messages, []);
+  const got = await act("sp-who", { action: "app_action", id: "inbox", action_name: "check_inbox", input: {}, agent: "claude-ai" });
+  assert.deepEqual(got.value.messages.map((m) => [m.from, m.to, m.body]), [["chatgpt", "claude", "Please test checkout."]]);
 });
 
 test("update_app is a new version: entered data stays, the screen changes, a bad spec changes nothing", async () => {

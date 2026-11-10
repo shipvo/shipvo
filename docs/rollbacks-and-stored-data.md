@@ -47,6 +47,5 @@ The control plane records a rollback that lowers `state_version` in the audit lo
 
 ## Next steps
 
-- [CLI guide](cli.md): `publish`, `rollback` and `--json` output.
 - [Rollback in the CLI guide](cli.md#--json-for-publish-promote-rollback-and-auto-halt): the `--json` output of `rollback`.
 - [Glossary](glossary.md): state version.
