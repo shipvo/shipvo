@@ -328,6 +328,19 @@ async function screen(page) {
 
 function log(id, action, ok, extra = {}) { appendFileSync(join(DIR, `${id}.json.log`), JSON.stringify({ at: Date.now(), name: action, ok, ...extra }) + "\n"); }
 
+/** Which parts of an imported layout were rejected, as path suffixes with the reason. Valid input that is only normalised (true to 1, default times, "Sat" to "sat") is not reported. */
+function droppedPlacement(raw, cleaned) {
+  if (raw == null) return [];
+  if (typeof raw !== "object" || Array.isArray(raw)) return [": not valid, ignored (expected an object)"];
+  const out = [];
+  for (const k of Object.keys(raw)) {
+    if (!["pinned", "hidden", "position", "schedule"].includes(k)) out.push(`.${k}: not recognised, ignored`);
+    else if (raw[k] == null || ((k === "pinned" || k === "hidden") && raw[k] === false)) continue;
+    else if (!cleaned || !(k in cleaned)) out.push(`.${k}: not valid, dropped`);
+  }
+  return out;
+}
+
 async function act(id, body) {
   const s = sessions.get(id); if (!s) throw new SimError("no_session", `no session '${id}': call /session first`);
   const { page } = s;
@@ -443,7 +456,7 @@ async function act(id, body) {
         const made = specHost.create(sidOf(s), a.id, a.spec, { style: a.style === "ios" ? "ios" : "android", data: a.data ?? undefined, state: a.settings ?? undefined });
         const nm = String(a.name ?? a.spec?.app?.name ?? a.id).replace(/[<>"'\\]/g, "").slice(0, 40);
         const placement = a.placement == null ? null : cleanPlacement(a.placement);
-        if (a.placement != null && JSON.stringify(placement) !== JSON.stringify(a.placement)) warnings.push(`apps[${list.indexOf(a)}].placement: ${placement ? "some fields were not valid and were dropped" : "not valid, the app keeps the default layout"}`);
+        for (const w of droppedPlacement(a.placement, placement)) warnings.push(`apps[${list.indexOf(a)}].placement${w}`);
         s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec", ...(placement ? { placement } : {}) });
         s.apps.log.push({ at: Date.now(), name: "import_apps", app: a.id, source: "real", version: "1", replaced: !!ex });
       }

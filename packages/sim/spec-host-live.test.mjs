@@ -313,5 +313,18 @@ test("export_apps carries the home-screen layout and import_apps restores it; a 
   const r = await act("pl-c", { action: "import_apps", apps: bad });
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.deepEqual(r.installed_apps.find((a) => a.id === "gifts-p").placement, { pinned: 1 });
-  assert.match(r.warnings[0], /apps\[0\]\.placement/);
+  assert.deepEqual(r.warnings, ["apps[0].placement.schedule: not valid, dropped"]);
+});
+
+test("import_apps does not warn about a valid hand-written layout, and names each rejected field", async () => {
+  const app = (placement) => ({ id: "gifts-h", style: "android", spec: GIFTS, placement });
+  assert.ok((await call("/session", { session: "pl-h" })).ok);
+  const ok = await act("pl-h", { action: "import_apps", apps: [app({ pinned: true, hidden: false, schedule: { days: ["Sat"], from: "08:00" } })] });
+  assert.equal(ok.ok, true, JSON.stringify(ok));
+  assert.equal(ok.warnings, undefined);
+  assert.deepEqual(ok.installed_apps.find((a) => a.id === "gifts-h").placement, { pinned: 1, schedule: { days: ["sat"], from: "08:00", to: "23:59" } });
+  const bad = await act("pl-h", { action: "import_apps", replace: true, apps: [app({ pinned: "yes", position: 500, extra: 1 })] });
+  assert.deepEqual(bad.warnings, ["apps[0].placement.pinned: not valid, dropped", "apps[0].placement.position: not valid, dropped", "apps[0].placement.extra: not recognised, ignored"]);
+  const str = await act("pl-h", { action: "import_apps", replace: true, apps: [app("pinned")] });
+  assert.deepEqual(str.warnings, ["apps[0].placement: not valid, ignored (expected an object)"]);
 });
