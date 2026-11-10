@@ -1,0 +1,1 @@
+- docs: the agent gate results and OTA spike pages say who they are for, and the gate page links to `shipvo eval`, agents and typed tests.
