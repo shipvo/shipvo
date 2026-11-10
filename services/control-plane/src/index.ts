@@ -9,6 +9,7 @@ import { auth } from "./auth";
 import { sso } from "./sso";
 import { samlRoutes } from "./saml-routes";
 import { rotationRoutes } from "./rotation";
+import { listRotations } from "./rotation-store";
 import { vaultRoutes } from "./vault";
 import { peopleRoutes } from "./people";
 import { phoneRoutes } from "./phone";
@@ -82,9 +83,19 @@ async function servePointer(c: any, platform: "android" | "ios") {
     return c.json(json, status, status === 404 ? { "cache-control": "public, max-age=5" } : undefined);
   }
   const release = offer.release;
-  const etag = `"${release}"`;
+  // Stored key rotations ride along (design section 6): at most 8, ascending. They are not part of the signed body.
+  let rotations: { body: string; signature: string }[] = [];
+  let lastSeq = 0;
+  if (c.env.DB) {
+    try {
+      const rows = await listRotations(c.env.DB, appId);
+      rotations = rows.map((x) => ({ body: x.body, signature: x.signature }));
+      lastSeq = rows.length ? rows[rows.length - 1].sequence : 0;
+    } catch { /* no rotation storage: serve the pointer alone */ }
+  }
+  const etag = lastSeq ? `"${release}-r${lastSeq}"` : `"${release}"`;
   if (c.req.header("if-none-match") === etag) return new Response(null, { status: 304, headers: { ETag: etag } });
-  return new Response(raw, { headers: { "content-type": "application/json", ETag: etag, "cache-control": "public, max-age=5" } });
+  return new Response(rotations.length ? JSON.stringify({ ...JSON.parse(raw), rotations }) : raw, { headers: { "content-type": "application/json", ETag: etag, "cache-control": "public, max-age=5" } });
 }
 app.get("/p/:app/:major/ios/:band", (c) => servePointer(c, "ios"));
 app.get("/p/:app/:major/:band", (c) => servePointer(c, "android"));

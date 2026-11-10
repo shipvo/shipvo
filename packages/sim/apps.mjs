@@ -138,6 +138,7 @@ function cleanPlacement(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   var p = {};
   if (raw.pinned === true) p.pinned = true;
+  if (p.pinned && Number.isInteger(raw.pinOrder) && raw.pinOrder > 0) p.pinOrder = raw.pinOrder;
   if (raw.hidden === true) p.hidden = true;
   if (Number.isInteger(raw.position) && raw.position >= 0 && raw.position <= 99) p.position = raw.position;
   var sc = raw.schedule;
@@ -177,9 +178,32 @@ export function arrangeApp(st, id, patch = {}) {
       p.schedule = { days, from, to };
     }
   }
+  if (!p.pinned) delete p.pinOrder;
+  else if (p.pinOrder == null) p.pinOrder = Math.max(0, ...st.installed_apps.map((x) => x.placement?.pinOrder ?? 0)) + 1;
   if (Object.keys(p).length) a.placement = p; else delete a.placement;
   note(st, "arrange_apps", id, { placement: a.placement ?? null });
   return a;
+}
+
+/** Pin or unpin an app. Pinned apps lead the home screen in the order they were pinned. Throws not_installed. */
+export function pinApp(st, id, pinned) {
+  const a = st.installed_apps.find((x) => x.id === id);
+  if (!a) throw new AppsError("not_installed", `'${id}' is not installed`);
+  const p = { ...(a.placement ?? {}) };
+  if (pinned) { if (!p.pinned) { p.pinned = true; p.pinOrder = Math.max(0, ...st.installed_apps.map((x) => x.placement?.pinOrder ?? 0)) + 1; } }
+  else { delete p.pinned; delete p.pinOrder; }
+  if (Object.keys(p).length) a.placement = p; else delete a.placement;
+  note(st, "pin_app", id, { pinned: !!pinned }); return st;
+}
+
+/** Hide an app from the home screen and the app list, or show it again. Its data stays. Throws not_installed. */
+export function hideApp(st, id, hidden) {
+  const a = st.installed_apps.find((x) => x.id === id);
+  if (!a) throw new AppsError("not_installed", `'${id}' is not installed`);
+  const p = { ...(a.placement ?? {}) };
+  if (hidden) p.hidden = true; else delete p.hidden;
+  if (Object.keys(p).length) a.placement = p; else delete a.placement;
+  note(st, "hide_app", id, { hidden: !!hidden }); return st;
 }
 
 /** True when the app shows on the home screen at `now` (a Date): not hidden, and inside its schedule if it has one. */
@@ -198,7 +222,7 @@ export function appVisible(a, now = new Date()) {
 /** The apps on the home screen at `now`, in order: pinned first, then by position, then in the order they were installed. */
 export function homeApps(st, now = new Date()) {
   return st.installed_apps.map((a, i) => ({ a, i })).filter(({ a }) => appVisible(a, now))
-    .sort((x, y) => (y.a.placement?.pinned ? 1 : 0) - (x.a.placement?.pinned ? 1 : 0) || (x.a.placement?.position ?? 1e3) - (y.a.placement?.position ?? 1e3) || x.i - y.i)
+    .sort((x, y) => (y.a.placement?.pinned ? 1 : 0) - (x.a.placement?.pinned ? 1 : 0) || (x.a.placement?.position ?? 1e3) - (y.a.placement?.position ?? 1e3) || (x.a.placement?.pinOrder ?? 0) - (y.a.placement?.pinOrder ?? 0) || x.i - y.i)
     .map(({ a }) => a);
 }
 
