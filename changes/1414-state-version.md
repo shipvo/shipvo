@@ -1,4 +1,3 @@
-- `@shipvo/schema`: releases can declare an optional `state_version` (positive whole number). The telemetry event `crash_loop_revert` can carry `state_version_from` and `state_version_to`.
-- `@shipvo/cli`: `shipvo publish` signs `stateVersion` from `shipvo.json` as `state_version`. `shipvo rollback` refuses to go to a release with a lower state version than the live one unless you pass `--allow-state-downgrade`; the audit log records the downgrade.
-- `@shipvo/runtime`: new `getAppliedStateVersion()` and `pickRevertTarget()`. The `crash_loop_revert` report carries both state versions when the shell sends them.
-- Migration: none; all additions are optional.
+- `@shipvo/schema`: release pointers take an optional `state_version` (positive integer).
+- `@shipvo/cli`: set `stateVersion` in `shipvo.json` and `shipvo publish` signs it into the release. `shipvo rollback` refuses to send phones to a lower `state_version` unless you pass `--allow-state-downgrade`; the control plane records the downgrade in the audit log.
+- Migration: none. Releases without `state_version` behave as before.

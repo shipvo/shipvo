@@ -133,8 +133,7 @@ async function publishRun(argv: string[], json: boolean): Promise<Done> {
   const nativeModules = requiredNativeModules(".", skippedNative);
   if (skippedNative.length) console.error(`native modules not recorded (the range is not a plain numeric semver range, so the control plane cannot check it): ${skippedNative.join(", ")}`);
   if (dry) console.error(`native modules this release requires: ${nativeModules ? Object.entries(nativeModules).map(([n, r]) => `${n}@${r}`).join(", ") : "none found"}`);
-  const stateVersion = cfg.stateVersion;
-  if (stateVersion !== undefined && (!Number.isInteger(stateVersion) || stateVersion < 1)) throw new UsageError(`shipvo.json: "stateVersion" must be a positive whole number (got ${JSON.stringify(stateVersion)})`);
+  const stateVersion = parseStateVersion(cfg.stateVersion);
   const bands = (a.bands || "b0,b1,b2").split(",");
   if (dry) {
     const verdict = checkPublishPolicy(cfg.policy, bands);
@@ -236,21 +235,6 @@ export function publishedSummary(release: number, bands: string[]) {
   return `Published release ${release} to ${bands.join(", ")}. ${next}`;
 }
 
-/** The highest `state_version` in the live pointers of these bands, or 0 when none declares one. */
-async function appliedStateVersion(kv: { get(k: string): Promise<string | null> }, app: string, major: number, bands: string[], pf: Platform): Promise<number> {
-  let max = 0;
-  for (const band of bands) {
-    try { const v = JSON.parse(JSON.parse((await kv.get(pointerKey(app, major, band, pf)))!).body).state_version; if (Number.isInteger(v)) max = Math.max(max, v); } catch {}
-  }
-  return max;
-}
-
-/** Why a rollback was refused, and what to do. */
-export function stateDowngradeMessage(to: number, target: number, applied: number) {
-  const has = target > 0 ? `state version ${target}` : "no state version";
-  return `Release ${to} has ${has}, but devices already run code that writes state version ${applied}. Older code may crash or corrupt the stored data it cannot read. Ship a forward fix instead, or pass --allow-state-downgrade to roll back anyway (the choice is recorded in the audit log).`;
-}
-
 /** The rollback result in plain words. */
 export function rolledBackSummary(to: number, release: number) {
   return `Rolled back to the code of release ${to} as new release ${release}. Next: shipvo status.`;
@@ -319,52 +303,60 @@ async function publishWeb(kv: ReturnType<typeof kvFor>, cfg: ReturnType<typeof l
   return web;
 }
 
+/** `stateVersion` from shipvo.json: absent, or a positive integer. */
+export function parseStateVersion(v: unknown): number | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== "number" || !Number.isInteger(v) || v < 1) throw new CliFailure(`shipvo.json: stateVersion must be a positive integer (got ${JSON.stringify(v)}).`, "bad_config", 1, []);
+  return v;
+}
+
 export async function rollback(argv: string[]) {
   if (argv.includes("--json")) return runJson(() => rollbackRun(argv, true), [...DOCTOR, { command: "shipvo status --json", why: "See the newest releases." }]);
   await rollbackRun(argv, false);
 }
 
 async function rollbackRun(argv: string[], json: boolean): Promise<Done> {
-  checkFlags(argv, ["to", "bands", "platform", "dry-run", "json", "allow-state-downgrade"]);
+  checkFlags(argv, ["to", "bands", "platform", "dry-run", "allow-state-downgrade", "json"]);
   const a = parse(argv), dry = a["dry-run"] !== undefined, cfg = loadConfig();
   const offline = dry && !hasStore();
   const SEED = dry ? "" : seed(), kv = offline ? offlineKv() : kvFor(cfg);
   if (offline) console.error("Offline rehearsal: reading releases from .shipvo/dry-run (written by shipvo publish --dry-run). No login used, nothing is sent.");
   const APP = cfg.appId, MAJOR = cfg.shellMajor, to = Number(a.to);
   if (!to) {
-    const usage = "Usage: shipvo rollback --to <release> [--bands b0,b1,b2] [--platform android|ios|all] [--allow-state-downgrade] [--dry-run] [--json]";
+    const usage = "Usage: shipvo rollback --to <release> [--bands b0,b1,b2] [--platform android|ios|all] [--dry-run] [--allow-state-downgrade] [--json]";
     if (json) throw new UsageError(usage);
     console.error(usage); process.exit(2);
   }
   const release = (await currentRelease(kv, APP, MAJOR)) + 1, issued_at = new Date().toISOString();
   let minShell = "1.0.0";
+  const allowDowngrade = a["allow-state-downgrade"] !== undefined, downgrades: { platform: string; from: number; to: number }[] = [];
   const platforms = platformsOf(a), bands = (a.bands || "b0,b1,b2").split(",");
-  const allowDowngrade = switchFlag(a, "allow-state-downgrade");
-  const stateByPlatform = new Map<Platform, number>();
-  for (const pf of platforms) {
-    let target = 0;
-    try { target = JSON.parse((await kv.get(pf === "ios" ? `h/${APP}/ios-r${to}` : `h/${APP}/r${to}`))!).state_version ?? 0; } catch {}
-    stateByPlatform.set(pf, target);
-    const applied = await appliedStateVersion(kv, APP, MAJOR, bands, pf);
-    if (applied > target && !allowDowngrade) {
-      throw new CliFailure(stateDowngradeMessage(to, target, applied), "state_downgrade", 1, [{ command: `shipvo rollback ${argv.join(" ")} --allow-state-downgrade`, why: "Roll back anyway, knowing the older code may not read the stored data." }]);
-    }
-  }
   for (const pf of platforms) {
     const bytes = await kv.getBytes(`b/${APP}/${bundleName(to, pf)}`);
     if (!bytes) {
       if (json) throw new CliFailure(`Release ${to} ${pf} bundle not found`, "not_found", 1, [{ command: "shipvo status --json", why: "See which releases exist." }]);
       console.error(`Release ${to} ${pf} bundle not found`); process.exit(1);
     }
-    let web: unknown = undefined;
-    try { const h = JSON.parse((await kv.get(pf === "ios" ? `h/${APP}/ios-r${to}` : `h/${APP}/r${to}`))!); minShell = h.min_shell_version || minShell; web = h.web ?? undefined; } catch {}
+    let web: unknown = undefined, targetState: number | undefined = undefined;
+    try { const h = JSON.parse((await kv.get(pf === "ios" ? `h/${APP}/ios-r${to}` : `h/${APP}/r${to}`))!); minShell = h.min_shell_version || minShell; web = h.web ?? undefined; targetState = h.state_version ?? undefined; } catch {}
+    // A rollback to a lower stored-data format can crash the older code or corrupt data. Ask for an explicit choice.
+    let applied = 0;
+    for (const band of bands) { try { const sv = JSON.parse(JSON.parse((await kv.get(pointerKey(APP, MAJOR, band, pf)))!).body).state_version; if (typeof sv === "number") applied = Math.max(applied, sv); } catch {} }
+    if (applied > (targetState ?? 0)) {
+      downgrades.push({ platform: pf, from: applied, to: targetState ?? 0 });
+      if (!allowDowngrade) {
+        const msg = `Release ${to} (${pf}) has state_version ${targetState ?? "none"}, but phones already run state_version ${applied}. Older code may not read data the newer release stored. Publish a fix forward, or pass --allow-state-downgrade to roll back anyway. The choice is recorded in the audit log.`;
+        if (json) throw new CliFailure(msg, "state_downgrade", 1, [{ command: `shipvo rollback ${argv.filter((x) => x !== "--json").join(" ")} --allow-state-downgrade --json`, why: "Roll back anyway." }]);
+        console.error(msg); process.exit(1);
+      }
+    }
     for (const band of bands) {
       const body = JSON.stringify({ schema_version: "1.0", app_id: APP, shell_major: MAJOR, band, ...(pf === "ios" ? { platform: "ios" } : {}), release, issued_at,
-        core: { version: `1.0.${release}`, sha256: sha256Hex(bytes), size: bytes.length, url: `b/${APP}/${bundleName(to, pf)}` }, addons: [], screens: [], min_shell_version: minShell, ...(stateByPlatform.get(pf) ? { state_version: stateByPlatform.get(pf) } : {}), ...(web ? { web } : {}) });
+        core: { version: `1.0.${release}`, sha256: sha256Hex(bytes), size: bytes.length, url: `b/${APP}/${bundleName(to, pf)}` }, addons: [], screens: [], min_shell_version: minShell, ...(targetState ? { state_version: targetState } : {}), ...(web ? { web } : {}) });
       if (!dry) await kv.put(pointerKey(APP, MAJOR, band, pf), JSON.stringify({ body, signature: signBytes(new TextEncoder().encode(body), SEED) }), "application/json");
     }
   }
-  const data = { app: APP, rolled_back_to_code_of: to, new_release: release, min_shell_version: minShell, issued_at, platforms, bands, dry_run: dry };
+  const data = { app: APP, rolled_back_to_code_of: to, new_release: release, min_shell_version: minShell, issued_at, platforms, bands, dry_run: dry, ...(downgrades.length ? { state_downgrade: downgrades } : {}) };
   if (dry) {
     console.log([`Rollback preview for ${APP}:`, `  Rolling back to the code of release ${to}`, `  New release number: ${release}`, `  Platforms: ${platforms.join(", ")}`, `  Bands: ${bands.join(", ")}`, `  Min shell version: ${minShell}`, `Dry run: nothing was written.`].join("\n"));
     const real = argv.filter((x) => x !== "--dry-run").join(" ");

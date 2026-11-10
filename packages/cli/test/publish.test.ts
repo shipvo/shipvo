@@ -12,7 +12,7 @@ vi.mock("../src/bsdiff.js", async (orig) => {
   return { ...actual, bsdiff: (a: Uint8Array, b: Uint8Array) => { if (realDiff.fail) throw new Error("boom"); return (realDiff.on ? actual.bsdiff(a, b) : new Uint8Array(10).fill(1)); } };
 });
 
-const cfgPolicy = vi.hoisted(() => ({ value: undefined as unknown, engine: undefined as string | undefined, state: undefined as number | undefined }));
+const cfgPolicy = vi.hoisted(() => ({ value: undefined as unknown, engine: undefined as string | undefined }));
 const puts: string[] = [];
 const values = new Map<string, string>();
 const blobs = new Map<string, Uint8Array>();
@@ -24,7 +24,7 @@ const stub = {
 };
 vi.mock("../src/config.js", async (orig) => ({
   ...(await orig<typeof import("../src/config.js")>()),
-  loadConfig: () => ({ appId: "demo", name: "demo", shellMajor: 1, controlPlane: "http://x", publicKey: "k", ...(cfgPolicy.value ? { policy: cfgPolicy.value } : {}), ...(cfgPolicy.engine ? { hermesEngine: cfgPolicy.engine } : {}), ...(cfgPolicy.state ? { stateVersion: cfgPolicy.state } : {}) }),
+  loadConfig: () => ({ appId: "demo", name: "demo", shellMajor: 1, controlPlane: "http://x", publicKey: "k", ...(cfgPolicy.value ? { policy: cfgPolicy.value } : {}), ...(cfgPolicy.engine ? { hermesEngine: cfgPolicy.engine } : {}) }),
   seed: () => Buffer.alloc(32, 7).toString("base64"),
   kv: () => stub,
   hasStore: () => true,
@@ -41,7 +41,7 @@ const fakeHbc = (version: number) => {
 
 let cwd: string, prev: string;
 beforeEach(() => {
-  cfgPolicy.value = undefined; cfgPolicy.engine = undefined; cfgPolicy.state = undefined; process.exitCode = undefined; puts.length = 0; values.clear(); blobs.clear(); exec.fn = () => {};
+  cfgPolicy.value = undefined; cfgPolicy.engine = undefined; process.exitCode = undefined; puts.length = 0; values.clear(); blobs.clear(); exec.fn = () => {};
   prev = process.cwd(); cwd = mkdtempSync(join(tmpdir(), "shipvo-pub-"));
   writeFileSync(join(cwd, "app.json"), JSON.stringify({ expo: { version: "1.0.0" } }));
   mkdirSync(join(cwd, "dist-ota/_expo/static/js/android"), { recursive: true });
@@ -287,38 +287,51 @@ describe("publish and the Hermes bytecode check", () => {
   });
 
   describe("state_version", () => {
-    const pointer = (release: number, sv?: number) => JSON.stringify({ body: JSON.stringify({ release, ...(sv ? { state_version: sv } : {}) }), signature: "x" });
-    const seed = () => {
-      blobs.set("b/demo/r2.hbc", fakeHbc(96)); values.set("h/demo/r2", JSON.stringify({ min_shell_version: "1.0.0", state_version: 2 }));
-      blobs.set("b/demo/r3.hbc", fakeHbc(96)); values.set("h/demo/r3", JSON.stringify({ min_shell_version: "1.0.0", state_version: 3 }));
-      values.set("p/demo/1/b0", pointer(3, 3));
+    const ptr = (sv: number | undefined) => JSON.stringify({ body: JSON.stringify({ release: 5, ...(sv ? { state_version: sv } : {}) }), signature: "s" });
+    const seedState = (applied: number, target: number | undefined) => {
+      blobs.set("b/demo/r2.hbc", fakeHbc(96));
+      values.set("h/demo/r2", JSON.stringify({ min_shell_version: "1.0.0", ...(target ? { state_version: target } : {}) }));
+      values.set("p/demo/1/b0", ptr(applied));
     };
-    it("publish signs state_version from shipvo.json into the pointer and history", async () => {
-      withBundle(96); cfgPolicy.state = 4;
-      await publish(flags);
-      expect(JSON.parse(JSON.parse(values.get("p/demo/1/b0")!).body).state_version).toBe(4);
-      expect(JSON.parse(values.get("h/demo/r1")!).state_version).toBe(4);
-    });
-    it("publish without it adds no field", async () => {
-      withBundle(96);
-      await publish(flags);
-      expect(JSON.parse(JSON.parse(values.get("p/demo/1/b0")!).body)).not.toHaveProperty("state_version");
-    });
-    it("rollback from 3 to 2 without the flag fails with an actionable message and writes nothing", async () => {
-      seed(); puts.length = 0;
-      await expect(rollback(["--to", "2", "--bands", "b0"])).rejects.toThrow(/--allow-state-downgrade/);
-      await expect(rollback(["--to", "2", "--bands", "b0"])).rejects.toThrow(/state version 3/);
+    it("rollback from state_version 3 to 2 fails with an actionable message", async () => {
+      seedState(3, 2);
+      const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+      await expect(rollback(["--to", "2", "--bands", "b0"])).rejects.toThrow("exit");
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(String((console.error as any).mock.calls.at(-1)[0])).toMatch(/state_version 2.*state_version 3.*--allow-state-downgrade/);
       expect(puts).toEqual([]);
     });
-    it("rollback with the flag succeeds and signs the target's state_version", async () => {
-      seed(); puts.length = 0;
+    it("the --json hint names --json once", async () => {
+      seedState(3, 2);
+      const out = vi.spyOn(console, "log").mockImplementation(() => {});
+      await rollback(["--to", "2", "--bands", "b0", "--json"]);
+      const doc = JSON.parse(String(out.mock.calls.at(-1)![0]));
+      const cmd = doc.next[0].command as string;
+      expect(cmd).toBe("shipvo rollback --to 2 --bands b0 --allow-state-downgrade --json");
+      process.exitCode = 0;
+    });
+    it("a rollback takes the highest state_version across bands", async () => {
+      seedState(0, 2);
+      values.set("p/demo/1/b1", ptr(3));
+      const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+      await expect(rollback(["--to", "2", "--bands", "b0,b1"])).rejects.toThrow("exit");
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(puts).toEqual([]);
+    });
+    it("with --allow-state-downgrade it succeeds and the new pointer carries the lower state_version", async () => {
+      seedState(3, 2);
       await rollback(["--to", "2", "--bands", "b0", "--allow-state-downgrade"]);
       expect(puts).toEqual(["p/demo/1/b0"]);
       expect(JSON.parse(JSON.parse(values.get("p/demo/1/b0")!).body).state_version).toBe(2);
     });
-    it("rollback to an equal or higher state version needs no flag", async () => {
-      seed(); puts.length = 0;
-      await rollback(["--to", "3", "--bands", "b0"]);
+    it("a rollback to the same or a higher state_version needs no flag", async () => {
+      seedState(2, 2);
+      await rollback(["--to", "2", "--bands", "b0"]);
+      expect(puts).toEqual(["p/demo/1/b0"]);
+    });
+    it("releases without a declaration roll back as before", async () => {
+      seedState(0, undefined);
+      await rollback(["--to", "2", "--bands", "b0"]);
       expect(puts).toEqual(["p/demo/1/b0"]);
     });
   });

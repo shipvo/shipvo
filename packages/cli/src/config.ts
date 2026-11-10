@@ -16,6 +16,8 @@ export type ShipvoConfig = {
   stateVersion?: number;
   /** Hermes engine build the app's shells run, such as "250829098.0.10". If set, `shipvo publish` refuses to run with another hermes-compiler. */
   hermesEngine?: string;
+  /** Version of the stored-data format (AsyncStorage, SQLite, MMKV) this app version uses. A positive integer. `shipvo publish` signs it into the release. */
+  stateVersion?: number;
   /** What AI agents may do through `@shipvo/mcp` owner commands. "ask" (default): irreversible commands need confirm: true. "deny": they are refused. "allow": no confirm step (the owner must set it). */
   agentPolicy?: "ask" | "deny" | "allow";
   /** Owner commands agents may never run. */

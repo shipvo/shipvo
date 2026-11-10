@@ -92,6 +92,8 @@ export const ReleasePointer = z.object({
   state_version: z.number().int().positive().optional(),
   /** The agent-facing web build of this same release, served by the control plane at `base` (sim.shipvo.dev opens it). */
   web: z.object({ base: z.string().min(1), entry: z.string().min(1), sha256, files: z.number().int().nonnegative() }).optional(),
+  /** Version of the data format this release reads and writes in AsyncStorage, SQLite or MMKV. Absent = no declaration. A rollback to a lower value needs an explicit choice. */
+  state_version: z.number().int().positive().optional(),
   new_control_plane: z.object({ base_url: z.string().url(), cdn_url: z.string().url() }).optional(),
   signature: b64,
 });

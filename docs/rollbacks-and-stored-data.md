@@ -1,50 +1,29 @@
 # Rollbacks and stored data
 
-A rollback sends phones back to older code. If newer code already changed the data your app stores (AsyncStorage, SQLite, MMKV), the older code may not read it. A release can declare the version of its data format, so Shipvo can check this for you.
+A rollback sends phones back to older code. If the newer release already changed the format of data in AsyncStorage, SQLite or MMKV, the older code may crash or damage that data. A release can declare the format it uses, and Shipvo checks it before it sends phones back.
 
 ## Declare a state version
 
-Add `stateVersion` to `shipvo.json`. It is a positive whole number. Raise it whenever a release changes how stored data is written.
+Set `stateVersion` in `shipvo.json`. It is a positive integer. Raise it whenever a release changes how stored data is laid out.
 
 ```json
-{ "appId": "shop", "controlPlane": "https://cp.example.com", "publicKey": "...", "stateVersion": 3 }
+{ "appId": "tide", "stateVersion": 3 }
 ```
 
-`shipvo publish` signs it into the release as `state_version`. A release without it declares nothing, and nothing changes for that release.
+`shipvo publish` signs the number into the release. Releases without it work as before.
 
 ## Roll back
 
+If the target release has a lower `state_version` than the one phones run, `shipvo rollback` stops and says so:
+
+```
+Release 5 (android) has state_version 2, but phones already run state_version 3. ...
+```
+
+Publish a fix forward, or choose the rollback on purpose:
+
 ```bash
-shipvo rollback --to 2 --bands b0,b1,b2
+shipvo rollback --to 5 --allow-state-downgrade
 ```
 
-If release 2 has a lower state version than the release phones run now, the command stops and says so. To roll back anyway:
-
-```bash
-shipvo rollback --to 2 --bands b0,b1,b2 --allow-state-downgrade
-```
-
-The audit log row for that rollback has `state_downgrade_allowed`, `state_version_from` and `state_version_to`. Read it with `shipvo audit <app>`.
-
-## Read it in your app
-
-```ts
-import { getAppliedStateVersion } from "@shipvo/runtime";
-
-const STORED = Number(await AsyncStorage.getItem("data_version") ?? 0);
-const RUNNING = getAppliedStateVersion();
-
-if (STORED > RUNNING) {
-  // Newer code wrote this data. Do not read it as the old format.
-  await AsyncStorage.clear();
-} else if (STORED < RUNNING) {
-  // Migrate the data up to the format this release uses.
-}
-await AsyncStorage.setItem("data_version", String(RUNNING));
-```
-
-`getAppliedStateVersion()` returns 0 when the running release declared none.
-
-## Crash-loop reverts
-
-`pickRevertTarget(from, candidates)` chooses the newest earlier release whose `stateVersion` is not lower than the device's, or `null` for the embedded bundle. The `crash_loop_revert` report carries `state_version_from` and `state_version_to` when the shell sends them.
+The control plane records a rollback that lowers `state_version` in the audit log (`shipvo audit <app>`) with the `from` and `to` versions.
