@@ -2,7 +2,7 @@
 
 You will type one command and get a phone, Android or iPhone style, in a browser tab, running your app. You will tap through your shop, look at the pretend Android system sheet, switch to the iPhone style and stop it again. You need no real phone, no Android Studio and no Xcode.
 
-**Level:** beginner. **Time:** about 10 minutes to read and follow. On our test machine the first start took within a minute (see "What we measured" at the end).
+**Level:** beginner. **Time:** about 25 minutes to read and follow. On our test machine the first start took within a minute (see "What we measured" at the end).
 
 New words are explained once, and collected in the [glossary](../glossary.md).
 
@@ -72,15 +72,27 @@ Below is a live phone with the finished Tide & Tackle sample shop, so you can tr
 
 You do not need to stop the phone to change your app. While it runs, Shipvo watches your files. When you save one, the phone updates by itself. This is called **live reload**.
 
-Leave the terminal running. Open your app's folder in any text editor and open the file `src/data/products.json`. It holds your products. Find the line with `"Wool beanie"`, change the words to `Merino beanie` and save the file.
+Leave the terminal running. Open your app's folder in any text editor and open the file `src/data/products.json`. It holds your products. If you started from the shop template, find the line with `"Wool beanie"`, change the words to `Merino beanie` and save the file.
 
-Look at the terminal. You should see `Rebuilding...` and, a few seconds later, `rebuilt in 6.1 s` (your number will differ). The phone shows a small "Updating..." hint and then reloads. The list now says **Merino beanie**. You did not touch the browser tab.
+Look at the terminal. You should see `Rebuilding...` and, a moment later, a line such as `rebuilt in 1.2 s` (your number will differ). The phone shows a small "Updating..." hint and then reloads. The list now says **Merino beanie**. You did not touch the browser tab. Live reload works the same way in the iPhone style: switch the frame and save again, and the iPhone updates too.
 
 ![The Android phone before the edit. The product list shows Canvas tote, Enamel mug, Pocket notebook, Wool beanie at $24.00 and Steel bottle.](/tutorials/run-your-app-on-a-phone/07-before-edit.png)
 
 ![The same phone after the edit. The fourth product now says Merino beanie, still at $24.00.](/tutorials/run-your-app-on-a-phone/08-after-edit.png)
 
-Now make a mistake on purpose. In the same file, type the word `oops` right after the first `"name"` and save. The phone keeps showing your last good version. A red bar under the phone says what is wrong and where, for example "Your file src/data/products.json has a mistake at line 5, column 11: check for a missing or extra comma." The terminal prints the same message. Take the `oops` out and save: the bar goes away and the phone reloads.
+Now make a mistake on purpose. In the same file, break one line on purpose. Before:
+
+```json
+"name": "Merino beanie",
+```
+
+After (a stray word `oops` where the colon was):
+
+```json
+"name" oops "Merino beanie",
+```
+
+Save. The phone keeps showing your last good version. A red bar under the phone says what is wrong and where, for example "Your file src/data/products.json has a mistake at line 5, column 11: check for a missing or extra comma." The terminal prints the same message. Put the colon back and save: the bar goes away and the phone reloads.
 
 ![The phone still showing the product list, with a red bar under it that says Your file src/data/products.json has a mistake at line 5, column 11: check for a missing or extra comma. The page still shows your last good version.](/tutorials/run-your-app-on-a-phone/09-error-bar.png)
 
@@ -133,7 +145,7 @@ Keep the phone open while you work. Each time you save a file, it shows the chan
 
 On 2026-11-06, on a GitHub Actions Linux runner with Node 22.23, a first start of `shipvo run android` for a new shop app, with an empty cache, bundled 204 modules in 6.0 s and was serving the phone within the 60 seconds we waited. We did not time it more closely than that. A start-to-tappable timing on a clean machine is tracked in issue #676. We took every screenshot in this tutorial from that run.
 
-On 2026-11-10, on the same kind of runner with this branch's code, saving a one-word change to `src/data/products.json` took 6.1 s to rebuild (the terminal line) and the new name was visible in the phone 6.4 s after the save (measured by a Playwright script polling the page). Screenshots 07 to 09 come from that run.
+On 2026-11-10, on a GitHub Actions Linux runner, the test [`packages/cli/test/run-live-reload.test.ts`](https://github.com/shipvo/shipvo/blob/main/packages/cli/test/run-live-reload.test.ts) saved a one-word change in a small app and printed `save-to-visible android: 194 ms` and `save-to-visible ios: 190 ms`: the time from the save to the new text showing in the Android and iPhone frames. A shop app bundles more modules, so its rebuild takes longer. Screenshots 07 to 09 come from a `shipvo run android` session on a shop app.
 
 ## Next steps
 
