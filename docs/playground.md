@@ -19,7 +19,7 @@ The sidebar opens one panel at a time. Each panel has its own link, so you can s
 | Signed updates | Publish a signed update, stage it to 10% and then 100% of phones, crash it and watch the rollback. | [Publish over the air](getting-started.md#5-publish-over-the-air) |
 | Device API | Set location, camera, biometrics, payment, notification and airplane mode. The app shows each result. | [Device API](device-api.md) |
 | Agent tools | Run the tools an assistant uses, or watch Lumi use the app. | [Agents](agents.md) |
-| Many phones | Show 1 to 12 phones side by side. | [Simulators](https://shipvo.dev/products/simulators/) |
+| Many phones | Show 1 to 12 phones side by side. | [Run](run.md) |
 
 ## Run an agent tool
 
