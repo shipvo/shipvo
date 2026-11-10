@@ -82,13 +82,13 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
-- 2026-11-10: Secrets screen in the phone's Settings lists saved keys, metadata only ([Phone apps](phone-apps.md#see-saved-keys-in-settings), #1350)
+- 2026-11-10: Spec `calendar` and `map` blocks, the Secrets screen in phone Settings, and opening a build from a `build_url` ([App spec](spec-blocks.md#calendars-and-maps), [Phone apps](phone-apps.md#see-saved-keys-in-settings), [Test your build](test-your-build.md#open-a-build-from-a-link), #1353, #1350, #1287)
+- 2026-11-10: Playground Many phones: 1 to 12 Android and iOS phones with a shareable link ([Playground](playground.md#many-phones), #1323, #1335)
 - 2026-11-10: Network profiles on the phone: `set_network_profile`, `setNetwork` in tests and `network` in `phone.json` ([Phone network](phone-network.md), #1338)
 - 2026-11-10: The release pointer carries up to 8 key rotation statements ([Key rotation](design/key-rotation.md), #1336)
 - 2026-11-10: Saved keys: list, rotate, revoke and use log in Settings, with four control-plane vault routes ([App spec](spec-blocks.md#manage-saved-keys), #1298, #1334)
 - 2026-11-10: `pin_app` and `hide_app` arrange the phone's home screen; a phone's spec apps and data can be exported and imported ([Phone apps](phone-apps.md), #1330, #1329)
 - 2026-11-10: `find_apps` searches the Store by need, country, language and currency ([Phone apps](phone-apps.md), #1315)
-- 2026-11-10: Playground Many phones with shareable links, 1 to 12 Android and iOS phones ([Playground](playground.md#many-phones), #1323, #1335)
 - 2026-11-09: Playground Agent panel with a tool console and Watch Lumi ([Playground](playground.md#run-an-agent-tool), #1290)
 - 2026-11-09: `publish_preview` and `upload_build` return a job you read with `job_status` ([Agents](agents.md#slow-tools-and-tracing), #1314)
 - 2026-11-09: `create_app` builds an app from a description and `update_app` edits it in place ([Phone apps](phone-apps.md), #1301, #1302)

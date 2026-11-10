@@ -108,3 +108,6 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Traceparent.** A standard header value that carries a trace id from your assistant's tool call into the logs of every system a request touches. Shipvo records it in the tool-call log. See [Agents](agents.md#slow-tools-and-tracing).
 
 **Rotation statement.** A signed note that says a release signing key has been replaced. The release pointer lists up to 8 of them so phones can follow the change. See [key rotation](design/key-rotation.md).
+**Calendar block.** A part of an app spec that shows dated rows as a month, a week or an agenda. See [App spec](spec-blocks.md#calendars-and-maps).
+
+**Map block.** A part of an app spec that draws rows with a latitude and longitude as pins on a canvas. It loads no map tiles. See [App spec](spec-blocks.md#calendars-and-maps).

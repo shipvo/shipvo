@@ -94,19 +94,16 @@ Content agents take their next item from this list first (top to bottom, skippin
 | `shipvo store policy` (privacy policy from what the app does) | [store](store.md) | | | |
 | `shipvo sim` and `shipvo preview` open a Capacitor project | [capacitor](capacitor.md#see-it-in-the-simulator) | | | |
 | The playground: update, device, agent and many-phones panels with shareable links | [playground](playground.md) | | | |
-| Slow tools return a job (`job_status`, `wait_ms`) and `traceparent` is recorded | [agents](agents.md#slow-tools-and-tracing) | | | |
-| Saved keys: list, rotate, revoke and use log | [spec-blocks](spec-blocks.md#manage-saved-keys) | | | |
-| Key rotation statements in the release pointer | [key-rotation](design/key-rotation.md) | | | |
-| `pin_app`, `hide_app`, and export or import of a phone's apps | [phone-apps](phone-apps.md) | | | |
-| `find_apps`, `create_app` and `update_app` | [phone-apps](phone-apps.md) | | | |
-| Job handles for slow tools (`job_status`, `wait_ms` on `publish_preview` and `upload_build`) | [cli](cli.md), [agents](agents.md), [mcp](../packages/mcp/README.md) | | | |
-| Saved-key routes: list, rotate, revoke and use log (`/vault/keys`, `/vault-ui/*` in the simulator) | [self-hosting](self-hosting.md#saved-key-routes-vault) | | | |
-| Key rotations in the pointer response (`rotations`) | [self-hosting](self-hosting.md#pointer-response-and-key-rotations) | | | |
-| Playground Many phones (1 to 12 Android and iOS phones, shareable link) | [getting-started](getting-started.md#try-it-in-your-browser-first) | | | |
+| Job handles for slow tools (`job_status`, `wait_ms` on `publish_preview` and `upload_build`) | [playground](playground.md), [cli](cli.md), [agents](agents.md), [mcp](../packages/mcp/README.md) | | | |
+| Saved-key routes: list, rotate, revoke and use log (`/vault/keys`, `/vault-ui/*` in the simulator) | [self-hosting](self-hosting.md#saved-key-routes-vault), [spec-blocks](spec-blocks.md#manage-saved-keys) | | | |
+| Key rotations in the pointer response (`rotations`) | [self-hosting](self-hosting.md#pointer-response-and-key-rotations), [key-rotation](design/key-rotation.md) | | | |
+| Playground Many phones (1 to 12 Android and iOS phones, shareable link) | [playground](playground.md#many-phones) | | | |
 | Pin and hide apps on the home screen (`pin_app`, `hide_app`) | [phone-apps](phone-apps.md) | | | |
 | Describe an app and it appears (`create_app`, `update_app`) | [phone-apps](phone-apps.md) | | | |
 | Export and import a phone's apps (`export_phone_apps`, `import_phone_apps`) | [phone-apps](phone-apps.md) | | | |
 | Real app install from the Store (`install_app`, `find_apps`) | [phone-apps](phone-apps.md) | | | |
 | SAML sign-in for the control plane | [sso](sso.md) | | | |
-| W3C `traceparent` recorded from MCP tool calls | [mcp](../packages/mcp/README.md) | | | |
+| W3C `traceparent` recorded from MCP tool calls | [mcp](../packages/mcp/README.md), [agents](agents.md#slow-tools-and-tracing) | | | |
+| Spec `calendar` and `map` blocks (month, week, agenda, pins, `onSelect`) | [spec-blocks](spec-blocks.md#calendars-and-maps) | | | |
+| Open a build from a link (`build_url` on `POST /session`) | [test-your-build](test-your-build.md#open-a-build-from-a-link) | | | |
 | Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
