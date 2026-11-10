@@ -16,6 +16,11 @@ export interface ShipvoNativePlugin {
   status(): Promise<{ serving?: string }>;
 }
 
+/** Android only for now (iOS follows): build a stored bundle from another stored bundle and a BSDIFF40 patch. Native checks the patch hash, the rebuilt size and hash, and the memory budget. */
+export interface ShipvoPatchPlugin {
+  filePatch(o: { base: string; name: string; patch: string; patchSha256: string; size: number; sha256: string }): Promise<{ via: "patch" | "full"; patchError?: string }>;
+}
+
 const toB64 = (u: Uint8Array) => { let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
 const fromB64 = (b: string) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
 
@@ -28,7 +33,11 @@ export class NativeStore implements KeyValueStore {
 
 /** `BundleFiles` backed by the native plugin (the app-private files directory on Android). */
 export class NativeFiles implements BundleFiles {
-  constructor(private n: ShipvoNativePlugin) {}
+  /** Set only when the plugin has `filePatch`, so the core tries a patch only where one can be applied. */
+  patch?: BundleFiles["patch"];
+  constructor(private n: ShipvoNativePlugin & Partial<ShipvoPatchPlugin>) {
+    if (n.filePatch) this.patch = (o) => n.filePatch!({ base: o.base, name: o.name, patch: toB64(o.patch), patchSha256: o.patchSha256, size: o.size, sha256: o.sha256 });
+  }
   async write(name: string, bytes: Uint8Array) { await this.n.fileWrite({ name, data: toB64(bytes) }); }
   async read(name: string) { return fromB64((await this.n.fileRead({ name })).data); }
   async remove(name: string) { await this.n.fileRemove({ name }); }
