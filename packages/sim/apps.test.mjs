@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
 import { renderFrame, statusClientScript } from "./frame.mjs";
-import { appsClientScript, findApps, loadProfile, installApp, uninstallApp, switchApp, describeApps, profilePatch, AppsError, STORE_FIXTURE, resolveUrl } from "./apps.mjs";
+import { findApps, loadProfile, installApp, uninstallApp, switchApp, describeApps, profilePatch, AppsError, STORE_FIXTURE, resolveUrl } from "./apps.mjs";
 import { createNav } from "./nav.mjs";
 
 const code = (fn) => { try { fn(); } catch (e) { return e.code; } return null; };
@@ -87,6 +87,73 @@ test("the Store screen lists the fixture apps and a tap installs one, in both sk
   });
 }
 
+// Placement: pin, hide, order and schedule apps on the home screen.
+import { arrangeApp, homeApps, appVisible } from "./apps.mjs";
+{
+  const mk = () => loadProfile({ apps: [{ id: "a", name: "A" }, { id: "b", name: "B" }, { id: "c", name: "C" }] });
+  const ids = (st, d) => homeApps(st, d).map((x) => x.id).join("");
+  const MON = new Date("2026-11-09T10:00:00"), SAT = new Date("2026-11-14T10:00:00");
+  test("home order: pinned first, then position, then install order", () => {
+    const st = mk(); assert.equal(ids(st), "abc");
+    arrangeApp(st, "c", { pinned: true }); assert.equal(ids(st), "cab");
+    arrangeApp(st, "b", { position: 0 }); assert.equal(ids(st), "cba");
+    arrangeApp(st, "c", { pinned: false }); assert.equal(ids(st), "bac");
+  });
+  test("a hidden app is off the home screen, still installed, and described as hidden", () => {
+    const st = mk(); arrangeApp(st, "a", { hidden: true });
+    assert.equal(ids(st), "bc"); assert.equal(st.installed_apps.length, 3);
+    assert.match(describeApps(st), /"A" \(a\): hidden; switch_app still opens it/);
+  });
+  test("a schedule shows the app only on its days and hours, also across midnight", () => {
+    const st = mk();
+    arrangeApp(st, "a", { schedule: { days: ["mon", "tue", "wed", "thu", "fri"], from: "08:00", to: "18:00" } });
+    arrangeApp(st, "b", { schedule: { days: ["sat", "sun"] } });
+    assert.equal(ids(st, MON), "ac"); assert.equal(ids(st, SAT), "bc");
+    assert.equal(appVisible({ placement: { schedule: { days: ["mon"], from: "22:00", to: "02:00" } } }, new Date("2026-11-09T23:30:00")), true);
+    assert.equal(appVisible({ placement: { schedule: { days: ["mon"], from: "22:00", to: "02:00" } } }, new Date("2026-11-09T12:00:00")), false);
+    assert.match(describeApps(st, SAT), /"A" \(a\): not showing now, scheduled mon,tue,wed,thu,fri 08:00-18:00/);
+    arrangeApp(st, "a", { schedule: null }); assert.equal(ids(st, SAT), "abc");
+  });
+  test("placement errors are typed", () => {
+    const st = mk(); const code = (f) => { try { f(); } catch (e) { return e.code; } };
+    assert.equal(code(() => arrangeApp(st, "zzz", { pinned: true })), "not_installed");
+    assert.equal(code(() => arrangeApp(st, "a", { pinned: "yes" })), "bad_placement");
+    assert.equal(code(() => arrangeApp(st, "a", { position: -1 })), "bad_placement");
+    assert.equal(code(() => arrangeApp(st, "a", { schedule: { days: ["noday"] } })), "bad_placement");
+    assert.equal(code(() => arrangeApp(st, "a", { schedule: { from: "9am" } })), "bad_placement");
+    assert.equal(code(() => arrangeApp(st, "a", { colour: "red" })), "bad_placement");
+  });
+}
+
+test("a schedule across midnight counts its early-morning tail against the day it started", async () => {
+  const { appVisible } = await import("./apps.mjs");
+  const a = { id: "x", placement: { schedule: { days: ["fri"], from: "22:00", to: "06:00" } } };
+  const at = (day, h, m = 0) => ({ getDay: () => day, getHours: () => h, getMinutes: () => m });
+  assert.equal(appVisible(a, at(5, 23)), true);    // Friday 23:00
+  assert.equal(appVisible(a, at(6, 5)), true);     // Saturday 05:00: the tail of Friday's window
+  assert.equal(appVisible(a, at(5, 5)), false);    // Friday 05:00: the tail of Thursday's window
+  assert.equal(appVisible(a, at(6, 23)), false);   // Saturday 23:00
+  assert.equal(appVisible(a, at(6, 6, 1)), false); // just after the window
+  const day = { placement: { schedule: { days: ["mon"], from: "08:00", to: "18:00" } } };
+  assert.equal(appVisible(day, at(1, 9)), true); assert.equal(appVisible(day, at(2, 9)), false);
+});
+
+test("a bad placement in a profile is dropped, never thrown on", async () => {
+  const { loadProfile, describeApps, homeApps } = await import("./apps.mjs");
+  const st = loadProfile({ apps: [
+    { id: "a", name: "A", placement: { schedule: "weekdays" } },
+    { id: "b", name: "B", placement: { schedule: { days: ["mon", "noday"], from: "08:00", to: "18:00" }, pinned: true } },
+    { id: "c", name: "C", placement: { schedule: { from: "9am" }, position: "first" } },
+    { id: "d", name: "D", placement: { schedule: {}, hidden: true } },
+  ] });
+  assert.doesNotThrow(() => describeApps(st, new Date()));
+  assert.equal(st.installed_apps[0].placement, undefined);
+  assert.deepEqual(st.installed_apps[1].placement, { pinned: 1 });
+  assert.equal(st.installed_apps[2].placement, undefined);
+  assert.deepEqual(st.installed_apps[3].placement, { hidden: true, schedule: { days: ["sun","mon","tue","wed","thu","fri","sat"], from: "00:00", to: "23:59" } });
+  assert.deepEqual(homeApps(st, new Date()).map((a) => a.id), ["b", "a", "c"]);
+});
+
 const shelf = [
   { id: "splitly", name: "Splitly", description: "Split bills with friends. Settle up fast.", tags: ["expenses"], currencies: ["EUR"], version: "1.2.0" },
   { id: "dollar", name: "Dollar Share", description: "Split bills in dollars.", currencies: ["USD"], version: "1.0.0" },
@@ -113,14 +180,8 @@ test("find_apps: no match is an empty list; limit is capped at 25", () => {
   assert.equal(findApps(many, { query: "bill" }).length, 10);
 });
 
-test("the frame page script can draw scheduled apps (inWindow and checkSchedule are injected)", () => {
-  const seed = { apps: [{ id: "aa", name: "Aa", schedule: { from: "08:00", to: "12:00", timezone: "Europe/Berlin" } }, { id: "bb", name: "Bb" }], clock: "2026-11-10T06:00:00Z" };
-  const src = appsClientScript("app", seed);
-  const decl = src.slice(src.indexOf("var AppsError"), src.indexOf("var r=document"));
-  const draw = new Function(`${decl}\nreturn function(seedJson){var st=loadProfile(seedJson);return installedIconsHtml(st)}`)();
-  const ids = (h) => [...h.matchAll(/data-app="(\w+)"/g)].map((m) => m[1]).join(",");
-  assert.equal(ids(draw(seed)), "bb");
-  assert.equal(ids(draw({ ...seed, clock: "2026-11-10T07:00:00Z" })), "aa,bb");
-  assert.equal(code(() => loadProfile({ apps: [{ id: "a", schedule: { from: "1", to: "2", timezone: "UTC" } }] })), "bad_schedule");
-  assert.equal(code(() => loadProfile({ clock: "yesterday" })), "bad_profile");
+test("old top-level pinned and hidden fields in a profile are ignored without error; pins and hides come from placement", async () => {
+  const { loadProfile, homeApps } = await import("./apps.mjs");
+  const st = loadProfile({ apps: [{ id: "a", name: "A", pinned: 2, hidden: true }, { id: "b", name: "B", placement: { hidden: true } }, { id: "c", name: "C", placement: { pinned: true } }] });
+  assert.deepEqual(homeApps(st, new Date()).map((a) => a.id), ["c", "a"]);
 });

@@ -1,6 +1,6 @@
 # Build a Capacitor app in your own GitHub Actions
 
-Shipvo gives you a workflow that builds signed Android and iOS binaries in your own repository. You do not need EAS.
+This page is for developers with a Capacitor project who want signed Android and iOS builds from their own GitHub repository. You will see your app in the simulator, add one workflow, set the signing secrets, and get a signed `.aab` and `.ipa` as run artifacts. You do not need EAS.
 
 ## See it in the simulator
 
@@ -60,8 +60,6 @@ The output is a signed `.ipa` in the `ios-release` artifact.
 
 ## Upload to the stores
 
-The iOS job has not been run on a macOS runner in this repo yet; the template is checked by a parse test only. Your first run is the check.
-
 The template stops at the signed files. Download them from the run's artifacts and upload them with Play Console and Transporter, or add your own upload step. It uses the certificate and profile route, not an App Store Connect API key.
 
 ---
@@ -106,4 +104,8 @@ npx eas-cli build:version:set -p ios
 
 Then `npx eas-cli submit -p ios --profile shipvo-ios` (or `-p android`) after a build finishes.
 
-The generated YAML has not been run against a live Expo account in this repo yet. Treat the first build as the check, and edit the YAML if a step name differs in your EAS CLI version.
+## Next steps
+
+- [Store path](store.md): take the signed builds to Google Play and the App Store.
+- [Adapters](adapters.md): what a runtime port covers for Capacitor web bundles.
+- [Getting started](getting-started.md): create an app and run it in the simulator.

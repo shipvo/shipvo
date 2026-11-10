@@ -15,7 +15,7 @@ export const STORE_FIXTURE = [
 
 const text = (v, n) => String(v ?? "").replace(/[<>"'\\]/g, "").slice(0, n);
 const scheme = (x) => String(x).toLowerCase().replace(/:$/, "");
-const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20), ...(Array.isArray(a.schemes) && a.schemes.length ? { schemes: a.schemes.map(scheme) } : {}) });
+const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20), ...(Array.isArray(a.schemes) && a.schemes.length ? { schemes: a.schemes.map(scheme) } : {}), ...(cleanPlacement(a.placement) ? { placement: cleanPlacement(a.placement) } : {}) });
 
 /** Phone state for apps. `installed_apps` is a list of { id, name, url, version }; `current_app` is an id or null (the app the phone was started with). */
 export function createApps(profile = {}) {
@@ -38,9 +38,8 @@ export function loadProfile(json) {
   for (const a of apps) {
     if (!a || typeof a.id !== "string" || !/^[a-z0-9-]+$/.test(a.id)) throw new AppsError("bad_profile", "every app needs an id of lowercase letters, digits and dashes");
     if (seen.has(a.id)) throw new AppsError("bad_profile", `app '${a.id}' is listed twice`);
-    seen.add(a.id); st.installed_apps.push({ ...entry(a), ...(a.schedule != null ? { schedule: checkSchedule(a.schedule) } : {}) });
+    seen.add(a.id); st.installed_apps.push(entry(a));
   }
-  if (p.clock != null) { const c = Date.parse(String(p.clock)); if (Number.isNaN(c)) throw new AppsError("bad_profile", "'clock' must be an ISO time such as 2026-11-10T08:00:00Z"); st.clock = c; }
   if (p.current_app != null) { if (!seen.has(p.current_app)) throw new AppsError("bad_profile", `current_app '${p.current_app}' is not in 'apps'`); st.current_app = p.current_app; }
   if (p.network !== undefined) { if (typeof p.network !== "string") throw new AppsError("bad_profile", "'network' must be a profile name"); st.network = p.network; }
   if (p.settings !== undefined) {
@@ -132,62 +131,99 @@ export function switchApp(st, id, nav) {
   st.current_app = id; if (nav) nav.where = "app"; note(st, "switch_app", id); return st;
 }
 
+export const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** A placement from outside (phone.json, an export) reduced to what is valid: bad fields are dropped. Returns an object or null. */
+function cleanPlacement(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  var p = {};
+  if (raw.pinned === true) p.pinned = 1;
+  else if (Number.isInteger(raw.pinned) && raw.pinned > 0) p.pinned = raw.pinned;
+  if (raw.hidden === true) p.hidden = true;
+  if (Number.isInteger(raw.position) && raw.position >= 0 && raw.position <= 99) p.position = raw.position;
+  var sc = raw.schedule;
+  if (sc && typeof sc === "object" && !Array.isArray(sc)) {
+    var days = Array.isArray(sc.days) && sc.days.length ? Array.from(new Set(sc.days.map(function (d) { return String(d).toLowerCase().slice(0, 3); }))) : DAYS;
+    var from = sc.from == null ? "00:00" : sc.from, to = sc.to == null ? "23:59" : sc.to;
+    if (days.every(function (d) { return DAYS.indexOf(d) >= 0; }) && HHMM.test(from) && HHMM.test(to)) p.schedule = { days: days, from: from, to: to };
+  }
+  return Object.keys(p).length ? p : null;
+}
+
+/**
+ * Where an installed app sits on the home screen. `patch` may set: pinned (true or false), hidden (true or false),
+ * position (a whole number from 0, or null to clear), schedule ({ days: ["mon",...], from: "HH:MM", to: "HH:MM" }, or null
+ * to always show). Throws not_installed or bad_placement with the reason.
+ */
+function placeApp(st, id, patch = {}) {
+  const a = st.installed_apps.find((x) => x.id === id);
+  if (!a) throw new AppsError("not_installed", `'${id}' is not installed`);
+  const p = { ...(a.placement ?? {}) };
+  const bad = (m) => new AppsError("bad_placement", m);
+  for (const k of Object.keys(patch)) if (!["pinned", "hidden", "position", "schedule"].includes(k)) throw bad(`unknown field '${k}'. Fields: pinned, hidden, position, schedule`);
+  for (const k of ["pinned", "hidden"]) if (patch[k] !== undefined) {
+    if (typeof patch[k] !== "boolean") throw bad(`${k} must be true or false`);
+    if (!patch[k]) delete p[k];
+    else if (k === "hidden") p.hidden = true;
+    else if (!p.pinned) p.pinned = Math.max(0, ...st.installed_apps.map((x) => x.placement?.pinned ?? 0)) + 1;   // pinned apps keep the order they were pinned in
+  }
+  if (patch.position !== undefined) {
+    if (patch.position === null) delete p.position;
+    else if (!Number.isInteger(patch.position) || patch.position < 0 || patch.position > 99) throw bad("position must be a whole number from 0 to 99, or null");
+    else p.position = patch.position;
+  }
+  if (patch.schedule !== undefined) {
+    const sc = patch.schedule;
+    if (sc === null) delete p.schedule;
+    else {
+      const days = Array.isArray(sc?.days) && sc.days.length ? [...new Set(sc.days.map((d) => String(d).toLowerCase().slice(0, 3)))] : DAYS;
+      if (days.some((d) => !DAYS.includes(d))) throw bad(`days must be from: ${DAYS.join(", ")}`);
+      const from = sc?.from ?? "00:00", to = sc?.to ?? "23:59";
+      if (!HHMM.test(from) || !HHMM.test(to)) throw bad("from and to must be times like 09:00");
+      p.schedule = { days, from, to };
+    }
+  }
+  if (Object.keys(p).length) a.placement = p; else delete a.placement;
+  return a;
+}
+export function arrangeApp(st, id, patch = {}) {
+  const a = placeApp(st, id, patch);
+  note(st, "arrange_apps", id, { placement: a.placement ?? null });
+  return a;
+}
 /** Pin or unpin an app. Pinned apps lead the home screen in the order they were pinned. Throws not_installed. */
-export function pinApp(st, id, pinned) {
-  const a = st.installed_apps.find((x) => x.id === id);
-  if (!a) throw new AppsError("not_installed", `'${id}' is not installed`);
-  if (pinned && a.pinned == null) a.pinned = Math.max(0, ...st.installed_apps.map((x) => x.pinned ?? 0)) + 1;
-  if (!pinned) delete a.pinned;
-  note(st, "pin_app", id, { pinned: !!pinned }); return st;
-}
-
+export function pinApp(st, id, pinned) { placeApp(st, id, { pinned: !!pinned }); note(st, "pin_app", id, { pinned: !!pinned }); return st; }
 /** Hide an app from the home screen and the app list, or show it again. Its data stays. Throws not_installed. */
-export function hideApp(st, id, hidden) {
-  const a = st.installed_apps.find((x) => x.id === id);
-  if (!a) throw new AppsError("not_installed", `'${id}' is not installed`);
-  if (hidden) a.hidden = true; else delete a.hidden;
-  note(st, "hide_app", id, { hidden: !!hidden }); return st;
+export function hideApp(st, id, hidden) { placeApp(st, id, { hidden: !!hidden }); note(st, "hide_app", id, { hidden: !!hidden }); return st; }
+
+/** True when the app shows on the home screen at `now` (a Date): not hidden, and inside its schedule if it has one. */
+export function appVisible(a, now = new Date()) {
+  const p = a.placement ?? {};
+  if (p.hidden) return false;
+  const sc = p.schedule;
+  if (!sc) return true;
+  const d = now.getDay(), t = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const on = (i) => sc.days.includes(DAYS[i]);
+  if (sc.from <= sc.to) return on(d) && t >= sc.from && t <= sc.to;
+  // A window across midnight belongs to the day it starts: its early-morning tail counts against the day before.
+  return (t >= sc.from && on(d)) || (t <= sc.to && on((d + 6) % 7));
 }
 
-/** Check a daily window. Returns a clean schedule or throws bad_schedule. Times are HH:MM (24 hour); a window may cross midnight. */
-export function checkSchedule(w) {
-  const t = (v) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(v));
-  if (!w || typeof w !== "object" || !t(w.from) || !t(w.to) || w.from === w.to) throw new AppsError("bad_schedule", "schedule needs from and to as HH:MM (24 hour), and they must differ");
-  const tz = String(w.timezone ?? "");
-  try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); } catch { throw new AppsError("bad_schedule", `'${tz.slice(0, 60)}' is not a timezone name, for example Europe/Berlin or UTC`); }
-  return { from: String(w.from), to: String(w.to), timezone: tz };
-}
-
-/** Show the app only inside a daily window (sim clock), or remove the window so pin/hide decide again. Throws not_installed or bad_schedule. */
-export function scheduleApp(st, id, window) {
-  const a = st.installed_apps.find((x) => x.id === id);
-  if (!a) throw new AppsError("not_installed", `'${id}' is not installed`);
-  if (window == null) { delete a.schedule; note(st, "clear_schedule", id); return st; }
-  a.schedule = checkSchedule(window);
-  note(st, "schedule_app", id, { ...a.schedule }); return st;
-}
-
-/** True when the sim clock is inside the app's window. Apps without a schedule are never asked. */
-export function inWindow(w, now) {
-  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: w.timezone, hourCycle: "h23", hour: "2-digit", minute: "2-digit" }).formatToParts(new Date(now)).map((x) => [x.type, x.value]));
-  const m = Number(p.hour) * 60 + Number(p.minute), mins = (v) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3));
-  const f = mins(w.from), t = mins(w.to);
-  return f < t ? m >= f && m < t : m >= f || m < t;
-}
-
-/** The apps shown on the home screen: pinned first (in pin order), then the rest in install order. A schedule decides first (shown inside its window, hidden outside); otherwise hidden apps are left out. */
-export function homeApps(st) {
-  const now = st.clock ?? Date.now();
-  const shown = st.installed_apps.filter((a) => (a.schedule ? inWindow(a.schedule, now) : !a.hidden));
-  return [...shown.filter((a) => a.pinned != null).sort((a, b) => a.pinned - b.pinned), ...shown.filter((a) => a.pinned == null)];
+/** The apps on the home screen at `now`, in order: pinned first, then by position, then in the order they were installed. */
+export function homeApps(st, now = new Date()) {
+  return st.installed_apps.map((a, i) => ({ a, i })).filter(({ a }) => appVisible(a, now))
+    .sort((x, y) => (x.a.placement?.pinned && y.a.placement?.pinned ? x.a.placement.pinned - y.a.placement.pinned : (y.a.placement?.pinned ? 1 : 0) - (x.a.placement?.pinned ? 1 : 0)) || (x.a.placement?.position ?? 1e3) - (y.a.placement?.position ?? 1e3) || x.i - y.i)
+    .map(({ a }) => a);
 }
 
 /** Plain text for an agent: the installed apps, then the Store. */
-export function describeApps(st) {
+export function describeApps(st, now = new Date()) {
   const l = ["Installed apps"];
-  const shown = homeApps(st);
-  if (!shown.length) l.push("- none");
-  for (const a of shown) l.push(`- button "${a.name}" (${a.id} ${a.version}${a.pinned != null ? ", pinned" : ""}${st.current_app === a.id ? ", open" : ""}: switch_app opens it)`);
+  if (!st.installed_apps.length) l.push("- none");
+  const shown = homeApps(st, now);
+  for (const a of shown) l.push(`- button "${a.name}" (${a.id} ${a.version}${a.placement?.pinned ? ", pinned" : ""}${st.current_app === a.id ? ", open" : ""}: switch_app opens it)`);
+  for (const a of st.installed_apps) if (!shown.includes(a)) l.push(`- "${a.name}" (${a.id}): ${a.placement?.hidden ? "hidden" : `not showing now, scheduled ${a.placement.schedule.days.join(",")} ${a.placement.schedule.from}-${a.placement.schedule.to}`}; switch_app still opens it`);
   l.push("Store");
   for (const a of st.store) l.push(st.installed_apps.some((i) => i.id === a.id) ? `- "${a.name}" (${a.id}): installed` : `- button "Install ${a.name}" (${a.id}: install_app installs it)`);
   return l.join("\n");
@@ -195,8 +231,8 @@ export function describeApps(st) {
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 /** Home screen icons for installed apps. */
-export function installedIconsHtml(st) {
-  return homeApps(st).map((a) => `<button type="button" class="sf-icon sf-appicon" data-part="installed-app" data-app="${esc(a.id)}" aria-label="${esc(a.name)}"><b>${esc(a.name.slice(0, 1).toUpperCase())}</b><span>${esc(a.name)}</span></button>`).join("");
+export function installedIconsHtml(st, now = new Date()) {
+  return homeApps(st, now).map((a) => `<button type="button" class="sf-icon sf-appicon" data-part="installed-app" data-app="${esc(a.id)}" aria-label="${esc(a.name)}"><b>${esc(a.name.slice(0, 1).toUpperCase())}</b><span>${esc(a.name)}</span></button>`).join("");
 }
 /** Store rows: one button per app that is not installed yet. */
 export function storeRowsHtml(st) {
@@ -227,7 +263,7 @@ export const MAX_BUNDLE_BYTES = 200 * 1024 * 1024;
 export function appsClientScript(iframeId = "app", seed = {}) {
   return `(function(){
 var AppsError=function(c,m){var e=new Error(m);e.code=c;return e},STORE_FIXTURE=${JSON.stringify(STORE_FIXTURE)};
-var entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},inWindow=${inWindow.toString()},checkSchedule=${checkSchedule.toString()},homeApps=${homeApps.toString()},installedIconsHtml=${installedIconsHtml.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
+var entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},installedIconsHtml=${installedIconsHtml.toString()},DAYS=${JSON.stringify(DAYS)},HHMM=${HHMM.toString()},cleanPlacement=${cleanPlacement.toString()},appVisible=${appVisible.toString()},homeApps=${homeApps.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
 var loadProfile=${loadProfile.toString()},settingPatch=function(){};
 var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
 var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("store-screen"),home=q("home-screen");if(!sc||!home)return;
@@ -236,7 +272,8 @@ var st;try{st=loadProfile(${JSON.stringify({ ...seed, marketplace: undefined })}
 st.settings={};
 var box=document.createElement("div");box.className="sf-apps";box.setAttribute("data-part","installed-apps");home.appendChild(box);
 var msg="";
-function drawHome(){box.innerHTML=installedIconsHtml(st)}
+var lastHome=null;
+function drawHome(){var h=installedIconsHtml(st,new Date());if(h===lastHome)return;lastHome=h;box.innerHTML=h}
 function drawStore(){q("store-rows").innerHTML=storeRowsHtml(st)+(msg?'<p class="sf-store-msg" role="status">'+esc(msg)+'</p>':"")}
 function loadStore(){if(!mp)return Promise.resolve();return fetch(mp.replace(/\\/$/,"")+"/apps/public").then(function(r){return r.json()}).then(function(j){var l=(j&&j.apps)||[];if(l.length)st.store=l.map(function(a){return entry({id:a.app_id,name:a.name||a.app_id,version:a.latest_release!=null?"r"+a.latest_release:"latest",url:"app://"+a.app_id+(a.latest_release!=null?"@r"+a.latest_release:"@latest")})})}).catch(function(){})}
 // Without a session the page fetches the app itself. The marketplace answers with CORS open, so a page on any origin can read it.
@@ -248,7 +285,7 @@ if(!mp||/^fixture:/.test(a.url)){installApp(st,id);return Promise.resolve()}
 var bad=function(){return new Error("The app could not be fetched")};
 return bundle(a).then(function(u){return fetch(u).then(function(r){if(!r.ok||Number(r.headers.get("content-length"))>MAXB)throw bad();return r.arrayBuffer()}).then(function(buf){if(buf.byteLength>MAXB)throw bad();return sha(buf).then(function(h){urls[id]=u;installApp(st,id,st.store,{sha256:h,bytes:buf.byteLength})})})})}
 function open(on){sc.hidden=!on;if(on){msg="";drawStore();sc.focus({preventScroll:true});loadStore().then(drawStore)}}
-drawHome();
+drawHome();setInterval(drawHome,30000);
 r.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
 if(t.closest('[data-part="store-icon"]'))return open(true);
 if(t.closest('[data-part="store-close"]'))return open(false);
