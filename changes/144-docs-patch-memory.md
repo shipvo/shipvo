@@ -1,0 +1,2 @@
+- Docs: Android patch memory fallback in the runtime README and OTA updates page; "Rollbacks and stored data" is now in the docs sidebar.
+- Migration: none.

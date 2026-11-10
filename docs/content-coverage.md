@@ -126,3 +126,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Network proxy refusal codes (`x-shipvo-net-error`) | [phone-network](phone-network.md#troubleshooting) | | | |
 | Room log and notes (`room_log`, `room_note`): a lead agent sees what the others did | [agents](agents.md#room-log-and-notes) | | | |
 | Shop template warns when a price is in the wrong unit (`[shop]` message, failing test) | [your-own-shop](tutorials/your-own-shop.md#troubleshooting), [getting-started](getting-started.md#the-shop-checkout) | [your-own-shop](tutorials/your-own-shop.md) | | |
+| Patch memory guard: Android falls back to the full download (`over_memory_budget`, `out_of_memory`) | [phone-updates](phone-updates.md#large-patches-on-android), [runtime](../packages/runtime/README.md#patches-and-memory-android) | | | |
+| Rollbacks and stored data (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
+| `csv()` export in the app spec | [phone-apps](phone-apps.md) | | | |

@@ -69,6 +69,10 @@ The simulator refuses a signed release that is not newer than every release the 
 | A release you published is not offered | It is not newer than every release the session knows, or it is blocked | Publish a higher release number |
 | State is `reverted` with reason `crash_loop` | The release raised a page error on 3 boots in a row | Fix the page error and publish a new release. The blocked one is not offered again |
 
+## Large patches on Android
+
+An update that arrives as a patch is rebuilt in memory. When the base, the patch and the result would not fit comfortably, the runtime downloads the full bundle instead, and `checkForUpdate` returns `via: "full"` with `patchError` set to `over_memory_budget` or `out_of_memory`. Nothing for you to fix: the release is verified the same way. See [@shipvo/runtime](../packages/runtime/README.md#patches-and-memory-android).
+
 ## Next steps
 
 - [CLI guide](cli.md): publish, promote and roll back real releases.

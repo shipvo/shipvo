@@ -28,6 +28,12 @@ Runtime.markHealthy();                   // call once the first screen rendered
 
 `shipvo init` wires all of this for you.
 
+## Patches and memory (Android)
+
+Applying a patch needs the base bundle, the patch and the new bundle in memory together. The runtime checks first. If they would use more than 40% of the app's heap limit, it skips the patch and downloads the full bundle. If the patch step runs out of memory anyway, it does the same. The update still lands and is verified the same way.
+
+`checkForUpdate` reports what happened: `via` is `"full"` and `patchError` is `"over_memory_budget"` or `"out_of_memory"`. A patch that was applied has `via: "patch"` and `patchError: null`. Covered by `PatchStepTest.kt`.
+
 ## Events
 
 The runtime reports refused and reverted releases for you. `Runtime.markHealthy()` and every `Runtime.checkForUpdate()` drain the device's event queue and send each event to `POST {baseUrl}/t`, using `baseUrl` and `appId` from `expo.extra.shipvo`. A refusal found during a background check is reported in the same session, without a restart.
