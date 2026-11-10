@@ -211,25 +211,34 @@ Add `strings` to the spec: a map from language to `{ "original text": "translate
 
 Add `"presentation": "sheet"` to a screen and to the `navigate` action that opens it. The screen appears as a bottom sheet (a `dialog` in the tree). `{ "back": true }` closes it.
 
-## Data that refreshes by itself
+## Keep a data source fresh
 
-An `http` data source can set `refresh`, a number of seconds (30 or more). While the app is installed on a phone, the simulator runs the source again on that interval. The open screen and its labelled tree show the new value, with no tap and no model call.
+Add `refresh` to an `http` data source to run it again on a timer while the app is installed. The value is a number of seconds, 30 or more. The open screen updates when new data arrives, so a price or a score stays current without a tap.
 
 ```json
 "data": {
-  "rates": {
+  "price": {
     "source": "http",
-    "get": "https://api.example.com/rates",
+    "get": "https://api.example.com/price",
     "refresh": 60
   }
 }
 ```
 
-- The refresh uses the same domain checks, size trimming and cost limits as the first load.
-- If a refresh fails, the screen keeps the last value. A source never runs twice at once.
-- Refreshing stops when the app is uninstalled or the session ends. Updating the app with `update_app` restarts it with the new interval.
-- `refresh` is for `http` sources only. `collection` and `computed` sources give a validator error.
-- A value below 30 gives the error at `$.data.<name>.refresh` with the fix "Use 30 or more."
+- Each refresh calls the service again. It does not read `cache`, and refreshed values are not written to it.
+- If a refresh fails, the screen keeps the last value and the next tick tries again.
+- Only public `http` and `https` hosts are called, and redirects are not followed.
+- The timer stops when the app is removed or replaced.
+
+| Error path | Meaning | Fix |
+| --- | --- | --- |
+| `$.data.<name>.refresh` below 30 | The interval is too short. | Use 30 or more. |
+| `$.data.<name>.refresh` is not a number | Seconds must be a number, not text. | Write `60`, not `"60"`. |
+| `$.data.<name>.refresh` on a non-`http` source | Only `http` sources refresh. | Remove `refresh`, or change the source to `http`. |
+
+## Example specs
+
+`packages/spec/gallery/` holds example specs to copy and change: a habit tracker and a workout log. Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.
 
 ## Data sources that use a saved key
 
@@ -283,7 +292,6 @@ A data source can call a service with a key you saved once in the secret form. T
 - **A week or month view shows no events.** The view only lists events inside the days it shows. Set `at` to a day in the period you want, or use `agenda`.
 - **A translation does not show.** The key must match the text exactly, including capitals and spaces, and `language` must be the same code you used in `strings` (`fr`, not `fr-FR`). Pass `locale` separately for money and dates.
 - **A vector shape is missing.** An unknown `shape` is an error; a colour that is not hex, a name or `url(#id)` draws as `none`; a path with other characters draws nothing.
-- **`refresh` is rejected.** Use 30 or more, and only on an `http` source.
 - **State is empty before the first change.** Declare a `default` for each `state` value. Declared defaults are present from the start.
 
 ## Next steps
