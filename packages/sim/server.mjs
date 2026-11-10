@@ -37,6 +37,7 @@ import { createNav, pressHome, openRecents, resume, killApp, assertForeground, s
 import { assistantName } from "./identity.mjs";
 import { pendingBanner, waitForNew } from "./banner.mjs";
 import { createWakeups, WakeupError } from "./wakeup.mjs";
+import { makeBackup, checkBackup, BackupError } from "./backup.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
@@ -550,6 +551,38 @@ async function act(id, body) {
       if (res.ok === false) throw new SimError("action_failed", res.error);
       return { value: res.value ?? null, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
     }
+    // Whole-phone backup: spec apps (spec, data, settings, layout, permission answers), store apps (listing and permission answers),
+    // system settings and the clipboard. Changes nothing. Secrets in the vault are never in it.
+    case "backup_phone": {
+      const exported = await act(sidOf(s), { action: "export_apps" });
+      const storeApps = s.apps.installed_apps.filter((a) => a.kind !== "spec").map(({ sha256, bytes, ...rest }) => structuredClone(rest));
+      let settings; try { settings = (await settingsAction(page, { action: "get_settings" })).settings; } catch { settings = { ...(s.apps.settings ?? {}) }; }
+      const clipboard = await page.evaluate(() => { if (globalThis.__pnDevice) return globalThis.__pnDevice.state.clipboard; try { return globalThis.sessionStorage.getItem("pn.clipboard"); } catch { return null; } }).catch(() => null);
+      s.apps.log.push({ at: Date.now(), name: "backup_phone", apps: exported.apps.length, store_apps: storeApps.length, source: "real" });
+      return { backup: makeBackup({ apps: exported.apps, storeApps, settings, clipboard: clipboard ?? s.clipboard ?? "" }) };
+    }
+    // Put a backup on this phone. Every part is checked first; a bad backup changes nothing. Spec apps already on the phone need replace: true.
+    // A store app that is already installed is skipped and listed.
+    case "restore_phone": {
+      let b; try { b = checkBackup(body.backup); } catch (e) { if (e instanceof BackupError) throw new SimError(e.code, e.message); throw e; }
+      const imported = b.apps.length ? (await act(sidOf(s), { action: "import_apps", apps: b.apps, replace: body.replace === true })) : { imported: [] };
+      const installed = [], skipped = [], failed = [];
+      for (const a of b.storeApps) {
+        if (s.apps.installed_apps.some((x) => x.id === a.id)) { skipped.push(a.id); continue; }
+        try { await act(sidOf(s), { action: "install_app", id: a.id, catalog: [a], permissions: a.permissions }); installed.push(a.id); }
+        catch (e) { failed.push({ id: a.id, error: String(e?.message ?? e) }); }
+      }
+      const settings = [];
+      for (const [key, value] of Object.entries(b.settings)) {
+        try { await settingsAction(page, { action: "set_setting", key, value }); settings.push(key); } catch { s.apps.settings = { ...(s.apps.settings ?? {}), [key]: value }; settings.push(key); }
+      }
+      if (b.clipboard != null) {
+        s.clipboard = b.clipboard;
+        await page.evaluate((v) => { if (globalThis.__pnDevice) return globalThis.__pnDevice.set({ clipboard: v }); try { globalThis.sessionStorage.setItem("pn.clipboard", v); } catch {} }, b.clipboard).catch(() => {});
+      }
+      s.apps.log.push({ at: Date.now(), name: "restore_phone", apps: imported.imported.length, store_apps: installed.length, source: "real" });
+      return { restored: { apps: imported.imported, store_apps: installed, settings, clipboard: b.clipboard != null }, ...(skipped.length ? { skipped } : {}), ...(failed.length ? { failed } : {}), ...(imported.warnings ? { warnings: imported.warnings } : {}), installed_apps: s.apps.installed_apps };
+    }
     // Installed apps. Errors are typed: unknown_app, already_installed, not_installed. Logged in device_log: source "real" (with the bundle sha256) for a fetched bundle, "simulated" for a fixture app.
     // One toggle per app and permission, the same as the Settings screen.
     case "set_app_permission": {
@@ -766,7 +799,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: backup_phone, restore_phone, screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
