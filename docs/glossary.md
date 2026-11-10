@@ -33,6 +33,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Over the air (OTA).** Sending an update to phones through the internet, so people do not have to go to the app store.
 
 
+**Vault.** A safe place for keys you give an app, such as a payment key. You paste a key once into a private page, it is stored encrypted, and the assistant never sees it. You can replace a key, remove it, and see when it was used. See [Self-hosting](self-hosting.md#saved-key-routes-vault).
+
 **Release.** One numbered version of your app that phones can download.
 
 **Signing.** Putting a secret stamp on a release so phones can check it really came from you. The stamp comes from a key file kept on your computer.

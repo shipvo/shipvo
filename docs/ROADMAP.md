@@ -95,6 +95,8 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 - 2026-11-09: MCP records a W3C `traceparent` from tool calls ([Agents](agents.md#slow-tools-and-tracing), #1288)
 - 2026-11-09: `POST /session` opens a `build_url` and replies with the build id ([Test your build](test-your-build.md), #1287)
 - 2026-11-09: The hosted MCP accepts Client ID Metadata Documents for sign-in ([Agents](agents.md), #1286)
+- 2026-11-09: SAML sign-in routes in the control plane ([Single sign-on](sso.md), #1272)
+
 - 2026-11-08: Wallet, Calendar, Files and Photos, and Shop first-party spec apps ([Phone apps](phone-apps.md#first-party-apps), #1275, #1252, #1299, #1300)
 - 2026-11-08: App spec `vector` block, `motion`, translations, locale formatting and right-to-left ([App spec](spec-blocks.md#vector-drawings), #1271, #1274)
 - 2026-11-08: Playground Device API and over-the-air update panels, Android and iOS ([Getting started](getting-started.md#try-it-in-your-browser-first), #1276, #1278)
