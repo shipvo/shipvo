@@ -30,6 +30,7 @@
     "identity.mjs",
     "banner.mjs",
     "permission-log.mjs",
+    "search.mjs",
     "wakeup.mjs",
     "frame.mjs",
     "lumi.mjs",
