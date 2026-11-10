@@ -31,6 +31,10 @@ Run time: a full run takes about 18 minutes (the crash-loop scenarios alone take
 
 `on-device Runtime.rollback(): previous release restored and kept after a restart` publishes release A, then B (both healthy), taps the sample app's "Roll back to previous release" button (found with `uiautomator dump`), and times the call until the server receives `applied` telemetry for A (`rollbackToGoodActiveMs`). It then waits for two or more check-ins while the pointer still names B, force-stops and relaunches, and checks that A runs, B is blocked and was not downloaded again, and `rolled_back` telemetry arrived. The app reports that event under the release that is running when it is sent, so the scenario looks for it under A. If B comes back after the relaunch, the scenario fails and the row says so. The `rolled_back` event is sent when the app next mounts.
 
+## First update after install
+
+`--first-trials` (default 3) fresh installs: each trial uninstalls, installs, starts the shell, waits for the bundled release to report healthy, deletes the pointers of earlier releases (a new install would otherwise apply them before the trial publishes), then publishes a patch against the APK's own bundle. The cohort is drawn again on each install, so the band is read again each time. The report has `phaseMedianMs.pointerToPatchMs`.
+
 ## Patch update timeline
 
 The patch scenario runs `--patch-trials` trials (default 5). Each trial records a `timeline`: pointer seen, patch received, staged (runtime finished download and verify) and healthy (`applied` telemetry after `markHealthy`), all in ms after publish, from the server log and telemetry. `phaseMedianMs` in the report gives the median gap between phases and `unaccountedMs`, the time that the runtime's own download and apply numbers do not explain. Poll misses (pointer fetched more than 3 s after publish) and the trial after one are left out of the median. The scenario needs `v1` to `v10` bundles (`make-bundles.sh bundles 10`).
