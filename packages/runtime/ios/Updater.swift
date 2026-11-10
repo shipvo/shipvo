@@ -98,7 +98,7 @@ enum Updater {
     let dest = s.dir.appendingPathComponent("r\(release).hbc")
     try? FileManager.default.removeItem(at: dest)
     try FileManager.default.moveItem(at: tmp, to: dest)
-    stage(s, dest: dest, release: release, sha: wantSha, issuedAt: body["issued_at"] as? String)
+    stage(s, dest: dest, release: release, sha: wantSha, issuedAt: body["issued_at"] as? String, stateVersion: body["state_version"])
     return ["status": "staged", "release": release, "bytes": downloadedBytes, "via": via, "bundleBytes": size,
             "downloadMs": Int(downloadMs), "verifyMs": Int(verifyMs), "issuedAt": body["issued_at"] as? String ?? ""]
   }
@@ -170,10 +170,10 @@ enum Updater {
   }
 
   /// Synchronous so the lock is never held across a suspension point.
-  private static func stage(_ s: Store, dest: URL, release: Int, sha: String, issuedAt: String?) {
+  private static func stage(_ s: Store, dest: URL, release: Int, sha: String, issuedAt: String?, stateVersion: Any?) {
     Store.lock.lock(); defer { Store.lock.unlock() }
     if let p = s.pendingPath, p != dest.path { try? FileManager.default.removeItem(atPath: p) }
-    s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0; s.pendingSha = sha
+    s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0; s.pendingSha = sha; s.stageStateVersion(stateVersion)
     if s.binaryVersion == nil { s.binaryVersion = s.installedBinaryVersion }
     s.pendingIssuedAt = issuedAt
   }
