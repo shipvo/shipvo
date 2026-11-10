@@ -288,10 +288,11 @@ shipvo audit shop --limit 100                  # only the newest 100 entries
 ```
 
 - It pages through `GET /audit/<app>` with `?before=<id>`, 200 rows at a time. `--limit` caps the total (default: all).
-- Key rotations appear in the log as rows with `action` `key-rotation`, merged by time with publishes and rollbacks. `release`, `release_id` and `before` are empty; `after` holds `{ "sequence": n, "valid_from": "<ISO time>" }`. They come with the first page only. See [Key rotation](key-rotation.md#see-rotations-in-the-audit-log).
+- Key rotations appear in the log as rows with `action` `key-rotation`, merged by time with publishes and rollbacks. `release`, `release_id` and `before` are empty; `after` holds `{ "sequence": n, "valid_from": "<ISO time>" }`. They are merged into the first page, which holds the newest rows (up to 200), so an export includes rotations that fall within the newest 200 rows. See [Key rotation](key-rotation.md#see-rotations-in-the-audit-log).
 - CSV has a header row, every field in double quotes, and columns in this order: `id`, `app_id`, `at`, `actor`, `actor_kind`, `action`, `release`, `release_id`, `before`, `after`. Objects are written as JSON text.
 - A value that starts with `=`, `+`, `-` or `@` gets a leading `'` so a spreadsheet does not run it as a formula.
 - It needs `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create`. A non-2xx answer prints the status and exits 1. The token is never printed.
+- Key rotations (`shipvo keys rotate`) appear in the log as rows with `action` `key-rotation`, next to publishes and rollbacks. Their `after` is `{"sequence":n,"valid_from":"..."}`, and `release`, `release_id` and `before` are empty. Rows from both sources are merged by time. Rotation rows come only with the first page of `GET /audit/<app>` (the request with no `before`).
 
 ## shipvo run
 

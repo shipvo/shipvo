@@ -1,0 +1,1 @@
+{"duration": 90, "want": ["ambient", "acoustic", "tech"], "avoid": ["upbeat"], "bpm": [70, 110], "energy": "calm", "hits": [{"t": 50, "type": "reveal"}, {"t": 70, "type": "payoff"}], "narration": true}
