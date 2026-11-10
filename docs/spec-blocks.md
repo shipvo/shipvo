@@ -246,7 +246,7 @@ Add `refresh` to an `http` data source to run it again on a timer while the app 
 
 ## Example specs
 
-`packages/spec/gallery/` holds example specs to copy and change: a habit tracker and a workout log. Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.
+`packages/spec/gallery/` holds example specs to copy and change: a habit tracker, a workout log, an expense splitter, a trip checklist and flashcards. Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.
 
 ## Data sources that use a saved key
 
