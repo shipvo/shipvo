@@ -2,7 +2,7 @@
 
 Ask Claude, ChatGPT or Cursor to use your app the way a customer would, and tell you where it breaks. The assistant connects to Shipvo over MCP, opens your app in a simulated phone and works through it screen by screen. There is no emulator to install and no phone to plug in.
 
-This page is for founders and developers who want an AI assistant to try their app. You will end with the assistant tapping through your app and reporting what broke. It takes about five minutes. This page is the shortest path from nothing to your assistant tapping through your app. For scripted tests that run on every pull request, see [Test your app in CI](testing.md).
+This page is for founders and developers who want an AI assistant to try their app. You will end with the assistant tapping through your app and reporting what broke. This page is the shortest path from nothing to your assistant tapping through your app. For scripted tests that run on every pull request, see [Test your app in CI](testing.md).
 
 ## The two ways to connect
 
@@ -105,7 +105,7 @@ The simulator renders your app on the web and simulates the device. Everything s
 
 ## Troubleshooting
 
-**The assistant says it has no Shipvo tools.** Check these in order: it has no Shipvo tools, check these in order:
+**The assistant says it has no Shipvo tools.** Check these in order:
 
 - The key has not expired (`shipvo keys`).
 - The URL ends in `/mcp` for header clients and `/mcp/<key>` for ChatGPT.

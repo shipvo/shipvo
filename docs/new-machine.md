@@ -1,6 +1,6 @@
 # Moving to a new machine
 
-This page is for anyone who is switching laptops or joining a teammate's repo. You will end with the new machine able to publish updates to the phones that already have your app. It takes about ten minutes. One step matters a lot: the **signing seed**, a secret value that proves an update is yours (see the [glossary](glossary.md)).
+This page is for anyone who is switching laptops or joining a teammate's repo. You will end with the new machine able to publish updates to the phones that already have your app. One step matters a lot: the **signing seed**, a secret value that proves an update is yours (see the [glossary](glossary.md)).
 
 ## What lives where
 
@@ -54,22 +54,20 @@ The line `signing key matches shipvo.json publicKey` should pass.
 
 So back it up once, today, even if you are not moving.
 
+## Troubleshooting
+
+| You see | Why | Fix |
+| --- | --- | --- |
+| `This seed does not match the public key in shipvo.json` | The seed is from a different app or key | Import the seed you backed up for this app. Do not change `publicKey` in `shipvo.json`: installed apps pin it |
+| `Usage: shipvo keys import <seed>` | No seed was given | Pass the seed, `--file seed.txt`, or pipe it in: `echo <seed> \| shipvo keys import` |
+| `Set SHIPVO_SIGNING_SEED or SHIPVO_SIGNING_SEED_FILE ... or keep it at .shipvo/seed.txt` | `publish` found no seed | Run `shipvo keys import` on this machine, or set `SHIPVO_SIGNING_SEED` in CI |
+
 ## Teams
 
 Do not share the seed over chat. Put it in the CI secrets (`SHIPVO_SIGNING_SEED`) and let CI publish, or keep it in a shared vault your team already trusts. Each person runs their own `shipvo login` and `shipvo app create`; publish tokens are per machine.
 
-## Troubleshooting
-
-**`keys import` says the seed belongs to a different key.** It is the seed of another app, or an older key. Use the seed from the backup of this app, the one that matches the `publicKey` in `shipvo.json`.
-
-**`keys import` says it does not look like a Shipvo signing seed.** The copy lost or gained characters. A seed is a 32-byte value in base64. Copy it again from your password manager, or use `--file seed.txt` so nothing is retyped.
-
-**A command says to set `SHIPVO_SIGNING_SEED`.** This machine has no seed yet. Run `shipvo keys import`, or keep the seed at `.shipvo/seed.txt`.
-
-**`shipvo doctor` fails on the signing key.** Its fix line says to restore the right seed with `shipvo keys import`.
-
 ## Next steps
 
-- Publish from the new machine: [Getting started](getting-started.md).
-- Let CI publish so no one needs the seed on a laptop: [Command line guide](cli.md).
-- Words used on this page: [Glossary](glossary.md).
+- [Ship a fix](tutorials/ship-a-fix.md): publish your first update from the new machine.
+- [Self-hosting](self-hosting.md): run your own control plane.
+- [Glossary](glossary.md): signing seed, publish token, shell.
