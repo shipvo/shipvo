@@ -131,3 +131,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Refs after a phone restart (`f1e2`, `p1e5`) work in `tap`, `type`, `scroll`, `wait_for` | [agents](agents.md#troubleshooting) | | | |
 | Android patch step falls back to the full download on out-of-memory or over budget (`patchError`) | [runtime](../packages/runtime/README.md), [getting-started](getting-started.md) | | | |
 | Roll back safely with a state version (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
+| Assistant Inbox (`send_message`, `check_inbox`, `hand_off`, `{{ caller }}`) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | |
+| Patch falls back to full download on small heaps (Android, `patchError`) | [runtime](../packages/runtime/README.md#patches-on-small-heaps-android) | | | |
+| Permissions detected from camera, scanner and file blocks | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |

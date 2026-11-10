@@ -85,6 +85,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: Assistant Inbox: assistants on one phone message each other and hand over tasks, with `{{ caller }}` filled in automatically ([Phone apps](phone-apps.md#assistants-talking-to-each-other), #1472)
 - 2026-11-10: Spec apps export a list as CSV with `csv(rows, columns?)` ([Export data as CSV](spec-blocks.md#export-data-as-csv), #1458)
 - 2026-11-10: `tap`, `type`, `scroll` and `wait_for` accept the refs the phone returns after a restart, such as `f1e2` ([Agents](agents.md#troubleshooting), #1459)
 - 2026-11-10: On Android, an update patch that would use too much memory falls back to the full download ([Runtime](../packages/runtime/README.md), #1454)
