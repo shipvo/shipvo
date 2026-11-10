@@ -108,6 +108,10 @@ Then `npx eas-cli submit -p ios --profile shipvo-ios` (or `-p android`) after a 
 
 - **`eas-cli submit` asks for a profile.** Pass the profile the template creates: `--profile shipvo-ios` or `--profile shipvo-android`.
 - **iOS says the build number was already used.** Set it with `npx eas-cli build:version:set -p ios`, then build again.
+- **`shipvo sim` says `No index.html in <folder>. Build your web app first`.** The `webDir` folder in `capacitor.config.*` is empty or missing. Run `npm run build`, then `npx cap copy`, and start `shipvo sim` again.
+- **`capacitor.config webDir "<path>" is outside the project`.** `webDir` must point inside the project folder. Change it to a folder under the project root, for example `dist`.
+- **`This is not a Capacitor project`.** Run the command in the folder that holds `capacitor.config.*` and an `android/` or `ios/App/App.xcodeproj` folder.
+- **An Expo app in the same repo opens as Expo.** A project with `app.json` or `app.config.*` is treated as an Expo app and builds with `expo export`, as before.
 
 ## Next steps
 
