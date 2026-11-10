@@ -1,0 +1,1 @@
+- docs: the App spec page covers the `calendar` and `map` blocks, Phone apps covers the Secrets screen in Settings, and Test your build covers opening a build from a `build_url`. Troubleshooting entries added for the new blocks.
