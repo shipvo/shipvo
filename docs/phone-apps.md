@@ -41,9 +41,14 @@ Each change is recorded in `device_log` as `setting`, with `simulated: true`. Us
 
 ## See saved keys in Settings
 
-The phone's Settings app has a **Secrets** row, on the Android and iOS skins. Tap it to see one row for each key saved for the apps on the home screen: the key's name, the app, the domain it may be sent to, its access, and when it was last used. With no keys, the screen says so.
+Use this to check which keys your apps have saved, without anyone seeing the key itself.
 
-The screen shows only those five facts. A key's value never reaches the page. To rotate or revoke a key, use the [saved-key routes](self-hosting.md#saved-key-routes-vault). If an app's keys cannot be loaded, the screen leaves that app out and lists the rest.
+1. Open the phone in your browser with `shipvo run` or `shipvo sim`.
+2. Tap Settings, then tap **Secrets**.
+3. Each saved key shows its name, the app, the domain it may call, its access, and when it was last used ("never" if it has not been used).
+4. Tap **Back** to return to Settings.
+
+With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate or revoke a key.
 
 ## Open a web page in the phone's Browser
 
@@ -69,6 +74,7 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 | `unknown_setting` / `bad_value` | Wrong key or value | Use the table above |
 | `app_not_foreground` | The home screen or switcher is showing | Call `resume_app` |
 | `phone_locked` | The phone is locked | Call `unlock` |
+| The Secrets screen is empty | No key is saved for the apps on this phone, or the simulator cannot reach the saved-key routes | Save a key for an app first; check that the simulator is running |
 | `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
 
 ## Next steps
@@ -90,6 +96,12 @@ The app is real HTML with every control labelled, so `screen`, `tap`, `type` and
 `device_log` records the create, each action and each update (old and new version) with `source: "real"`.
 
 An app's data lives for the session: it starts from the spec's seed data when the app is created, and it is dropped when the session ends or the app is uninstalled.
+
+## Arrange the home screen
+
+`arrange_apps { session, id, pinned?, hidden?, position?, schedule? }` places an installed app. Pinned apps come first, then apps by `position` (0 first), then in install order. A hidden app is off the home screen but still installed, and `switch_app` still opens it. A `schedule` (`days`, `from`, `to`, for example Monday to Friday 08:00 to 18:00) shows the app only then. A window that crosses midnight belongs to the day it starts: `days: ["fri"], from: "22:00", to: "06:00"` shows Friday 22:00 until Saturday 06:00. `schedule: null` shows it always. Put a weekly planner on weekdays and weekend plans on Saturday, and the home screen follows the phone's clock.
+
+`set_phone_time { session, at }` sets that clock (`2026-11-14T09:00:00`, or `null` for real time), so a test can check what shows on a Saturday morning. The clock stays at the time you set and a time without an offset is read in the simulator host's time zone. In `shipvo run`, the home screen follows the computer's clock and updates when a schedule starts or ends. The home screen text lists the apps that are showing as buttons and, for the others, says whether they are hidden or when their schedule starts. In a phone.json, an app can carry the same `placement` object. Errors are `not_installed`, `bad_placement` and `bad_time`. The result has `home` (the home screen text) and `screen` (the open app's screen when an app is in front, otherwise the home text). A placement in a phone.json that is not valid is left out. Every change is in `device_log`.
 
 ## Install apps and switch between them
 
