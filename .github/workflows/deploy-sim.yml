@@ -31,6 +31,7 @@ jobs:
           # server.mjs imports its sibling modules (app-name.mjs, nav.mjs, ...): copy every runtime .mjs, not the tests.
           for f in packages/sim/*.mjs; do case "$f" in *.test.mjs|*.cases.mjs) ;; *) cp "$f" services/sim/build/sim/ ;; esac; done
           cp -r packages/mcp/dist services/sim/build/mcp/dist
+          pnpm --filter @shipvo/spec build
           mkdir -p services/sim/build/spec && cp -r packages/spec/dist packages/spec/package.json services/sim/build/spec/
       - name: Build the E2B template (one sandbox = one phone)
         if: ${{ env.E2B_API_KEY != '' }}
