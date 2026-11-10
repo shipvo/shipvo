@@ -34,11 +34,11 @@ You have two ways forward:
 - **Publish a fix forward.** Ship a new release with the fix and the same or a higher `stateVersion`. This is the safe choice.
 - **Roll back on purpose**, if you know the older code can read the data:
 
-```bash
-shipvo rollback --to 5 --allow-state-downgrade
-```
+  ```bash
+  shipvo rollback --to 5 --allow-state-downgrade
+  ```
 
-Add `--dry-run` to preview. A preview that would lower the version lists it under `state_downgrade` in `--json` output.
+A `--dry-run` hits the same check. To preview a rollback that lowers the version, pass `--dry-run --allow-state-downgrade`; the `--json` output then lists `state_downgrade` with `platform`, `from` and `to`.
 
 With `--json`, the refusal has code `state_downgrade` and a `next` command that repeats the rollback with `--allow-state-downgrade`.
 
@@ -57,7 +57,7 @@ shipvo audit <app>
 | `has state_version 2, but phones already run state_version 3` | The release you chose stores data in an older format. | Publish a fix forward, or add `--allow-state-downgrade` if the older code can read the newer data. |
 | Rollback stops although you never set `stateVersion` on the old release | Releases published before you started using `stateVersion` have none, and a newer release declares one. | Same two choices. Set `stateVersion` from your next publish on. |
 | `stateVersion must be a positive integer` | `shipvo.json` holds `0`, a decimal, a string or a negative number. | Use a whole number from 1 up. |
-| No `state_downgrade` in the audit log | The rollback did not lower the version. | Nothing to do. Only downgrades are recorded this way. |
+| `--dry-run` stops with the `state_downgrade` refusal | The preview runs the same check as the real rollback. | Pass `--dry-run --allow-state-downgrade` to preview a rollback that lowers the version. |
 
 ## Next steps
 
