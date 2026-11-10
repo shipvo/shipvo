@@ -21,7 +21,7 @@ You should see the line **Cart: 2 items** under the order note.
 
 ![A simulated Android phone with a camera hole at the top. The app is called Tide and Tackle. It lists Spinning rod, Tackle box and Tide chart, each with an Add button, then an Order note field and the line Cart: 2 items. Under the list are five lines for device features, all set to not set or off, and the line Version 1.](/tutorials/try-shipvo-in-your-browser/01-cart.png)
 
-Try it here too. This phone is the same sample shop, in the page you are reading:
+Here is a live phone in this page. It runs the Tide & Tackle sample app, which has a cart screen:
 
 <div data-shipvo-phone data-app="tide" data-release="latest" data-path="/" data-caption="Try it: add two items to the cart, then open the cart. You should see both items and a total." data-fallback="/tutorials/try-shipvo-in-your-browser/01-cart.png"></div>
 
