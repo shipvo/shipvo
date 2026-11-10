@@ -104,6 +104,27 @@ describe("evaluate: text and fallbacks", () => {
     expect(() => evaluate("csv(rows, ['t'], 1)", { rows: [] })).toThrow();
   });
 
+  it("parseCsv reads what csv writes", () => {
+    const rows = [{ title: "A, B", note: 'say "hi"', n: "2" }, { title: "line\nbreak", note: "", n: "" }];
+    expect(evaluate("parseCsv(csv(rows))", { rows })).toEqual(rows);
+  });
+
+  it("parseCsv: LF and CRLF, BOM, blank lines, short rows and no final newline", () => {
+    expect(evaluate("parseCsv(t)", { t: "\uFEFFa,b\n1,2\r\n\r\n3\n4,5" })).toEqual([{ a: "1", b: "2" }, { a: "3", b: "" }, { a: "4", b: "5" }]);
+    expect(ev("parseCsv('')")).toEqual([]);
+    expect(ev("parseCsv('a,b\\n')")).toEqual([]);
+  });
+
+  it("parseCsv drops cells beyond the header and the last duplicate header wins", () => {
+    expect(ev("parseCsv('a,b\\n1,2,3')")).toEqual([{ a: "1", b: "2" }]);
+    expect(ev("parseCsv('a,a\\n1,2')")).toEqual([{ a: "2" }]);
+  });
+
+  it("parseCsv refuses an open quote and non-text", () => {
+    expect(() => evaluate("parseCsv(t)", { t: 'a\n"x' })).toThrow(/never closed/);
+    expect(() => ev("parseCsv(1)")).toThrow();
+  });
+
   it("orElse", () => {
     expect(ev("orElse(null, 'x')")).toBe("x");
     expect(ev("orElse('a', 'x')")).toBe("a");
