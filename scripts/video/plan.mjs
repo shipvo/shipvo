@@ -36,5 +36,6 @@ export function flashes(script, plan) {
 export const imgPath = (pub, n, exists) => {
   if (n.includes("/")) { const [d, f] = n.split("/"); return `${pub}/${d}/${f}.png`; }
   const d = ["first-app", "test-with-an-assistant", "test-your-app-with-lumi"].find((x) => exists(`${pub}/${x}/${n}.png`));
+  if (!d) throw new Error(`image not found in any folder: ${n}`);
   return `${pub}/${d}/${n}.png`;
 };
