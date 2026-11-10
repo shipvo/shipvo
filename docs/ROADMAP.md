@@ -85,7 +85,8 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
-- 2026-11-10: Revoke a saved key from the Secrets screen, and three more example specs: expense splitter, trip checklist and flashcards ([Phone apps](phone-apps.md#see-saved-keys-in-settings), [Example specs](spec-blocks.md#example-specs), #1388, #1385)
+- 2026-11-10: `room_log` and `room_note` let a lead agent see what the other agents in a room did and leave notes for them ([Agents](agents.md#room-log-and-notes), #1419)
+- 2026-11-10: New-machine troubleshooting for saved keys, a clear message when a revoke fails, and a "cannot be undone" prompt on Revoke ([New machine](new-machine.md), [Phone apps](phone-apps.md#see-saved-keys-in-settings), #1400)
 - 2026-11-10: Exported phone apps carry their home-screen layout, and `import_phone_apps` warns about each invalid layout field ([Phone apps](phone-apps.md), #1401)
 - 2026-11-10: `app_activity` shows what the agent built and changed in each spec app, `refresh_app` fetches a data source now, and `schedule_app` shows or hides an app on a time window ([Phone apps](phone-apps.md#see-what-was-built-and-changed), #1396, #1379, #1357)
 - 2026-11-10: Arrange the home screen with `arrange_apps` (pin, hide, position, schedule) and set the phone's clock with `set_phone_time`, on Android and iOS ([Phone apps](phone-apps.md#arrange-the-home-screen), #1349)

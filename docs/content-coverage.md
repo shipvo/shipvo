@@ -116,8 +116,8 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Data sources refresh on an interval (`refresh`, 30 seconds or more) | [spec-blocks](spec-blocks.md#keep-a-data-source-fresh) | | | |
 | Gallery of example specs (`packages/spec/gallery`: habit tracker, workout log, expense splitter, trip checklist, flashcards) | [spec-blocks](spec-blocks.md#example-specs) | | | |
 | Faster rebuild after a save in `shipvo run` (Metro cache kept) | [run](run.md) | | | |
-| Revoke a saved key from the phone's Secrets screen | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
 | See what an agent built and changed in a spec app (`app_activity`) | [phone-apps](phone-apps.md#see-what-was-built-and-changed) | | | |
 | Fetch an app's live data now (`refresh_app`) | [phone-apps](phone-apps.md#fetch-live-data-now) | | | |
 | Show or hide an app on a time window (`schedule_app`, `clear_schedule`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
 | Network proxy refusal codes (`x-shipvo-net-error`) | [phone-network](phone-network.md#troubleshooting) | | | |
+| Room log and notes (`room_log`, `room_note`): a lead agent sees what the others did | [agents](agents.md#room-log-and-notes) | | | |

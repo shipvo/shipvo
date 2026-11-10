@@ -180,10 +180,11 @@ export class SpecHost {
   }
 
   /** Starts an app from a spec. Resolves { ok: true } or { ok: false, errors } with a JSON path and a fix for each problem. */
-  create(session, id, spec, { style = "android", reduceMotion = false, data, state } = {}) {
-    const made = createApp(spec, { style, reduceMotion, ...(data ? { data } : {}), ...(state ? { state } : {}) });
+  create(session, id, spec, { style = "android", reduceMotion = false, data, state, permissions = {} } = {}) {
+    const devicePermissions = { ...permissions };   // shared with the running app: setPermissions changes it in place
+    const made = createApp(spec, { style, reduceMotion, devicePermissions, ...(data ? { data } : {}), ...(state ? { state } : {}) });
     if (!made.ok) return { ok: false, errors: made.errors };
-    this.running.set(key(session, id), { app: made.app, spec, style, reduceMotion, version: 1, history: [{ version: 1, at: Date.now(), changes: [`created: ${describeSpec(spec)}`] }] });
+    this.running.set(key(session, id), { app: made.app, spec, style, reduceMotion, devicePermissions, version: 1, history: [{ version: 1, at: Date.now(), changes: [`created: ${describeSpec(spec)}`] }] });
     this.schedule(session, id);
     return { ok: true, warnings: made.app.render().warnings ?? [] };
   }
@@ -199,7 +200,7 @@ export class SpecHost {
     const keep = (names, from) => Object.fromEntries(Object.entries(from).filter(([k]) => names.includes(k)));
     const collections = Object.entries(spec?.data ?? {}).filter(([, v]) => v?.source === "collection").map(([k]) => k);
     const stateKeys = Object.keys(spec?.state ?? {});
-    const made = createApp(spec, { style: cur.style, reduceMotion: cur.reduceMotion, data: keep(collections, cur.app.data), state: keep(stateKeys, cur.app.state) });
+    const made = createApp(spec, { style: cur.style, reduceMotion: cur.reduceMotion, devicePermissions: cur.devicePermissions, data: keep(collections, cur.app.data), state: keep(stateKeys, cur.app.state) });
     if (!made.ok) return { ok: false, errors: made.errors };
     const from = cur.version;
     this.running.set(key(session, id), { ...cur, app: made.app, spec, version: from + 1, history: [...cur.history, { version: from + 1, at: Date.now(), changes: diffSpec(cur.spec, spec) }] });
@@ -220,6 +221,13 @@ export class SpecHost {
     const names = Object.entries(r.spec?.data ?? {}).filter(([, v]) => v?.source === "collection").map(([k]) => k);
     return { style: r.style, spec: structuredClone(r.spec), data: structuredClone(Object.fromEntries(names.filter((n) => n in r.app.data).map((n) => [n, r.app.data[n]]))), settings: structuredClone(r.app.state) };
   }
+
+  /** Sets one permission answer for a running app. The next action sees it. */
+  // An unknown app is ignored on purpose: the person may toggle Settings for an app that is not running yet.
+  setPermission(session, id, permission, allowed) { const r = this.running.get(key(session, id)); if (r) r.devicePermissions[permission] = allowed; }
+
+  /** Makes a running app's permission answers exactly `answers` (after an update that declares other permissions). */
+  syncPermissions(session, id, answers) { const r = this.running.get(key(session, id)); if (!r) return; for (const k of Object.keys(r.devicePermissions)) delete r.devicePermissions[k]; Object.assign(r.devicePermissions, answers); }
 
   /** Every version of an app with what changed in it, newest last. */
   history(session, id) { return (this.running.get(key(session, id))?.history ?? []).map((h) => ({ version: h.version, at: h.at, changes: h.changes ?? [] })); }
