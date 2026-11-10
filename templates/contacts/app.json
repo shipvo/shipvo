@@ -274,7 +274,7 @@
         },
         {
           "type": "badge",
-          "value": "{{ count(shown) }} contacts"
+          "value": "{{ count(shown) }} {{ count(shown) == 1 ? 'contact' : 'contacts' }}"
         },
         {
           "type": "text",

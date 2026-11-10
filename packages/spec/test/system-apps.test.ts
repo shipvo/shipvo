@@ -63,7 +63,7 @@ describe("Contacts", () => {
     r.app.setField("Find a contact form", "query", "mechanic");
     expect(r.app.submit("Find a contact form").ok).toBe(true);
     const t = describeTree(r.app.render().tree);
-    expect(t).toContain("1 contacts"); expect(t).toContain("Ada Obi"); expect(t).not.toContain("Bola Ade");
+    expect(t).toContain("1 contact"); expect(t).not.toContain("1 contacts"); expect(t).toContain("Ada Obi"); expect(t).not.toContain("Bola Ade");
   });
 });
 
@@ -88,6 +88,15 @@ describe("Messages", () => {
     expect(p.call("list_conversations", {}).value.threads[0].unread).toBe(0);
     expect(p.screen()).toContain("0 unread");
   });
+  it("matches a person's name without regard to case or spaces at the ends", () => {
+    const p = mk();
+    p.call("send_text", { to: "Ada", body: "one" }); p.call("receive_text", { from: " ada ", body: "two" });
+    const t = p.call("list_conversations", {}).value.threads;
+    expect(t.map((x: any) => [x.with, x.unread])).toEqual([["Ada", 1]]);
+    expect(p.call("read_conversation", { with: "ADA" }).value.texts.map((x: any) => x.body)).toEqual(["one", "two"]);
+    p.call("delete_conversation", { with: "ada" });
+    expect(p.call("list_conversations", {}).value.threads).toEqual([]);
+  });
   it("delete_conversation removes the texts and the thread", () => {
     const p = mk();
     p.call("send_text", { to: "Ada", body: "one" }); p.call("send_text", { to: "Bola", body: "two" });
@@ -111,6 +120,7 @@ describe("Clock", () => {
   it("turns alarms off and on, and deletes them", () => {
     const p = mk();
     const id = p.call("add_alarm", { time: "06:45" }).value.id;
+    expect(p.screen()).toContain("1 alarm on"); expect(p.screen()).not.toContain("1 alarms");
     p.call("set_alarm", { id, on: false });
     expect(p.call("list_alarms", {}).value.alarms[0].on).toBe(false);
     expect(p.screen()).toContain("0 alarms on");
@@ -121,6 +131,7 @@ describe("Clock", () => {
     const p = mk();
     const id = p.call("start_timer", { minutes: 12, label: "Tea" }).value.id;
     expect(p.call("list_timers", {}).value.timers.map((x: any) => [x.label, x.minutes, x.state])).toEqual([["Tea", 12, "running"]]);
+    expect(p.call("list_timers", {}).value.timers[0].started).toBe("2026-11-10T12:00:00.000Z");
     p.call("stop_timer", { id });
     expect(p.call("list_timers", {}).value.timers[0].state).toBe("stopped");
     const pid = p.call("add_place", { name: "Paris", timezone: "Europe/Paris" }).value.id;

@@ -4,7 +4,7 @@
     "id": "messages",
     "name": "Messages",
     "icon": "message",
-    "description": "Text conversations with people, one thread for each person."
+    "description": "Text conversations with people, one thread for each person. Names match without regard to case or spaces at the ends."
   },
   "theme": {
     "mode": "light",
@@ -76,15 +76,15 @@
           }
         },
         {
-          "if": "threads.exists(h, h.with == trim(input.to))",
+          "if": "threads.exists(h, lower(h.with) == lower(trim(input.to)))",
           "then": [
             {
               "update": "threads",
-              "where": "item.with == trim(input.to)",
+              "where": "lower(item.with) == lower(trim(input.to))",
               "value": {
                 "last": "{{ input.body }}",
                 "order": "{{ 0 - last(sortBy(texts, 'seq')).seq }}",
-                "unread": "{{ count(texts.filter(t, t.with == trim(input.to) && t.direction == 'in' && !t.read)) }}"
+                "unread": "{{ count(texts.filter(t, lower(t.with) == lower(trim(input.to)) && t.direction == 'in' && !t.read)) }}"
               }
             }
           ],
@@ -95,7 +95,7 @@
                 "with": "{{ trim(input.to) }}",
                 "last": "{{ input.body }}",
                 "order": "{{ 0 - last(sortBy(texts, 'seq')).seq }}",
-                "unread": "{{ count(texts.filter(t, t.with == trim(input.to) && t.direction == 'in' && !t.read)) }}"
+                "unread": "{{ count(texts.filter(t, lower(t.with) == lower(trim(input.to)) && t.direction == 'in' && !t.read)) }}"
               }
             }
           ]
@@ -137,15 +137,15 @@
           }
         },
         {
-          "if": "threads.exists(h, h.with == trim(input.from))",
+          "if": "threads.exists(h, lower(h.with) == lower(trim(input.from)))",
           "then": [
             {
               "update": "threads",
-              "where": "item.with == trim(input.from)",
+              "where": "lower(item.with) == lower(trim(input.from))",
               "value": {
                 "last": "{{ input.body }}",
                 "order": "{{ 0 - last(sortBy(texts, 'seq')).seq }}",
-                "unread": "{{ count(texts.filter(t, t.with == trim(input.from) && t.direction == 'in' && !t.read)) }}"
+                "unread": "{{ count(texts.filter(t, lower(t.with) == lower(trim(input.from)) && t.direction == 'in' && !t.read)) }}"
               }
             }
           ],
@@ -156,7 +156,7 @@
                 "with": "{{ trim(input.from) }}",
                 "last": "{{ input.body }}",
                 "order": "{{ 0 - last(sortBy(texts, 'seq')).seq }}",
-                "unread": "{{ count(texts.filter(t, t.with == trim(input.from) && t.direction == 'in' && !t.read)) }}"
+                "unread": "{{ count(texts.filter(t, lower(t.with) == lower(trim(input.from)) && t.direction == 'in' && !t.read)) }}"
               }
             }
           ]
@@ -198,21 +198,21 @@
       "do": [
         {
           "update": "texts",
-          "where": "item.with == input.with && item.direction == 'in'",
+          "where": "lower(item.with) == lower(trim(input.with)) && item.direction == 'in'",
           "value": {
             "read": true
           }
         },
         {
           "update": "threads",
-          "where": "item.with == input.with",
+          "where": "lower(item.with) == lower(trim(input.with))",
           "value": {
             "unread": 0
           }
         },
         {
           "return": {
-            "texts": "{{ sortBy(texts.filter(t, t.with == input.with), 'seq') }}"
+            "texts": "{{ sortBy(texts.filter(t, lower(t.with) == lower(trim(input.with))), 'seq') }}"
           }
         }
       ]
@@ -227,11 +227,11 @@
       "do": [
         {
           "delete": "texts",
-          "where": "item.with == input.with"
+          "where": "lower(item.with) == lower(trim(input.with))"
         },
         {
           "delete": "threads",
-          "where": "item.with == input.with"
+          "where": "lower(item.with) == lower(trim(input.with))"
         },
         {
           "toast": "Conversation deleted"
