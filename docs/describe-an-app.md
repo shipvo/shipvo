@@ -10,7 +10,7 @@ For founders and makers who want a small app on a phone in a minute, and for dev
 - A change is a new version of the same app. What people entered stays.
 - `app_activity` lists each version and what changed.
 
-Android and iOS work the same way. Pick the look with `style` (`"android"` is the default, `"ios"` for the iPhone look).
+Android and iOS work the same way. Pick the look with `style`: `"android"` (the default) or `"ios"` for the iPhone look. Both are covered in [Phone apps](phone-apps.md#describe-an-app-and-it-appears).
 
 ## Before you start
 
@@ -120,7 +120,13 @@ To check a spec yourself before you send it:
 
 ```bash
 npm install @shipvo/spec
-node -e "import('@shipvo/spec').then(({validate}) => console.log(validate(JSON.parse(require('fs').readFileSync('planner.json','utf8')))))"
+cat > check.mjs <<'EOF'
+import { readFileSync } from "node:fs";
+import { validate } from "@shipvo/spec";
+
+console.log(validate(JSON.parse(readFileSync("planner.json", "utf8"))));
+EOF
+node check.mjs
 ```
 
 Expected output: `{ errors: [], warnings: [] }`.
@@ -148,7 +154,7 @@ Every option and error is in [Phone apps](phone-apps.md#describe-an-app-and-it-a
 | `already_installed` from `import_phone_apps` | An app with that id is already on the phone. | Pass `replace: true`, or use `update_app` to change the app. |
 | `action_failed` | The action refused the input. | Read the reason in the result, then send a valid value. |
 | A form you typed in starts empty after an update | The app is rebuilt and the page reloads. Entered data stays; unsent form text and the back stack do not. | Submit the form before asking for a change. |
-| The app's data is gone | Data lives for the session. It is dropped when the session ends or the app is uninstalled. | Use `export_phone_apps` to keep it. |
+| The app's data is gone | The app's data stays with the session and the installed app. | `export_phone_apps` saves it and `import_phone_apps` brings it back. |
 
 ## Next steps
 
