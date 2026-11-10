@@ -1,0 +1,5 @@
+- New MCP tools `get_connectivity` and `set_connectivity`: Wi-Fi, mobile data and airplane mode for the whole phone, on Android and iOS. Error codes `bad_value`, `airplane_on`.
+- `@shipvo/spec`: expressions can read `network.online` and `network.type` (`wifi`, `cellular` or `none`). New render option `network`. Default: online on Wi-Fi.
+- `@shipvo/device`: airplane mode turns Wi-Fi and mobile data off, Wi-Fi can come back on during it (and the phone is then online), and leaving it restores the radios. Before, airplane mode was always offline and left the radio switches as they were.
+- Spec apps' http data sources do not fetch while the phone is offline.
+- Migration: a test that set `airplane: true` with Wi-Fi on and expected offline still gets offline, because airplane mode now turns Wi-Fi off. Setting `wifi: true` in airplane mode now means online.

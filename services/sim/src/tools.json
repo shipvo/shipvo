@@ -1126,6 +1126,31 @@
     }
   },
   {
+    "name": "get_connectivity",
+    "description": "The phone's Wi-Fi, mobile data and airplane mode switches, and the network every app sees from them: online and type (wifi, cellular or none). Android and iOS.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "get_network_profile",
     "description": "Read the phone's current network profile name (online until set_network_profile or phone.json changes it).",
     "inputSchema": {
@@ -2759,6 +2784,40 @@
       "required": [
         "session",
         "text"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "set_connectivity",
+    "description": "Turn Wi-Fi, mobile data or airplane mode on or off for the whole phone, as in quick settings on Android and iOS. Airplane mode turns both radios off; Wi-Fi can come back on during it, and leaving it restores the radios as they were. Every app sees the result: apps you built read it as {{ network.online }} and {{ network.type }}, and their web data does not load while the phone is offline. The open app's screen is drawn again. Logged in device_log as \"connectivity\".",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "wifi": {
+          "type": "boolean"
+        },
+        "mobile_data": {
+          "type": "boolean"
+        },
+        "airplane": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "session"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"

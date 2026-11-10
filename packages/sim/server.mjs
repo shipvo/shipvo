@@ -37,6 +37,7 @@ import { createNav, pressHome, openRecents, resume, killApp, assertForeground, s
 import { assistantName } from "./identity.mjs";
 import { pendingBanner, waitForNew } from "./banner.mjs";
 import { createWakeups, WakeupError } from "./wakeup.mjs";
+import { initialConnectivity, applyConnectivity, networkOf, describeConnectivity, ConnectivityError } from "./connectivity.mjs";
 import { shareTargets, shareInput, ShareError } from "./share.mjs";
 import { createReminders, ReminderError } from "./reminders.mjs";
 import { makeBackup, checkBackup, BackupError } from "./backup.mjs";
@@ -254,6 +255,16 @@ async function boot(s, url) {
 // A new page load starts with a fresh device state, so the session's network profile is set on it again.
 async function reapplyNetProfile(s, page) {
   if (s.netProfile) await page.evaluate((n) => globalThis.__pnDevice?.set?.({ networkProfile: n }), s.netProfile).catch(() => {});
+  if (s.conn) await page.evaluate((c) => globalThis.__pnDevice?.set?.({ wifi: c.wifi, mobileData: c.mobile_data, airplane: c.airplane }), s.conn).catch(() => {});
+}
+// Spec apps read the phone's network as `network`; it follows Wi-Fi, mobile data, airplane mode and an "offline" network profile.
+// When it changes and a spec app is open, its screen is drawn again so it shows the new state.
+async function syncNetwork(s, page) {
+  const sid = sidOf(s), before = JSON.stringify(specHost.network(sid));
+  const now = specHost.setNetwork(sid, networkOf(s.conn ?? initialConnectivity(), s.netProfile ?? "online"));
+  const open = s.nav.where === "app" && s.apps.installed_apps.some((a) => a.id === s.apps.current_app && a.kind === "spec");
+  // A spec app page has no device layer, so no panel can be open over it; the reset keeps the record right if that ever changes.
+  if (open && JSON.stringify(now) !== before) { s.shade.open = "none"; await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
 }
 const specHost = new SpecHost();
 /** One answer per device permission a spec declares: the person's (`given`), or allowed when none was given. */
@@ -555,6 +566,18 @@ async function act(id, body) {
       if (res.ok === false) throw new SimError("action_failed", res.error);
       return { value: res.value ?? null, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
     }
+    // Connectivity: Wi-Fi, mobile data and airplane mode for the whole phone. Every app reads the result (spec apps as `network`,
+    // apps with a bundle through the device layer), and spec apps' http data does not load while the phone is offline.
+    case "get_connectivity": return { connectivity: describeConnectivity(s.conn ?? initialConnectivity(), s.netProfile ?? "online") };
+    case "set_connectivity": {
+      const from = describeConnectivity(s.conn ?? initialConnectivity(), s.netProfile ?? "online");
+      try { s.conn = applyConnectivity(s.conn ?? initialConnectivity(), { wifi: body.wifi, mobile_data: body.mobile_data, airplane: body.airplane }); } catch (e) { if (e instanceof ConnectivityError) throw new SimError(e.code, e.message); throw e; }
+      await page.evaluate((c) => globalThis.__pnDevice?.set?.({ wifi: c.wifi, mobileData: c.mobile_data, airplane: c.airplane }), s.conn).catch(() => {});
+      await syncNetwork(s, page);
+      const now = describeConnectivity(s.conn, s.netProfile ?? "online");
+      (s.netLog ??= []).push({ at: Date.now(), name: "connectivity", from, to: now, source: "simulated" });
+      return { connectivity: now };
+    }
     // Share sheet: the apps and actions that take shared text, and sending text into one. Logged in the app activity as "share".
     case "share_targets": {
       const apps = s.apps.installed_apps.filter((x) => x.kind === "spec").map((x) => ({ id: x.id, name: x.name, spec: specHost.snapshot(sidOf(s), x.id)?.spec }));
@@ -725,7 +748,13 @@ async function act(id, body) {
         if (i < 0) throw new SimError("not_found", `no notification '${body.id}'`);
         s.sysNotes.splice(i, 1); return { dismissed: body.id };
       }
-      try { return { ...(await shadeAction(page, s.shade, body)) }; } catch (e) { if (e instanceof ShadeError) throw new SimError(e.code, e.message); throw e; }
+      let out; try { out = { ...(await shadeAction(page, s.shade, body)) }; } catch (e) { if (e instanceof ShadeError) throw new SimError(e.code, e.message); throw e; }
+      // A Wi-Fi, mobile data or airplane tile changes what every app on the phone sees.
+      if (body.action === "toggle_tile") {
+        const d = await page.evaluate(() => globalThis.__pnDevice ? { wifi: globalThis.__pnDevice.state.wifi, mobile_data: globalThis.__pnDevice.state.mobileData, airplane: globalThis.__pnDevice.state.airplane } : null).catch(() => null);
+        if (d) { s.conn = { ...(s.conn ?? initialConnectivity()), ...d }; await syncNetwork(s, page); }
+      }
+      return out;
     }
     case "get_settings": case "set_setting": {
       try { return { ...(await settingsAction(page, body)) }; } catch (e) { if (e instanceof SettingsError) throw new SimError(e.code, e.message); throw e; }
@@ -807,7 +836,7 @@ async function act(id, body) {
       catch (e) { if (e instanceof InboxError) throw new SimError(e.code, e.message); throw e; }
     }
     case "inbox_clear": return { address: s.inbox.address, cleared: s.inbox.clear() };
-    case "set_network_profile": { await setNetworkProfile(s, page, body.profile); break; }
+    case "set_network_profile": { await setNetworkProfile(s, page, body.profile); await syncNetwork(s, page); break; }
     case "get_network_profile": return { profile: s.netProfile ?? "online", screen: await screen(page) };
     // The phone's Chromium (isolated from the app page). Page text is untrusted: results carry source "web".
     case "browser_open": case "browser_snapshot": case "browser_click": case "browser_type": case "browser_back": case "browser_screenshot": case "browser_tabs": case "browser_close_tab": case "browser_scroll": case "browser_wait_for": {
@@ -862,7 +891,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: search_phone, share_targets, share, get_clipboard, set_clipboard, screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for, set_reminder, list_reminders, cancel_reminder, backup_phone, restore_phone`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: search_phone, get_connectivity, set_connectivity, screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for, share_targets, share, get_clipboard, set_clipboard, set_reminder, list_reminders, cancel_reminder, backup_phone, restore_phone`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
