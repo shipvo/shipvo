@@ -82,6 +82,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: Secrets screen in the phone's Settings lists saved keys, metadata only ([Phone apps](phone-apps.md#see-saved-keys-in-settings), #1350)
 - 2026-11-10: Network profiles on the phone: `set_network_profile`, `setNetwork` in tests and `network` in `phone.json` ([Phone network](phone-network.md), #1338)
 - 2026-11-10: The release pointer carries up to 8 key rotation statements ([Key rotation](design/key-rotation.md), #1336)
 - 2026-11-10: Saved keys: list, rotate, revoke and use log in Settings, with four control-plane vault routes ([App spec](spec-blocks.md#manage-saved-keys), #1298, #1334)
