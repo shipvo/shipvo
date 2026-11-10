@@ -444,6 +444,39 @@ test("import_apps does not warn about a valid hand-written layout, and names eac
 });
 
 for (const style of ["android", "ios"]) {
+  test(`${style}: backup_phone and restore_phone move apps, data, layout, settings and the clipboard to a new phone`, async () => {
+    const NOTES = JSON.parse(readFileSync(new URL("../../templates/notes-tasks/app.json", import.meta.url), "utf8"));
+    const a = `sp-bk-a-${style}`, b = `sp-bk-b-${style}`;
+    assert.ok((await call("/session", { session: a, skin: style, phone: { settings: { dark_mode: true } } })).ok);
+    { const _r = await act(a, { action: "create_app", id: "notes", spec: NOTES, style, open: false }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+    { const _r = await act(a, { action: "app_action", id: "notes", action_name: "add_note", input: { title: "Harbour", body: "rope, hooks" } }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+    { const _r = await act(a, { action: "pin_app", id: "notes", pinned: true }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+    { const _r = await act(a, { action: "install_app", id: "tidewatch", permissions: { location: false } }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+    const bk = await act(a, { action: "backup_phone" });
+    assert.equal(bk.ok, true, JSON.stringify(bk).slice(0, 300));
+    assert.equal(bk.backup.format, "shipvo.phone-backup/v0");
+    assert.equal(bk.backup.settings.dark_mode, true); assert.equal(typeof bk.backup.clipboard, "string");
+    const wire = { ...JSON.parse(JSON.stringify(bk.backup)), clipboard: "lamp order 42" };
+
+    assert.ok((await call("/session", { session: b, skin: style })).ok);
+    assert.equal((await act(b, { action: "restore_phone", backup: { ...wire, settings: { dark_mode: "on" } } })).code, "bad_backup");
+    assert.ok(!(await act(b, { action: "phone_apps" })).installed_apps.some((x) => x.id === "notes"));
+    const r = await act(b, { action: "restore_phone", backup: wire });
+    assert.equal(r.ok, true, JSON.stringify(r).slice(0, 400));
+    assert.deepEqual(r.restored.apps, ["notes"]); assert.deepEqual(r.restored.store_apps, ["tidewatch"]);
+    assert.deepEqual(r.installed_apps.find((x) => x.id === "tidewatch").permissions, { notifications: true, location: false }); assert.ok(r.restored.settings.includes("dark_mode")); assert.equal(r.restored.clipboard, true);
+    const back = (await act(b, { action: "backup_phone" })).backup;
+    const notes = back.apps.find((x) => x.id === "notes");
+    assert.deepEqual(notes.data.notes.map((n) => [n.title, n.body]), [["Harbour", "rope, hooks"]]);
+    assert.deepEqual(notes.placement, wire.apps.find((x) => x.id === "notes").placement);
+    assert.equal(back.settings.dark_mode, true); assert.equal(back.clipboard, "lamp order 42");
+    assert.deepEqual(back.store_apps.map((x) => x.id).sort(), wire.store_apps.map((x) => x.id).sort());
+    assert.equal((await act(b, { action: "restore_phone", backup: wire })).code, "already_installed");
+    { const _r = await act(b, { action: "restore_phone", backup: wire, replace: true }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+  });
+}
+
+for (const style of ["android", "ios"]) {
   test(`${style}: with a spec app open (no device layer) the phone keeps the reminder itself, at the phone time, and it can be dismissed`, async () => {
     const sid = `sp-remsys-${style}`;
     assert.ok((await call("/session", { session: sid, skin: style })).ok);

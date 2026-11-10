@@ -209,6 +209,23 @@ uninstall_app { session, id: "notes" } -> back on the home screen
 device_log { session }                 -> install_app (source "real" for marketplace apps, with the bundle sha256), switch_app, uninstall_app
 ```
 
+## Back up and restore the whole phone
+
+`backup_phone` returns the whole phone as one JSON object, on Android and iOS:
+
+- every app you built, with its spec, data, settings, home-screen place and permission answers;
+- every Store app, with its listing and permission answers;
+- the system settings (dark mode, font size, bold text, reduce motion, language, right-to-left);
+- the clipboard.
+
+Saved keys in the vault are never in a backup.
+
+`restore_phone` puts a backup on this phone or another one. Every part is checked first, and a bad backup changes nothing. Apps you built that are already on the phone need `"replace": true`; a Store app that is already installed is skipped and listed in `skipped`.
+
+```json
+{ "session": "new-phone", "backup": { "format": "shipvo.phone-backup/v0", "...": "..." } }
+```
+
 ## Search across the phone
 
 `search_phone` finds text anywhere on the phone in one call: rows in every app's data (Notes and Tasks, Calendar, Files and Photos, Wallet, Shop, Assistant Inbox and any app you built) and notifications. It works the same on Android and iOS.

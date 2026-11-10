@@ -345,6 +345,31 @@
     }
   },
   {
+    "name": "backup_phone",
+    "description": "Back up the whole phone as one JSON object, on Android and iOS: every app you built with its spec, data, settings, home-screen place and permission answers; every Store app with its listing and permission answers; the system settings; and the clipboard. Saved keys in the vault are never in it. Pass the object to restore_phone on this phone or another. Changes nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "browser_back",
     "description": "Go back one page in the phone browser. Returns the snapshot.",
     "inputSchema": {
@@ -2268,6 +2293,41 @@
       },
       "required": [
         "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "restore_phone",
+    "description": "Put a backup from backup_phone on this phone: apps with their data and layout, Store apps with their permission answers, system settings and the clipboard. Every part is checked first, and a bad backup changes nothing. Apps you built that are already on the phone need replace: true. A Store app that is already installed is skipped and listed in skipped.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "backup": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The backup object from backup_phone"
+        },
+        "replace": {
+          "type": "boolean",
+          "description": "Replace apps already on the phone (default false)"
+        }
+      },
+      "required": [
+        "session",
+        "backup"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"

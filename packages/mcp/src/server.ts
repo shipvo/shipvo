@@ -416,6 +416,10 @@ use(server, tools.list_wakeups,
   async ({ session }) => { need(session); const r = await act({ session, action: "list_wakeups" }) as Act & { wakeups?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ wakeups: r.wakeups }, null, 2)); });
 use(server, tools.clear_wakeup,
   async ({ session, name }) => { need(session); const r = await act({ session, action: "clear_wakeup", name }) as Act & { cleared?: boolean }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cleared: r.cleared === true })); });
+use(server, tools.backup_phone,
+  async ({ session }) => { need(session); const r = await act({ session, action: "backup_phone" }) as Act & { backup?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.backup)); });
+use(server, tools.restore_phone,
+  async ({ session, backup, replace }) => { need(session); const r = await act({ session, action: "restore_phone", backup, replace }) as Act & { restored?: unknown; skipped?: unknown; failed?: unknown; warnings?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ restored: r.restored, ...(r.skipped ? { skipped: r.skipped } : {}), ...(r.failed ? { failed: r.failed } : {}), ...(r.warnings ? { warnings: r.warnings } : {}) }, null, 2)); });
 use(server, tools.search_phone,
   async ({ session, query, app, limit }) => { need(session); const r = await act({ session, action: "search_phone", query, app, limit }) as Act & { results?: unknown; count?: number; truncated?: boolean; query?: string }; if (!r.ok) return result(session, r); return text(JSON.stringify({ query: r.query, count: r.count, truncated: r.truncated, results: r.results }, null, 2)); });
 use(server, tools.inbox_wait,
