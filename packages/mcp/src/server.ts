@@ -428,6 +428,10 @@ use(server, tools.create_app,
   async ({ session, id, spec, name, style, open }) => { need(session); return result(session, await act({ session, action: "create_app", id, spec, ...(name ? { name } : {}), ...(style ? { style } : {}), ...(open === false ? { open: false } : {}) })); });
 use(server, tools.update_app, 
   async ({ session, id, spec, name }) => { need(session); return result(session, await act({ session, action: "update_app", id, spec, ...(name ? { name } : {}) })); });
+use(server, tools.arrange_apps, 
+  async ({ session, ...rest }) => { need(session); return result(session, await act({ session, action: "arrange_apps", ...rest })); });
+use(server, tools.set_phone_time, 
+  async ({ session, at }) => { need(session); return result(session, await act({ session, action: "set_time", at })); });
 use(server, tools.pin_app, 
   async ({ session, id, pinned }) => { need(session); return result(session, await act({ session, action: "pin_app", id, pinned })); });
 use(server, tools.hide_app, 
