@@ -11,11 +11,17 @@ export const STORE_FIXTURE = [
   { id: "tide", name: "Tide & Tackle", url: "fixture://tide", version: "1.0.0" },
   { id: "notes", name: "Pocket Notes", url: "fixture://notes", version: "0.3.1" },
   { id: "weather", name: "Harbour Weather", url: "fixture://weather", version: "2.1.0" },
+  { id: "tidewatch", name: "Tide Watch", url: "fixture://tidewatch", version: "1.2.0", declared: ["notifications", "location"] },
 ];
+
+/** The device features an app may ask for (see docs/design/app-spec.md). */
+export const DEVICE_PERMISSIONS = ["notifications", "camera", "location", "contacts", "calendar", "photos", "files"];
+/** Keeps only known permissions with a true/false answer. */
+const answers = (m) => Object.fromEntries(Object.entries(m && typeof m === "object" ? m : {}).filter(([k, v]) => DEVICE_PERMISSIONS.includes(k) && typeof v === "boolean"));
 
 const text = (v, n) => String(v ?? "").replace(/[<>"'\\]/g, "").slice(0, n);
 const scheme = (x) => String(x).toLowerCase().replace(/:$/, "");
-const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20), ...(Array.isArray(a.schemes) && a.schemes.length ? { schemes: a.schemes.map(scheme) } : {}), ...(cleanPlacement(a.placement) ? { placement: cleanPlacement(a.placement) } : {}) });
+const entry = (a) => ({ id: text(a.id, 60), name: text(a.name || a.id, 40), url: String(a.url ?? ""), version: text(a.version ?? "0.0.0", 20), ...(Array.isArray(a.schemes) && a.schemes.length ? { schemes: a.schemes.map(scheme) } : {}), ...(Array.isArray(a.declared) && a.declared.length ? { declared: a.declared.filter((x) => DEVICE_PERMISSIONS.includes(x)) } : {}), ...(cleanPlacement(a.placement) ? { placement: cleanPlacement(a.placement) } : {}), ...(a.permissions ? { permissions: answers(a.permissions) } : {}) });
 
 /** Phone state for apps. `installed_apps` is a list of { id, name, url, version }; `current_app` is an id or null (the app the phone was started with). */
 export function createApps(profile = {}) {
@@ -77,11 +83,14 @@ const note = (st, name, id, extra) => { st.log.push({ at: Date.now(), name, app:
  * `real` is { sha256, bytes } when the server fetched the app's published bundle first: the install is then logged
  * with source "real" and the installed entry keeps the hash. Fixture installs stay "simulated".
  */
-export function installApp(st, id, catalog = st.store, real) {
+export function installApp(st, id, catalog = st.store, real, given) {
   const found = (catalog ?? []).find((a) => a.id === id);
   if (!found) throw new AppsError("unknown_app", `no app '${id}' in the Store. Apps: ${(catalog ?? []).map((a) => a.id).join(", ") || "none"}`);
   if (st.installed_apps.some((a) => a.id === id)) throw new AppsError("already_installed", `'${id}' is already installed`);
-  st.installed_apps.push({ ...entry(found), ...(real ? { sha256: real.sha256, bytes: real.bytes } : {}) });
+  const e = entry(found);
+  // Every permission the app declares gets an answer: the person's, or allowed when none was given.
+  const permissions = Object.fromEntries((e.declared ?? []).map((p) => [p, answers(given)[p] ?? true]));
+  st.installed_apps.push({ ...e, ...(e.declared ? { permissions } : {}), ...(real ? { sha256: real.sha256, bytes: real.bytes } : {}) });
   note(st, "install_app", id, real ? { source: "real", sha256: real.sha256, bytes: real.bytes } : undefined); return st;
 }
 
@@ -115,6 +124,32 @@ export function findApps(catalog, { query = "", country, language, currency, lim
   }
   rows.sort((x, y) => y.score - x.score || String(x.name).localeCompare(String(y.name)));
   return rows.slice(0, n).map(({ score, ...r }) => r);
+}
+
+/** Allow or deny one declared device permission for an installed app. Throws not_installed, unknown_permission or not_declared. */
+export function setPermission(st, id, permission, allowed) {
+  const a = st.installed_apps.find((x) => x.id === id);
+  if (!a) throw new AppsError("not_installed", `'${id}' is not installed`);
+  if (!DEVICE_PERMISSIONS.includes(permission)) throw new AppsError("unknown_permission", `unknown permission '${permission}'. Permissions: ${DEVICE_PERMISSIONS.join(", ")}`);
+  if (typeof allowed !== "boolean") throw new AppsError("bad_value", "allowed takes true or false");
+  if (!Object.prototype.hasOwnProperty.call(a.permissions ?? {}, permission)) throw new AppsError("not_declared", `'${id}' does not ask for '${permission}'`);
+  a.permissions[permission] = allowed;
+  note(st, "set_permission", id, { permission, allowed }); return st;
+}
+
+/** The phone as a phone.json profile: installed apps with their permission answers, and the settings. loadProfile reads it back. */
+export function exportProfile(st) {
+  return { apps: st.installed_apps.map((a) => ({ id: a.id, name: a.name, url: a.url, version: a.version, ...(a.permissions && Object.keys(a.permissions).length ? { permissions: { ...a.permissions } } : {}) })), ...(Object.keys(st.settings ?? {}).length ? { settings: { ...st.settings } } : {}) };
+}
+
+/** The consent card for an install: one row per declared permission, each with a switch that reads Allowed or Denied (Allowed to start). */
+export function consentCardHtml(app) {
+  const rows = (app.declared ?? []).map((p) => `<div class="sf-perm" role="group" aria-label="${esc(p)}"><b>${esc(p)}</b><button type="button" role="switch" data-part="consent-switch" data-perm="${esc(p)}" aria-checked="true" aria-label="${esc(p)} for ${esc(app.name)}: allowed">Allowed</button></div>`).join("");
+  return `<div class="sf-consent" data-part="consent-card" role="group" aria-label="Install ${esc(app.name)}"><b>${esc(app.name)} asks for</b>${rows || "<p>No device permissions.</p>"}<button type="button" data-part="consent-install" data-app="${esc(app.id)}">Install</button><button type="button" data-part="consent-cancel">Cancel</button></div>`;
+}
+/** Settings rows: one switch per app and permission. */
+export function permissionRowsHtml(st) {
+  return st.installed_apps.filter((a) => a.permissions && Object.keys(a.permissions).length).map((a) => `<div class="sf-group2" role="group" aria-label="${esc(a.name)} permissions"><b>${esc(a.name)}</b>${Object.entries(a.permissions).map(([p, v]) => `<button type="button" class="sf-srow" role="switch" data-part="perm-switch" data-app="${esc(a.id)}" data-perm="${esc(p)}" aria-checked="${v}">${esc(p)}</button>`).join("")}</div>`).join("");
 }
 
 /** Remove an app. If it was in front, the phone goes home and current_app is empty. Throws not_installed. */
@@ -222,7 +257,7 @@ export function describeApps(st, now = new Date()) {
   const l = ["Installed apps"];
   if (!st.installed_apps.length) l.push("- none");
   const shown = homeApps(st, now);
-  for (const a of shown) l.push(`- button "${a.name}" (${a.id} ${a.version}${a.placement?.pinned ? ", pinned" : ""}${st.current_app === a.id ? ", open" : ""}: switch_app opens it)`);
+  for (const a of shown) l.push(`- button "${a.name}" (${a.id} ${a.version}${a.placement?.pinned ? ", pinned" : ""}${st.current_app === a.id ? ", open" : ""}: switch_app opens it)${a.permissions && Object.keys(a.permissions).length ? ` permissions: ${Object.entries(a.permissions).map(([p, v]) => `${p} ${v ? "allowed" : "denied"}`).join(", ")}` : ""}`);
   for (const a of st.installed_apps) if (!shown.includes(a)) l.push(`- "${a.name}" (${a.id}): ${a.placement?.hidden ? "hidden" : `not showing now, scheduled ${a.placement.schedule.days.join(",")} ${a.placement.schedule.from}-${a.placement.schedule.to}`}; switch_app still opens it`);
   l.push("Store");
   for (const a of st.store) l.push(st.installed_apps.some((i) => i.id === a.id) ? `- "${a.name}" (${a.id}): installed` : `- button "Install ${a.name}" (${a.id}: install_app installs it)`);
@@ -253,6 +288,7 @@ export const storeCss = [
   `.sf-store{position:absolute;inset:0;z-index:8;overflow:auto;padding:70px 20px 40px;box-sizing:border-box;background:#0b1320;color:#fff;font-family:system-ui,sans-serif}[data-theme="light"] .sf-store{background:#f4f7fb;color:#111}`,
   `.sf-store[hidden]{display:none}.sf-store-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #8883;font:600 15px system-ui,sans-serif}.sf-store-row small{opacity:.6;font-weight:400}`,
   `.sf-store-row button,.sf-store .sf-close{border:0;border-radius:999px;padding:12px 18px;min-height:44px;background:#f4a261;color:#102030;font:600 14px system-ui,sans-serif;cursor:pointer}.sf-store-have{color:#8a94a6;font-size:13px}[data-theme="light"] .sf-store-have{color:#4a5568}.sf-store .sf-close{margin-top:18px;background:#8883;color:inherit}`,
+  `.sf-consent{margin-top:16px;padding:14px;border-radius:14px;background:#8883}.sf-perm{display:flex;justify-content:space-between;align-items:center;padding:8px 0}.sf-consent button[role=switch][aria-checked=false]{background:transparent;color:inherit;border:2px solid currentColor}.sf-consent button{margin:8px 8px 0 0}`,
   `.sf-apps{position:absolute;left:28px;right:28px;top:180px;display:flex;flex-wrap:wrap;gap:20px 24px}.sf-apps .sf-icon{position:static}`,
 ].join("");
 
@@ -263,6 +299,7 @@ export const MAX_BUNDLE_BYTES = 200 * 1024 * 1024;
 export function appsClientScript(iframeId = "app", seed = {}) {
   return `(function(){
 var AppsError=function(c,m){var e=new Error(m);e.code=c;return e},STORE_FIXTURE=${JSON.stringify(STORE_FIXTURE)};
+var DEVICE_PERMISSIONS=${JSON.stringify(DEVICE_PERMISSIONS)},answers=${answers.toString()},consentCardHtml=${consentCardHtml.toString()},permissionRowsHtml=${permissionRowsHtml.toString()},setPermission=${setPermission.toString()};
 var entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},installedIconsHtml=${installedIconsHtml.toString()},DAYS=${JSON.stringify(DAYS)},HHMM=${HHMM.toString()},cleanPlacement=${cleanPlacement.toString()},appVisible=${appVisible.toString()},homeApps=${homeApps.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
 var loadProfile=${loadProfile.toString()},settingPatch=function(){};
 var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
@@ -274,23 +311,40 @@ var box=document.createElement("div");box.className="sf-apps";box.setAttribute("
 var msg="";
 var lastHome=null;
 function drawHome(){var h=installedIconsHtml(st,new Date());if(h===lastHome)return;lastHome=h;box.innerHTML=h}
-function drawStore(){q("store-rows").innerHTML=storeRowsHtml(st)+(msg?'<p class="sf-store-msg" role="status">'+esc(msg)+'</p>':"")}
-function loadStore(){if(!mp)return Promise.resolve();return fetch(mp.replace(/\\/$/,"")+"/apps/public").then(function(r){return r.json()}).then(function(j){var l=(j&&j.apps)||[];if(l.length)st.store=l.map(function(a){return entry({id:a.app_id,name:a.name||a.app_id,version:a.latest_release!=null?"r"+a.latest_release:"latest",url:"app://"+a.app_id+(a.latest_release!=null?"@r"+a.latest_release:"@latest")})})}).catch(function(){})}
+var card=null,given={};
+function drawStore(){q("store-rows").innerHTML=storeRowsHtml(st)+(card?consentCardHtml(card):"")+(msg?'<p class="sf-store-msg" role="status">'+esc(msg)+'</p>':"")}
+function loadStore(){if(!mp)return Promise.resolve();return fetch(mp.replace(/\\/$/,"")+"/apps/public").then(function(r){return r.json()}).then(function(j){var l=(j&&j.apps)||[];if(l.length)st.store=l.map(function(a){return entry({id:a.app_id,name:a.name||a.app_id,declared:a.declared||(a.permissions&&a.permissions.device)||(a.spec&&a.spec.permissions&&a.spec.permissions.device),version:a.latest_release!=null?"r"+a.latest_release:"latest",url:"app://"+a.app_id+(a.latest_release!=null?"@r"+a.latest_release:"@latest")})})}).catch(function(){})}
 // Without a session the page fetches the app itself. The marketplace answers with CORS open, so a page on any origin can read it.
 function bundle(a){var m=/^app:\\/\\/([a-z0-9-]+)(?:@(r?\\d+|latest))?$/.exec(a.url||"");if(!m)return Promise.reject(new Error("This app has no bundle URL"));var b=mp.replace(/\\/$/,"")+"/w/"+m[1]+"/";
 return(m[2]&&m[2]!=="latest"?Promise.resolve("r"+m[2].replace("r","")):fetch(b+"releases.json").then(function(r){if(!r.ok)throw new Error("No published release");return r.json()}).then(function(j){return"r"+j.latest})).then(function(rel){return b+rel+"/index.html"})}
 function sha(buf){if(!(window.crypto&&crypto.subtle))return Promise.resolve(undefined);return crypto.subtle.digest("SHA-256",buf).then(function(d){return Array.prototype.map.call(new Uint8Array(d),function(x){return("0"+x.toString(16)).slice(-2)}).join("")})}
 function localInstall(id){var a=st.store.filter(function(x){return x.id===id})[0];if(!a)return Promise.reject(new Error("No such app"));
-if(!mp||/^fixture:/.test(a.url)){installApp(st,id);return Promise.resolve()}
+if(!mp||/^fixture:/.test(a.url)){installApp(st,id,st.store,undefined,given);return Promise.resolve()}
 var bad=function(){return new Error("The app could not be fetched")};
-return bundle(a).then(function(u){return fetch(u).then(function(r){if(!r.ok||Number(r.headers.get("content-length"))>MAXB)throw bad();return r.arrayBuffer()}).then(function(buf){if(buf.byteLength>MAXB)throw bad();return sha(buf).then(function(h){urls[id]=u;installApp(st,id,st.store,{sha256:h,bytes:buf.byteLength})})})})}
+return bundle(a).then(function(u){return fetch(u).then(function(r){if(!r.ok||Number(r.headers.get("content-length"))>MAXB)throw bad();return r.arrayBuffer()}).then(function(buf){if(buf.byteLength>MAXB)throw bad();return sha(buf).then(function(h){urls[id]=u;installApp(st,id,st.store,{sha256:h,bytes:buf.byteLength},given)})})})}
+var ss=q("settings-screen"),pbox=null;
+var remote=null;
+function paintPerms(list){pbox.innerHTML=permissionRowsHtml({installed_apps:list})}
+function drawPerms(){if(!ss||ss.hidden)return;if(!pbox){pbox=document.createElement("div");pbox.setAttribute("data-part","permission-rows");pbox.setAttribute("role","group");pbox.setAttribute("aria-label","App permissions");ss.insertBefore(pbox,q("settings-close"))}
+var sid=window.__shipvoSession;
+if(!sid){paintPerms(st.installed_apps);return}
+paintPerms(remote||[]);fetch("/phone/apps?session="+encodeURIComponent(sid)).then(function(x){return x.json()}).then(function(j){if(j&&j.ok&&j.installed_apps){remote=j.installed_apps;paintPerms(remote)}}).catch(function(){})}
 function open(on){sc.hidden=!on;if(on){msg="";drawStore();sc.focus({preventScroll:true});loadStore().then(drawStore)}}
 drawHome();setInterval(drawHome,30000);
 r.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
+if(t.closest('[data-part="settings-icon"],[data-part="settings-gear"]')){setTimeout(drawPerms,0);return}
+var ps=t.closest('[data-part="perm-switch"]');if(ps){var pid=ps.getAttribute("data-app"),pp=ps.getAttribute("data-perm"),pw=ps.getAttribute("aria-checked")!=="true",sid=window.__shipvoSession;
+if(sid){ps.setAttribute("aria-checked",String(pw));fetch("/act",{method:"POST",body:JSON.stringify({session:sid,action:"set_app_permission",id:pid,permission:pp,allowed:pw})}).then(function(x){return x.json()}).then(function(j){if(j&&j.ok&&j.installed_apps)remote=j.installed_apps;drawPerms()}).catch(drawPerms)}
+else{try{setPermission(st,pid,pp,pw)}catch(x){}drawPerms()}return}
 if(t.closest('[data-part="store-icon"]'))return open(true);
 if(t.closest('[data-part="store-close"]'))return open(false);
-var i=t.closest('[data-part="store-install"]');if(i){var id=i.getAttribute("data-app");
-msg="Installing...";drawStore();localInstall(id).then(function(){msg=""}).catch(function(){msg="The app could not be fetched"}).then(function(){drawStore();drawHome()});return}
+var cs=t.closest('[data-part="consent-switch"]');if(cs){var on=cs.getAttribute("aria-checked")!=="true";given[cs.getAttribute("data-perm")]=on;cs.setAttribute("aria-checked",String(on));cs.setAttribute("aria-label",cs.getAttribute("data-perm")+" for "+(card?card.name:"")+": "+(on?"allowed":"denied"));cs.textContent=on?"Allowed":"Denied";return}
+if(t.closest('[data-part="consent-cancel"]')){card=null;given={};drawStore();return}
+var ci=t.closest('[data-part="consent-install"]');
+var i=ci||t.closest('[data-part="store-install"]');if(i){var id=i.getAttribute("data-app");
+var ap=st.store.filter(function(x){return x.id===id})[0];
+if(!ci&&ap&&ap.declared&&ap.declared.length){card=ap;given={};ap.declared.forEach(function(p){given[p]=true});drawStore();return}
+card=null;msg="Installing...";drawStore();localInstall(id).then(function(){msg=""}).catch(function(){msg="The app could not be fetched"}).then(function(){given={};drawStore();drawHome()});return}
 var a=t.closest('[data-part="installed-app"]');if(a){var aid=a.getAttribute("data-app");
 try{switchApp(st,aid)}catch(x){}var fr=document.getElementById(${JSON.stringify(iframeId)});if(fr&&urls[aid])fr.src=urls[aid];window.postMessage({type:"pn:nav",where:"app"},"*")}});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!sc.hidden)open(false)});

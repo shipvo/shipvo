@@ -1,0 +1,2 @@
+- `@shipvo/cli`: `shipvo keys root --out <file>` creates the offline root key for key rotation. It writes the seed with mode 0600, refuses to overwrite, and prints only the public key to pin.
+- Migration: none; new command.
