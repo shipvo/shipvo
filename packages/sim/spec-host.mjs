@@ -1,16 +1,60 @@
 // Runs app specs on the simulated phone. A spec app is a JSON document (see @shipvo/spec). This host keeps one running
 // app per phone and app id, renders its screen as a page the phone shows, and applies the taps, typing and choices
 // that page sends back. The page is real HTML with labelled controls, so the screen and tap tools work on it as on any app.
-import { createApp } from "@shipvo/spec";
+import { createHash } from "node:crypto";
+import { lookup as dnsLookup } from "node:dns/promises";
+import { isIP } from "node:net";
+import { createApp, runSource, memoryCache } from "@shipvo/spec";
+
+const REFRESH_POLL_MS = 5000;
+const FETCH_TIMEOUT_MS = 15000;
+
+/** True for loopback, private, link-local, unspecified and other non-public addresses (IPv4 and IPv6). */
+export function isPrivateAddress(ip) {
+  const v = ip.toLowerCase();
+  const m4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v);
+  if (m4) return isPrivateAddress(m4[1]);
+  const mh = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(v); // the form URL parsing produces
+  if (mh) { const n = (parseInt(mh[1], 16) << 16) | parseInt(mh[2], 16); return isPrivateAddress([n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join(".")); }
+  if (isIP(v) === 4) {
+    const [a, b] = v.split(".").map(Number);
+    return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || a >= 224;
+  }
+  if (isIP(v) === 6) return v === "::" || v === "::1" || /^f[cd]/.test(v) || /^fe[89ab]/.test(v) || v.startsWith("ff");
+  return true;
+}
+
+/**
+ * The fetch a refresh uses by default: public http(s) hosts only (every resolved address is checked), no redirects
+ * followed, and a timeout so one hung request cannot stop later refreshes. `lookup` can be replaced in tests.
+ */
+export function guardedFetch({ lookup = (h) => dnsLookup(h, { all: true }), fetchImpl = fetch, timeoutMs = FETCH_TIMEOUT_MS } = {}) {
+  return async (url, init = {}) => {
+    const u = new URL(String(url));
+    if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error("Only http and https URLs can be fetched");
+    const host = u.hostname.replace(/^\[|\]$/g, "");
+    if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal")) throw new Error(`Refused: ${host} is not a public host`);
+    const addrs = isIP(host) ? [{ address: host }] : await lookup(host);
+    if (!addrs.length || addrs.some((a) => isPrivateAddress(a.address))) throw new Error(`Refused: ${host} is not a public host`);
+    return fetchImpl(u, { ...init, redirect: "manual", signal: AbortSignal.timeout(timeoutMs) });
+  };
+}
 
 /** The script the page runs. Controls are found by their role and accessible name, as an agent finds them. */
 export const HOST_SCRIPT = `(function(){
 var base=location.pathname.replace(/\\/$/,"");
 function send(op){return fetch(base+"/op",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(op)}).then(function(r){return r.json()}).then(function(r){
- if(r&&typeof r.html==="string"){var m=/<body[^>]*>([\\s\\S]*)<\\/body>/i.exec(r.html);if(m){var s=document.getElementById("sv-host");document.body.innerHTML=m[1];if(s)document.body.appendChild(s)}}
+ if(r&&typeof r.html==="string"){shown=r.v;swap(r.html)}
  if(r&&r.ok===false){var p=document.createElement("p");p.setAttribute("role","alert");p.textContent=r.error||"That did not work";document.body.insertBefore(p,document.body.firstChild)}})}
 function name(el){return el.getAttribute("aria-label")||el.textContent.trim()}
 function form(el){var f=el.closest("form");return f?f.getAttribute("aria-label"):null}
+var hs=document.getElementById("sv-host");var shown=hs?hs.getAttribute("data-v"):null;
+function swap(h){var m=/<body[^>]*>([\\s\\S]*)<\\/body>/i.exec(h);if(!m)return;var y=window.scrollY,s=document.getElementById("sv-host");document.body.innerHTML=m[1];if(s)document.body.appendChild(s);window.scrollTo(0,y)}
+function poll(){if(document.hidden)return;fetch(base+"/op",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({op:"view"})}).then(function(r){return r.json()}).then(function(r){
+ if(!r||typeof r.html!=="string"||r.v===shown)return;
+ var ae=document.activeElement;if(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))return;
+ shown=r.v;swap(r.html)}).catch(function(){})}
+if(${REFRESH_POLL_MS})setInterval(poll,${REFRESH_POLL_MS});
 document.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
  var sw=t.closest('button[role="switch"]');if(sw)return send({op:"toggle",label:name(sw)});
  var rd=t.closest('button[role="radio"]');if(rd){var g=rd.parentElement&&rd.parentElement.parentElement;return send({op:"select",label:g?g.getAttribute("aria-label"):"",option:rd.textContent.trim()})}
@@ -20,6 +64,9 @@ document.addEventListener("change",function(e){var t=e.target;if(!t||!t.closest)
  if(t.type==="radio"){var g=t.closest('[role="radiogroup"]');return send({op:"field",form:fm,field:g?g.getAttribute("aria-label"):"",value:name(t)})}
  send({op:"field",form:fm,field:name(t),value:t.type==="checkbox"?t.checked:t.value})});
 })();`;
+
+const version = (html) => createHash("sha1").update(html).digest("hex").slice(0, 16);
+const withScript = (html) => html.replace("</body>", `<script id="sv-host" data-v="${version(html)}">${HOST_SCRIPT}</script></body>`);
 
 const key = (session, id) => `${session}/${id}`;
 
@@ -39,14 +86,105 @@ function fieldName(spec, form, shown) {
   return found ?? shown;
 }
 
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+/** Plain lines that say what changed between two specs: screens, actions, data and settings added, removed or changed. */
+export function diffSpec(a, b) {
+  const out = [];
+  const parts = [
+    ["screen", Object.fromEntries((a?.screens ?? []).map((x) => [x.id, x])), Object.fromEntries((b?.screens ?? []).map((x) => [x.id, x]))],
+    ["action", a?.actions ?? {}, b?.actions ?? {}],
+    ["data", a?.data ?? {}, b?.data ?? {}],
+    ["state", a?.state ?? {}, b?.state ?? {}],
+  ];
+  for (const [kind, x, y] of parts) {
+    for (const k of Object.keys(y)) if (!(k in x)) out.push(`added ${kind} '${k}'`);
+    for (const k of Object.keys(x)) if (!(k in y)) out.push(`removed ${kind} '${k}'`);
+    for (const k of Object.keys(y)) if (k in x && !same(x[k], y[k])) out.push(`changed ${kind} '${k}'`);
+  }
+  if (!same(a?.app, b?.app)) out.push("changed app details");
+  if (!same(a?.permissions, b?.permissions)) out.push("changed permissions");
+  return out;
+}
+
+/** What a spec has, in one line: used for the first entry in an app's history. */
+export function describeSpec(spec) {
+  const n = (v) => Array.isArray(v) ? v.length : Object.keys(v ?? {}).length;
+  return `${n(spec?.screens)} screens, ${n(spec?.actions)} actions, ${n(spec?.data)} data sources`;
+}
+
 export class SpecHost {
-  constructor() { this.running = new Map(); }
+  /**
+   * `timers` is { setInterval, clearInterval } and `context(session, id)` returns the runner context for an app
+   * (fetch, secrets, limits). Both can be replaced in tests; the defaults use the real clock and network.
+   */
+  constructor({ timers = { setInterval, clearInterval }, context } = {}) {
+    this.running = new Map();
+    this.timers = timers;
+    this.cache = memoryCache();
+    this.guarded = guardedFetch();
+    this.context = context ?? (() => ({ fetch: this.guarded, secrets: () => ({ refused: "unavailable" }), cache: this.cache }));
+    this.refreshing = new Map();
+  }
+
+  /** Re-runs each http data source that sets `refresh` (seconds) on that interval, until the app is dropped or replaced. */
+  schedule(session, id) {
+    const k = key(session, id);
+    this.unschedule(k);
+    const r = this.running.get(k);
+    const handles = [];
+    for (const [name, src] of Object.entries(r?.spec?.data ?? {})) {
+      if (src?.source !== "http" || typeof src.refresh !== "number" || !(src.refresh >= 30)) continue; // the validator reports other values; skip them here
+      let busy = false;
+      const h = this.timers.setInterval(async () => {
+        if (busy) return;
+        busy = true;
+        try {
+          const cur = this.running.get(k);
+          if (!cur || cur !== r) return;
+          // Refresh runs bypass the cache: a `cache` longer than `refresh` must not turn the refresh into a no-op.
+          const { cache: _cache, ...ctx } = this.context(session, id);
+          const value = await runSource(cur.spec, name, { ...ctx, scope: { state: cur.app.state, data: cur.app.data, ...cur.app.data } });
+          // The app may have been removed or replaced while the request ran.
+          if (this.running.get(k) === cur) cur.app.data[name] = value;
+        } catch { /* a failed refresh keeps the last value and tries again on the next tick */ }
+        finally { busy = false; }
+      }, src.refresh * 1000);
+      h?.unref?.();
+      handles.push(h);
+    }
+    if (handles.length) this.refreshing.set(k, handles);
+  }
+
+  /** Runs the app's http data sources now (all, or the ones named), ignoring the cache. Resolves { updated, errors }; a failed source keeps its last data. */
+  async refresh(session, id, { sources } = {}) {
+    const k = key(session, id);
+    const cur = this.running.get(k);
+    const out = { updated: [], errors: [] };
+    if (!cur) return out;
+    const names = Object.entries(cur.spec?.data ?? {}).filter(([n, s]) => s?.source === "http" && (!sources || sources.includes(n))).map(([n]) => n);
+    for (const name of names) {
+      try {
+        const { cache: _cache, ...ctx } = this.context(session, id);
+        const value = await runSource(cur.spec, name, { ...ctx, scope: { state: cur.app.state, data: cur.app.data, ...cur.app.data } });
+        if (this.running.get(k) !== cur) break; // the app was removed or replaced while the request ran
+        if (JSON.stringify(cur.app.data[name]) !== JSON.stringify(value)) { cur.app.data[name] = value; out.updated.push(name); }
+      } catch (e) { out.errors.push({ source: name, message: String(e?.message ?? e).slice(0, 200) }); }
+    }
+    return out;
+  }
+
+  unschedule(k) {
+    for (const h of this.refreshing.get(k) ?? []) this.timers.clearInterval(h);
+    this.refreshing.delete(k);
+  }
 
   /** Starts an app from a spec. Resolves { ok: true } or { ok: false, errors } with a JSON path and a fix for each problem. */
   create(session, id, spec, { style = "android", reduceMotion = false, data, state } = {}) {
     const made = createApp(spec, { style, reduceMotion, ...(data ? { data } : {}), ...(state ? { state } : {}) });
     if (!made.ok) return { ok: false, errors: made.errors };
-    this.running.set(key(session, id), { app: made.app, spec, style, reduceMotion, version: 1, history: [{ version: 1, at: Date.now() }] });
+    this.running.set(key(session, id), { app: made.app, spec, style, reduceMotion, version: 1, history: [{ version: 1, at: Date.now(), changes: [`created: ${describeSpec(spec)}`] }] });
+    this.schedule(session, id);
     return { ok: true, warnings: made.app.render().warnings ?? [] };
   }
 
@@ -64,7 +202,8 @@ export class SpecHost {
     const made = createApp(spec, { style: cur.style, reduceMotion: cur.reduceMotion, data: keep(collections, cur.app.data), state: keep(stateKeys, cur.app.state) });
     if (!made.ok) return { ok: false, errors: made.errors };
     const from = cur.version;
-    this.running.set(key(session, id), { ...cur, app: made.app, spec, version: from + 1, history: [...cur.history, { version: from + 1, at: Date.now() }] });
+    this.running.set(key(session, id), { ...cur, app: made.app, spec, version: from + 1, history: [...cur.history, { version: from + 1, at: Date.now(), changes: diffSpec(cur.spec, spec) }] });
+    this.schedule(session, id);
     return { ok: true, version: from + 1, from, warnings: made.app.render().warnings ?? [] };
   }
 
@@ -82,11 +221,20 @@ export class SpecHost {
     return { style: r.style, spec: structuredClone(r.spec), data: structuredClone(Object.fromEntries(names.filter((n) => n in r.app.data).map((n) => [n, r.app.data[n]]))), settings: structuredClone(r.app.state) };
   }
 
+  /** Every version of an app with what changed in it, newest last. */
+  history(session, id) { return (this.running.get(key(session, id))?.history ?? []).map((h) => ({ version: h.version, at: h.at, changes: h.changes ?? [] })); }
+
+  /** The app's http data sources and how often each refreshes (seconds, or null when only refresh_app fetches it). */
+  sources(session, id) {
+    const r = this.running.get(key(session, id));
+    return Object.entries(r?.spec?.data ?? {}).filter(([, s]) => s?.source === "http").map(([name, s]) => ({ name, refresh: typeof s.refresh === "number" ? s.refresh : null }));
+  }
+
   version(session, id) { return this.running.get(key(session, id))?.version ?? null; }
 
   has(session, id) { return this.running.has(key(session, id)); }
-  drop(session, id) { return this.running.delete(key(session, id)); }
-  dropSession(session) { for (const k of [...this.running.keys()]) if (k.startsWith(`${session}/`)) this.running.delete(k); }
+  drop(session, id) { this.unschedule(key(session, id)); return this.running.delete(key(session, id)); }
+  dropSession(session) { for (const k of [...this.running.keys()]) if (k.startsWith(`${session}/`)) { this.unschedule(k); this.running.delete(k); } }
 
   /** The page for an app's current screen. */
   page(session, id) {
@@ -94,7 +242,7 @@ export class SpecHost {
     if (!r) return null;
     const out = r.app.render();
     if (!out.ok) return null;
-    return out.html.replace("</body>", `<script id="sv-host">${HOST_SCRIPT}</script></body>`);
+    return withScript(out.html);
   }
 
   /** The screen as text for an agent: role and name of each node. */
@@ -125,10 +273,11 @@ export class SpecHost {
       case "tab": res = a.selectTab(String(body.label ?? "")); break;
       case "field": try { a.setField(String(body.form ?? ""), fieldName(r.spec, String(body.form ?? ""), String(body.field ?? "")), body.value); res = { ok: true }; } catch (e) { res = { ok: false, error: String(e?.message ?? e) }; } break;
       case "submit": res = a.submit(String(body.form ?? "")); break;
+      case "view": res = { ok: true }; break; // no change: returns the current page so refreshed data reaches an open screen
       default: res = { ok: false, error: `unknown op '${body?.op}'` };
     }
     const out = a.render();
-    const html = out.ok ? out.html.replace("</body>", `<script id="sv-host">${HOST_SCRIPT}</script></body>`) : undefined;
-    return { ...(res.ok === false && "errors" in res ? { ok: false, error: Object.values(res.errors).join(" ") } : res), ...(html ? { html } : {}) };
+    const html = out.ok ? withScript(out.html) : undefined;
+    return { ...(res.ok === false && "errors" in res ? { ok: false, error: Object.values(res.errors).join(" ") } : res), ...(html ? { html, v: version(out.html) } : {}) };
   }
 }
