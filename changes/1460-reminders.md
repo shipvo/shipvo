@@ -1,0 +1,4 @@
+- New MCP tools `set_reminder`, `list_reminders` and `cancel_reminder`: a notification arrives at a time on the phone's clock (`at` or `in_minutes`), once or `daily` or `weekly`, with an app open or not. Do Not Disturb and Focus keep it in the shade without a banner. Typed errors `bad_time`, `bad_title`, `too_long`, `bad_repeat`, `too_many`.
+- `@shipvo/sim`: new `set_reminder`, `list_reminders` and `cancel_reminder` actions; `set_time` fires reminders that became due; `notifications` includes the phone's own notifications.
+- `@shipvo/device`: the simulated device's internal push takes `{ system: true }` for the phone's own notifications, which need no app permission. The public API is unchanged.
+- Migration: none; new tools.
