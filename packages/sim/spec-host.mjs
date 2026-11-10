@@ -3,6 +3,8 @@
 // that page sends back. The page is real HTML with labelled controls, so the screen and tap tools work on it as on any app.
 import { createApp, runSource, memoryCache } from "@shipvo/spec";
 
+const REFRESH_POLL_MS = 5000;
+
 /** The script the page runs. Controls are found by their role and accessible name, as an agent finds them. */
 export const HOST_SCRIPT = `(function(){
 var base=location.pathname.replace(/\\/$/,"");
@@ -11,6 +13,12 @@ function send(op){return fetch(base+"/op",{method:"POST",headers:{"content-type"
  if(r&&r.ok===false){var p=document.createElement("p");p.setAttribute("role","alert");p.textContent=r.error||"That did not work";document.body.insertBefore(p,document.body.firstChild)}})}
 function name(el){return el.getAttribute("aria-label")||el.textContent.trim()}
 function form(el){var f=el.closest("form");return f?f.getAttribute("aria-label"):null}
+var shown=null;
+function poll(){if(document.hidden)return;fetch(base+"/op",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({op:"view"})}).then(function(r){return r.json()}).then(function(r){
+ if(!r||typeof r.html!=="string"||r.html===shown)return;shown=r.html;
+ var ae=document.activeElement;if(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName))return;
+ var m=/<body[^>]*>([\\s\\S]*)<\\/body>/i.exec(r.html);if(m){var s=document.getElementById("sv-host");document.body.innerHTML=m[1];if(s)document.body.appendChild(s)}}).catch(function(){})}
+if(${REFRESH_POLL_MS})setInterval(poll,${REFRESH_POLL_MS});
 document.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
  var sw=t.closest('button[role="switch"]');if(sw)return send({op:"toggle",label:name(sw)});
  var rd=t.closest('button[role="radio"]');if(rd){var g=rd.parentElement&&rd.parentElement.parentElement;return send({op:"select",label:g?g.getAttribute("aria-label"):"",option:rd.textContent.trim()})}
@@ -59,7 +67,7 @@ export class SpecHost {
     const r = this.running.get(k);
     const handles = [];
     for (const [name, src] of Object.entries(r?.spec?.data ?? {})) {
-      if (src?.source !== "http" || typeof src.refresh !== "number" || !(src.refresh >= 30)) continue;
+      if (src?.source !== "http" || typeof src.refresh !== "number" || !(src.refresh >= 30)) continue; // the validator reports other values; skip them here
       let busy = false;
       const h = this.timers.setInterval(async () => {
         if (busy) return;
@@ -67,7 +75,9 @@ export class SpecHost {
         try {
           const cur = this.running.get(k);
           if (!cur || cur !== r) return;
-          const value = await runSource(cur.spec, name, { ...this.context(session, id), scope: { state: cur.app.state, data: cur.app.data, ...cur.app.data } });
+          // Refresh runs bypass the cache: a `cache` longer than `refresh` must not turn the refresh into a no-op.
+          const { cache: _cache, ...ctx } = this.context(session, id);
+          const value = await runSource(cur.spec, name, { ...ctx, scope: { state: cur.app.state, data: cur.app.data, ...cur.app.data } });
           // The app may have been removed or replaced while the request ran.
           if (this.running.get(k) === cur) cur.app.data[name] = value;
         } catch { /* a failed refresh keeps the last value and tries again on the next tick */ }
@@ -169,6 +179,7 @@ export class SpecHost {
       case "tab": res = a.selectTab(String(body.label ?? "")); break;
       case "field": try { a.setField(String(body.form ?? ""), fieldName(r.spec, String(body.form ?? ""), String(body.field ?? "")), body.value); res = { ok: true }; } catch (e) { res = { ok: false, error: String(e?.message ?? e) }; } break;
       case "submit": res = a.submit(String(body.form ?? "")); break;
+      case "view": res = { ok: true }; break; // no change: returns the current page so refreshed data reaches an open screen
       default: res = { ok: false, error: `unknown op '${body?.op}'` };
     }
     const out = a.render();

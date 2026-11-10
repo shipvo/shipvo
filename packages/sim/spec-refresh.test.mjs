@@ -55,12 +55,49 @@ test("removing the app stops refreshes", async () => {
   assert.equal(calls(), 0);
 });
 
-test("cost limits still apply and a failed refresh keeps the last value", async () => {
+test("cost limits still apply: the refresh is rejected by the limit", async () => {
   const sp = spec({ get: "https://api.example.com/p?x={{ [1,2,3].map(a, [1,2,3].map(b, a+b)) }}" });
   const { host, timers, tick, calls } = setup(sp, { maxCost: 1 });
+  const { runSource } = await import("../spec/dist/index.js");
+  await assert.rejects(runSource(sp, "price", { fetch: async () => { throw new Error("no call"); }, secrets: () => undefined, maxCost: 1, scope: { state: {}, data: {} } }), /cost|limit|budget/i);
   await tick(timers[0]);
   assert.equal(calls(), 0);
   assert.doesNotMatch(JSON.stringify(host.tree("s", "app")), /Price 10/);
+});
+
+test("a failed refresh keeps the last value", async () => {
+  const timers = [];
+  let n = 0;
+  const fetch = async () => { n++; if (n === 2) throw new Error("offline"); return { ok: true, status: 200, text: async () => JSON.stringify({ price: 10 }) }; };
+  const host = new SpecHost({ timers: { setInterval: (fn, ms) => { const t = { fn, ms }; timers.push(t); return t; }, clearInterval() {} }, context: () => ({ fetch, secrets: () => undefined }) });
+  host.create("s", "app", spec());
+  await timers[0].fn();
+  assert.match(JSON.stringify(host.tree("s", "app")), /Price 10/);
+  await timers[0].fn();
+  assert.equal(n, 2);
+  assert.match(JSON.stringify(host.tree("s", "app")), /Price 10/);
+});
+
+test("a cache longer than refresh does not stop the value changing", async () => {
+  const { runSource, memoryCache } = await import("../spec/dist/index.js");
+  void runSource;
+  const cache = memoryCache();
+  const { host, timers, tick } = setup(spec({ cache: "5m" }), { cache });
+  await tick(timers[0]);
+  assert.match(JSON.stringify(host.tree("s", "app")), /Price 10/);
+  await tick(timers[0]);
+  assert.match(JSON.stringify(host.tree("s", "app")), /Price 20/);
+});
+
+test("an open page picks up a refreshed value through the view op, with no interaction", async () => {
+  const { host, timers, tick } = setup();
+  const before = host.op("s", "app", { op: "view" });
+  assert.equal(before.ok, true);
+  assert.doesNotMatch(before.html, /Price 10/);
+  await tick(timers[0]);
+  const after = host.op("s", "app", { op: "view" });
+  assert.match(after.html, /Price 10/);
+  assert.match(host.page("s", "app"), /op:"view"/);
 });
 
 test("replacing the spec reschedules and drops the old timer", () => {

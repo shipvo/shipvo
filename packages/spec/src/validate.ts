@@ -223,6 +223,9 @@ class Run {
           }
         }
       }
+      if ("refresh" in src && src.source !== "http") {
+        this.error(childPath(base, "refresh"), "refresh is only for http data sources.", "Remove refresh, or change the source to http.");
+      }
       if (isObject(src.paginate)) {
         this.checkBare(src.paginate.next, childPath(childPath(base, "paginate"), "next"));
         this.checkBare(src.paginate.until, childPath(childPath(base, "paginate"), "until"));

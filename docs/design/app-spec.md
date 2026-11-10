@@ -90,6 +90,7 @@ Three kinds of data: remote sources, local collections and computed values.
     "auth": { "secret": "STRIPE_KEY", "type": "bearer" },
     "select": "data",
     "cache": "5m",
+    "refresh": 60,
     "paginate": { "type": "cursor", "param": "starting_after", "next": "last(data).id", "until": "!has_more" }
   },
   "goals": {
@@ -104,7 +105,7 @@ Three kinds of data: remote sources, local collections and computed values.
 }
 ```
 
-- `http` sources run on Shipvo's edge, never in the browser, so the vault key is added server-side. Responses are cached per `cache`.
+- `http` sources run on Shipvo's edge, never in the browser, so the vault key is added server-side. Responses are cached per `cache`. `refresh` (seconds, 30 or more) re-runs an `http` source on that interval while the app is installed, ignores `cache`, and updates the open screen.
 - `collection` sources are the app's own local data, stored per person on their phone (synced to their account). Field types: text, number, money, date, datetime, bool, enum, image, file, ref.
 - `computed` values use the expression language (section 7) and update when their inputs change.
 
