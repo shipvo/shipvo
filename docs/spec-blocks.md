@@ -117,8 +117,6 @@ app.select("Period", "year");          // { ok: false, error: '"year" is not one
 | `calendar` | Events in a month, a week or an agenda | `label`, `from`, `date`, `title`, `detail`, `view`, `at`, `onSelect` |
 | `map` | Pins on a canvas | `label`, `from`, `lat`, `lng`, `title`, `onSelect` |
 | `vector` | A small drawing that follows your data | `label`, `value`, `width`, `height`, `shapes`, `motion` |
-| `calendar` | Events from data as a month, week or agenda | `label`, `from`, `date`, `title`, `detail`, `view`, `at`, `onSelect` |
-| `map` | Pins from data on a canvas | `label`, `from`, `lat`, `lng`, `title`, `onSelect` |
 
 In the screen tree, a toggle reads `Failed payment alerts: off` or `: on`, a segmented control reads `Period: week`, and a progress block reads `Monthly goal: 40%`. Assistants and `@shipvo/test` find them by those names.
 
@@ -210,7 +208,7 @@ Calendar options:
 Map options:
 
 - `lat` is a number from -90 to 90 and `lng` is a number from -180 to 180.
-- The map is a canvas that fits all pins in view. It makes no network calls and has no street tiles, so tests run the same offline. One pin sits in the middle.
+- The map is a canvas that fits all pins in view. It makes no network calls and has no street tiles, so tests run the same offline.
 
 Both blocks:
 
