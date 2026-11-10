@@ -184,7 +184,7 @@ A `vector` block draws shapes whose numbers and colours come from expressions, s
 | Shape | Options |
 | --- | --- |
 | `rect` | `x`, `y`, `width`, `height`, `rx`, `fill`, `stroke`, `strokeWidth`, `opacity` |
-| `circle` | `cx`, `cy`, `r`, `fill`, `stroke`, `strokeWidth`, `opacity`, `dash` (share of the outline to draw, 0 to 100, from the top; use it with `stroke` for a progress ring) |
+| `circle` | `cx`, `cy`, `r`, `fill`, `stroke`, `strokeWidth`, `opacity` |
 | `path` | `d` (path commands such as `M 0 30 L 100 30`), `fill`, `stroke`, `strokeWidth`, `opacity` |
 | `text` | `x`, `y`, `text`, `fontSize`, `fill`, `anchor` (`start`, `middle`, `end`), `opacity` |
 | `linearGradient` | `id`, `x1`, `y1`, `x2`, `y2`, `stops` (each `offset` from 0 to 1 and `color`). Use it as `fill: "url(#id)"`. |

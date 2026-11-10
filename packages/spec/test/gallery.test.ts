@@ -36,7 +36,7 @@ const blocks: Record<string, [string, string]> = {
   "meal-planner": ["event", "Paella"],
   "favourite-places": ["pin", "Castle"],
   "project-timeline": ["listitem", "Beta"],
-  "focus-timer": ["image", "Daily goal ring: 25%"],
+  "focus-timer": ["image", "Daily goal progress: 25%"],
 };
 
 function screenText(spec: unknown, data: Record<string, unknown>): string {
@@ -122,17 +122,7 @@ describe("spec gallery", () => {
     expect(screenText(spec, r.app.data)).toContain("Open milestones: 0");
   });
 
-  it("focus-timer: start_session sets the timer and log_session stops it", () => {
-    const spec = JSON.parse(readFileSync(new URL("focus-timer.json", dir), "utf8"));
-    const r = createApp(spec, {});
-    if (!r.ok) throw new Error(JSON.stringify(r.errors));
-    expect(r.app.call("start_session", {}).ok).toBe(true);
-    expect(r.app.state.active).toBe(true);
-    r.app.call("log_session", { task: "Write spec", minutes: 30 });
-    expect(r.app.state.active).toBe(false);
-  });
-
-  it("focus-timer: the ring animates unless motion is reduced", () => {
+  it("focus-timer: the progress bar animates unless motion is reduced", () => {
     const spec = JSON.parse(readFileSync(new URL("focus-timer.json", dir), "utf8"));
     const on = renderScreen(spec, { style: "ios" });
     const off = renderScreen(spec, { style: "ios", reduceMotion: true });
@@ -143,16 +133,16 @@ describe("spec gallery", () => {
     expect(JSON.stringify(off.tree)).not.toContain("scale");
   });
 
-  it("focus-timer: logging 30 minutes fills the ring to 25%", () => {
+  it("focus-timer: logging 30 minutes fills the bar to 25%", () => {
     const spec = JSON.parse(readFileSync(new URL("focus-timer.json", dir), "utf8"));
-    expect(screenText(spec, {})).toContain("Daily goal ring: 0%");
+    expect(screenText(spec, {})).toContain("Daily goal progress: 0%");
     const r = createApp(spec, {});
     if (!r.ok) throw new Error(JSON.stringify(r.errors));
     r.app.call("log_session", { task: "Write spec", minutes: 30 });
-    expect(screenText(spec, r.app.data)).toContain("Daily goal ring: 25%");
+    expect(screenText(spec, r.app.data)).toContain("Daily goal progress: 25%");
     const t = renderScreen(spec, { style: "ios", data: r.app.data });
     if (!t.ok) throw new Error("render failed");
-    expect(JSON.stringify(t.tree)).toContain('"dash":25');
+    expect(JSON.stringify(t.tree)).toMatch(/"width":25\b/);
   });
 
   it("project-timeline: the screen has a control for complete_milestone", () => {

@@ -23,4 +23,4 @@ Specs with a timeline or a drawing that moves:
 | Spec | Block | Data sources | Actions | Form |
 | --- | --- | --- | --- | --- |
 | [Project timeline](project-timeline.json) | `timeline` (milestones by day) | collection, computed open count | `add_milestone`, `complete_milestone` | milestone, due, note |
-| [Focus timer](focus-timer.json) | `vector` progress ring with `motion` | collection, computed minutes and percent | `start_session`, `log_session` | task, minutes |
+| [Focus timer](focus-timer.json) | `vector` progress bar with `motion` | collection, computed minutes and percent | `start_session`, `log_session` | task, minutes |

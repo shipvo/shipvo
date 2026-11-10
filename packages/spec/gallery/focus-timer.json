@@ -3,7 +3,7 @@
   "app": {
     "id": "focus-timer",
     "name": "Focus timer",
-    "description": "Start a focus session and watch the ring fill as you log minutes toward your daily goal."
+    "description": "Start a focus session and watch the bar fill as you log minutes toward your daily goal."
   },
   "theme": {
     "mode": "light",
@@ -42,7 +42,7 @@
       "body": [
         {
           "type": "vector",
-          "label": "Daily goal ring",
+          "label": "Daily goal progress",
           "value": "{{ percent }}%",
           "width": 120,
           "height": 120,
@@ -52,28 +52,27 @@
           },
           "shapes": [
             {
-              "shape": "circle",
-              "cx": 60,
-              "cy": 60,
-              "r": 50,
-              "fill": "none",
-              "stroke": "#F3F4F6",
-              "strokeWidth": 8
+              "shape": "rect",
+              "x": 10,
+              "y": 50,
+              "width": 100,
+              "height": 16,
+              "rx": 8,
+              "fill": "#F3F4F6"
             },
             {
-              "shape": "circle",
-              "cx": 60,
-              "cy": 60,
-              "r": 50,
-              "fill": "none",
-              "stroke": "#0B5FFF",
-              "strokeWidth": 8,
-              "dash": "{{ percent }}"
+              "shape": "rect",
+              "x": 10,
+              "y": 50,
+              "width": "{{ percent }}",
+              "height": 16,
+              "rx": 8,
+              "fill": "#0B5FFF"
             },
             {
               "shape": "text",
               "x": 60,
-              "y": 64,
+              "y": 90,
               "text": "{{ percent }}%",
               "fontSize": 16,
               "anchor": "middle",
