@@ -116,7 +116,7 @@ This spec is valid and was checked with `validate` from `@shipvo/spec`. It has o
 }
 ```
 
-To check a spec yourself before you send it:
+Save the spec above as `planner.json`. Then check it before you send it:
 
 ```bash
 npm install @shipvo/spec
