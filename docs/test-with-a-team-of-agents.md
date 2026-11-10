@@ -44,4 +44,4 @@ cursor: 4
 
 The next poll, `room_log("checkout-1", since: 4)`, returns only entries after #4. The report then has one block per session (`buyer`, `owner`), each with its steps, errors, findings, last screen and notes.
 
-The log and report live in the MCP server process, so the lead and sub-agents must use the same server. `room_log` and `room_report` work after a session has ended.
+`room_log` and `room_report` work after a session has ended.

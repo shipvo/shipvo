@@ -117,7 +117,7 @@ function scrollTrail(dir: string, el?: { x: number; y: number; w?: number; h?: n
   const [dx, dy] = dir === "down" ? [0, -h] : dir === "up" ? [0, h] : dir === "right" ? [-w, 0] : [w, 0];
   return [{ x: k(c.x - dx), y: k(c.y - dy) }, { x: k(c.x + dx), y: k(c.y + dy) }];
 }
-const sessions = new Map<string, { app: string; steps: number; startedAt: number; room?: string; client?: string; platform?: string }>();
+const sessions = new Map<string, { app: string; steps: number; startedAt: number; room?: string; owner?: string; client?: string; platform?: string }>();
 // Last tree per session id. Separate from `sessions` so it works for ids this server never opened.
 const trees = new Map<string, string>();
 // Recorded steps per session, for export_test. Dropped when the session ends.
@@ -169,22 +169,24 @@ const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: Tool
     if (typeof sid === "string") lastChange.delete(sid);
     const treeBefore = typeof sid === "string" ? trees.get(sid) : undefined;
     const roomBefore = typeof sid === "string" ? sessions.get(sid)?.room : undefined;
-    const out = inputHasKey(args) ? keyRefusal() : await (cb as (a: unknown, e: unknown) => unknown)(args, extra);
+    let out: unknown, thrown: unknown, failed = false;
+    try { out = inputHasKey(args) ? keyRefusal() : await (cb as (a: unknown, e: unknown) => unknown)(args, extra); } catch (e) { failed = true; thrown = e; }
     const room = typeof sid === "string" && !t.name.startsWith("room_") ? roomBefore : undefined;
     if (room && typeof sid === "string") {
       const a = args as { ref?: string; direction?: string };
       const found = a.ref ? findTarget(treeBefore, a.ref) : undefined;
       const target = a.ref ? (found ? `${found.role} "${found.text.slice(0, 40)}" [${a.ref}]` : `[${a.ref}]`) : a.direction ?? null;
-      const isErr = (out as { isError?: boolean } | undefined)?.isError === true;
-      roomLogs.add(room, { session: sid, agent: sessions.get(sid)?.client ?? null, tool: t.name, target, change: lastChange.get(sid) ?? null, ...(isErr ? { error: true } : {}) });
+      const isErr = failed || (out as { isError?: boolean } | undefined)?.isError === true;
+      roomLogs.add(room, { session: sid, agent: sessions.get(sid)?.client ?? null, tool: t.name, target, change: lastChange.get(sid) ?? null, ...(isErr ? { error: true } : {}) }, sessions.get(sid)?.owner);
     }
+    if (failed) throw thrown;
     if (t.name === "open_app") {
       // The session id is only known once the call returns.
       const opened = /^session: (\S+)/.exec((out as { content?: { text?: string }[] })?.content?.[0]?.text ?? "")?.[1];
       if (opened && sessions.has(opened)) {
         callLog.set(opened, [entry()]);
         const r = sessions.get(opened)!;
-        if (r.room) roomLogs.add(r.room, { session: opened, agent: r.client ?? null, tool: "open_app", target: r.app, change: "new screen" });
+        if (r.room) roomLogs.add(r.room, { session: opened, agent: r.client ?? null, tool: "open_app", target: r.app, change: "new screen" }, r.owner);
       }
     }
     return trace && out && typeof out === "object" ? { ...out, _meta: { ...((out as { _meta?: object })._meta ?? {}), traceparent: trace.traceparent } } : out;
@@ -285,7 +287,7 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, 
       const r = await act({ session: sid, action: "screen" });
       if (!r.ok) { attached.delete(sid); attachedRun.delete(sid); d.close(); if (mode === "always") return result(sid, r); attachNote += ` (live run found but attach failed: ${r.error ?? r.code ?? "unknown error"})`; }
       else {
-        sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, client: server.server.getClientVersion()?.name, platform: live.platform }); steps.set(sid, [{ action: "open" }]);
+        sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, owner: principal, client: server.server.getClientVersion()?.name, platform: live.platform }); steps.set(sid, [{ action: "open" }]);
         if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
         // Lumi shows the step in the phone frame. tap, type, scroll and back are captioned by the page itself, from the element it acts on.
         void d.request("lumi", { caption: `Opened ${id}`, state: "working", hold: 1800 }, 1000).catch(() => {});
@@ -303,7 +305,7 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, 
     return result("", { ok: false, code: "build_not_supported", error: `the simulator did not load build ${buildId}, so no session was opened. Open ${id} without @build to use the published app.` });
   }
   if (r.ok === false) return result(sid, r);
-  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, client: server.server.getClientVersion()?.name, platform: ctx.remote ? platform ?? "android" : "headless" });
+  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, owner: principal, client: server.server.getClientVersion()?.name, platform: ctx.remote ? platform ?? "android" : "headless" });
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
   return text(`session: ${sid}\napp: ${id} release: ${buildId ? `build:${buildId}` : r.release ?? "local"}\nmode: headless session${attachNote}\nvisible: no\n\n${r.screen ?? ""}`);
@@ -521,19 +523,22 @@ use(server, tools.device_reset,
   async ({ session, ...device }) => { need(session); return result(session, await act({ session, action: "device_reset", device })); });
 
 const ROOM_RE = /^[\w-]{1,64}$/;
-const badRoom = (room: string) => ROOM_RE.test(room) ? undefined : result("", { ok: false, code: "bad_room", error: "room must be 1 to 64 letters, digits, _ or -" });
+// A room another key owns answers like a room that does not exist, so its name is not revealed.
+const badRoom = (room: string) => !ROOM_RE.test(room) ? result("", { ok: false, code: "bad_room", error: "room must be 1 to 64 letters, digits, _ or -" })
+  : !roomLogs.canAccess(room, principal) ? result("", { ok: false, code: "bad_room", error: `no such room '${room}'` }) : undefined;
 use(server, tools.room_log, async ({ room, since }) => {
   const bad = badRoom(room); if (bad) return bad;
   const { entries, cursor } = roomLogs.since(room, since ?? 0);
   return { ...text(entries.length ? `${entries.map(line).join("\n")}\ncursor: ${cursor}` : `no new entries\ncursor: ${cursor}`), structuredContent: { room, entries, cursor } };
 });
 use(server, tools.room_note, async ({ room, text: body, session }) => {
+  if (ctx.scope === "read") return result("", { ok: false, code: "unauthorized", error: "this key is read-only: it cannot post notes" });
   const bad = badRoom(room); if (bad) return bad;
   const t = clean(body);
   if (!t) return result("", { ok: false, code: "empty_note", error: "the note is empty" });
   const s = session ? sessions.get(session) : undefined;
   if (session && s?.room !== room) return result("", { ok: false, code: "not_in_room", error: `session '${session}' is not in room '${room}'` });
-  const e = roomLogs.add(room, { session: session ?? "lead", agent: s?.client ?? server.server.getClientVersion()?.name ?? null, tool: "room_note", target: null, change: null, text: t });
+  const e = roomLogs.add(room, { session: session ?? null, agent: s?.client ?? server.server.getClientVersion()?.name ?? null, tool: "room_note", target: null, change: null, text: t }, principal);
   return { ...text(`noted #${e.n}${body.length > NOTE_MAX ? ` (cut to ${NOTE_MAX} characters)` : ""}`), structuredContent: { entry: e } };
 });
 use(server, tools.room_report, async ({ room }) => {
@@ -541,7 +546,7 @@ use(server, tools.room_report, async ({ room }) => {
   const log = roomLogs.all(room);
   const listed = await sim("/sessions", {}).catch(() => undefined) as (Act & { sessions?: { session: string; room?: string | null; title?: string }[] }) | undefined;
   const live = new Map((listed?.sessions ?? []).map((x) => [x.session, x]));
-  const ids = [...new Set([...sessions].filter(([, v]) => v.room === room).map(([k]) => k).concat(log.filter((e) => e.session !== "lead" && e.tool === "open_app").map((e) => e.session)))];
+  const ids = [...new Set([...sessions].filter(([, v]) => v.room === room).map(([k]) => k).concat(log.filter((e) => e.session != null && e.tool === "open_app").map((e) => e.session!)))];
   let orders: unknown[] = [];
   try { orders = (JSON.parse(readFileSync(`${process.env.PN_SIM_DIR ?? "/tmp/pn-ui"}/~${room}.json`, "utf8")) as { orders: unknown[] }).orders; } catch {}
   const report = ids.map((id) => {
@@ -549,7 +554,7 @@ use(server, tools.room_report, async ({ room }) => {
     const notes = mine.filter((e) => e.tool === "room_note").map((e) => e.text!);
     const acts = mine.filter((e) => e.tool !== "room_note");
     const m = sessions.get(id);
-    const first = mine[0] ? Date.parse(mine[0].at) : Date.now(), last = mine.length ? Date.parse(mine[mine.length - 1]!.at) : first;
+    const first = mine[0] ? Date.parse(mine[0].at) : Date.now(), last = m ? Date.now() : mine.length ? Date.parse(mine[mine.length - 1]!.at) : first;
     const t = trees.get(id);
     return { session: id, agent: m?.client ?? mine[0]?.agent ?? null, app: m?.app ?? null, steps: acts.length, seconds: Math.round((last - first) / 1000), errors: acts.filter((e) => e.error).length, findings: notes.filter(isFinding), last_screen: live.get(id)?.title || (t ? titleOf(t) : "") || null, notes };
   });

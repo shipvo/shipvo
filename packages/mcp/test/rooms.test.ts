@@ -92,7 +92,48 @@ describe("room log, notes and report", () => {
     const buyer = rep.sessions.find((s: any) => s.session === "buyer");
     expect(buyer).toMatchObject({ steps: 2, errors: 0, last_screen: "Shop", notes: ["Buyer: order placed, id 42"], findings: [] });
     expect(rep.sessions.find((s: any) => s.session === "owner").findings).toEqual(["Finding: total is wrong"]);
-    expect((await call("room_log", { room: "bad room" })).isError).toBe(true);
+    expect((await call("room_log", { room: "bad room" })).structuredContent.code).toBe("bad_room");
+    expect((await call("room_note", { room: "t1", text: "  " })).structuredContent.code).toBe("empty_note");
+    expect((await call("room_note", { room: "t1", session: "other", text: "x" })).structuredContent.code).toBe("not_in_room");
+    // A lead note has no session, so it never mixes with a session named "lead".
+    await call("room_note", { room: "t1", text: "Lead: all done" });
+    const lastEntry = (await call("room_log", { room: "t1", since: 6 })).structuredContent.entries[0];
+    expect(lastEntry).toMatchObject({ session: null, tool: "room_note", text: "Lead: all done" });
+    expect((await call("room_report", { room: "t1" })).structuredContent.sessions.map((s: any) => s.session).sort()).toEqual(["buyer", "owner"]);
+    await c.close(); srv.close();
+  }, 30000);
+});
+
+describe("room log ownership and failures", () => {
+  it("RoomLogs hides a room from another principal", async () => {
+    const { RoomLogs } = await import("../src/room.js");
+    const r = new RoomLogs();
+    r.add("shared", { session: "a", agent: null, tool: "tap", target: null, change: null }, "key-1");
+    expect(r.canAccess("shared", "key-1")).toBe(true);
+    expect(r.canAccess("shared", "key-2")).toBe(false);
+    expect(r.canAccess("fresh", "key-2")).toBe(true);
+  });
+
+  it("logs a tool that throws as an error, then rethrows", async () => {
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      if (req.url === "/act") { res.destroy(); return; }
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url === "/session") return res.end(JSON.stringify({ ok: true, app: "tide", release: "local", screen: '- heading "Shop"' }));
+      res.end(JSON.stringify({ ok: true, sessions: [] }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${(srv.address() as any).port}`, PN_CONTROL: "http://127.0.0.1:1" };
+    delete env.PN_APPS;
+    const c = new Client({ name: "lead", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const call = (name: string, args: any): Promise<any> => c.callTool({ name, arguments: args });
+    await call("open_app", { app: "tide", session: "s1", attach: "never", room: "boom" });
+    const t = await call("tap", { session: "s1", ref: "e1" }).catch((e) => ({ isError: true, thrown: e }));
+    expect(t.isError).toBe(true);
+    const entries = (await call("room_log", { room: "boom" })).structuredContent.entries;
+    expect(entries.map((e: any) => [e.tool, e.error === true])).toEqual([["open_app", false], ["tap", true]]);
+    expect((await call("room_report", { room: "boom" })).structuredContent.sessions[0].errors).toBe(1);
     await c.close(); srv.close();
   }, 30000);
 });
