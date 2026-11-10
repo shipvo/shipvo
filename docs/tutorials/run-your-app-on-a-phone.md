@@ -80,7 +80,7 @@ Leave the terminal running. Open your app's folder in any text editor and open t
 
 Change `Wool beanie` to `Merino beanie` and save the file.
 
-Look at the terminal. You should see `Rebuilding...` and, a moment later, a line such as `rebuilt in 1.2 s` (your number will differ). The phone shows a small "Updating..." hint and then reloads. The list now says **Merino beanie**. You did not touch the browser tab. Live reload works the same way in the iPhone style: [switch the frame](#6-try-the-iphone-style-and-dark-frame) and save again, and the iPhone updates too.
+Look at the terminal. You should see `Rebuilding...` and, a moment later, a line such as `rebuilt in 1.2 s` (your number will differ). The phone shows a small "Updating..." hint and then reloads. The list now says **Merino beanie**. You did not touch the browser tab. Live reload works the same way in the iPhone style: after [step 6](#6-try-the-iphone-style-and-dark-frame), when the iPhone is running, save again and the iPhone updates too.
 
 ![The Android phone before the edit. The product list shows Canvas tote, Enamel mug, Pocket notebook, Wool beanie at $24.00 and Steel bottle.](/tutorials/run-your-app-on-a-phone/07-before-edit.png)
 
@@ -99,6 +99,8 @@ After (a stray word `oops` where the colon was):
 ```
 
 Save. The phone keeps showing your last good version. A red bar under the phone names the file, `src/data/products.json`, gives a line and column number, and says the page still shows your last good version. The terminal prints the same message. Put the colon back and save: the bar goes away and the phone reloads.
+
+![The Android phone still showing the last good product list, with a red bar under it that names src/data/products.json and gives a line and column.](/tutorials/run-your-app-on-a-phone/09-error-bar.png)
 
 > **If something goes wrong.**
 > - Nothing happens after you save: check that the terminal still shows `Watching for changes: the phone reloads when you save.` and that you saved the file in the app folder that `shipvo run` started in.
@@ -149,7 +151,7 @@ Keep the phone open while you work. Each time you save a file, it shows the chan
 
 On 2026-11-06, on a GitHub Actions Linux runner with Node 22.23, a first start of `shipvo run android` for a new shop app, with an empty cache, bundled 204 modules in 6.0 s and was serving the phone within the 60 seconds we waited. We did not time it more closely than that. A start-to-tappable timing on a clean machine is tracked in issue #676. We took every screenshot in this tutorial from that run.
 
-On 2026-11-10, on a GitHub Actions Linux runner, the test [`packages/cli/test/run-live-reload.test.ts`](https://github.com/shipvo/shipvo/blob/main/packages/cli/test/run-live-reload.test.ts) saved a one-word change in a small app and printed `save-to-visible android: 194 ms` and `save-to-visible ios: 190 ms`: the time from the save to the new text showing in the Android and iPhone frames. A shop app bundles more modules, so its rebuild takes longer. Screenshots 07 and 08 come from a `shipvo run android` session on a shop app.
+On 2026-11-10, on a GitHub Actions Linux runner, the test [`packages/cli/test/run-live-reload.test.ts`](https://github.com/shipvo/shipvo/blob/main/packages/cli/test/run-live-reload.test.ts) saved a one-word change in a small app and printed `save-to-visible android: 194 ms` and `save-to-visible ios: 190 ms`: the time from the save to the new text showing in the Android and iPhone frames. A shop app bundles more modules, so its rebuild takes longer. Screenshots 07 and 08 come from a `shipvo run android` session on a shop app. Screenshot 09 is the run page showing the build-error bar with the message `shipvo run` prints for a mistake at line 5, column 11 of `src/data/products.json`.
 
 ## Next steps
 
