@@ -291,7 +291,7 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
       const date = text(each(b.date, sc));
       return { sc, date, day: date.slice(0, 10), title: str(b.title, sc), detail: str(b.detail, sc) };
     }).filter((e) => /^\d{4}-\d{2}-\d{2}/.test(e.date)).sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0));
-    const at = (typeof b.at === "string" ? text(each(b.at, scope)).slice(0, 10) : "") || events[0]?.day || "";
+    const at = (typeof b.at === "string" ? text(b.at.includes("{{") ? tpl(b.at, scope) : b.at).slice(0, 10) : "") || events[0]?.day || "";
     const shown = /^\d{4}-\d{2}-\d{2}$/.test(at) ? visibleDays(view, at) : [];
     const days = view === "agenda" ? [...new Set(events.map((e) => e.day))] : shown.filter((d) => events.some((e) => e.day === d));
     const children = days.map((day): ScreenNode => ({

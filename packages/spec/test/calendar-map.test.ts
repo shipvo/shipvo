@@ -46,6 +46,44 @@ describe("calendar", () => {
     const names = named(make({ view: "week", at: "2026-11-02" }), "event").map((n) => n.name);
     expect(names).toEqual([]);
   });
+  it("week view lists the events of the Monday-first week", () => {
+    const cal = named(make({ view: "week", at: "2026-11-10" }), "calendar")[0]!;
+    expect(named(make({ view: "week", at: "2026-11-10" }), "event").map((n) => n.name)).toEqual(["Flight to Lisbon", "Museum", "Dinner"]);
+    const days = cal.props.days as string[];
+    expect(days).toHaveLength(7);
+    expect(days[0]).toBe("2026-11-09");
+    expect(days[6]).toBe("2026-11-15");
+  });
+  it("month view hides events of other months and sets the weekday offset", () => {
+    expect(named(make({ view: "month", at: "2026-12-01" }), "event")).toEqual([]);
+    const cal = named(make({ view: "month", at: "2026-11-10" }), "calendar")[0]!;
+    expect(cal.props.offset).toBe(6);
+  });
+  it("rejects event times with trailing text", () => {
+    for (const bad of ["2026-11-12Tgarbage", "2026-11-12T25", "2026-11-12 09:30"]) {
+      const s = make();
+      s.data.events.seed[1]!.at = bad;
+      expect(validate(s).errors[0]?.path, bad).toBe("$.data.events.seed[1].at");
+    }
+    const ok = make();
+    ok.data.events.seed[1]!.at = "2026-11-12T19:00:30";
+    expect(validate(ok).errors).toEqual([]);
+  });
+  it("reports bad expressions in block fields with a JSON path", () => {
+    for (const [cal, map, path] of [
+      [{ date: "{{ item. }}" }, {}, "$.screens[0].body[0].date"],
+      [{ title: "{{ item. }}" }, {}, "$.screens[0].body[0].title"],
+      [{}, { lat: "{{ item. }}" }, "$.screens[0].body[1].lat"],
+      [{}, { lng: "{{ item. }}" }, "$.screens[0].body[1].lng"],
+    ] as const) {
+      expect(validate(make(cal, map)).errors.map((e) => e.path), path).toContain(path);
+    }
+  });
+  it("reports unknown item fields in date, lat and lng at the seed row", () => {
+    expect(validate(make({ date: "{{ item.nope }}" })).errors.map((e) => e.path)).toContain("$.data.events.seed[0].nope");
+    expect(validate(make({}, { lat: "{{ item.nope }}" })).errors.map((e) => e.path)).toContain("$.data.places.seed[0].nope");
+    expect(validate(make({}, { lng: "{{ item.nope }}" })).errors.map((e) => e.path)).toContain("$.data.places.seed[0].nope");
+  });
   it("tapping an event fires its action", () => {
     const a = createApp(make());
     if (!a.ok) throw new Error("bad spec");

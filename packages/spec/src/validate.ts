@@ -499,7 +499,7 @@ class Run {
     if (field && seed) {
       seed.forEach((row, i) => {
         const v = isObject(row) ? row[field] : undefined;
-        if (!isDay(typeof v === "string" ? v.slice(0, 10) : "")) {
+        if (!(typeof v === "string" && /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?)?$/.test(v) && isDay(v.slice(0, 10)))) {
           this.error(this.seedPath(b, i, field), `Event date ${JSON.stringify(v ?? null)} is not a date.`, "Use a date like 2026-11-07, or a date and time like 2026-11-07T09:30.");
         }
       });
