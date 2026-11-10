@@ -65,6 +65,9 @@ The planner keeps this list current: the epics in flight, newest owner direction
 - Secret vault: keys go from the person straight into an encrypted vault, never through the model (#841)
 - Security hardening from the external review (#732)
 
+**Spaces on Shipvo Phone:**
+- Describe an app and it appears: create, edit, arrange, schedule, refresh and audit spec apps on the assistant's phone (#1297)
+
 **Agents together (planner epic):**
 - Agents use apps together: shared rooms, sub-agent teams and agent evaluation (#1188)
 
@@ -82,6 +85,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: `app_activity` shows what the agent built and changed in each spec app, `refresh_app` fetches a data source now, and `schedule_app` shows or hides an app on a time window ([Phone apps](phone-apps.md#see-what-was-built-and-changed), #1396, #1379, #1357)
 - 2026-11-10: Guide for describing an app: a checked example spec, the tools and troubleshooting ([Describe an app and it appears](describe-an-app.md), #1301, #1302, #1396)
 - 2026-11-10: Arrange the home screen with `arrange_apps` (pin, hide, position, schedule) and set the phone's clock with `set_phone_time`, on Android and iOS ([Phone apps](phone-apps.md#arrange-the-home-screen), #1349)
 - 2026-11-10: Watch link on the hosted phone: `open_app` returns a read-only `watch_url` ([Agents](agents.md#watch-link-on-the-hosted-phone), #1277)
