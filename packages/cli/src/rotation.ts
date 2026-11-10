@@ -71,24 +71,29 @@ Pick a sequence above every statement you signed before. To override a planned s
 upload needs a signed-in owner session (shipvo login). Tokens are refused by the control plane.
 `;
 
+/** `shipvo keys root`: needs no app config, so it works on a separate offline machine with no shipvo.json. */
+export function createRoot(argv: string[]): void {
+  const a = args(argv), json = a.json === "true", out = a.out;
+  if (!out || out === "true") throw new RotateError(ROTATE_HELP);
+  const seedB64 = b64(new Uint8Array(randomBytes(32)));
+  try { writeFileSync(out, seedB64 + "\n", { mode: 0o600, flag: "wx" }); }
+  catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    throw new RotateError(code === "EEXIST" ? `${out} already exists. Not overwriting a root key. Pick a new file name.` : code === "ENOENT" ? `Cannot write the root key file ${out}: the folder does not exist.` : `Cannot write the root key file ${out}.`);
+  }
+  const publicKey = b64(keyFromSeed(seedB64).publicKey), file = resolve(out);
+  if (json) console.log(JSON.stringify({ public_key: publicKey, file }));
+  else {
+    console.log(`Root public key (pin this value): ${publicKey}`);
+    console.error(`Root seed written to ${file} (mode 0600). Store it offline, in a password manager or vault, then delete this file from this machine. Anyone with it can rotate your release key.`);
+  }
+}
+
 /** Runs `shipvo keys rotate ...`. Throws RotateError for user mistakes; the caller prints it and exits 1. */
 export async function rotate(argv: string[], cfg: Cfg, deps: { fetchFn?: typeof fetch; now?: () => Date } = {}): Promise<void> {
   const [sub, ...rest] = argv, a = args(rest), json = a.json === "true";
   const now = (deps.now ?? (() => new Date()))();
-  if (sub === "root") {
-    const out = a.out;
-    if (!out || out === "true") throw new RotateError(ROTATE_HELP);
-    const seedB64 = b64(new Uint8Array(randomBytes(32)));
-    try { writeFileSync(out, seedB64 + "\n", { mode: 0o600, flag: "wx" }); }
-    catch (e) { throw new RotateError((e as NodeJS.ErrnoException).code === "EEXIST" ? `${out} already exists. Not overwriting a root key. Pick a new file name.` : `Cannot write the root key file ${out}.`); }
-    const publicKey = b64(keyFromSeed(seedB64).publicKey), file = resolve(out);
-    if (json) console.log(JSON.stringify({ public_key: publicKey, file }));
-    else {
-      console.log(`Root public key (pin this value): ${publicKey}`);
-      console.error(`Root seed written to ${file} (mode 0600). Store it offline, in a password manager or vault, then delete this file from this machine. Anyone with it can rotate your release key.`);
-    }
-    return;
-  }
+  if (sub === "root") return createRoot(rest);
   if (sub === "sign") {
     const file = a["root-seed-file"], newKey = a["new-key"], seq = a.sequence;
     if (!file || file === "true" || !newKey || newKey === "true" || !seq || seq === "true") throw new RotateError(ROTATE_HELP);

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, statSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -194,6 +194,55 @@ describe("shipvo keys rotate sign (process)", () => {
   });
 });
 
+describe("keys root (process, no shipvo.json)", () => {
+  const pkg = resolve(__dirname, "..");
+  let out = "";
+  beforeAll(() => {
+    out = mkdtempSync(join(pkg, "dist-test-"));
+    const tsc = createRequire(join(pkg, "package.json")).resolve("typescript/bin/tsc");
+    const r = spawnSync(process.execPath, [tsc, "-p", join(pkg, "tsconfig.json"), "--outDir", out], { encoding: "utf8" });
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+  }, 60_000);
+  afterAll(() => { if (out) rmSync(out, { recursive: true, force: true }); });
+  const go = (cwd: string, ...a: string[]) => spawnSync(process.execPath, [join(out, "cli.js"), "keys", "root", ...a], { cwd, encoding: "utf8" });
+
+  it("creates the key from an empty folder", () => {
+    const d = mkdtempSync(join(tmpdir(), "root-empty-"));
+    const r = go(d, "--out", "f");
+    expect(r.status, r.stderr).toBe(0);
+    const seed = readFileSync(join(d, "f"), "utf8").trim();
+    expect(statSync(join(d, "f")).mode & 0o777).toBe(0o600);
+    expect(r.stdout).toContain(b64(keyFromSeed(seed).publicKey));
+    expect(r.stdout + r.stderr).not.toContain(seed);
+  });
+
+  it("creates the key from an empty folder with --json", () => {
+    const d = mkdtempSync(join(tmpdir(), "root-empty-"));
+    const r = go(d, "--out", "g", "--json");
+    expect(r.status, r.stderr).toBe(0);
+    const env = JSON.parse(r.stdout), seed = readFileSync(join(d, "g"), "utf8").trim();
+    expect(env.code).toBe("root_created");
+    expect(env.data.public_key).toBe(b64(keyFromSeed(seed).publicKey));
+    expect(env.data.file).toBe(join(realpathSync(d), "g"));
+    expect(r.stdout).not.toContain(seed);
+    expect(statSync(join(d, "g")).mode & 0o777).toBe(0o600);
+  });
+
+  it("prints usage and exits 1 without --out", () => {
+    const d = mkdtempSync(join(tmpdir(), "root-empty-"));
+    const r = go(d);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/Usage:/);
+  });
+
+  it("names a missing folder", () => {
+    const d = mkdtempSync(join(tmpdir(), "root-empty-"));
+    const r = go(d, "--out", "nope/f");
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/folder does not exist/);
+  });
+});
+
 describe("keys root", () => {
   const cfg = { appId: V.appId, controlPlane: "https://cp.example" };
   const tmp = mkdtempSync(join(tmpdir(), "root-"));
@@ -222,5 +271,12 @@ describe("keys root", () => {
     const { public_key } = JSON.parse(log.mock.calls[0][0]); log.mockRestore();
     const env = signStatement({ appId: V.appId, sequence: 1, newKey: V.keys.K2.publicKey, validFrom: "2026-11-01T00:00:00Z" }, readFileSync(out, "utf8").trim());
     expect(verifyStatement(env, public_key, { appId: V.appId, effectiveSequence: 0, now: new Date("2026-11-02T00:00:00Z") }).ok).toBe(true);
+  });
+});
+
+describe("keys root without --out", () => {
+  it("throws the usage text", async () => {
+    await expect(rotate(["root"], { appId: "x", controlPlane: "https://cp.example" })).rejects.toThrow(/Usage:/);
+    await expect(rotate(["root", "--out"], { appId: "x", controlPlane: "https://cp.example" })).rejects.toBeInstanceOf(RotateError);
   });
 });
