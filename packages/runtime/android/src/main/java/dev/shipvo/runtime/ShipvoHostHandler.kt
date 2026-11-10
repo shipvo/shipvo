@@ -33,7 +33,7 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
       val pending = s.pendingPath
       if (pending != null) {
         if (s.trialBoots >= MAX_BOOTS || !File(pending).exists()) {
-          s.addEvent("crash_loop_revert:${s.pendingRelease}")
+          s.addEvent("crash_loop_revert:${s.pendingRelease}:${if (Store.loadsInProcess <= 1) "cold" else "reload"}")
           s.block(s.pendingRelease)
           File(pending).delete()
           s.pendingPath = null; s.pendingRelease = 0; s.trialBoots = 0; StateVersion.dropPending(s)
@@ -47,7 +47,7 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
       val current = s.currentPath
       if (current != null && File(current).exists()) {
         if (Store.gate.selectCurrent(s, visible, s.now(), MAX_BOOTS, WINDOW_MS)) {
-          s.addEvent("crash_loop_revert:${s.currentRelease}")
+          s.addEvent("crash_loop_revert:${s.currentRelease}:${if (Store.loadsInProcess <= 1) "cold" else "reload"}")
           s.block(s.currentRelease)
           revertToPrevious(s)
           return selectCurrentOrEmbedded(s)
