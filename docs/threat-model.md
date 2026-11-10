@@ -220,3 +220,13 @@ rg -n "aReleaseAlreadyPendingCurrentOrBlockedIsNotStagedAgain" packages/runtime/
 ```
 
 Host-side tests run with `pnpm -r test`. The iOS and Android runtime tests run in CI on a simulator and an emulator.
+
+## Software bill of materials
+
+`pnpm sbom` writes one CycloneDX 1.5 JSON file for each published `@shipvo/*` package to `dist-sbom/<name>-<version>.cdx.json`. Each file lists the package itself (name, version, purl, license) and every production dependency it ships, with name, version and purl, sorted by purl with no duplicates. Dev dependencies are not included.
+
+```bash
+pnpm install --frozen-lockfile
+pnpm sbom
+ls dist-sbom
+```
