@@ -59,7 +59,7 @@ Apps whose installs run a build without the signing runtime will not auto-halt u
 
 ## Troubleshooting
 
-- **`The control plane ... rejected your token (401)`**: the token is wrong or missing. Set `SHIPVO_OWNER_TOKEN`, or run `shipvo app create` to get a publish token.
+- **`The control plane ... rejected your token (401 or 403)`**: the token is wrong or missing. Set `SHIPVO_OWNER_TOKEN`, or run `shipvo app create` to get a publish token.
 - **`--min-reports needs --threshold too`**: pass both, for example `--threshold 0.2 --min-reports 20`.
 - **`Unknown flag ... Write "--threshold 0.2" (a space, not =)`**: write the value after a space.
 - **Failures are high but the release did not halt**: check that there are enough installs (`min_installs`), that failures come from at least 3 networks, and that the reports are signed. Run `shipvo status` to see the release numbers.
