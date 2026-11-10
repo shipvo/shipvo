@@ -27,6 +27,7 @@
     "chromium-hint.mjs",
     "browser-resolver.mjs",
     "app-name.mjs",
+    "identity.mjs",
     "frame.mjs",
     "lumi.mjs",
     "guide.mjs",
