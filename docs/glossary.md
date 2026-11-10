@@ -110,3 +110,9 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Map block.** A part of an app spec that draws rows with a latitude and longitude as pins on a canvas. It loads no map tiles. See [App spec](spec-blocks.md#calendars-and-maps).
 
 **Refresh (data source).** A number of seconds on a web data source in an app spec. Shipvo asks the service again on that timer while the app is installed. See [App spec](spec-blocks.md#keep-a-data-source-fresh).
+
+**App activity.** The record of what an agent built on a phone: each version of an app with plain lines for what changed, its web data sources, and its events. You get it with `app_activity`. See [Phone apps](phone-apps.md#see-what-was-built-and-changed).
+
+**Schedule (for an app).** A window of days and hours when an app shows on the phone's home screen. Outside the window the app is hidden but still installed. See [Phone apps](phone-apps.md#arrange-the-home-screen).
+
+**Phone clock.** The time the simulated phone uses for schedules. `set_phone_time` sets it so a test can check what shows on a Saturday morning. See [Phone apps](phone-apps.md#arrange-the-home-screen).

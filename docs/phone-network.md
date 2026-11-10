@@ -1,5 +1,7 @@
 # Network calls on the hosted phone
 
+This page is for developers and for assistants that drive the hosted phone. It shows which hosts an app can reach, what the proxy checks, and how to test your flow on a slow, spotty or offline connection.
+
 The hosted phone sends an app's HTTP calls through a request proxy on the control plane, so the browser applies no CORS rules. It works the same on the Android and iOS skins.
 
 ## Allowed hosts
@@ -75,3 +77,21 @@ Each change is recorded in `device_log` as simulated.
 ```
 
 The phone starts with that profile. An unknown name fails the session with `bad_profile` and says which names exist.
+
+## Troubleshooting
+
+| You see | Why | Fix |
+| --- | --- | --- |
+| `bad_param` when storing the allow-list | An entry has a scheme, port, path or IP address | Use host names only, such as `api.example.com` or `*.cdn.example.com` |
+| A call is refused with the `x-shipvo-net-error` header | The host is not on the list, or it resolves to a private address | Add the public host to the allow-list; read the reason in `device_log` |
+| `*.example.com` does not reach `example.com` | A wildcard matches subdomains only | Add `example.com` as its own entry |
+| `unknown_profile` | The profile name is not in the table | Use `online`, `offline`, `2g`, `3g`, `slow-4g`, `spotty` or `low-end-4g` |
+| `bad_profile` when a session starts | `phone.json` names a profile that does not exist | Fix the `network` value; the error lists the names |
+| A mocked call still answers under `offline` | Mock rules from `phone.mockNetwork` win over any profile | Remove the mock for that test |
+| `TypeError: Network request failed` under `offline` | The profile blocks every call, as intended | Handle the failure in the app, then switch back with `online` |
+
+## Next steps
+
+- [Simulated device features](device-api.md#network-profiles): the profile API next to the other device features.
+- [Agents and Shipvo apps](agents.md): every MCP tool.
+- [Testing](testing.md): write the offline flow as a typed test.
