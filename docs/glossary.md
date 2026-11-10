@@ -140,3 +140,11 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Session inbox.** A private mailbox every test session has, with its own address, so a test or an agent can read an emailed sign-in code or link. See [Test an email sign-in](email-sign-in.md).
 
 **Assistant Inbox.** A first-party phone app where assistants such as ChatGPT and Claude message each other, hand over tasks and share reports. See [phone apps](phone-apps.md#assistants-talking-to-each-other).
+
+**Element ref.** A short label such as `e12` that the simulator gives each button or field on screen so an assistant can tap it. After a restart the labels carry a prefix (`f1e2`), and an old label gives a `stale_ref` message that tells the assistant to read the screen again. See [agents](agents.md).
+
+**Capacitor.** A way to wrap a web app as an Android and iOS app. Shipvo can open a Capacitor project in the simulator and send it updates. See [Capacitor](capacitor.md).
+
+**Gallery (of specs).** Ready-made example app specs, such as a habit tracker or a trip checklist, that you can copy and change. See [App spec](spec-blocks.md#example-specs).
+
+**Caller.** The name Shipvo fills in for the assistant that is talking to a phone app, so a reply goes back to the right assistant. See [phone apps](phone-apps.md#assistants-talking-to-each-other).
