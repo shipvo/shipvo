@@ -209,6 +209,19 @@ A person may paste an API key into the chat. The model would then pass it to a t
 
 The model has already seen the key by the time the check runs, so the advice is to rotate it.
 
+## Per-app spend limit (slice 5a of #843)
+
+The person sets a monthly limit for each installed app. Code: `services/control-plane/src/spend.ts`, `phone.ts`, migration `0025_spend_limit.sql`. Tests: `services/control-plane/test/spend-limit.test.ts`.
+
+The source of `spent` is the `phone_spend` ledger. `authorizeSpend` is the only writer, so the number shown to the person is the sum of money actions that were allowed. The check and the record are one SQL statement, so two calls at once cannot pass the limit together.
+
+| Threat | What stops it | Test |
+|---|---|---|
+| An app or assistant moves money without the person's say | The limit is 0 until the person sets it. `authorizeSpend` refuses an amount over the limit with `spend_limit` (with `limit` and `spent`). | "defaults to 0 and refuses a money action"; "passes under the limit and refuses the call that would pass it" |
+| The assistant raises its own limit | The limit routes refuse an assistant token with 403. Only a signed-in person session can read or set a limit. | "an assistant token gets 403, the person can set it" |
+| A change or refusal goes unseen | Each change and each refusal writes a row to `phone_spend_audit` (person, app, action, detail, time). | "writes audit rows for set and refuse" |
+| Old spending hides the budget, or one currency pays another | Spend is summed for the current month only, in the limit's currency. Another currency is refused, and spend in an old currency does not count against a new limit. Check and record are atomic. | "does not count last month and refuses another currency"; "old-currency spend does not count against a new currency limit"; "two calls at once cannot pass the limit together" |
+
 ## How to check these claims
 
 Every path and test name above can be found with `rg`, for example:

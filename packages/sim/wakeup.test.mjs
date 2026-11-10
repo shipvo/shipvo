@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { createHmac } from "node:crypto";
-import { createWakeups, sign, WakeupError } from "./wakeup.mjs";
+import { createWakeups, sign, nudgeText, WakeupError } from "./wakeup.mjs";
 
 function receiver(statuses = [200]) {
   const got = [];
@@ -84,9 +84,31 @@ test("private addresses, bad input and a duplicate-name replace are handled", as
   assert.equal(await code({ name: "", url: "https://example.com/h" }), "bad_name");
   assert.equal(await code({ name: "x", url: "https://example.com/h", events: ["report"] }), "bad_events");
   assert.equal(await code({ name: "x", url: "https://example.com/h", secret: "short" }), "bad_secret");
+  assert.equal(await code({ name: "x", url: "https://example.com/h", format: "xml" }), "bad_format");
   const r = await w.register({ name: "x", url: "https://example.com/h", secret: "a-secret-of-16-chars" }); assert.equal(r.secret, undefined);
   await w.register({ name: "x", url: "https://example.com/other", allowPrivate: false });
-  assert.deepEqual(w.list(), [{ name: "x", url: "https://example.com/other", events: ["message", "task"] }]);
+  assert.deepEqual(w.list(), [{ name: "x", url: "https://example.com/other", events: ["message", "task"], format: "json" }]);
   assert.equal(w.clear("x"), true); assert.equal(w.clear("x"), false); assert.deepEqual(w.list(), []);
   w.close();
+});
+
+test("text and slack formats tell the person to open their chat, and stay signed", async () => {
+  assert.equal(nudgeText("chatgpt", 1, 0), "ChatGPT has 1 new message on the phone. Open your chat with ChatGPT to pick it up.");
+  assert.equal(nudgeText("claude", 2, 1), "Claude has 2 new messages and 1 new task on the phone. Open your chat with Claude to pick it up.");
+  const rx = await receiver();
+  const data = { messages: [], handoffs: [] };
+  const { w } = mk(data);
+  const t = await w.register({ name: "chatgpt", url: rx.url, format: "text", allowPrivate: true });
+  data.messages.push({ id: "m1", to: "chatgpt", read: false, body: "private words" });
+  w.tick(); await w.idle();
+  assert.equal(rx.got[0].body, "ChatGPT has 1 new message on the phone. Open your chat with ChatGPT to pick it up.");
+  assert.match(rx.got[0].headers["content-type"], /^text\/plain/); assert.equal(rx.got[0].headers.title, "Shipvo phone");
+  assert.equal(rx.got[0].headers["x-shipvo-signature"].split("v1=")[1], createHmac("sha256", t.secret).update(`${/t=(\d+)/.exec(rx.got[0].headers["x-shipvo-signature"])[1]}.${rx.got[0].body}`).digest("hex"));
+  await w.register({ name: "claude", url: rx.url, format: "slack", allowPrivate: true });
+  data.handoffs.push({ id: "h1", to: "claude", status: "open" });
+  w.tick(); await w.idle();
+  assert.deepEqual(JSON.parse(rx.got[1].body), { text: "Claude has 1 new task on the phone. Open your chat with Claude to pick it up." });
+  assert.match(rx.got[1].headers["content-type"], /^application\/json/);
+  assert.ok(!rx.got.some((g) => g.body.includes("private words")));
+  w.close(); rx.close();
 });
