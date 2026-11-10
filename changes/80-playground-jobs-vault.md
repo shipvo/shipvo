@@ -1,1 +1,4 @@
-- docs: new page "The playground" (panels, agent console, Many phones link parameters, troubleshooting); Agents covers `job_status` and `traceparent`; App spec covers managing saved keys; glossary and Shipped list updated.
+- docs: new page "The playground" with panels, the agent console, Many phones link parameters and troubleshooting.
+- docs: Agents covers `job_status` and `traceparent`.
+- docs: App spec covers managing saved keys.
+- docs: glossary and Shipped list updated.
