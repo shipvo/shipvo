@@ -106,10 +106,8 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Spec `calendar` and `map` blocks (month, week, agenda, pins, `onSelect`) | [spec-blocks](spec-blocks.md#calendars-and-maps) | | | |
 | Open a build from a link (`build_url` on `POST /session`; errors `bad_url`, `host_not_allowed`, `too_large`, `unreachable`) | [test-your-build](test-your-build.md#open-a-build-from-a-link) | | | |
 | Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
-| Arrange the home screen and set the phone's clock (`arrange_apps`, `set_phone_time`, `placement` in `phone.json`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
-| `/phone?session=<name>` frame page for a live session's Store and apps | [phone-apps](phone-apps.md#install-apps-and-switch-between-them) | | | |
-| Arrange the home screen and set the phone clock (`arrange_apps`, `set_phone_time`) | [phone-apps](phone-apps.md) | | | |
-| Phone frame page `/phone?session=` with Store and installed apps | [phone-apps](phone-apps.md) | | | |
+| Arrange the home screen and set the phone clock (`arrange_apps`, `set_phone_time`, `placement` in `phone.json`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
+| Phone frame page `/phone?session=<name>` with Store and installed apps | [phone-apps](phone-apps.md#install-apps-and-switch-between-them) | | | |
 | Watch link on the hosted phone (`watch_url`, read-only, sign in to take over) | [agents](agents.md#watch-link-on-the-hosted-phone) | | | |
 | Hosted MCP sign-in with URL client ids (Client ID Metadata Documents) | [agents](agents.md) | | | |
 | Data sources refresh on an interval (`refresh`, 30 seconds or more) | [spec-blocks](spec-blocks.md#keep-a-data-source-fresh) | | | |

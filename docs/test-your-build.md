@@ -47,16 +47,16 @@ If your coding agent runs the local `@shipvo/mcp` server (`shipvo agents setup` 
 
 `upload_build` reads your project, so it runs only on the local (stdio) server. Add `npx @shipvo/mcp` next to the hosted one. A key with read scope cannot upload.
 
-## Open a build from a URL
+## Open a build from a link
 
-If you run the simulator yourself, `POST /session` can take a `build_url` instead of a published app. The simulator downloads the web build (a `.tar.gz`), unpacks it, opens it as the app and answers with `build: <id>`. The id is the build's content hash, so the same file always gets the same id. In an MCP tool call, `open_app("tide@build:<id>")` sends that id along.
+If you run the simulator yourself, `POST /session` can take a `build_url` instead of a published app. The simulator fetches the web build (a `.tar.gz`) into its build cache, unpacks it, serves it at `/b/<id>/`, opens it as the app and answers with `build: <id>`. The id is the build's content hash, so the same file always gets the same id. In an MCP tool call, `open_app("tide@build:<id>")` sends that id along.
 
-The download is checked before any session is made. If it fails, you get one of these errors and no session is left behind:
+The host must be public. A private or local host is refused; to allow your own, set `PN_BUILD_ALLOW_HOSTS`. The download is checked before any session is made. If it fails, you get one of these errors and no session is left behind:
 
 | Code | Meaning | What to do |
 | --- | --- | --- |
 | `bad_url` | The address is not an `http(s)` URL. | Use a full `https://` address. |
-| `host_not_allowed` | The host is private or local, on the first request or on a redirect. | Use a public host. To allow your own, set `PN_BUILD_ALLOW_HOSTS` to a comma-separated list of host names before you start the simulator. |
+| `host_not_allowed` | The host is private or local, on the first request or on a redirect, and is not in `PN_BUILD_ALLOW_HOSTS`. | Use a public host, or set `PN_BUILD_ALLOW_HOSTS` to a comma-separated list of host names before you start the simulator. |
 | `too_large` | The file is over the simulator's size cap. | Remove unused assets and upload again. |
 | `unreachable` | The host did not answer in time, refused, or redirected too many times. | Check the address from a browser, then try again. |
 | `bad_build` | The file is not a `.tar.gz` with an `index.html` at its top level, or it contains links. | Pack the contents of your `sim-dist` folder so `index.html` is at the top, with no links. |
@@ -64,10 +64,6 @@ The download is checked before any session is made. If it fails, you get one of 
 ## Who can see a build
 
 A build is private to your account. A key from another account gets `build_not_found`, the same answer as for a build that never existed. A build is deleted when it expires.
-
-## Open a build from a link
-
-The simulator's `POST /session` also takes a `build_url`: a link to a `.tar.gz` of your built app. The simulator fetches it into its build cache, unpacks it (an archive that contains links is refused) and serves it at `/b/<id>/`. The reply has `build`: the id you sent, or the content id. `open_app("<app>@build:<id>")` sends it for you. The host must be on the same allow-list the phone's Browser uses. If the fetch fails, the reply is `{ ok: false, code, error }` and no session is created.
 
 ## Errors
 
