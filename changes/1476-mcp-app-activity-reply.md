@@ -1,0 +1,1 @@
+- mcp: `app_activity` and `refresh_app` now return readable text and `structuredContent` (versions, change lines, sources, events; updated sources and errors). `export_phone_apps` also returns `structuredContent`.

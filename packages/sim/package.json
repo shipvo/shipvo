@@ -28,6 +28,7 @@
     "browser-resolver.mjs",
     "app-name.mjs",
     "identity.mjs",
+    "banner.mjs",
     "frame.mjs",
     "lumi.mjs",
     "guide.mjs",

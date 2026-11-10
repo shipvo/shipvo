@@ -139,3 +139,5 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Key rotations in the audit log (`shipvo audit`, `action: key-rotation`) | [key-rotation](key-rotation.md#see-rotations-in-the-audit-log), [cli](cli.md#shipvo-audit) | | | |
 | Measured simulator cost (`scripts/sim-bench`: session start time and memory) | [sim-bench](sim-bench.md) | | | |
 | Lumi benchmark (`scripts/lumi/bench.mjs`: screens, flows and planted bugs on fixed apps) | [lumi-bench](lumi-bench.md) | | | |
+| App spec validator (`validate`, error paths and fixes, network and write permissions) | [app-spec-validator](app-spec-validator.md) | | | |
+| Crash-loop revert paths on Android (trial boots, promoted boots, 60 s window) | [android-crash-loop-paths](android-crash-loop-paths.md) | | | |

@@ -35,6 +35,7 @@ import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updat
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
 import { assistantName } from "./identity.mjs";
+import { pendingBanner } from "./banner.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
@@ -439,7 +440,7 @@ async function act(id, body) {
     case "schedule_app": case "clear_schedule":   // the same schedule as arrange_apps, under the names an assistant looks for
     case "arrange_apps": {
       const { id: appId, ...rest } = body; delete rest.action; delete rest.session;
-      const patch = body.action === "clear_schedule" ? { schedule: null } : body.action === "schedule_app" ? { schedule: { days: body.days, from: body.from, to: body.to } } : rest;
+      const patch = body.action === "clear_schedule" ? { schedule: null } : body.action === "schedule_app" ? { schedule: { days: body.days, from: body.from, to: body.to, timezone: body.timezone } } : rest;
       try { arrangeApp(s.apps, String(appId ?? ""), patch, body.action); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       return { installed_apps: s.apps.installed_apps, home: `Home screen\n${describeApps(s.apps, nowOf(s))}`, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
@@ -679,6 +680,8 @@ async function act(id, body) {
       await ensureNetworkRoute(s, page);
       break;
     }
+    // The line MCP puts at the start of every tool result: what waits for the calling assistant in the Assistant Inbox app. Changes nothing.
+    case "pending_banner": return { banner: pendingBanner(specHost.dataOf(sidOf(s), "inbox"), assistantName(body.agent)) };
     // The session's private inbox. Reads change nothing.
     case "inbox_read": return { address: s.inbox.address, messages: s.inbox.read({ subject: body.subject, from: body.from }) };
     case "inbox_wait": {
@@ -743,7 +746,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
@@ -846,7 +849,7 @@ const server = http.createServer(async (req, res) => {
       try { const s0 = sessions.get(body.session); const prevScreen = s0?.lastScreen; const r = await act(body.session, body);
         if (s0 && typeof r.screen === "string") { s0.lastScreen = r.screen; watch.step(body.session, describeStep(body, prevScreen), changeLine(prevScreen, r.screen)); }
         if (s0?.room && describeStep(body, prevScreen)) roomLog(s0.room, { kind: "action", session: body.session, agent: typeof body.agent === "string" ? body.agent.slice(0, 64) : null, tool: String(body.action), target: body.ref ? String(body.ref) : null, change: changeLine(prevScreen, r.screen) || null });
-        log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
+        if (body.action !== "pending_banner") log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
       catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: e.code === "invalid_spec" ? String(e.message) : String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }
     }
     send(404, { error: "not found" });

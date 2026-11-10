@@ -19,7 +19,7 @@ beforeAll(async () => {
     let raw = ""; for await (const c of req) raw += c;
     const body = raw ? JSON.parse(raw) : {}; res.writeHead(200, { "content-type": "application/json" });
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [] }));
-    sent.push(body);
+    if (body.action !== "pending_banner") sent.push(body);
     if (body.url?.includes("localhost")) return res.end(JSON.stringify({ ok: false, code: "host_not_allowed", error: "localhost is a private host" }));
     res.end(JSON.stringify({ ok: true, source: "web", url: "https://shop.test/", title: "Shop", tree: '- button "Pay" [ref=e2]' }));
   });

@@ -16,6 +16,8 @@ cd apps/tide-and-tackle && PN_SIM=1 npx expo export --platform web --output-dir 
 node scripts/sim-bench/run.mjs --sessions 5 --out .shipvo/sim-bench.json
 ```
 
+3. Read the table it prints, or open `.shipvo/sim-bench.json`.
+
 Options: `--sessions` (whole number, 1 or more; default 5), `--out` (JSON file; default `.shipvo/sim-bench.json`) and `--port` (default 4749).
 
 The script starts `@shipvo/sim` for the sample app, waits for Chromium to launch, then opens sessions one after another and keeps them open.

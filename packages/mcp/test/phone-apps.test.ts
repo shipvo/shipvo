@@ -22,7 +22,7 @@ beforeAll(async () => {
     res.writeHead(200, { "content-type": "application/json" });
     const body = raw ? JSON.parse(raw) : {};
     if (req.url !== "/act") return res.end(JSON.stringify({ ok: true }));
-    seen.push(body);
+    if (body.action !== "pending_banner") seen.push(body);
     const fail = (code: string, error: string) => res.end(JSON.stringify({ ok: false, code, error }));
     const ok = () => res.end(JSON.stringify({ ok: true, screen: `Home screen\ninstalled: ${[...installed.keys()].join(",")} current: ${current}` }));
     if (body.action === "find_apps") {
@@ -36,7 +36,9 @@ beforeAll(async () => {
       if (installed.has(body.id)) return fail("already_installed", "already");
       installed.set(body.id, app.name); return ok();
     }
-    if (body.action === "arrange_apps" || body.action === "set_time" || body.action === "schedule_app" || body.action === "clear_schedule" || body.action === "refresh_app" || body.action === "app_activity") return res.end(JSON.stringify({ ok: true, screen: "Home screen" }));
+    if (body.action === "arrange_apps" || body.action === "set_time" || body.action === "schedule_app" || body.action === "clear_schedule") return res.end(JSON.stringify({ ok: true, screen: "Home screen" }));
+    if (body.action === "refresh_app") return res.end(JSON.stringify({ ok: true, updated: ["prices"], errors: [{ source: "news", error: "HTTP 500" }] }));
+    if (body.action === "app_activity") return res.end(JSON.stringify({ ok: true, apps: [{ id: "prices", name: "Prices", version: 2, history: [{ version: 1, at: 1, changes: ["created: 1 screens"] }, { version: 2, at: 2, changes: ["added screen 'about'"] }], sources: [{ name: "prices", refresh: 60 }], events: [{ at: 3, name: "update_app", changes: ["added screen 'about'"] }] }] }));
     if (body.action === "update_app") {
       if (!installed.has(body.id)) return fail("not_installed", "not a spec app");
       if (!body.spec?.screens?.length) return fail("invalid_spec", "$.screens: Must have at least one screen.");
@@ -53,6 +55,11 @@ beforeAll(async () => {
       if (!body.spec?.screens?.length) return fail("invalid_spec", "$.screens: Must have at least one screen.");
       if (installed.has(body.id)) return fail("already_installed", "already");
       installed.set(body.id, body.name ?? body.id); if (body.open !== false) current = body.id; return ok();
+    }
+    if (body.action === "type" || body.action === "tap") {
+      // Spec apps show refs with the frame prefix, as the real simulator does.
+      if (body.ref !== "f1e7") return fail("stale_ref", "no such ref");
+      return res.end(JSON.stringify({ ok: true, screen: `- textbox "Who is it for?" [ref=f1e7] value="${body.text ?? ""}"` }));
     }
     if (!installed.has(body.id)) return fail("not_installed", "not installed");
     if (body.action === "pin_app" || body.action === "hide_app") return ok();
@@ -103,6 +110,18 @@ describe("phone app tools", () => {
     expect((await call(c, "uninstall_app", { session: s, id: "notes" })).content[0].text).toMatch(/current: null/);
     await c.close();
   });
+  it("type reaches a form field of an app made with create_app, by its f1e7 ref", async () => {
+    const c = await connect();
+    const s = "s-type";
+    const spec = { spec: "shipvo.app/v0", app: { id: "gifts2", name: "Gifts" }, screens: [{ id: "home", title: "Gifts", body: [{ type: "input", id: "who", label: "Who is it for?" }] }] };
+    expect((await call(c, "create_app", { session: s, id: "gifts2", spec })).isError).toBeFalsy();
+    const r = await call(c, "type", { session: s, ref: "f1e7", text: "Mum" });
+    expect(r.isError).toBeFalsy();
+    expect(r.content[0].text).toMatch(/\[ref=f1e7\].*Mum/);
+    expect(seen.filter((b: any) => b.action === "type").at(-1)).toMatchObject({ ref: "f1e7", text: "Mum" });
+    await call(c, "uninstall_app", { session: s, id: "gifts2" });
+    await c.close();
+  });
   it("create_app sends the spec to the phone and reports a bad spec with its code", async () => {
     const c = await connect();
     const s = "s-create";
@@ -147,9 +166,17 @@ describe("phone app tools", () => {
   });
   it("refresh_app asks the phone to fetch an app's data now", async () => {
     const c = await connect();
-    expect((await call(c, "refresh_app", { session: "s-ref", id: "prices" })).isError).toBeFalsy();
+    const rf: any = await call(c, "refresh_app", { session: "s-ref", id: "prices" });
+    expect(rf.isError).toBeFalsy();
+    expect(rf.content[0].text).toContain("updated prices");
+    expect(rf.content[0].text).toContain("Error in news: HTTP 500");
+    expect(rf.structuredContent.updated).toEqual(["prices"]);
     expect(seen.filter((b: any) => b.action === "refresh_app").at(-1)).toMatchObject({ id: "prices" });
-    expect((await call(c, "app_activity", { session: "s-ref", id: "prices", limit: 5 })).isError).toBeFalsy();
+    const ac: any = await call(c, "app_activity", { session: "s-ref", id: "prices", limit: 5 });
+    expect(ac.isError).toBeFalsy();
+    expect(ac.content[0].text).toContain("added screen 'about'");
+    expect(ac.content[0].text).toContain("prices (every 60 s)");
+    expect(ac.structuredContent.apps[0].history).toHaveLength(2);
     expect(seen.filter((b: any) => b.action === "app_activity").at(-1)).toMatchObject({ id: "prices", limit: 5 });
     await c.close();
   });
