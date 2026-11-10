@@ -1,1 +1,0 @@
-- Docs: the Use log button on the Secrets screen, and ChatGPT connector setup troubleshooting.
