@@ -10,6 +10,9 @@ export const FORWARDED_EVENTS = [
 ] as const;
 export type ForwardedEvent = (typeof FORWARDED_EVENTS)[number];
 
+/** `cold`: first bundle load in the process. `reload`: in-place reload after an apply. */
+export type LoadKind = "cold" | "reload";
+
 const CARRIES_RELEASE: string[] = ["verify_failed", "download_failed", "hermes_bytecode_mismatch"];
 const NATIVE_MODULE_REASONS: string[] = ["native_module_missing", "native_module_version"];
 
@@ -22,10 +25,10 @@ const NATIVE_MODULE_REASONS: string[] = ["native_module_missing", "native_module
  */
 export function forwardRuntimeEvents(
   events: string[],
-  send: (event: ForwardedEvent, release?: number) => void,
+  send: (event: ForwardedEvent, release?: number, loadKind?: LoadKind) => void,
 ): void {
   for (const e of events) {
-    const [name, id] = e.split(":");
+    const [name, id, kindPart] = e.split(":");
     if (name === "pointer_rejected") {
       // "pointer_rejected:<reason>": only the two native-module reasons are reported.
       if (id !== undefined && NATIVE_MODULE_REASONS.includes(id)) send(id as ForwardedEvent);
@@ -33,6 +36,8 @@ export function forwardRuntimeEvents(
     }
     if (!(FORWARDED_EVENTS as readonly string[]).includes(name)) continue;
     const release = CARRIES_RELEASE.includes(name) && id !== undefined && /^\d+$/.test(id) ? Number(id) : undefined;
-    send(name as ForwardedEvent, release);
+    // "crash_loop_revert:<release>:<cold|reload>" says which kind of load the revert happened in.
+    const loadKind = name === "crash_loop_revert" && (kindPart === "cold" || kindPart === "reload") ? kindPart : undefined;
+    send(name as ForwardedEvent, release, loadKind);
   }
 }

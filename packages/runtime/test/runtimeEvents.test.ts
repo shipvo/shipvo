@@ -46,4 +46,9 @@ describe("forwardRuntimeEvents", () => {
   it("ignores other pointer_rejected reasons", () => {
     expect(run(["pointer_rejected:hermes_bytecode_mismatch", "pointer_rejected:x", "pointer_rejected"])).toEqual([]);
   });
+  it("passes the load kind of a crash_loop_revert", () => {
+    const sent: unknown[][] = [];
+    forwardRuntimeEvents(["crash_loop_revert:5:reload", "crash_loop_revert:5:cold", "crash_loop_revert:5:bogus"], (...a) => sent.push(a));
+    expect(sent).toEqual([["crash_loop_revert", undefined, "reload"], ["crash_loop_revert", undefined, "cold"], ["crash_loop_revert", undefined, undefined]]);
+  });
 });

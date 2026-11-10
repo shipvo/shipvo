@@ -1,5 +1,30 @@
 [
   {
+    "name": "a11y_audit",
+    "description": "Check the current screen for controls TalkBack and VoiceOver users cannot use. Lists every button, link, field or other control with no accessible name (missing_label) and every tap target under the platform minimum (small_target: 48 dp wide or high on the Android style, 44 pt on the iPhone style). Each issue has ref, role, code and message. Fails with sizes_unavailable when the simulator cannot report sizes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "app_activity",
     "description": "What was built and changed on the phone: for each app made with create_app, its versions with a plain line for what changed in each (added, removed or changed screens, actions and data), its http data sources and how often each refreshes, and its events (create, update, action, data refresh). Pass id for one app. Fails with not_installed.",
     "inputSchema": {
@@ -18,31 +43,6 @@
           "minimum": 1,
           "maximum": 200,
           "description": "Most recent events per app (default 50)"
-        }
-      },
-      "required": [
-        "session"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    },
-    "annotations": {
-      "readOnlyHint": true,
-      "destructiveHint": false
-    },
-    "execution": {
-      "taskSupport": "forbidden"
-    }
-  },
-  {
-    "name": "a11y_audit",
-    "description": "Check the current screen for controls TalkBack and VoiceOver users cannot use. Lists every button, link, field or other control with no accessible name (missing_label) and every tap target under the platform minimum (small_target: 48 dp wide or high on the Android style, 44 pt on the iPhone style). Each issue has ref, role, code and message. Fails with sizes_unavailable when the simulator cannot report sizes.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "session": {
-          "type": "string",
-          "description": "Session from open_app"
         }
       },
       "required": [
@@ -707,6 +707,35 @@
       "required": [
         "session",
         "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "clear_wakeup",
+    "description": "Stop waking an assistant by webhook. Returns whether one was registered.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "name"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
@@ -1418,6 +1447,31 @@
     }
   },
   {
+    "name": "list_wakeups",
+    "description": "The wake-up URLs registered on this phone: assistant name, URL and events (never the secret).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "lock",
     "description": "Press the power button: the simulated phone locks and shows the lock screen. The app and its screen are kept. While locked, tap, type, scroll and back fail with phone_locked. Logged in device_log as simulated.",
     "inputSchema": {
@@ -1998,6 +2052,69 @@
       "required": [
         "session",
         "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "register_wakeup",
+    "description": "Wake an assistant that is not in a turn: when a new message or task arrives for `name` in the Assistant Inbox app, the phone POSTs a small signed JSON note to `url` (who it is for, whether it is a message or a task, a one-line summary and the ids; never the message text). The URL can be a Claude Code scheduled task, a GitHub repository_dispatch, an OpenAI background run, Slack or Zapier. Only arrivals after this call wake it. A failed call is retried twice, and every delivery is in device_log. The signature is in the x-shipvo-signature header as `t=<unix seconds>,v1=<hex hmac-sha256 of \"<t>.<body>\">` using the secret; leave `secret` out and one is generated and returned once. Private and local addresses are refused unless allow_private is true. To tell the person instead of an assistant (for a chat that cannot be started by a URL), point the URL at a push or chat service and set format to text or slack: it sends one line such as \"ChatGPT has 1 new message on the phone. Open your chat with ChatGPT to pick it up.\" Calling it again for the same name replaces the URL.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "name": {
+          "type": "string",
+          "description": "The assistant to wake, such as chatgpt or claude (the same names check_inbox uses)"
+        },
+        "url": {
+          "type": "string",
+          "description": "http or https URL that receives the POST"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "message",
+              "task"
+            ]
+          },
+          "description": "What wakes it (default: both)"
+        },
+        "secret": {
+          "type": "string",
+          "description": "Shared secret, at least 16 characters (default: generated and returned once)"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "json",
+            "text",
+            "slack"
+          ],
+          "description": "What is sent (default json). text: one plain line for a push service such as ntfy, so the person is told to open their chat. slack: {\"text\": line} for a Slack-style incoming webhook"
+        },
+        "allow_private": {
+          "type": "boolean",
+          "description": "Allow a private or local address (for a service you run yourself)"
+        }
+      },
+      "required": [
+        "session",
+        "name",
+        "url"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"

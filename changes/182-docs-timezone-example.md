@@ -1,0 +1,1 @@
+- Docs: Phone apps page adds a worked `timezone` example for `schedule_app` and a sharper `bad_timezone` troubleshooting row.
