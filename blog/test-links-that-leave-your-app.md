@@ -110,3 +110,5 @@ If the app calls `openUrl` and the Browser refuses the page, the call returns `f
 3. Turn the checks that matter into typed tests with `export_test`.
 
 Related reading: [Test dark mode, large text and right-to-left](/blog/test-dark-mode-large-text-and-rtl-in-react-native/) covers the Settings app on the same phone, and [The permission you never test](/blog/the-permission-you-never-test/) covers camera, location and payment.
+
+For the rest of the phone, read [Test your app on a phone that has a Store, a Browser and other apps](/blog/test-an-app-on-a-phone-with-a-store-and-other-apps/).

@@ -172,3 +172,23 @@ test("a hung request that times out does not stop later ticks refreshing", async
   assert.match(JSON.stringify(host.tree("s", "app")), /Price 99/);
   clearTimeout(keep);
 });
+
+test("refresh() fetches now, skips the cache, and reports only the sources whose data changed", async () => {
+  const { host, calls } = setup();
+  const a = await host.refresh("s", "app");
+  assert.deepEqual(a, { updated: ["price"], errors: [] });
+  assert.equal(calls(), 1);
+  assert.match(JSON.stringify(host.tree("s", "app")), /Price 10/);
+  const b = await host.refresh("s", "app", { sources: ["nope"] });
+  assert.deepEqual(b, { updated: [], errors: [] });
+  assert.equal(calls(), 1);
+});
+
+test("refresh() keeps the last data and names the source when a fetch fails", async () => {
+  const host = new SpecHost({ context: () => ({ fetch: async () => { throw new Error("offline"); }, secrets: () => undefined }) });
+  assert.equal(host.create("s", "app", spec()).ok, true);
+  const out = await host.refresh("s", "app");
+  assert.deepEqual(out.updated, []);
+  assert.equal(out.errors[0].source, "price");
+  assert.match(out.errors[0].message, /failed/);
+});
