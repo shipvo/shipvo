@@ -12,6 +12,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **App id.** A short name for your app with no spaces, such as `tideshop`. Shipvo uses it to find your app.
 
+**App activity.** The record of what an assistant built and changed in an app on the phone: each version with plain lines for what changed, the data sources, and recent events. Ask for it with `app_activity`. See [Phone apps](phone-apps.md#see-what-was-built-and-changed).
+
 **Assistant.** An AI helper such as Claude or ChatGPT. With Shipvo it can open your app and use it like a customer.
 
 **Command.** One line of text you type in the terminal and run by pressing Enter.
@@ -108,5 +110,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Calendar block.** A part of an app spec that shows dated rows as a month, a week or an agenda. See [App spec](spec-blocks.md#calendars-and-maps).
 
 **Map block.** A part of an app spec that draws rows with a latitude and longitude as pins on a canvas. It loads no map tiles. See [App spec](spec-blocks.md#calendars-and-maps).
+
+**Live reload.** While `shipvo run` is open, Shipvo rebuilds your app each time you save a file and shows the new version in the phone, with no restart. If the save has a mistake, the phone keeps the last good version and a red bar names the file and line. See [Run your app on a phone](run.md#edit-and-save-the-phone-updates).
 
 **Refresh (data source).** A number of seconds on a web data source in an app spec. Shipvo asks the service again on that timer while the app is installed. See [App spec](spec-blocks.md#keep-a-data-source-fresh).
