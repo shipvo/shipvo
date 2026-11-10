@@ -38,7 +38,7 @@ export const LIBRARY_ARITY: Record<string, [number, number]> = {
   first: [1, 1], last: [1, 1], take: [2, 2],
   today: [0, 0], startOf: [2, 2], endOf: [2, 2], addDays: [2, 2], diffDays: [2, 2], formatDate: [2, 2], unix: [1, 1],
   money: [2, 2], number: [1, 2], percent: [1, 1], compact: [1, 1],
-  lower: [1, 1], upper: [1, 1], trim: [1, 1], split: [2, 2], join: [2, 2], orElse: [2, 2], csv: [1, 2]
+  lower: [1, 1], upper: [1, 1], trim: [1, 1], split: [2, 2], join: [2, 2], orElse: [2, 2], csv: [1, 2], parseCsv: [1, 1]
 };
 
 const toJs = (v: unknown): unknown => {
@@ -133,6 +133,29 @@ function library(o: Required<Pick<EvalOptions, "locale" | "timeZone">> & { now: 
     const line = (cells: string[]) => cells.join(",");
     return [line(keys.map(cell)), ...rows.map((r) => line(keys.map((k) => cell(r !== null && typeof r === "object" ? (r as Record<string, unknown>)[k] : undefined))))].join("\r\n") + "\r\n";
   };
+  const parseCsv = (t: unknown) => {
+    if (typeof t !== "string") throw new Error("parseCsv() needs text");
+    const text = t.replace(/^\uFEFF/, "");
+    const table: string[][] = [];
+    let row: string[] = [], cur = "", quoted = false, any = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i]!;
+      if (quoted) {
+        if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else quoted = false; } else cur += c;
+      } else if (c === '"' && cur === "") { quoted = true; any = true; }
+      else if (c === ",") { row.push(cur); cur = ""; any = true; }
+      else if (c === "\n" || c === "\r") {
+        if (c === "\r" && text[i + 1] === "\n") i++;
+        if (any || cur !== "") { row.push(cur); table.push(row); }
+        row = []; cur = ""; any = false;
+      } else { cur += c; any = true; }
+    }
+    if (quoted) throw new Error("parseCsv() found a quote that is never closed");
+    if (any || cur !== "") { row.push(cur); table.push(row); }
+    const [head, ...body] = table;
+    if (!head) return [];
+    return body.map((r) => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ""])));
+  };
   const empty = (l: unknown[], fn: string) => { if (!l.length) throw new Error(`${fn}() needs a non-empty list`); return l; };
   return [
     f("sum", 1, (l) => nums(l, "sum").reduce((a: number, b: number) => a + b, 0)),
@@ -171,7 +194,8 @@ function library(o: Required<Pick<EvalOptions, "locale" | "timeZone">> & { now: 
     }),
     f("orElse", 2, (v, fb) => (v === null || v === undefined ? fb : v)),
     f("csv", 1, (l) => csv(l)),
-    f("csv", 2, (l, c) => csv(l, c))
+    f("csv", 2, (l, c) => csv(l, c)),
+    f("parseCsv", 1, parseCsv)
   ];
 }
 

@@ -86,4 +86,16 @@ export default defineConfig({ root: ${JSON.stringify(dir)}, resolve: { alias: [{
       expect(run.status, log).toBe(0);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   }, 120_000);
+
+  it("a11y_audit runs on the sample app and returns an issues list", async () => {
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${port}`, PN_CONTROL: "http://127.0.0.1:1", PN_APPS: JSON.stringify({ tide: { name: "Tide & Tackle", description: "sample app" } }) };
+    const c = new Client({ name: "test", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    await c.callTool({ name: "open_app", arguments: { app: "tide", session: "a1" } });
+    const r: any = await c.callTool({ name: "a11y_audit", arguments: { session: "a1" } });
+    await c.close();
+    expect(r.isError).toBeFalsy();
+    expect(Array.isArray(r.structuredContent.issues)).toBe(true);
+    for (const i of r.structuredContent.issues) expect(["missing_label", "small_target"]).toContain(i.code);
+  }, 120_000);
 });
