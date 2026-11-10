@@ -10,6 +10,8 @@ Content agents take their next item from this list first (top to bottom, skippin
 2. ~~Shipvo Testers and `shipvo store testers`~~ (done)
 3. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog done) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial done 10 Nov; video needs the new section)
 4. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps (Settings, Browser, Store, updates) need tutorial, video and blog, and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
+3. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog done) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial and video need the new section)
+4. Shipvo Phone and `shipvo run` (launch kit written 6 Nov; Phone apps (Settings, Browser, Store, updates) need tutorial and video (blog done 10 Nov), and attach is still open; blog for `shipvo run` done; docs, video and `shipvo run` tutorial done)
 5. Store path: `shipvo store` from working app to both stores (video done; tutorial, blog)
 6. Your coding agent tests the app (agent simulator over MCP) (blog for founders)
 7. Signed over-the-air updates, staged rollout and rollback (video; tutorial done)
@@ -98,7 +100,8 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Saved-key routes: list, rotate, revoke and use log (`/vault/keys`, `/vault-ui/*` in the simulator) | [self-hosting](self-hosting.md#saved-key-routes-vault) | | | |
 | Key rotations in the pointer response (`rotations`) | [self-hosting](self-hosting.md#pointer-response-and-key-rotations) | | | |
 | Playground Many phones (1 to 12 Android and iOS phones, shareable link) | [getting-started](getting-started.md#try-it-in-your-browser-first) | | | |
-| Pin and hide apps on the home screen (`pin_app`, `hide_app`) | [phone-apps](phone-apps.md) | | | |
+| Pin and hide apps on the home screen (`pin_app`, `hide_app`) | [phone-apps](phone-apps.md) | | | [test-an-app-on-a-phone-with-a-store-and-other-apps](../blog/test-an-app-on-a-phone-with-a-store-and-other-apps.md) |
+| Arrange the home screen (`arrange_apps`, schedules, `set_phone_time`) | [phone-apps](phone-apps.md) | | | [test-an-app-on-a-phone-with-a-store-and-other-apps](../blog/test-an-app-on-a-phone-with-a-store-and-other-apps.md) |
 | Describe an app and it appears (`create_app`, `update_app`) | [phone-apps](phone-apps.md) | | | |
 | Export and import a phone's apps (`export_phone_apps`, `import_phone_apps`) | [phone-apps](phone-apps.md) | | | |
 | Real app install from the Store (`install_app`, `find_apps`) | [phone-apps](phone-apps.md) | | | |
@@ -107,3 +110,10 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Spec `calendar` and `map` blocks (month, week, agenda, pins, `onSelect`) | [spec-blocks](spec-blocks.md#calendars-and-maps) | | | |
 | Open a build from a link (`build_url` on `POST /session`) | [test-your-build](test-your-build.md#open-a-build-from-a-link) | | | |
 | Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
+| Arrange the home screen and set the phone clock (`arrange_apps`, `set_phone_time`) | [phone-apps](phone-apps.md) | | | |
+| Phone frame page `/phone?session=` with Store and installed apps | [phone-apps](phone-apps.md) | | | |
+| Watch link on the hosted phone (`watch_url`, read-only, sign in to take over) | [agents](agents.md#watch-link-on-the-hosted-phone) | | | |
+| Hosted MCP sign-in with URL client ids (Client ID Metadata Documents) | [agents](agents.md) | | | |
+| Data sources refresh on an interval (`refresh`, 30 seconds or more) | [spec-blocks](spec-blocks.md#keep-a-data-source-fresh) | | | |
+| Gallery of example specs (`packages/spec/gallery`) | [spec-blocks](spec-blocks.md#example-specs) | | | |
+| Faster rebuild after a save in `shipvo run` (Metro cache kept) | [run](run.md) | | | |

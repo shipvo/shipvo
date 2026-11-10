@@ -36,7 +36,7 @@ beforeAll(async () => {
       if (installed.has(body.id)) return fail("already_installed", "already");
       installed.set(body.id, app.name); return ok();
     }
-    if (body.action === "arrange_apps" || body.action === "set_time") return res.end(JSON.stringify({ ok: true, screen: "Home screen" }));
+    if (body.action === "arrange_apps" || body.action === "set_time" || body.action === "refresh_app" || body.action === "app_activity") return res.end(JSON.stringify({ ok: true, screen: "Home screen" }));
     if (body.action === "update_app") {
       if (!installed.has(body.id)) return fail("not_installed", "not a spec app");
       if (!body.spec?.screens?.length) return fail("invalid_spec", "$.screens: Must have at least one screen.");
@@ -135,6 +135,14 @@ describe("phone app tools", () => {
     expect(seen.filter((b: any) => b.action === "arrange_apps").at(-1)).toMatchObject({ id: "plan", pinned: true, schedule: { days: ["mon", "fri"], from: "08:00", to: "18:00" } });
     expect((await call(c, "set_phone_time", { session: "s-arr", at: "2026-11-14T09:00:00" })).isError).toBeFalsy();
     expect(seen.filter((b: any) => b.action === "set_time").at(-1)).toMatchObject({ at: "2026-11-14T09:00:00" });
+    await c.close();
+  });
+  it("refresh_app asks the phone to fetch an app's data now", async () => {
+    const c = await connect();
+    expect((await call(c, "refresh_app", { session: "s-ref", id: "prices" })).isError).toBeFalsy();
+    expect(seen.filter((b: any) => b.action === "refresh_app").at(-1)).toMatchObject({ id: "prices" });
+    expect((await call(c, "app_activity", { session: "s-ref", id: "prices", limit: 5 })).isError).toBeFalsy();
+    expect(seen.filter((b: any) => b.action === "app_activity").at(-1)).toMatchObject({ id: "prices", limit: 5 });
     await c.close();
   });
   it("pin_app and hide_app reach the phone and report not_installed", async () => {

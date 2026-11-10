@@ -1,0 +1,102 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "flashcards",
+    "name": "Flashcards",
+    "description": "Write cards with a question and an answer, grouped by deck."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable"
+  },
+  "data": {
+    "cards": {
+      "source": "collection",
+      "fields": {
+        "deck": "text",
+        "front": "text",
+        "back": "text"
+      },
+      "seed": []
+    },
+    "total": {
+      "source": "computed",
+      "value": "{{ size(cards) }}"
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Cards",
+      "body": [
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "Cards: {{ total }}"
+        },
+        {
+          "type": "chart",
+          "kind": "bar",
+          "from": "cards",
+          "x": "{{ item.deck }}",
+          "y": "{{ 1 }}",
+          "aggregate": "sum",
+          "label": "Cards by deck"
+        },
+        {
+          "type": "form",
+          "label": "Add card form",
+          "submit": { "label": "Add card", "action": "add_card" },
+          "fields": [
+            { "name": "deck", "type": "text", "label": "Deck", "required": true, "maxLength": 60 },
+            { "name": "front", "type": "text", "label": "Question", "required": true, "maxLength": 120 },
+            { "name": "back", "type": "text", "label": "Answer", "required": true, "maxLength": 120 }
+          ]
+        },
+        {
+          "type": "list",
+          "label": "Cards",
+          "from": "{{ sortBy(cards, 'deck') }}",
+          "item": {
+            "title": "{{ item.front }}",
+            "subtitle": "{{ item.deck }}: {{ item.back }}"
+          },
+          "empty": {
+            "message": "No cards yet"
+          }
+        }
+      ]
+    }
+  ],
+  "actions": {
+    "add_card": {
+      "description": "Add one card.",
+      "input": {
+        "deck": { "type": "text" },
+        "front": { "type": "text" },
+        "back": { "type": "text" }
+      },
+      "do": [
+        {
+          "insert": "cards",
+          "value": {
+            "deck": "{{ input.deck }}",
+            "front": "{{ input.front }}",
+            "back": "{{ input.back }}"
+          }
+        },
+        {
+          "toast": "Card added"
+        }
+      ]
+    }
+  }
+}
