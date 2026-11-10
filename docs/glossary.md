@@ -43,6 +43,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Signing.** Putting a secret stamp on a release so phones can check it really came from you. The stamp comes from a key file kept on your computer.
 
+**Signing seed.** The secret file (`.shipvo/seed.txt`) that makes the stamp. Back it up once: without it you cannot update phones that already have your app. See [Moving to a new machine](new-machine.md).
+
 **Simulator.** A copy of a phone that runs on your computer and opens in your web browser. It shows your app without a real phone.
 
 **Template.** A ready-made app you change into your own, such as the shop template.
