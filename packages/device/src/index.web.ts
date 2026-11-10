@@ -312,6 +312,8 @@ g.__pnDevice = {
   openNotification(id?: string) { const n = id ? recent.find((x) => x.id === id) : recent[recent.length - 1]; if (!n) return false; document.querySelectorAll("[data-pn-banner]").forEach((e) => e.remove()); openSubs.forEach((f) => f(n)); log("notification_opened", { id: n.id }); return true; },
   /** Open a deep link: same path as openUrl. False when the app has no onUrl listener. */
   openUrl: (url: string): boolean | Promise<boolean> => deliverUrl(url),
+  /** Another app's share arrives: logged as simulated, then handed to the URL listeners (when there is a url) and to `pn:share` listeners. */
+  receiveShare(p: { message?: string; url?: string }) { log("share_received", { message: p.message ?? "", url: p.url ?? "" }); window.dispatchEvent(new CustomEvent("pn:share", { detail: p })); if (p.url) deliverLocal(p.url); return true; },
   /** Set the URL `Linking.getInitialURL()` returns for this load. `null` clears it. */
   setInitialUrl(url: string | null) { initialUrl = url ?? null; },
   capabilities: () => device.capabilities(),
@@ -367,6 +369,16 @@ function deliverLocal(url: string): boolean {
   urlSubs.forEach((f) => f(url)); log("url_opened", { url, handled: urlSubs.size > 0 });
   return urlSubs.size > 0;
 }
+/** The `Share` API of a phone. `share` records one pending share (a second call replaces it) for the simulator's `share_to`; no sheet is drawn. */
+export const Share = {
+  sharedAction: "sharedAction" as const, dismissedAction: "dismissedAction" as const,
+  async share(content: { message?: string; url?: string; title?: string }): Promise<{ action: "sharedAction" }> {
+    const message = content.message ?? "", url = content.url ?? "";
+    log("share_pending", { message, url });
+    await (g.__pnShare as ((s: { message: string; url: string }) => Promise<unknown>) | undefined)?.({ message, url });
+    return { action: "sharedAction" };
+  },
+};
 export const openUrl = async (url: string) => { deliverUrl(url); };
 let initialUrl: string | null = null;
 /** The `Linking` API of a phone, backed by the simulated device. `openURL` goes through `openUrl`; its log entry is marked simulated. */

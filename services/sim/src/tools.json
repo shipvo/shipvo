@@ -1662,6 +1662,39 @@
     }
   },
   {
+    "name": "share_to",
+    "description": "Deliver what the app last passed to Share.share ({ message, url }) to another installed app, as choosing it in the share sheet would; the pending share is then cleared. Use app_id \"copy\" to put the text on the phone clipboard. Fails with no_share_sheet if nothing is being shared, or no_such_app if app_id is not installed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "app_id": {
+          "type": "string",
+          "description": "An installed app id, or \"copy\""
+        }
+      },
+      "required": [
+        "session",
+        "app_id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "title": "Share to an app",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "owner_command",
     "description": "Run an owner command against the live app (changes are audited). Commands that cannot be undone or reach users (publish, prices, offers, deletes, API keys) do nothing and return { code: \"needs_confirm\", plan } first: show the plan to the owner, then ask the owner to approve the returned challenge in the admin (approval_url). You cannot approve it yourself, and confirm: true alone does nothing. Once approved, call again with the same args and approval: <challenge id>. An approval works once, for 10 minutes, for exactly those args.",
     "inputSchema": {

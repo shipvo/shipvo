@@ -136,6 +136,8 @@ export class Phone {
   async openNotification(id?: string): Promise<this> { await this.act("open_notification", { id }); return this; }
   /** Open a deep link in the app, as a push tap or share link would. Throws a `PhoneError` with code `no_url_listener` if the app has no `onUrl` listener. */
   async openUrl(url: string): Promise<this> { await this.act("open_url", { url }); return this; }
+  /** Deliver the pending Share.share to an installed app, or to the clipboard with "copy". Throws no_share_sheet or no_such_app. */
+  async shareTo(appId: string): Promise<this> { await this.act("share_to", { app_id: appId }); return this; }
   /** Stub `fetch` and XHR calls the app makes. Replaces earlier rules. Unmatched requests go to the network as usual.
    * Throws a `PhoneError` with code `mock_invalid` for a bad rule. */
   async mockNetwork(rules: MockRule[]): Promise<this> { await this.act("set_network_mocks", { rules: encodeMockRules(rules) }); return this; }
