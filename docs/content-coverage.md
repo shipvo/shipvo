@@ -126,3 +126,8 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Network proxy refusal codes (`x-shipvo-net-error`) | [phone-network](phone-network.md#troubleshooting) | | | |
 | Room log and notes (`room_log`, `room_note`): a lead agent sees what the others did | [agents](agents.md#room-log-and-notes) | | | |
 | Shop template warns when a price is in the wrong unit (`[shop]` message, failing test) | [your-own-shop](tutorials/your-own-shop.md#troubleshooting), [getting-started](getting-started.md#the-shop-checkout) | [your-own-shop](tutorials/your-own-shop.md) | | |
+| Assistant Inbox (messages, hand-offs and shared reports between assistants on one phone) | [phone-apps](phone-apps.md#first-party-apps) | | | |
+| Automatic assistant name (`caller`) from the MCP client name | [phone-apps](phone-apps.md#first-party-apps) | | | |
+| Export a collection as CSV (`csv()` in a spec action) | [phone-apps](phone-apps.md#export-data-as-csv) | | | |
+| Android update falls back to the full bundle when a patch is too big for memory (`patchError`) | [getting-started](getting-started.md#5-publish-over-the-air) | | | |
+| Rollback guard for stored-data format (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |

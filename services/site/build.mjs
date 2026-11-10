@@ -33,6 +33,7 @@ const NAV = [
     { slug: "phone-network", src: "docs/phone-network.md", title: "Network calls on the hosted phone", desc: "How the hosted phone sends your app's HTTP calls through a request proxy, the same on Android and iOS." },
     { slug: "new-machine", src: "docs/new-machine.md", title: "Moving to a new machine", desc: "Move your Shipvo project to a new computer: back up and restore your release signing seed, sign in again and keep publishing updates." },
     { slug: "key-rotation", src: "docs/key-rotation.md", title: "Key rotation", desc: "Create an offline root key and replace your update signing key without a new store build." },
+    { slug: "rollbacks-and-stored-data", src: "docs/rollbacks-and-stored-data.md", title: "Rollbacks and stored data", desc: "Declare a stored-data format version so shipvo rollback stops before sending phones back to code that cannot read their data." },
     { slug: "self-hosting", src: "docs/self-hosting.md", title: "Self-host the control plane", desc: "Self-host the Shipvo control plane on Cloudflare Workers, KV and D1 in about ten minutes, with your own keys and no per-user fees." },
   ]},
   { group: "Ship", pages: [

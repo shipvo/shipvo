@@ -169,6 +169,8 @@ To check a release before you have a control plane or token, run `shipvo publish
 
 If your first publish fails, run `shipvo doctor` first. It checks your Node version, `shipvo.json`, signing key match, control plane reachability, and `hermesBytecodeVersion` when present.
 
+If a patch cannot be applied safely on an Android phone, the phone takes the full bundle instead and the update still lands. That happens when the patch step runs out of memory, or when the old bundle, the patch and the new bundle together would use too large a share of the app's memory limit. The check runs before anything is read, the hash and size checks are the same as for a patch, and the update result reports `via: "full"` with `patchError` set to `out_of_memory` or `over_memory_budget`. You do not need to do anything.
+
 Phones check while open, verify signature, hash and size, stage atomically, apply without a restart and mark the release healthy once the first screen renders. A release that fails to boot three times is discarded on that phone. `shipvo rollback --to 7` republishes release 7's code as a new release for everyone.
 
 To see whether the release reached phones, run `shipvo status [--app <id>] [--json]`. It reads the control plane's `/t/<app>/summary` and prints one row per recent release: counts for each telemetry event, and the median apply and cold start times in milliseconds. It prints "No telemetry yet" when phones have not reported. `--json` prints the endpoint's payload unchanged.
