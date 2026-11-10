@@ -273,7 +273,7 @@ async function steps(spec: unknown, list: unknown[], ctx: RunContext): Promise<{
 
 /**
  * Brings stored rows of a collection up to the spec's `version`.
- * Rows saved under a lower version (`savedVersion`, default 1) get the collection's `migrate` steps in order.
+ * Rows saved under a lower version (`savedVersion`, default 1) get, in order, the `migrate` steps where `savedVersion < since <= version`.
  * Rows already at the spec's version are returned as they are. Input rows are not changed.
  */
 export function migrateRows(spec: unknown, name: string, rows: unknown[], savedVersion = 1, ctx: Pick<RunContext, "eval"> = {}): unknown[] {
@@ -287,9 +287,11 @@ export function migrateRows(spec: unknown, name: string, rows: unknown[], savedV
     let out: Json = { ...row };
     for (const st of steps) {
       if (!isObj(st)) continue;
+      const since = typeof st.since === "number" ? st.since : 2;
+      if (!(savedVersion < since && since <= version)) continue;
       if (isObj(st.rename)) {
         const { from, to } = st.rename as { from: string; to: string };
-        if (from in out) {
+        if (Object.hasOwn(out, from)) {
           const { [from]: v, ...rest } = out;
           out = { ...rest, [to]: v };
         }
@@ -298,7 +300,7 @@ export function migrateRows(spec: unknown, name: string, rows: unknown[], savedV
         out = rest;
       } else if (isObj(st.retype)) {
         const { field, using } = st.retype as { field: string; using: string };
-        if (field in out) {
+        if (Object.hasOwn(out, field)) {
           try {
             out = { ...out, [field]: evaluate(using, { value: out[field] }, ctx.eval) };
           } catch (e) {

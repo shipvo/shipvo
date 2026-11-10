@@ -193,7 +193,9 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
+            "required": ["since"],
             "properties": {
+              "since": { "type": "integer", "minimum": 2 },
               "rename": {
                 "type": "object", "required": ["from", "to"], "additionalProperties": false,
                 "properties": { "from": { "type": "string", "minLength": 1 }, "to": { "type": "string", "minLength": 1 } }

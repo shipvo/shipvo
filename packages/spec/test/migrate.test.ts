@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validate, migrateRows } from "../src/index";
+import { validate, migrateRows, RunError } from "../src/index";
 
 const base = (fields: Record<string, string>, extra: Record<string, unknown> = {}) => ({
   spec: "shipvo.app/v0",
@@ -13,7 +13,7 @@ const rows = [{ title: "a", old: "x", count: "3" }];
 describe("migrateRows", () => {
   const v2 = base({ name: "text", count: "number" }, {
     version: 2,
-    migrate: [{ rename: { from: "title", to: "name" } }, { drop: { field: "old" } }, { retype: { field: "count", to: "number", using: "int(value)" } }]
+    migrate: [{ since: 2, rename: { from: "title", to: "name" } }, { since: 2, drop: { field: "old" } }, { since: 2, retype: { field: "count", to: "number", using: "int(value)" } }]
   });
   it("renames, drops and retypes stored rows", () => {
     expect(migrateRows(v2, "notes", rows, 1)).toEqual([{ name: "a", count: 3 }]);
@@ -28,20 +28,64 @@ describe("migrateRows", () => {
   });
 });
 
+describe("migrateRows generations", () => {
+  const v3 = base({ n: "number" }, {
+    version: 3,
+    migrate: [
+      { since: 2, retype: { field: "count", to: "number", using: "int(value)" } },
+      { since: 3, rename: { from: "count", to: "n" } }
+    ]
+  });
+  it("applies only steps newer than the saved version", () => {
+    expect(migrateRows(v3, "notes", [{ count: 5 }], 2)).toEqual([{ n: 5 }]);
+    expect(migrateRows(v3, "notes", [{ count: "5" }], 1)).toEqual([{ n: 5 }]);
+  });
+  it("does not drop a field that a later version re-added", () => {
+    const s = base({ a: "text" }, { version: 2, migrate: [{ since: 2, drop: { field: "a" } }] });
+    expect(migrateRows(s, "notes", [{ a: "new" }], 2)).toEqual([{ a: "new" }]);
+  });
+  it("ignores inherited keys", () => {
+    const s = base({ x: "text" }, { version: 2, migrate: [{ since: 2, rename: { from: "toString", to: "x" } }] });
+    expect(migrateRows(s, "notes", [{}], 1)).toEqual([{}]);
+  });
+  it("reports a failing using as expression_error", () => {
+    const s = base({ count: "number" }, { version: 2, migrate: [{ since: 2, retype: { field: "count", to: "number", using: "int(value)" } }] });
+    try { migrateRows(s, "notes", [{ count: { a: 1 } }], 1); expect.unreachable(); }
+    catch (e) { expect(e).toBeInstanceOf(RunError); expect((e as RunError).code).toBe("expression_error"); }
+  });
+});
+
 describe("validate migrate", () => {
+  it("requires version to rise when the shape changed", () => {
+    const r = validate(base({ title: "text", count: "text" }, { migrate: [{ since: 2, drop: { field: "old" } }] }), v1);
+    expect(r.errors.some((e) => e.path === "$.data.notes.version")).toBe(true);
+  });
+  it("requires since on each step", () => {
+    const r = validate(base({ a: "text" }, { version: 2, migrate: [{ drop: { field: "b" } }] }));
+    expect(r.errors.some((e) => e.path === "$.data.notes.migrate[0].since")).toBe(true);
+  });
+  it("allows a rename chain", () => {
+    const s = base({ c: "text" }, { version: 3, migrate: [{ since: 2, rename: { from: "a", to: "b" } }, { since: 3, rename: { from: "b", to: "c" } }] });
+    expect(validate(s, base({ a: "text" })).errors).toEqual([]);
+  });
+  it("refuses a retype whose to differs from the declared type", () => {
+    const s = base({ count: "number" }, { version: 2, migrate: [{ since: 2, retype: { field: "count", to: "text", using: "value" } }] });
+    expect(validate(s).errors[0]!.path).toBe("$.data.notes.migrate[0].retype.to");
+  });
+
   it("refuses a removed field without a migrate step, with a suggestion", () => {
-    const r = validate(base({ title: "text", count: "text" }), v1);
+    const r = validate(base({ title: "text", count: "text" }, { version: 2 }), v1);
     expect(r.errors).toHaveLength(1);
     expect(r.errors[0]!.path).toBe("$.data.notes");
     expect(r.errors[0]!.fix).toContain('"drop"');
   });
   it("refuses a retyped field without a migrate step", () => {
-    const r = validate(base({ title: "text", old: "text", count: "number" }), v1);
+    const r = validate(base({ title: "text", old: "text", count: "number" }, { version: 2 }), v1);
     expect(r.errors[0]!.path).toBe("$.data.notes.fields.count");
     expect(r.errors[0]!.fix).toContain("retype");
   });
   it("points at a step that targets a field the collection does not declare", () => {
-    const r = validate(base({ a: "text" }, { migrate: [{ rename: { from: "b", to: "zzz" } }] }));
+    const r = validate(base({ a: "text" }, { migrate: [{ since: 2, rename: { from: "b", to: "zzz" } }], version: 2 }));
     expect(r.errors[0]!.path).toBe("$.data.notes.migrate[0].rename.to");
     expect(r.errors[0]!.fix).toContain("a");
   });

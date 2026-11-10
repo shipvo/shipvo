@@ -12,6 +12,7 @@ export const MAX_SCREENS = 40;
 export const MAX_BLOCKS = 2000;
 export const MAX_EXPRESSION_LENGTH = 2000;
 const MAX_WALK_DEPTH = 100;
+const shapeKey = (f: Record<string, unknown>) => JSON.stringify(Object.entries(f).sort(([a], [b]) => (a < b ? -1 : 1)));
 const BLOCK_CONTAINERS = ["children"];
 
 const INTERACTIVE = new Set([
@@ -248,9 +249,15 @@ class Run {
       const steps = Array.isArray(src.migrate) ? src.migrate : [];
       const removed = new Set<string>();
       const retyped = new Set<string>();
+      const chained: { f: string; at: string }[] = [];
       steps.forEach((step, i) => {
         if (!isObject(step)) return;
         const p = childPath(childPath(base, "migrate"), i);
+        const since = step.since;
+        const version = typeof src.version === "number" ? src.version : 1;
+        if (typeof since !== "number" || !Number.isInteger(since) || since < 2 || since > version) {
+          this.error(childPath(p, "since"), `A migrate step needs "since": the version it produces, from 2 up to the collection's version (${version}).`, `Set "since" to the version whose rows this step creates, for example 2, and make sure "${name}.version" is at least that.`);
+        }
         const kinds = ["rename", "drop", "retype"].filter((k) => k in step);
         if (kinds.length !== 1) {
           this.error(p, "A migrate step has exactly one of rename, drop or retype.", "Use one step per change, for example { \"drop\": { \"field\": \"old\" } }.");
@@ -263,12 +270,13 @@ class Run {
           removed.add(f);
           if (f in fields) this.error(childPath(childPath(p, kinds[0]!), key), `"${f}" is still declared in "${name}.fields", so it cannot be ${what}.`, `Remove "${f}" from fields, or remove this step.`);
         };
-        const kept = (f: unknown, key: string) => {
+        const kept = (f: unknown, key: string, chain = false) => {
           if (typeof f === "string" && !(f in fields)) {
+            if (chain) { chained.push({ f, at: childPath(childPath(p, kinds[0]!), key) }); return; }
             this.error(childPath(childPath(p, kinds[0]!), key), `"${f}" is not a field of "${name}".`, `Declare "${f}" in "${name}.fields", or use one of: ${Object.keys(fields).join(", ")}.`);
           }
         };
-        if (kinds[0] === "rename") { gone(body.from, "from", "renamed"); kept(body.to, "to"); }
+        if (kinds[0] === "rename") { gone(body.from, "from", "renamed"); kept(body.to, "to", true); }
         else if (kinds[0] === "drop") gone(body.field, "field", "dropped");
         else {
           kept(body.field, "field");
@@ -279,8 +287,17 @@ class Run {
           if (typeof body.using === "string") this.checkExpression(body.using, childPath(childPath(p, "retype"), "using"));
         }
       });
+      // A rename target may be an intermediate name that a later step renames or drops (rename a to b, then b to c).
+      for (const { f, at } of chained) {
+        if (!removed.has(f)) this.error(at, `"${f}" is not a field of "${name}".`, `Declare "${f}" in "${name}.fields", rename or drop it in a later step, or use one of: ${Object.keys(fields).join(", ")}.`);
+      }
       const old = prev[name];
       if (!isObject(old) || !isObject(old.fields)) continue;
+      const nowV = typeof src.version === "number" ? src.version : 1;
+      const wasV = typeof old.version === "number" ? old.version : 1;
+      if (shapeKey(old.fields) !== shapeKey(fields) && nowV <= wasV) {
+        this.error(childPath(base, "version"), `"${name}" changed shape but "version" is still ${nowV}, so saved rows would not be migrated.`, `Set "${name}.version" to ${wasV + 1} or higher.`);
+      }
       for (const [f, t] of Object.entries(old.fields)) {
         const at = childPath(childPath(base, "fields"), f);
         if (!(f in fields) && !removed.has(f)) {
