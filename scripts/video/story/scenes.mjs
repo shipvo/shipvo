@@ -1,5 +1,7 @@
-// Story ad scenes 1 to 6 (0 to 60 s of the storyboard): street, empty counter, customer walks away, chat, the app appears, Dana's assistant orders.
+// Story ad scenes 1 to 10 (0 to 100 s of the storyboard): street, empty counter, customer walks away, chat, the app appears, Dana's assistant orders,
+// the rush, the orders list, the busy shop at sunset, the end card.
 // Each scene is a pure function t -> SVG string (1280x720), t in seconds from the start of the film.
+import { mark } from "../../../services/site/brand.mjs";
 import { createCharacter, CAST } from "../cast/rig.mjs";
 import { cameraAt, parallax, sky, glow, lightRays, particles, grain, vignette, motionBlur, whipPan, progress, EASE, f } from "../camera.mjs";
 
@@ -12,10 +14,14 @@ export const SHOTS = [
   { id: "chat", t0: 22, t1: 32 },
   { id: "app", t0: 32, t1: 44 },
   { id: "order", t0: 44, t1: 60 },
+  { id: "rush", t0: 60, t1: 76 },
+  { id: "list", t0: 76, t1: 90 },
+  { id: "sunset", t0: 90, t1: 96 },
+  { id: "endcard", t0: 96, t1: 100 },
 ];
 
 /** Real screen recordings, supplied by the renderer: name -> (seconds into the recording) => image URL, or null when not loaded. */
-export const SCREEN_LENGTH = { order: 9.1 };
+export const SCREEN_LENGTH = { order: 9.1, rush: 26.6 };
 const screens = {};
 export const setScreen = (name, fn) => { screens[name] = fn; };
 export const shotAt = (t) => SHOTS.find((s) => t >= s.t0 && t < s.t1) || SHOTS[SHOTS.length - 1];
@@ -170,7 +176,56 @@ export function order(t) {
   return wrap("or", t, parallax([{ depth: 1, svg: split }, { depth: 1.4, svg: near }], camera)).replace(/<\/svg>$/, `${caption("Your assistant can order.", t, 46)}</svg>`);
 }
 
-const BY_ID = { street, counter, walkaway, chat, app, order };
+mara.expression("surprised", { at: 61 }).lookAt(.8, 0, { at: 61 }).pose("lean", { at: 66 });
+mara.say("Another one?", { at: 62 }); mara.say("Three orders!", { at: 68.5 });
+mara.expression("relieved", { at: 78 }).pose("idle", { at: 78 }).lookAt(.5, .2, { at: 78 });
+pip.say("All done.", { at: 74.4 });
+
+/** 60 to 76 s: the rush. Cuts between Mara and the phone as three orders land (real recording, 1.25x). */
+export function rush(t) {
+  const camera = cameraAt([ // hard cuts at 63.5 (phone), 67 (Mara), 71 (phone, orders 2 and 3), 74 (Pip)
+    { type: "pushIn", t0: 60, t1: 63.5, from: 1.3, to: 1.45, x: 340, y: 300 }, { type: "pushIn", t0: 63.5, t1: 67, from: 1.5, to: 1.65, x: 900, y: 380 },
+    { type: "pushIn", t0: 67, t1: 71, from: 1.4, to: 1.55, x: 340, y: 300 }, { type: "pushIn", t0: 71, t1: 74, from: 1.55, to: 1.4, x: 900, y: 400 },
+    { type: "pushIn", t0: 74, t1: 76, from: 1.1, to: 1.2, x: 640, y: 360 }], t);
+  const bg = sky("rusky", "dusk") + `<rect y="470" width="1280" height="250" fill="#3a2a3e"/>` + glow("rug", 640, 360, 460, "#ff8a3d", .3);
+  const ph = phone(790, 60, .62, "rush", (t - 60) * 1.25);
+  const fg = mara.render(t, { x: 80, y: 80, scale: .9 }) + pip.render(t, { x: 560, y: 40, scale: .5 });
+  const ping = [63.5, 67.5, 71.5].map((p) => { const k = progress(t, p, p + .5, EASE.outCubic); return k > 0 && k < 1 ? `<circle cx="990" cy="190" r="${f(20 + 90 * k)}" fill="none" stroke="#ff8a3d" stroke-width="6" opacity="${f(1 - k)}"/>` : ""; }).join("");
+  const near = particles({ seed: 14, t, count: 30 });
+  return wrap("ru", t, parallax([{ depth: .2, svg: bg }, { depth: 1, svg: fg }, { depth: 1.05, svg: ph + ping }, { depth: 1.4, svg: near }], camera));
+}
+
+/** 76 to 90 s: the orders list fills on the phone, Mara relieved. Push-in. Caption 3 at 78 s. */
+export function list(t) {
+  const camera = cameraAt([{ type: "pushIn", t0: 76, t1: 83, from: 1, to: 1.25, x: 640, y: 380 }, { type: "pushIn", t0: 83, t1: 90, from: 1.3, to: 1.55, x: 330, y: 300 }], t);
+  const bg = sky("lisky", "golden") + `<rect y="470" width="1280" height="250" fill="#5a3a2a"/>` + glow("lig", 760, 360, 420, "#ffd37a", .4);
+  const ph = phone(700, 40, .66, "rush", 20.6 + Math.min(t - 76, 6));
+  const fg = mara.render(t, { x: 120, y: 120, scale: .9 });
+  const near = lightRays("liray", { x: 1000, y: -40, t, angle: 110, spread: 50 }) + particles({ seed: 15, t, count: 30 });
+  return wrap("li", t, parallax([{ depth: .2, svg: bg }, { depth: 1, svg: fg }, { depth: 1.05, svg: ph }, { depth: 1.4, svg: near }], camera)).replace(/<\/svg>$/, `${caption("Every order, in one list.", t, 78)}</svg>`);
+}
+
+/** 90 to 96 s: the shop at sunset, busy, with confetti. Wide, slow dolly back. */
+export function sunset(t) {
+  const camera = cameraAt([{ type: "dolly", t0: 90, t1: 96, from: { x: 700, y: 360 }, to: { x: 600, y: 360 }, zoom: 1.12 }], t);
+  const far = sky("susky", "golden") + glow("susun", 640, 300, 520, "#ff8a3d", .6);
+  const people = [0, 1, 2, 3, 4].map((i) => walker(180 + i * 230 + Math.sin(t + i) * 10, 410 + (i % 2) * 20, t * (i % 2 ? .4 : .7), { color: ["#4b4fa3", "#d9534f", "#3b4a6b", "#1f6f6a", "#e8a33d"][i], hair: ["#1f6f6a", "#5a2a1a", "#2a1a2e", "#3a2418", "#1f1f2a"][i], scale: 1.2 })).join("");
+  const rng = [...Array(60)].map((_, i) => { const x = (i * 211) % 1280, y = ((i * 97 + t * (90 + (i % 5) * 30)) % 760) - 40;
+    return `<rect x="${f(x)}" y="${f(y)}" width="10" height="16" rx="2" fill="${["#ff8a3d", "#7fb2ff", "#ffd37a", "#ffffff"][i % 4]}" transform="rotate(${f(t * 200 + i * 40)} ${f(x)} ${f(y)})"/>`; }).join("");
+  return wrap("su", t, parallax([{ depth: .15, svg: far }, { depth: .5, svg: shopFront(true) }, { depth: .9, svg: people }, { depth: 1.4, svg: rng + particles({ seed: 16, t, count: 30 }) }], camera));
+}
+
+/** 96 to 100 s: end card. The paper-plane mark flies in, then the line and shipvo.dev. */
+export function endcard(t) {
+  const k = progress(t, 96, 96.7, EASE.outCubic), l = progress(t, 96.6, 97.2, EASE.outCubic);
+  const body = `<rect width="1280" height="720" fill="#0b1f3a"/>${glow("ecg", 640, 300, 420, "#ff8a3d", .25)}
+    <g transform="translate(${f(560 + (1 - k) * -200)} ${f(130 + (1 - k) * 120)}) scale(.31)" opacity="${f(k)}">${mark("ec").replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "")}</g>
+    <text x="640" y="400" text-anchor="middle" font-family="Georgia,serif" font-weight="800" font-size="52" fill="#ffffff" opacity="${f(l)}">Every assistant can use your app.</text>
+    <text x="640" y="470" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="40" fill="#ff8a3d" opacity="${f(l)}">shipvo.dev</text>`;
+  return wrap("ec", t, body);
+}
+
+const BY_ID = { street, counter, walkaway, chat, app, order, rush, list, sunset, endcard };
 
 /** The frame at film time t. */
 export const frameAt = (t) => BY_ID[shotAt(t).id](t);
