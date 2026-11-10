@@ -120,7 +120,7 @@ npx shipvo rollback --to 3 --dry-run   # preview
 npx shipvo rollback --to 3
 ```
 
-This signs the code of release 3 as the next release number and publishes it to the bands you name (default all). It needs the control plane, so the preview reads from it too. `--bands` and `--platform` work as in `publish`.
+This signs the code of release 3 as the next release number and publishes it to the bands you name (default all). It needs the control plane, so the preview reads from it too. `--bands` and `--platform` work as in `publish`. If your app saves data on the phone and a newer release changed its layout, set `stateVersion` first: see [Rollbacks and stored data](rollbacks-and-stored-data.md).
 
 ## How Shipvo differs from CodePush
 
@@ -139,7 +139,8 @@ This signs the code of release 3 as the next release number and publishes it to 
 | Phones do not get the release | The installed app does not include `@shipvo/runtime` from Step 2 | Install an app build made after Step 2; later releases go over the air |
 | Any other failure | Setup problem | Run `npx shipvo doctor`; each FAIL line ends with the exact fix |
 
-## Next
+## Next steps
 
 - [Build your first app](getting-started.md)
+- [Rollbacks and stored data](rollbacks-and-stored-data.md)
 - [Self-hosting the control plane](self-hosting.md)
