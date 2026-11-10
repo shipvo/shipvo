@@ -28,6 +28,8 @@ beforeAll(async () => {
       { n: 1, at: "2026-11-10T10:00:00.000Z", kind: "action", session: "a", agent: "worker-a", tool: "tap", change: "ok" },
       { n: 2, at: "2026-11-10T10:00:05.000Z", kind: "action", session: "b", agent: "worker-b", tool: "tap", change: "error: not found" },
       { n: 3, at: "2026-11-10T10:00:09.000Z", kind: "action", session: "a", agent: "worker-a", tool: "type", change: "ok" },
+      { n: 4, at: "2026-11-10T10:00:10.000Z", kind: "note", session: null, agent: "worker-b", text: "found it" },
+      { n: 5, at: "2026-11-10T10:00:11.000Z", kind: "note", session: null, agent: "stranger", text: "lost" },
     ] }));
     if (req.url === "/room_log") return res.end(JSON.stringify({ ok: true, entries: [{ n: 2, at: "t", kind: "note", agent: "x", text: "hi" }], cursor: "2", seen: body }));
     if (req.url === "/room_note") return res.end(JSON.stringify(body.text.length > 500 ? { ok: false, code: "note_too_long", error: "note is too long" } : { ok: true, cursor: "3" }));
@@ -87,7 +89,9 @@ describe("rooms", () => {
     expect(r.structuredContent.sessions.map((s: any) => s.session)).toEqual(["a", "b"]);
     expect(r.structuredContent.sessions[0]).toMatchObject({ agent: "worker-a", steps: 2, seconds: 9, errors: 0 });
     expect(r.structuredContent.sessions[1]).toMatchObject({ steps: 1, errors: 1 });
-    expect(r.structuredContent.sessions.some((s: any) => s.session === "c")).toBe(false);
+    expect(r.structuredContent.sessions.some((s: any) => s.session === "c" || s.session === "")).toBe(false);
+    expect(r.structuredContent.sessions[1].notes).toEqual(["found it"]);
+    expect(r.structuredContent.sessions[0].notes).toEqual([]);
     expect(r.content[0].text.split("\n")).toHaveLength(2);
     const none: any = await c.callTool({ name: "room_report", arguments: { room: "nope" } });
     expect(none.isError).toBe(true);
