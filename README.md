@@ -120,7 +120,7 @@ Telemetry                   POST /t → D1;  orders POST /o/{app} → D1
 | Path | What it is |
 | --- | --- |
 | `packages/schema` | Contracts: shell manifest, add-on manifest, release pointer, signed envelope, gate report, change log, telemetry (Zod) |
-| `packages/cli` | `shipvo` CLI: `init` a new app or adopt an existing one, `sim` it, `publish` / `rollback` signed releases, `store` help, signing keys (`docs/cli.md`) |
+| `packages/cli` | `shipvo` CLI: `init` a new app or adopt an existing one, `sim` it, `publish` / `rollback` signed releases, `store` help, signing keys and offline root key rotation (`docs/cli.md`, `docs/key-rotation.md`) |
 | `packages/runtime` | `@shipvo/runtime`: the native OTA runtime for Android (Kotlin) and iOS (Swift): verify, patch, stage, apply, crash-loop rollback and the config plugin that pins the trust root |
 | `packages/sim` | `@shipvo/sim`: the simulator (phone-sized headless browser, accessibility tree, simulated device, mock backend) |
 | `packages/mcp` | `@shipvo/mcp`: the MCP server agents use to open, see and operate apps, control the simulated device, and run owner commands |

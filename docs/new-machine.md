@@ -61,5 +61,6 @@ Do not share the seed over chat. Put it in the CI secrets (`SHIPVO_SIGNING_SEED`
 ## Next steps
 
 - [Ship a fix](tutorials/ship-a-fix.md): publish your first update from the new machine.
+- [Rotate your update signing key](key-rotation.md): create an offline root key so a leaked seed does not need a new store build.
 - [Self-hosting](self-hosting.md): run your own control plane.
 - [Glossary](glossary.md): signing seed, publish token, shell.

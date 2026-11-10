@@ -172,6 +172,18 @@ device_log { session }                 -> install_app (source "real" for marketp
 
 The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action into a tool. Two assistants on the same phone read and write the same tasks and notes. Copy the folder to start your own app. The screen tree names every control: tabs `Tasks` and `Notes`, lists `Open tasks`, `Done tasks` and `Notes`, forms `Complete task form`, `New task form` and `New note form`. Test: `pnpm --filter @shipvo/spec test`.
 
+## Allow or deny device permissions per app
+
+An app can declare the device features it needs: `notifications`, `camera`, `location`, `contacts`, `calendar`, `photos` and `files`. When you install it, the install card lists each one with **Allow** and **Deny**, the same on Android and iOS skins. Each answer belongs to that app only.
+
+- Answers show in `installed_apps` (for example `permissions: { notifications: true, camera: false }`) and in the home screen text (`permissions: notifications allowed, camera denied`).
+- To change one later, open **Settings** and use the switch under the app's name, or send the simulator action `set_app_permission { session, id, permission, allowed }`. It returns the app's `permissions`, `installed_apps` and `profile`, the phone as a phone.json that keeps the answers.
+- An action that needs a denied permission (a `notify` step needs `notifications`) returns `permission_denied` and names the permission.
+- `export_apps` and `import_apps` carry the answers, and so does a phone.json.
+- `update_app` allows each newly declared permission to start with, and drops answers for permissions the new version no longer asks for.
+
+Errors from `set_app_permission`: `not_installed`, `unknown_permission` (the message lists the valid names), `bad_value` (`allowed` must be `true` or `false`) and `not_declared` (the app does not ask for that permission).
+
 ## Open a link in the owning app
 
 `open_url myapp://item/42` finds the installed app that declares the `myapp` scheme. If that app is not the current one, the simulator switches to it. The app's `getInitialURL()` returns the link once, and its `onUrl` listener gets the `url` event. Switching to another app or reloading afterwards does not deliver the link again. Android and iOS skins behave the same. `Linking.openURL` from inside an app does the same for another app's scheme.
@@ -189,6 +201,8 @@ The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action in
 | `placement.… not valid, dropped` in the `warnings` of `import_phone_apps` | An exported layout has a field that is not valid | The valid fields were kept. Fix the field named in the warning and import again with `replace: true` |
 | `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
 | A scheduled app is missing from the home screen | Its schedule is not active at the phone's clock | Read the home text, which says when it starts; call `set_phone_time`, or `switch_app` still opens it |
+| `permission_denied` from an app action | The app needs a device permission you denied | Turn it on in Settings, or call `set_app_permission` with `allowed: true` |
+| `not_declared` from `set_app_permission` | The app does not ask for that permission | Check `installed_apps` for the permissions it declares |
 | `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
 
 ## Next steps

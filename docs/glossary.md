@@ -117,6 +117,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Signing seed.** The secret key that signs your releases. Every installed app pins its matching public key and accepts only updates signed with it. Shipvo never holds your seed, so back it up (see [Moving to a new machine](new-machine.md)).
 
+**Root key.** A second key you keep offline. It only signs key rotation statements ("trust this new release key") and never signs updates. Create it with `shipvo keys root`. See [Rotate your update signing key](key-rotation.md).
+
 **Publish token.** A key that lets one machine or CI job publish releases for your app. `shipvo app create` issues a new one and revokes the old one.
 
 **Shell.** The app build you install from a store. It carries the runtime and your public key. Over-the-air updates change the code inside it.
