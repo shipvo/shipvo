@@ -100,6 +100,7 @@ The runs are `.github/workflows/parity.yml` (Android emulator) and `.github/work
 
 ## Next steps
 
+- [Test with an assistant](test-with-an-assistant.md): use the simulator from Claude, ChatGPT or Cursor.
 - [Agents guide](agents.md): drive the simulator from your assistant over MCP.
 - [Device API](device-api.md): the simulated camera, location, payment and biometrics.
 - [Testing](testing.md): write typed tests and run them on an emulator or simulator.
