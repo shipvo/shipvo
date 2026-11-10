@@ -2,7 +2,7 @@
 
 You will tell an AI assistant, in plain words, what small app you want. A few seconds later the app is on a simulated Android phone in your browser, with its own icon. You will use it, ask for a change and see the change appear with your entries still in place. You write no code and you need no real phone.
 
-**Level:** beginner. **Time:** about 15 minutes, most of it the first-time setup. On our test machine `npm install` for the starter app took 27 seconds.
+**Level:** beginner. **Time:** a short first-time setup, then a few minutes of talking to your assistant.
 
 New words are explained once, and collected in the [glossary](../glossary.md).
 
@@ -96,17 +96,17 @@ You do not need to read the spec. Your wording will give a slightly different ap
 
 ## 5. Use the app
 
-Ask the assistant to use it, as a person would:
+Ask the assistant to add an idea with the app's own action:
 
 ```text
-Add a gift idea: Mum, garden gloves.
+Use run_app_action on the gift-ideas app to run add_idea with person "Mum" and idea "Garden gloves".
 ```
 
 The list should now show "Mum" with "Garden gloves" under it.
 
 ![The Gift ideas app after one idea was added: the list shows Mum with Garden gloves under the name.](/tutorials/describe-an-app/03-first-idea.png)
 
-Every control in the app has a name, so the assistant can use it in the same ways it can use any app on the phone. Add two or three more ideas.
+Every action in the app has a name, so the assistant can run it by name. Add two or three more ideas the same way.
 
 > **If something goes wrong.**
 > - The assistant says `action_failed`: the app refused what it sent, for example because the "Who for" box was empty. Tell it to fill both boxes.
@@ -123,30 +123,11 @@ The open screen changes at once. Look for two things: an **About** button under 
 
 ![The Gift ideas app after the change: the idea from Mum is still in the list, and a blue About button is under it.](/tutorials/describe-an-app/04-updated.png)
 
-Tell the assistant to open the About screen. You should see your line of text and a Back button.
-
-![The About screen of the Gift ideas app, with one line of text and a Back button.](/tutorials/describe-an-app/05-about.png)
-
 > **If something goes wrong.**
 > - Your ideas are gone: an app's data lives for the session. If the simulator was stopped and started, ask the assistant to make the app again.
-> - The About button is missing: ask "What changed in the last update?" and tell it to try again.
+> - The About button is missing: say "The About button is missing, please update the app again".
 
-## 7. See what changed
-
-Ask:
-
-```text
-What did you build and change in the gift ideas app?
-```
-
-Shipvo keeps a record of every version, with a plain line for each change. On our test machine the record for this tutorial read:
-
-```text
-version 1: created: 1 screens, 1 actions, 1 data sources
-version 2: added screen 'about', changed screen 'home'
-```
-
-## 8. Try the iPhone look
+## 7. Try the iPhone look
 
 Say:
 
@@ -162,7 +143,7 @@ When you are done, go to the first terminal window and press **Ctrl+C** to stop 
 
 ## Recap
 
-You started a simulated phone, connected an assistant, described an app in plain words and saw it appear on the phone. You used it, asked for a change that kept your entries, read what changed, and made the iPhone version from the same description.
+You started a simulated phone, connected an assistant, described an app in plain words and saw it appear on the phone. You used it, asked for a change that kept your entries, and made the iPhone version from the same description.
 
 ## Next steps
 

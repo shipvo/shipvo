@@ -7,7 +7,7 @@ Step-by-step tutorials for people who have never used a terminal. Each one ends 
 | Tutorial | You will | Time | Level |
 | --- | --- | --- | --- |
 | [Create your first app](first-app.md) | Create an app, open it on a simulated phone, change its words and check a release | a few minutes of commands, plus reading | Beginner |
-| [Describe an app and watch it appear on a phone](describe-an-app.md) | Tell an assistant what app you want, see it on an Android phone in your browser, ask for a change and read what changed | about 15 minutes | Beginner |
+| [Describe an app and watch it appear on a phone](describe-an-app.md) | Tell an assistant what app you want, see it on an Android phone in your browser, ask for a change and see it update | a few minutes after setup | Beginner |
 
 ## Sell
 
