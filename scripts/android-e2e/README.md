@@ -10,7 +10,7 @@ Pieces:
 - `release.mjs`: signs and publishes one release (bundle, bsdiff patches, pointer per band), with `--tamper signature|hash|size`.
 - `run.mjs`: starts the server in-process, runs the scenarios, and writes the report.
 
-Run (needs `pnpm --filter @shipvo/cli build` (patches come from the built CLI, no Python needed), and `adb` with one emulator):
+Run (needs `pnpm --filter @shipvo/store build` and `pnpm --filter @shipvo/cli build` (the CLI imports the store package; patches come from the built CLI, no Python needed), and `adb` with one emulator):
 
 ```bash
 node scripts/ios-e2e/keygen.mjs > key.json
