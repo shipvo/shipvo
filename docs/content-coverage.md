@@ -106,3 +106,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Spec `calendar` and `map` blocks (month, week, agenda; pins with no tile calls) | [spec-blocks](spec-blocks.md#calendars-and-maps) | | | |
 | Secrets screen in the phone's Settings app | [phone-apps](phone-apps.md#secrets-screen) | | | |
 | Open a hosted build from a link (`POST /session` with `build_url`) | [test-your-build](test-your-build.md#open-a-build-from-a-link) | | | |
+| Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |

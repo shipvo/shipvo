@@ -84,6 +84,7 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 
 - 2026-11-10: Spec `calendar` and `map` blocks, the Secrets screen in Settings, and opening a hosted build from a link ([Spec blocks](spec-blocks.md#calendars-and-maps), [Phone apps](phone-apps.md#secrets-screen), [Test your build](test-your-build.md#open-a-build-from-a-link), #1353, #1350, #1287)
 - 2026-11-10: Playground Many phones: 1 to 12 Android and iOS phones with a shareable link ([Getting started](getting-started.md#try-it-in-your-browser-first), #1323, #1335)
+- 2026-11-10: Secrets screen in the phone's Settings lists saved keys, metadata only ([Phone apps](phone-apps.md#see-saved-keys-in-settings), #1350)
 - 2026-11-10: Pin and hide apps on the home screen, export and import a phone's apps, and search the Store with `find_apps` ([Phone apps](phone-apps.md), #1330, #1329, #1315)
 - 2026-11-10: Saved-key routes (list, rotate, revoke, use log) in the control plane and the simulator, and key rotations in the pointer response ([Self-hosting](self-hosting.md#saved-key-routes-vault), #1298, #1334, #1336)
 - 2026-11-09: Describe an app and it appears, edit it in place with `update_app` ([Phone apps](phone-apps.md), #1301, #1302)
