@@ -1,0 +1,1 @@
+- docs: the phone apps page lists `bad_placement`, `bad_time` and a scheduled app missing from the home screen under Troubleshooting.
