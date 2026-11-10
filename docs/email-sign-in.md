@@ -1,5 +1,7 @@
 # Test an email sign-in on Android and iOS
 
+This page is for developers and for people whose assistant tests an app that signs in by email. You will get a test or an agent run that reads the emailed code or link and finishes the sign-in on Android and iOS.
+
 Many apps sign in with a code or a link sent by email. Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
 
 The inbox works the same on the Android and iOS phones.
@@ -60,3 +62,19 @@ Agents use three tools. Each takes the `session` from `open_app`.
 ## Android and iOS
 
 The inbox, the tools and `phone.inbox` are the same on the Android and iOS phones. With MCP, open the session with `platform: "android"` or `platform: "ios"` in `open_app` and follow the same steps.
+
+## Troubleshooting
+
+| You see | Why | Do this |
+| --- | --- | --- |
+| `inbox_timeout` | No mail matched `subject` or `from` before the timeout (default 10000 ms, at most 25000) | Check that the tap that sends the code happened first, that the stub rule has a `mail` field, and that `subject` is part of the real subject (any case) |
+| `inbox_no_code` | The matching mail has no 4 to 8 digit code | Use `waitFor` and read `links`, or fix the code text in the mail |
+| Status 550 from `https://inbox.shipvo.test/send` | The `to` address is not this session's address | Send to the address from `address()` or `inbox_read` |
+| An old code is typed | The inbox still holds mail from an earlier attempt | Call `clear()` (`inbox_clear` over MCP) between attempts |
+| The address changed | Each session has its own address | Read the address again after every new `open_app` |
+
+## Next steps
+
+- [Typed tests](testing.md): `mockNetwork` and the rest of the test API.
+- [Agent simulator over MCP](agents.md): the full tool list.
+- [Phone apps](phone-apps.md): the apps your sign-in flow may hand over to.
