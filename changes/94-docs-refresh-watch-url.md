@@ -1,2 +1,0 @@
-- docs: App spec page covers `refresh` for data sources; Agents page covers the hosted `watch_url`; Run page notes that rebuilds after a save reuse the bundler's cache.
-- Migration: none; docs only.
