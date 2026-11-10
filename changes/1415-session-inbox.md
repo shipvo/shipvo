@@ -1,0 +1,5 @@
+- `@shipvo/mcp`: new tools `inbox_wait`, `inbox_read` and `inbox_clear`. Every session has a private inbox with its own address (`s-<id>@inbox.shipvo.test`). `inbox_wait` returns the first mail that matches a subject or sender, or fails with the typed error `inbox_timeout`. `inbox_read` returns subject, text, 4 to 8 digit codes and links, and changes nothing.
+- `@shipvo/sim`: session inbox, kept in memory only and removed when the session ends. Mail comes from `set_network_mocks` rules with a `mail` field, or from a POST to `https://inbox.shipvo.test/send`.
+- `@shipvo/test`: `phone.inbox` (`address`, `waitFor`, `code`, `list`, `clear`) and an optional `mail` field on `mockNetwork` rules.
+- Docs: [Test an email sign-in on Android and iOS](../docs/email-sign-in.md).
+- Migration: none. The change is additive.
