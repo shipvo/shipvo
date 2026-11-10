@@ -106,3 +106,5 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Calendar block.** A part of an app spec that shows dated rows as a month, a week or an agenda. See [App spec](spec-blocks.md#calendars-and-maps).
 
 **Map block.** A part of an app spec that draws rows with a latitude and longitude as pins on a canvas. It loads no map tiles. See [App spec](spec-blocks.md#calendars-and-maps).
+
+**Live reload.** While `shipvo run` is open, Shipvo rebuilds your app each time you save a file and shows the new version in the phone, with no restart. If the save has a mistake, the phone keeps the last good version and a red bar names the file and line. See [Run your app on a phone](run.md#edit-and-save-the-phone-updates).
