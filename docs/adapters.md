@@ -43,7 +43,7 @@ Telemetry event names are in `packages/schema/src/index.ts` (`Telemetry.event`).
 
 ## Capacitor (web bundles)
 
-`@shipvo/capacitor` (`packages/capacitor`) is a third implementation, in TypeScript, for a signed web bundle. A web pointer has `kind: "web"`. These rules are now implemented in `packages/capacitor/src/engine.ts` and tested in `packages/capacitor/test/capacitor.test.ts`: 1 (platform and kind), 2, 3 (uses `bandForCohort` from `@shipvo/schema`), 4, 5, 10, 11, 12, 13, 14 and 15 (events are `pointer_rejected:<why>`, queued once per distinct reason). Signature, size and sha-256 checks use WebCrypto. Rules 6, 7 and 8 do not apply to plain web assets or are decided by the control plane. These are one TypeScript copy that Android and iOS Capacitor shells both use, not a fourth copy per OS.
+`@shipvo/capacitor` (`packages/capacitor`) is a third implementation, in TypeScript, for a signed web bundle. A web pointer has `kind: "web"`. These rules are now implemented in `packages/capacitor/src/engine.ts` and tested in `packages/capacitor/test/capacitor.test.ts`: 1 (platform and kind), 2, 3 (uses `bandForCohort` from `@shipvo/schema`), 4, 5, 10, 11, 12, 13, 14 and 15 (events are `pointer_rejected:<why>`, queued once per distinct reason). Signature, size and sha-256 checks use WebCrypto. `native.ts` serves the chosen bundle in the web view, and `checkForUpdate({ apply: true })` switches it. A plain web bundle has no bytecode header, so rule 6 has nothing to check. These are one TypeScript copy that Android and iOS Capacitor shells both use, not a fourth copy per OS.
 
 ## What a Capacitor port would need to redo
 
@@ -64,7 +64,7 @@ These need no new work, because the control plane decides them (rules 1, 6 on th
 
 ## Troubleshooting
 
-- **A release is never offered to a device.** Check rules 1, 2, 5, 6, 7 and 8 first. The control plane answers with a typed 404 (`hermes_bytecode_mismatch`, `native_module_missing`, `native_module_version`) or a halted release. On Android and iOS the reason comes back as `reason` from `checkForUpdate`.
+- **A release is never offered to a device.** Check rules 1, 2, 5, 6, 7 and 8 first. The control plane answers with a typed 404 (`hermes_bytecode_mismatch`, `native_module_missing`, `native_module_version`) or a halted release. For a typed 404, `checkForUpdate` returns `status: "none"` with that `reason`, on Android and iOS. A halted release has no reason: the result is `status: "none"` and the device keeps its current release.
 - **Two runtimes pick different bands.** Cohort and band are chosen on the device (rule 3). Compare the thresholds in the three copies named in that row: `packages/schema/src/index.ts`, `Store.kt` and `Store.swift`.
 - **A rule is not covered by a port.** Use the table: "Shared" rules run on the control plane for every runtime, "Per platform" rules need code in each runtime.
 

@@ -1,1 +1,1 @@
-- Docs: the shop tutorial explains the `[shop]` price message and cents; the adapters page has troubleshooting and next steps.
+- Docs: the adapters page has troubleshooting and next steps, and states which Capacitor rules are implemented.

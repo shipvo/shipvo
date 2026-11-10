@@ -142,8 +142,6 @@ Then change a price: find `"price": 650` and make it `"price": 700`. Save, wait 
 
 > **If something goes wrong.** The same as step 3. Most mistakes here are a comma missing between two blocks, or a comma left after the last block.
 
-> **If a price looks wrong.** Prices are in cents, so `24` is 24 cents, not $24. If a price is not a whole number, or is smaller than one whole dollar, the terminal prints a line that starts with `[shop]`, for example `Wool beanie: price 24 is less than one whole unit. Prices are in the smallest unit, so write 2400 for 24.` Do what the line says: write `2400`, save, and the line goes away. The same check runs in `npm test` and fails the test until the price is fixed. A shop in another currency, such as FCFA with no cents, sets its unit in `src/data/shop.json` (`decimals`).
-
 ## 5. Check the cart
 
 Open the app again. Click **Fresh tilapia**, **Add to cart**, **Back**, **River shrimp**, **Add to cart**, then **Cart**. The cart lists both, and the total adds up.
