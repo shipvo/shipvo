@@ -11,7 +11,7 @@ import { pickPort } from "./test-port.mjs";
 import { renderFrame, statusClientScript } from "./frame.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = pickPort(11150, 150);
+const PORT = pickPort(12100, 150);
 const root = mkdtempSync(join(tmpdir(), "sim-placement-"));
 const dist = join(root, "dist"), dir = join(root, "state");
 let proc;
