@@ -141,7 +141,7 @@ This signs the code of release 3 as the next release number and publishes it to 
 - **Users on the old build get no Shipvo update.** They need the new store binary from Step 5. Shipvo cannot update a build that does not contain its runtime.
 - **Installed apps refuse updates after you changed machines.** The signing seed is missing or different. Restore it with `shipvo keys import` ([new-machine.md](new-machine.md)).
 
-## Next steps
+## Next
 
 - [Build your first app](getting-started.md)
 - [Ship a fix, widen it and roll it back](tutorials/ship-a-fix.md)
