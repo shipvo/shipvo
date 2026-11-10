@@ -31,6 +31,8 @@ class ShipvoRuntimeModule : Module() {
       )
     }
 
+    AsyncFunction("getAppliedStateVersion") { StateVersion.applied(Store(ctx), Store.runningRelease) }
+
     AsyncFunction("checkForUpdate") { apply: Boolean ->
       val r = try { check() } catch (e: Exception) { mapOf("status" to "error", "error" to (e.message ?: e.javaClass.simpleName)) }
       if (apply && r["status"] == "staged") reloadHost()
@@ -51,6 +53,7 @@ class ShipvoRuntimeModule : Module() {
         ShipvoHostHandler.settleDeferred(s, visible = true, crashed = false) // count the load first
         if (s.pendingRelease != 0 && Store.runningRelease == s.pendingRelease) {
           s.previousPath?.let { old -> if (old != s.currentPath) File(old).delete() }
+          StateVersion.promote(s)
           s.previousRelease = s.currentRelease; s.previousPath = s.currentPath
           s.currentRelease = s.pendingRelease; s.currentPath = s.pendingPath; s.currentSha = s.pendingSha
           s.pendingRelease = 0; s.pendingPath = null; s.trialBoots = 0
@@ -82,7 +85,7 @@ class ShipvoRuntimeModule : Module() {
       val s = Store(ctx)
       synchronized(ShipvoHostHandler.LOCK) {
         s.pendingPath?.let { File(it).delete() }
-        s.pendingPath = null; s.pendingRelease = 0; s.trialBoots = 0
+        s.pendingPath = null; s.pendingRelease = 0; s.trialBoots = 0; StateVersion.dropPending(s)
         s.addEvent("rolled_back:${s.currentRelease}")
         s.block(s.currentRelease)
         ShipvoHostHandler.revertToPrevious(s)
@@ -233,6 +236,7 @@ class ShipvoRuntimeModule : Module() {
       if (!BootRules.mayStage(release, s.currentRelease, s.pendingRelease, s.blockedRelease)) return mapOf("status" to "none")
       s.pendingPath?.let { if (it != dest.path) File(it).delete() }
       s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0; s.pendingSha = wantSha
+      StateVersion.stage(s, body.opt("state_version"))
       if (s.binaryVersion == null) s.binaryVersion = s.installedBinaryVersion
       s.pendingIssuedAt = body.optString("issued_at")
     }

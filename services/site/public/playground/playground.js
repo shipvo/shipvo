@@ -28,7 +28,15 @@
   ];
   var chosen = {};
   function sendDevice(kind, value) { try { phone.contentWindow.postMessage({ type: "pg:device", kind: kind, value: value }, "*"); } catch (e) {} }
+  // On a narrow screen the phone sits below the controls. After a choice, bring it into view.
+  function showPhone() {
+    if (!window.matchMedia("(max-width:800px)").matches) return;
+    var r = phone.getBoundingClientRect();
+    if (r.top >= 0 && r.bottom <= window.innerHeight) return;
+    try { phone.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" }); } catch (e) { phone.scrollIntoView(); }
+  }
   function deviceControls(panel) {
+    var result = document.createElement("p"); result.className = "pg-result"; result.id = "pg-result"; result.setAttribute("role", "status"); result.setAttribute("aria-live", "polite"); result.textContent = "Pick an option to change the phone.";
     DEVICE.forEach(function (g) {
       var fs = document.createElement("fieldset"), lg = document.createElement("legend"); lg.textContent = g.label; fs.appendChild(lg);
       g.opts.forEach(function (o) {
@@ -41,11 +49,14 @@
             Array.prototype.forEach.call(fs.querySelectorAll("button"), function (x) { x.setAttribute("aria-pressed", String(x === b)); });
           }
           sendDevice(g.kind, o[1]);
+          result.textContent = g.label + ": " + o[0] + ". The phone shows the result.";
+          showPhone();
         });
         fs.appendChild(b);
       });
       panel.appendChild(fs);
     });
+    panel.appendChild(result);
   }
   function replay() { Object.keys(chosen).forEach(function (k) { sendDevice(k, chosen[k]); }); }
 
@@ -222,7 +233,7 @@
     };
     steps.forEach(function (st, i) {
       var b = document.createElement("button"); b.type = "button"; b.setAttribute("data-step", st[0]); b.textContent = st[1];
-      b.addEventListener("click", function () { if (!otaRun || ota.step !== i) return; actions[st[0]](); ota.step = i + 1; paint(); });
+      b.addEventListener("click", function () { if (!otaRun || ota.step !== i) return; actions[st[0]](); ota.step = i + 1; paint(); showPhone(); });
       row.appendChild(b);
     });
     var reset = document.createElement("button"); reset.type = "button"; reset.className = "pg-reset"; reset.setAttribute("data-step", "reset"); reset.textContent = "Start over";

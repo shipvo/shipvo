@@ -10,6 +10,7 @@ export const Runtime = {
     return { cohort: 0, band: "b0", runningRelease: 0, currentRelease: 0, pendingRelease: 0, previousRelease: 0,
       shellVersion: "simulator", baseUrl: sim.baseUrl ?? "", appId: sim.appId ?? "", shellMajor: 1 };
   },
+  async getAppliedStateVersion(): Promise<number | null> { return null; },
   async checkForUpdate(_apply: boolean): Promise<CheckResult> { return { status: "none" }; },
   markHealthy(): HealthyResult { return { release: 0, coldStartMs: Date.now() - t0, sinceLoadMs: 0, promoted: false, kind: "cold" }; },
   consumeEvents(): string[] { return []; },
@@ -19,3 +20,4 @@ export const Runtime = {
 export { FORWARDED_EVENTS, forwardRuntimeEvents } from "./runtimeEvents";
 export function reportRuntimeEvents(): string[] { return []; }
 export function onRuntimeEvents(_fn: (events: string[]) => void): () => void { return () => {}; }
+export function getAppliedStateVersion(): Promise<number | null> { return Runtime.getAppliedStateVersion(); }
