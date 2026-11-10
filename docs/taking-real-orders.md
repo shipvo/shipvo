@@ -1,10 +1,12 @@
 # Taking real orders
 
-Shipvo stores the orders your app sends. It does not take payment. You, or your payment provider and you together, decide when an order is really paid, then tell Shipvo.
+This page is for shop owners and the developers who build their shop. You will learn how an order moves from "received" to "paid" and how to mark it paid.
+
+Shipvo stores the orders your app sends. You decide when an order is really paid, then tell Shipvo.
 
 ## Who verifies payment
 
-You do. Shipvo never checks that money arrived. Every new order starts as `unverified`. Check your mobile money or card account, then call `settle` for that order with the owner token. Settling covers every `unverified` row that has that order id. There is no settle button in the admin yet. There are no payment-provider webhooks yet.
+You do. Shipvo never checks that money arrived. Every new order starts as `unverified`. Check your mobile money or card account, then call `settle` for that order with the owner token. Settling covers every `unverified` row that has that order id.
 
 ## Order statuses
 
@@ -38,3 +40,20 @@ curl -X POST "$CONTROL_PLANE/app/$APP_ID/api/orders/$ORDER_ID/settle" \
 - `404` if the order id is unknown.
 
 Each settle is written to the app's audit log with who did it.
+
+## Troubleshooting
+
+| You see | Why | What to do |
+| --- | --- | --- |
+| Order shows `unverified` after the customer paid | Settling is a step you do. | Check your payment account, then call `settle` for that order id. |
+| `401` on settle | No token, a wrong token, or a publish token. | Use the owner token. |
+| `409` on settle | The order is `simulated` or `price_mismatch`. | These cannot be settled. For a mismatch, republish your content and ask the customer to order again. |
+| `422` on a new order | The total did not match the published content version, or the catalogue is empty. | Publish your content, then retry from the app. |
+| `429` on a new order | Too many orders from one IP or install. | Wait and retry. |
+| `404` on settle | The order id is wrong. | Check the id you used. |
+
+## Next steps
+
+- [Getting started](getting-started.md) to create a shop and publish it.
+- [Device API](device-api.md) for the simulated payment flow you can test before going live.
+- [Self-hosting](self-hosting.md) for running the control plane yourself.

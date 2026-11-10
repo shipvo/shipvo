@@ -93,12 +93,13 @@ describe("frame page, shared renderer", () => {
       expect(l).toContain('<iframe id="app" src="/app/"'); expect(l).toContain("scale(");
     }
   });
-  it("keeps the label and sheet button in one wrapping row, and reserves room for the error bar below the phone", () => {
+  it("keeps the label and sheet button in one wrapping row, and reserves room for the error bar above the phone", () => {
     const h = runFramePage("android", "Tide", renderFrame);
     expect(h).toContain('<div class="top" id="top"><div class="tag"');
     expect(h).toMatch(/\.tag\{[^}]*overflow-wrap:anywhere/);
     expect(h).not.toMatch(/\.tag\{position:fixed/);
-    expect(h).toContain("b.hidden?10:b.offsetHeight+20");
+    expect(h).toMatch(/\.banner\{position:fixed;[^}]*top:10px/);
+    expect(h).toContain("top=bt+b.offsetHeight+10");
     expect(h).toContain("window.fit&&fit()");
   });
   it("loadFrameRenderer resolves @shipvo/sim and returns a function", async () => {
