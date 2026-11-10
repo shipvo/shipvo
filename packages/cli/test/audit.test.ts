@@ -64,4 +64,28 @@ describe("shipvo audit", () => {
     inApp();
     await expect(audit(["shop", "--format", "xml"], { fetchFn: vi.fn() as any })).rejects.toThrow("--format");
   });
+
+  describe("key-rotation rows", () => {
+    const rot = row(9, { actor: "a@b.c", action: "key-rotation", release: null, after: JSON.stringify({ sequence: 2, valid_from: "2026-02-01T00:00:00Z" }) });
+
+    it("prints the row in JSON with app, sequence and time", async () => {
+      inApp();
+      const f = vi.fn(async () => resp([rot, row(8)]));
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      await audit(["shop"], { fetchFn: f as any });
+      const out = JSON.parse(String(log.mock.calls[0][0]));
+      expect(out[0]).toMatchObject({ app_id: "shop", at: "2026-01-01T00:00:00Z", action: "key-rotation" });
+      expect(JSON.parse(out[0].after)).toEqual({ sequence: 2, valid_from: "2026-02-01T00:00:00Z" });
+    });
+
+    it("prints the row in CSV with the stable column order", async () => {
+      inApp();
+      const f = vi.fn(async () => resp([rot]));
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      await audit(["shop", "--format", "csv"], { fetchFn: f as any });
+      const lines = String(log.mock.calls[0][0]).split("\n");
+      expect(lines[0]).toBe('"id","app_id","at","actor","actor_kind","action","release","release_id","before","after"');
+      expect(lines[1]).toBe('"9","shop","2026-01-01T00:00:00Z","a@b.c","owner","key-rotation","","","","{""sequence"":2,""valid_from"":""2026-02-01T00:00:00Z""}"');
+    });
+  });
 });
