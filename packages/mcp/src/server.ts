@@ -418,6 +418,8 @@ use(server, tools.get_clipboard,
   async ({ session }) => { need(session); const r = await act({ session, action: "get_clipboard" }) as Act & { text?: string }; if (!r.ok) return result(session, r); return text(JSON.stringify({ text: r.text ?? "" })); });
 use(server, tools.set_clipboard,
   async ({ session, text: body }) => { need(session); const r = await act({ session, action: "set_clipboard", text: body }) as Act & { text?: string }; if (!r.ok) return result(session, r); return text(JSON.stringify({ text: r.text ?? "" })); });
+use(server, tools.search_phone,
+  async ({ session, query, app, limit }) => { need(session); const r = await act({ session, action: "search_phone", query, app, limit }) as Act & { results?: unknown; count?: number; truncated?: boolean; query?: string }; if (!r.ok) return result(session, r); return text(JSON.stringify({ query: r.query, count: r.count, truncated: r.truncated, results: r.results }, null, 2)); });
 use(server, tools.inbox_wait,
   async ({ session, subject, from, timeout_ms }) => { need(session); const r = await act({ session, action: "inbox_wait", subject, from, timeout_ms }) as Act & { address?: string; message?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ address: r.address, message: r.message }, null, 2)); });
 use(server, tools.inbox_read,

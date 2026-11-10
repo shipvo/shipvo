@@ -204,6 +204,25 @@ for (const style of ["android", "ios"]) {
 }
 
 for (const style of ["android", "ios"]) {
+  test(`${style}: search_phone finds text in app data, can be narrowed to one app, and rejects bad input`, async () => {
+    const INBOX = JSON.parse(readFileSync(new URL("../../templates/assistant-inbox/app.json", import.meta.url), "utf8"));
+    const sid = `sp-search-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "inbox", spec: INBOX, style })).ok, true);
+    await act(sid, { action: "app_action", id: "inbox", action_name: "send_message", input: { to: "claude", body: "Order the Marigold lamps" }, agent: "claude-ai" });
+    const hit = await act(sid, { action: "search_phone", query: "marigold" });
+    assert.equal(hit.ok, true, JSON.stringify(hit).slice(0, 300));
+    assert.equal(hit.count, 1); assert.equal(hit.results[0].app, "inbox"); assert.equal(hit.results[0].kind, "row");
+    assert.match(hit.results[0].snippet, /Marigold lamps/);
+    assert.equal((await act(sid, { action: "search_phone", query: "marigold", app: "inbox" })).count, 1);
+    assert.equal((await act(sid, { action: "search_phone", query: "marigold", app: "notifications" })).count, 0);
+    assert.equal((await act(sid, { action: "search_phone", query: "zzz-none" })).count, 0);
+    assert.equal((await act(sid, { action: "search_phone", query: "" })).code, "bad_query");
+    assert.equal((await act(sid, { action: "search_phone", query: "x", app: "nope" })).code, "not_installed");
+  });
+}
+
+for (const style of ["android", "ios"]) {
   test(`${style}: share puts text into another app, and the clipboard survives switching apps`, async () => {
     const NOTES = JSON.parse(readFileSync(new URL("../../templates/notes-tasks/app.json", import.meta.url), "utf8"));
     const sid = `sp-share-${style}`;
