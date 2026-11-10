@@ -242,6 +242,11 @@ class Run {
     const data = this.spec.data;
     if (!isObject(data)) return;
     const prev = isObject(previous) && isObject(previous.data) ? previous.data : {};
+    for (const [name, old] of Object.entries(prev)) {
+      if (isObject(old) && old.source === "collection" && !Object.hasOwn(data, name)) {
+        this.error(childPath("$.data", name), `Collection "${name}" was removed and its saved rows would be lost.`, `Keep "${name}" in data. Remove its fields in steps instead, or confirm the removal with a new collection name.`);
+      }
+    }
     for (const [name, src] of Object.entries(data)) {
       if (!isObject(src) || src.source !== "collection" || !isObject(src.fields)) continue;
       const base = childPath("$.data", name);
@@ -268,10 +273,11 @@ class Run {
         const gone = (f: unknown, key: string, what: string) => {
           if (typeof f !== "string") return;
           removed.add(f);
-          if (f in fields) this.error(childPath(childPath(p, kinds[0]!), key), `"${f}" is still declared in "${name}.fields", so it cannot be ${what}.`, `Remove "${f}" from fields, or remove this step.`);
+          // A later version may add the field again, so only a step at the current version must see it gone.
+          if (Object.hasOwn(fields, f) && !(typeof since === "number" && since < version)) this.error(childPath(childPath(p, kinds[0]!), key), `"${f}" is still declared in "${name}.fields", so it cannot be ${what} at version ${version}.`, `Remove "${f}" from fields, remove this step, or give the step a lower "since" if a later version adds "${f}" again.`);
         };
         const kept = (f: unknown, key: string, chain = false) => {
-          if (typeof f === "string" && !(f in fields)) {
+          if (typeof f === "string" && !Object.hasOwn(fields, f)) {
             if (chain) { chained.push({ f, at: childPath(childPath(p, kinds[0]!), key) }); return; }
             this.error(childPath(childPath(p, kinds[0]!), key), `"${f}" is not a field of "${name}".`, `Declare "${f}" in "${name}.fields", or use one of: ${Object.keys(fields).join(", ")}.`);
           }
@@ -282,7 +288,7 @@ class Run {
           kept(body.field, "field");
           if (typeof body.field === "string") {
             retyped.add(body.field);
-            if (body.to !== fields[body.field]) this.error(childPath(childPath(p, "retype"), "to"), `"${body.field}" is declared as ${JSON.stringify(fields[body.field])}, not ${JSON.stringify(body.to)}.`, `Set "to" to "${String(fields[body.field])}", or change the field's type.`);
+            if (Object.hasOwn(fields, body.field) && body.to !== fields[body.field]) this.error(childPath(childPath(p, "retype"), "to"), `"${body.field}" is declared as ${JSON.stringify(fields[body.field])}, not ${JSON.stringify(body.to)}.`, `Set "to" to "${String(fields[body.field])}", or change the field's type.`);
           }
           if (typeof body.using === "string") this.checkExpression(body.using, childPath(childPath(p, "retype"), "using"));
         }
@@ -300,10 +306,10 @@ class Run {
       }
       for (const [f, t] of Object.entries(old.fields)) {
         const at = childPath(childPath(base, "fields"), f);
-        if (!(f in fields) && !removed.has(f)) {
+        if (!Object.hasOwn(fields, f) && !removed.has(f)) {
           this.error(base, `Field "${f}" was removed from "${name}" and no migrate step says what happens to saved rows.`,
             `Add { "drop": { "field": "${f}" } } or { "rename": { "from": "${f}", "to": "<new name>" } } to "${name}.migrate", and raise "version".`);
-        } else if (f in fields && fields[f] !== t && !retyped.has(f)) {
+        } else if (Object.hasOwn(fields, f) && fields[f] !== t && !retyped.has(f)) {
           this.error(at, `Field "${f}" changed from ${JSON.stringify(t)} to ${JSON.stringify(fields[f])} and no migrate step converts saved rows.`,
             `Add { "retype": { "field": "${f}", "to": "${String(fields[f])}", "using": "<expression over value>" } } to "${name}.migrate", and raise "version".`);
         }

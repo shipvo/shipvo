@@ -89,4 +89,28 @@ describe("validate migrate", () => {
     expect(r.errors[0]!.path).toBe("$.data.notes.migrate[0].rename.to");
     expect(r.errors[0]!.fix).toContain("a");
   });
+  it("allows a drop at a lower since when the field is added again later", () => {
+    const s = base({ a: "text" }, { version: 3, migrate: [{ since: 2, drop: { field: "a" } }] });
+    expect(validate(s, base({ a: "text" })).errors).toEqual([]);
+  });
+  it("refuses a drop at the current version while the field is declared", () => {
+    const s = base({ a: "text" }, { version: 2, migrate: [{ since: 2, drop: { field: "a" } }] });
+    expect(validate(s).errors.some((e) => e.path === "$.data.notes.migrate[0].drop.field")).toBe(true);
+  });
+  it("ignores inherited keys in steps", () => {
+    const s = base({ a: "text" }, { version: 2, migrate: [{ since: 2, drop: { field: "constructor" } }, { since: 2, retype: { field: "toString", to: "text", using: "value" } }] });
+    expect(validate(s).errors.some((e) => e.path === "$.data.notes.migrate[1].retype.field")).toBe(true);
+  });
+  it("refuses a collection removed from the spec", () => {
+    const s = { ...base({ a: "text" }), data: {} };
+    const r = validate(s, v1);
+    expect(r.errors.some((e) => e.path === "$.data.notes")).toBe(true);
+  });
+});
+
+describe("migrateRows input", () => {
+  it("refuses a non-integer saved version", () => {
+    const s = base({ a: "text" }, { version: 2 });
+    expect(() => migrateRows(s, "notes", [], 1.5)).toThrow(RunError);
+  });
 });

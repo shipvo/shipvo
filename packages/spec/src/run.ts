@@ -279,6 +279,7 @@ async function steps(spec: unknown, list: unknown[], ctx: RunContext): Promise<{
 export function migrateRows(spec: unknown, name: string, rows: unknown[], savedVersion = 1, ctx: Pick<RunContext, "eval"> = {}): unknown[] {
   const c = isObj(spec) && isObj(spec.data) ? spec.data[name] : undefined;
   if (!isObj(c) || c.source !== "collection") throw new RunError("bad_spec", `"${name}" is not a collection in this spec.`);
+  if (!Number.isInteger(savedVersion) || savedVersion < 1) throw new RunError("bad_spec", `savedVersion must be a whole number from 1 up, got ${String(savedVersion)}.`);
   const version = typeof c.version === "number" ? c.version : 1;
   const steps = Array.isArray(c.migrate) ? c.migrate : [];
   if (savedVersion >= version || steps.length === 0) return rows;
