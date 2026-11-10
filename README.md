@@ -8,7 +8,7 @@
 
 Three pillars:
 
-1. **Publish.** Signed OTA updates (64 KB patches, crash-loop rollback, staged rollouts), a built-in owner admin at `/app/<id>/admin`, and a control plane you can self-host on Cloudflare.
+1. **Publish.** Signed OTA updates (64 KB patches, crash-loop rollback, staged rollouts, a rollback guard for stored data: `docs/rollbacks-and-stored-data.md`), a built-in owner admin at `/app/<id>/admin`, and a control plane you can self-host on Cloudflare.
 2. **Simulate.** `@shipvo/mcp` opens any Shipvo app for an agent: accessibility tree with refs, tap/type/scroll/back, screenshots. `@shipvo/device` gives apps one device API, real on phones and simulated in the simulator, with Android- and iOS-worded system sheets the agent answers like a person. Simulation is explicit: every simulated event is logged as simulated and no simulated payment or fingerprint is ever presented as real.
 3. **Verify.** The parity harness runs the same flows on the simulator, an Android emulator and an iPhone simulator and compares every screen. Current result, measured on an Android emulator and an iOS Simulator in CI: 100% actionable parity across the 13 screens of the two purchase flows on Android and iOS, meaning the same actionable elements with the same roles and labels on every screen. Full method and results: [`docs/parity-results.md`](docs/parity-results.md).
 

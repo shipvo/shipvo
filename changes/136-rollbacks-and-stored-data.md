@@ -1,0 +1,1 @@
+- Docs: new page "Rollbacks and stored data" for `stateVersion` and `shipvo rollback --allow-state-downgrade`, with troubleshooting. No API change.

@@ -1,29 +1,68 @@
 # Rollbacks and stored data
 
-A rollback sends phones back to older code. If the newer release already changed the format of data in AsyncStorage, SQLite or MMKV, the older code may crash or damage that data. A release can declare the format it uses, and Shipvo checks it before it sends phones back.
+For app owners who store data on the phone (AsyncStorage, SQLite or MMKV) and want a safe rollback. You will declare which format of stored data each release uses, and Shipvo will stop a rollback that could send phones back to code that cannot read their data.
 
-## Declare a state version
+## Why this matters
 
-Set `stateVersion` in `shipvo.json`. It is a positive integer. Raise it whenever a release changes how stored data is laid out.
+A rollback sends phones back to older code. If a newer release already changed how data is laid out on the phone, the older code may crash or damage that data. A release can declare the format it uses. Before it moves phones back, `shipvo rollback` compares the two numbers.
+
+## 1. Declare a state version
+
+Set `stateVersion` in `shipvo.json`. It is a positive integer. Raise it whenever a release changes how stored data is laid out. Leave it alone when the layout stays the same.
 
 ```json
 { "appId": "tide", "stateVersion": 3 }
 ```
 
-`shipvo publish` signs the number into the release. Releases without it work as before.
-
-## Roll back
-
-If the target release has a lower `state_version` than the one phones run, `shipvo rollback` stops and says so:
+`shipvo publish` signs the number into the release as `state_version`. Releases without it work as before. A value that is not a positive whole number stops the publish:
 
 ```
-Release 5 (android) has state_version 2, but phones already run state_version 3. ...
+shipvo.json: stateVersion must be a positive integer (got 0).
 ```
 
-Publish a fix forward, or choose the rollback on purpose:
+## 2. Roll back
+
+```bash
+shipvo rollback --to 5
+```
+
+If phones already run a higher `state_version` than release 5 declares (or release 5 declares none), the command stops and changes nothing:
+
+```
+Release 5 (android) has state_version 2, but phones already run state_version 3. Older code may not read data the newer release stored. Publish a fix forward, or pass --allow-state-downgrade to roll back anyway. The choice is recorded in the audit log.
+```
+
+With `--json` the same stop is reported with the error code `state_downgrade`, and the suggested next command includes `--allow-state-downgrade`.
+
+If the target has the same or a higher `state_version`, the rollback goes ahead with no flag.
+
+## 3. Choose on purpose
+
+Two ways forward:
+
+- **Publish a fix forward.** Ship a new release that reads both formats. This is the safest choice.
+- **Roll back anyway.** You accept that older code will meet newer data:
 
 ```bash
 shipvo rollback --to 5 --allow-state-downgrade
 ```
 
-The control plane records a rollback that lowers `state_version` in the audit log (`shipvo audit <app>`) with the `from` and `to` versions.
+The control plane records a rollback that lowers `state_version` in the audit log, with the `from` and `to` numbers:
+
+```bash
+shipvo audit tide
+```
+
+## Troubleshooting
+
+**The rollback stops and I did not set `stateVersion`.** The target release declares none, and a newer release does. Phones already run that newer number. Add `stateVersion` to the releases that change stored data, or pass `--allow-state-downgrade` if you are sure the data is safe.
+
+**I use `--bands` or `--platform`.** The check uses the highest `state_version` across the bands you name, for each platform, so a rollback of one band is still checked against what phones in it run.
+
+**Nothing is reported for old releases.** Releases published before you set `stateVersion` carry no number. They are treated as 0.
+
+## Next steps
+
+- [CLI guide](cli.md): every `shipvo rollback` option and `--json` output.
+- [Auto-halt](auto-halt.md): stop a bad release before it reaches every phone.
+- [Glossary](glossary.md): state version.

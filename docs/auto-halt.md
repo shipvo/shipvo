@@ -70,3 +70,4 @@ Apps whose installs run a build without the signing runtime will not auto-halt u
 - [Command reference](cli.md) for `shipvo status`, `promote` and `rollback`.
 - [Self-hosting](self-hosting.md) for revert alerts.
 - [Ship a fix](tutorials/ship-a-fix.md) to see a rollout and a rollback end to end.
+- [Rollbacks and stored data](rollbacks-and-stored-data.md) for a check before `shipvo rollback` sends phones to older code.
