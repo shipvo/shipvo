@@ -1,0 +1,1 @@
+- cli: `shipvo run` and `shipvo sim --watch` no longer clear the Metro cache on rebuilds after a save. The first build still clears it.
