@@ -118,6 +118,14 @@ Any spec app can turn a collection into CSV with the `csv()` function. Return it
 
 The first line holds the column names. Fields with commas, quotes or line breaks are quoted, and lists such as tags are joined with `; `. Leave the column list out to export every field. Spreadsheets treat a cell that starts with `=`, `+`, `-` or `@` as a formula. For text that other people typed, map the field first, for example `data.entries.map(r, {'note': has(r.note) && r.note.startsWith('=') ? "'" + r.note : (has(r.note) ? r.note : '')})`, then pass that list to `csv()`.
 
+## Save as a file
+
+A `saveFile` step keeps text as a named file on the phone. It needs the `files` device permission, on Android and iOS alike. Saving again with the same name replaces the file.
+
+```json
+{ "actions": { "save_diary": { "description": "Save the diary as diary.csv.", "input": {}, "do": [ { "saveFile": "diary.csv", "content": "{{ csv(data.entries, ['date', 'title']) }}", "mime": "text/csv" }, { "toast": "Saved diary.csv" } ] } } }
+```
+
 ## Import data from CSV
 
 `parseCsv(text)` is the other direction. It reads CSV text into a list of maps keyed by the header row, on Android and iOS alike. Quoted fields, CRLF or LF line ends and a leading byte order mark are read, and blank lines are skipped. Every value is text. A row with fewer cells than the header gets empty values.
@@ -200,6 +208,16 @@ switch_app { session, id: "notes" }    -> current_app is notes
 uninstall_app { session, id: "notes" } -> back on the home screen
 device_log { session }                 -> install_app (source "real" for marketplace apps, with the bundle sha256), switch_app, uninstall_app
 ```
+
+## Search across the phone
+
+`search_phone` finds text anywhere on the phone in one call: rows in every app's data (Notes and Tasks, Calendar, Files and Photos, Wallet, Shop, Assistant Inbox and any app you built) and notifications. It works the same on Android and iOS.
+
+```json
+{ "session": "demo", "query": "marigold", "limit": 10 }
+```
+
+Each result has the app, the collection, the row id, the field that matched, a short snippet and the full row. The match is not case sensitive and a row gives one result. Set `app` to an app id to look in one app, or to `notifications`. `limit` is 1 to 100 (default 20) and `truncated` says when more matched. Nothing is changed.
 
 ## First-party apps
 

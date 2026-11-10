@@ -141,6 +141,29 @@ describe("wake-up tools", () => {
     expect(JSON.parse(k.content[0].text)).toEqual({ cleared: true });
     await c.close(); srv.close();
   }, 30000);
+
+  it("search_phone passes the query on and returns the hits", async () => {
+    const seen: any[] = [];
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      res.end(JSON.stringify({ ok: true, query: body.query, count: 1, truncated: false, results: [{ kind: "row", app: "contacts", collection: "people", id: "p1", field: "name", snippet: "Amina Diallo" }] }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    expect((await c.listTools()).tools.map((t) => t.name)).toContain("search_phone");
+    const r: any = await c.callTool({ name: "search_phone", arguments: { session: "s", query: "amina", app: "contacts", limit: 5 } });
+    expect(seen.at(-1)).toMatchObject({ action: "search_phone", session: "s", query: "amina", app: "contacts", limit: 5 });
+    const out2 = JSON.parse(r.content[0].text);
+    expect(out2.count).toBe(1); expect(out2.results[0].snippet).toBe("Amina Diallo");
+    await c.close(); srv.close();
+  }, 30000);
 });
 
 describe("reminder tools", () => {
