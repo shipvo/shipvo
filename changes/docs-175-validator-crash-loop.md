@@ -1,0 +1,1 @@
+- Docs: the app spec validator page and the Android crash-loop revert page are in the sidebar, with steps, real output, troubleshooting and next steps.
