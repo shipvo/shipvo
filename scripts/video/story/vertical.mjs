@@ -1,4 +1,5 @@
 // The 9:16 cut of the story ad (1080x1920, about 38 s), edited from the main cut: the hook, one product beat and the payoff.
+// vertical-audio.py reads the segments below with a regex: keep each as `{ from: N, to: N }`.
 // A 405x720 window of the same 1280x720 frames is shown, so the picture is the main cut, not a second story.
 export const SEGMENTS = [
   { from: 0, to: 4.5 },      // street at golden hour: the hook
