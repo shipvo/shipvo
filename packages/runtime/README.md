@@ -4,7 +4,7 @@ The native half of Shipvo's over-the-air updates, as an Expo module.
 
 - Verifies every release pointer (Ed25519) and bundle (SHA-256 + size) against a public key built into the shell.
 - Downloads bsdiff patches when it has the previous release, full bundles otherwise; stages atomically.
-- On Android, a patch that would use more than 40% of the app's heap limit is skipped before any memory is allocated, and a patch that runs out of memory is dropped. Either way the release applies through the resumable full download, and `patchError` is `over_memory_budget` or `out_of_memory`. The hash and size checks are the same.
+- On Android, a patch that would not fit in memory falls back to the full download; see [Patches on small heaps](#patches-on-small-heaps-android).
 - Applies without restart, marks the release healthy when the app says so, and discards a release that fails to boot 3 times.
 - Android and iOS. iOS applies patches from the bundle it is running and downloads the full bundle otherwise. It is verified on the iOS Simulator in CI; in the web simulator the app runs the same release as the web build.
 

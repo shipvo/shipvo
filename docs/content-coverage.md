@@ -129,8 +129,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Shop template warns when a price is in the wrong unit (`[shop]` message, failing test) | [your-own-shop](tutorials/your-own-shop.md#troubleshooting), [getting-started](getting-started.md#the-shop-checkout) | [your-own-shop](tutorials/your-own-shop.md) | | |
 | Export a list as CSV from a spec app (`csv(rows, columns?)`) | [spec-blocks](spec-blocks.md#export-data-as-csv), [phone-apps](phone-apps.md#export-data-as-csv), [app-spec](design/app-spec.md) | | | |
 | Refs after a phone restart (`f1e2`, `p1e5`) work in `tap`, `type`, `scroll`, `wait_for` | [agents](agents.md#troubleshooting) | | | |
-| Android patch step falls back to the full download on out-of-memory or over budget (`patchError`) | [runtime](../packages/runtime/README.md), [getting-started](getting-started.md) | | | |
 | Roll back safely with a state version (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
 | Assistant Inbox (`send_message`, `check_inbox`, `hand_off`, `{{ caller }}`) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | |
-| Patch falls back to full download on small heaps (Android, `patchError`) | [runtime](../packages/runtime/README.md#patches-on-small-heaps-android) | | | |
+| Patch falls back to full download on small heaps (Android, `patchError`) | [runtime](../packages/runtime/README.md#patches-on-small-heaps-android), [getting-started](getting-started.md) | | | |
 | Permissions detected from camera, scanner and file blocks | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
