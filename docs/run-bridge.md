@@ -23,13 +23,13 @@ CI checks this against the sample app (`packages/cli/test/run-bridge.test.ts`): 
 
 ## Actions
 
-The same channel accepts `tap`, `type`, `scroll` and `back` with the refs from the tree. `tap` and `type` reply with `delivery` and the new screen. `type` also returns the value now in the field. The frame shows what the agent did, for example "Tapped ..." or "Typing into ...".
+The same channel accepts `tap`, `type`, `scroll` and `back` with the refs from the tree. All four reply with `delivery` (`delivered`) and the new screen. `type` also returns the value now in the field. The frame shows what the agent did, for example "Tapped ..." or "Typing into ...".
 
 ## Troubleshooting
 
-- **A ref from an earlier read is rejected.** A ref lasts while its element stays in the DOM. After the page re-renders the element, read the tree again and use the new ref.
+- **A ref from an earlier read is rejected.** A ref lasts while its element stays in the DOM with the same role and name. If the element leaves the DOM, or its role or name changes, the action fails with `stale_ref` and a message to take a new snapshot. Read the tree again and use the new ref.
 - **An element is missing from the tree.** It has no role, or it is hidden by the screen rules. Give it a `role` or a native element, then read the tree again.
-- **The tree is shallower than the simulator's.** Wrapper elements without a role are left out. This is expected. Compare by role, name and state, not by nesting.
+- **The tree is shallower than the simulator's.** Wrapper elements without a role are left out. Compare by role, name and state, not by nesting.
 
 ## Next steps
 

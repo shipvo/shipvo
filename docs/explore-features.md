@@ -47,7 +47,7 @@ The file is created empty at the start and gets one line per action. Each line i
 ## Troubleshooting
 
 - **`--record-features needs a file`.** You gave the flag without a path. Add one, for example `--record-features features.jsonl`.
-- **The file is empty.** The walk took no actions, for example because the start screen has nothing to tap or type into. Open the start screen with `shipvo sim` and check it.
+- **The file is empty.** The walk took no actions, for example because the start screen has nothing to tap or type into.
 - **Two runs give different lines.** Pass the same `--seed` to repeat a walk.
 
 ## Next steps
