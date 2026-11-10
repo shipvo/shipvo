@@ -33,6 +33,7 @@ import { AppsError, DEVICE_PERMISSIONS, setPermission, exportProfile, loadProfil
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
+import { assistantName } from "./identity.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
@@ -525,8 +526,8 @@ async function act(id, body) {
     case "app_action": {
       const appId = String(body.id ?? "");
       if (!specHost.has(sidOf(s), appId)) throw new SimError("not_installed", `'${appId}' is not a spec app running on this phone`);
-      const res = specHost.call(sidOf(s), appId, String(body.action_name ?? ""), body.input && typeof body.input === "object" ? body.input : {});
-      s.apps.log.push({ at: Date.now(), name: "app_action", app: appId, action: String(body.action_name ?? ""), source: "real" });
+      const res = specHost.call(sidOf(s), appId, String(body.action_name ?? ""), body.input && typeof body.input === "object" ? body.input : {}, { caller: assistantName(body.agent) });
+      s.apps.log.push({ at: Date.now(), name: "app_action", app: appId, action: String(body.action_name ?? ""), source: "real", ...(body.agent ? { caller: assistantName(body.agent) } : {}) });
       if (s.apps.current_app === appId && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
       if (res.ok === false && /^permission_denied:/.test(res.error)) throw new SimError("permission_denied", res.error.replace(/^permission_denied:\s*/, ""));
       if (res.ok === false) throw new SimError("action_failed", res.error);
