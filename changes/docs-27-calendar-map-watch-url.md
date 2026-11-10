@@ -1,1 +1,0 @@
-- docs: new "Calendars and maps" section in the app spec guide (`calendar` and `map` blocks, options, screen tree, errors, troubleshooting), and `watch_url` on the hosted phone in the agents page. No migration.
