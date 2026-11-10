@@ -1,6 +1,6 @@
 # Test an email sign-in on Android and iOS
 
-This page is for developers and for people whose assistant tests an app that signs in by email. You will get a test or an agent run that reads the emailed code or link and finishes the sign-in on Android and iOS.
+This page is for developers and for anyone who asks an assistant to test an app that signs in by email. You will get a test or an agent run that reads the emailed code or link and finishes the sign-in on Android and iOS.
 
 Many apps sign in with a code or a link sent by email. Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
 
