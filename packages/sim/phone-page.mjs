@@ -21,11 +21,11 @@ function draw(){box.innerHTML=installedIconsHtml(st);if(!sc.hidden)rows.innerHTM
 var a=st.where==="app"&&st.installed_apps.filter(function(x){return x.id===st.current_app})[0];
 opened.hidden=!a;opened.textContent=a?a.name+" is open":""}
 function pull(){return fetch("/phone/apps?session="+encodeURIComponent(SESSION)).then(function(x){return x.json()}).then(function(j){
-if(!j.ok){say(j.error||"No such session",true);return}if(msg.className.indexOf("err")>-1)say("");st=j;draw()}).catch(function(){say("The simulator is not reachable",true)})}
+if(!j.ok){say(j.code==="no_session"?"No such session":(j.error||"Failed"),true);return}if(msg.className.indexOf("err")>-1)say("");st=j;draw()}).catch(function(){say("The simulator is not reachable",true)})}
 function act(body){body.session=SESSION;return fetch("/act",{method:"POST",body:JSON.stringify(body)}).then(function(x){return x.json()}).then(function(j){if(!j.ok)say(j.error||"Failed",true);else say("");return pull()})}
 r.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
 if(t.closest('[data-part="store-icon"]')){sc.hidden=false;draw();sc.focus({preventScroll:true});return}
-if(t.closest('[data-part="store-close"]')){sc.hidden=true;return}
+if(t.closest('[data-part="store-close"]')){sc.hidden=true;var si=q("store-icon");if(si)si.focus();return}
 var i=t.closest('[data-part="store-install"]');if(i){act({action:"install_app",id:i.getAttribute("data-app")});return}
 var a=t.closest('[data-part="installed-app"]');if(a){act({action:"switch_app",id:a.getAttribute("data-app")})}});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!sc.hidden)sc.hidden=true});
