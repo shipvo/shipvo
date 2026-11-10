@@ -61,7 +61,7 @@ The sample app shows each result. Deny the camera and the app shows what it does
 
 ## See what an AI agent sees
 
-Open **Agent tools**. It has a small console with four tools: `screen`, `tap`, `type` and `device_log`. `screen` returns the app as labelled elements, such as `button "Add to cart"`. `tap` and `type` act on those labels. You can run them by hand, or press **Watch Lumi** to see a test run on the sample app, on Android and iOS.
+Open **Agent tools**. It has a small console with four tools: `screen`, `tap`, `type` and `device_log`. `screen` returns the app as labelled elements, such as `button "Add to cart"`. `tap` and `type` act on those elements by ref. You can run them by hand, or press **Watch Lumi** to see a test run on the sample app, on Android and iOS.
 
 This is the same view an assistant gets over MCP when it tests your own app. If you have not met MCP, start with [what MCP is and why your app might speak it](/blog/what-mcp-is-and-why-your-app-might-speak-it/). The console is a browser version of the tools in the [agents docs](/docs/agents/).
 
