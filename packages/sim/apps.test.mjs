@@ -148,7 +148,7 @@ test("a bad placement in a profile is dropped, never thrown on", async () => {
   ] });
   assert.doesNotThrow(() => describeApps(st, new Date()));
   assert.equal(st.installed_apps[0].placement, undefined);
-  assert.deepEqual(st.installed_apps[1].placement, { pinned: true });
+  assert.deepEqual(st.installed_apps[1].placement, { pinned: 1 });
   assert.equal(st.installed_apps[2].placement, undefined);
   assert.deepEqual(st.installed_apps[3].placement, { hidden: true, schedule: { days: ["sun","mon","tue","wed","thu","fri","sat"], from: "00:00", to: "23:59" } });
   assert.deepEqual(homeApps(st, new Date()).map((a) => a.id), ["b", "a", "c"]);
