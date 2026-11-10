@@ -1,0 +1,2 @@
+- `@shipvo/spec`: new `saveFile` step (needs the `files` device permission) saves text as a named file. `content` is required and `mime` defaults to `text/plain`. `app.files` lists saved files.
+- Migration: none; new step and `App.files` property.

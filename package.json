@@ -3,7 +3,8 @@
   "private": true,
   "packageManager": "pnpm@10.28.0",
   "scripts": {
-    "test": "pnpm -r test",
+    "test": "node --test scripts/sbom.test.mjs && pnpm -r test",
+    "sbom": "node scripts/sbom.mjs --out dist-sbom",
     "build": "pnpm -r build"
   },
   "license": "Apache-2.0",

@@ -701,7 +701,7 @@ async function act(id, body) {
     // Webhook wake-ups: POST a signed note to a URL when something new arrives for an assistant name. Every delivery is in device_log.
     case "register_wakeup": {
       s.wakeups ??= createWakeups(() => specHost.dataOf(sidOf(s), "inbox"), (e) => { (s.wakeLog ??= []).push({ at: Date.now(), ...e }); if (s.wakeLog.length > 200) s.wakeLog.splice(0, s.wakeLog.length - 200); });
-      try { return { wakeup: await s.wakeups.register({ name: body.name, url: body.url, events: body.events, secret: body.secret, allowPrivate: body.allow_private === true }) }; }
+      try { return { wakeup: await s.wakeups.register({ name: body.name, url: body.url, events: body.events, secret: body.secret, format: body.format, allowPrivate: body.allow_private === true }) }; }
       catch (e) { if (e instanceof WakeupError) throw new SimError(e.code, e.message); throw e; }
     }
     case "list_wakeups": return { wakeups: s.wakeups?.list() ?? [] };

@@ -10,4 +10,4 @@ export type { ScreenNode, PhoneStyle, RenderOptions, RenderResult } from "./rend
 export { toolsFromSpec } from "./tools.js";
 export type { SpecTool, ToolsFromSpecOptions } from "./tools.js";
 export { createApp, checkField, actionDeviceNeeds } from "./app.js";
-export type { App, PressResult, CreateAppOptions, CallContext } from "./app.js";
+export type { App, SavedFile, PressResult, CreateAppOptions, CallContext } from "./app.js";
