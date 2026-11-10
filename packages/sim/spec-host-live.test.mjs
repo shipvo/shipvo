@@ -204,27 +204,21 @@ for (const style of ["android", "ios"]) {
 }
 
 for (const style of ["android", "ios"]) {
-  test(`${style}: Contacts, Messages and Clock install and keep their data`, async () => {
-    const spec = (n) => JSON.parse(readFileSync(new URL(`../../templates/${n}/app.json`, import.meta.url), "utf8"));
-    const sid = `sp-sys-${style}`;
+  test(`${style}: search_phone finds text in app data, can be narrowed to one app, and rejects bad input`, async () => {
+    const INBOX = JSON.parse(readFileSync(new URL("../../templates/assistant-inbox/app.json", import.meta.url), "utf8"));
+    const sid = `sp-search-${style}`;
     assert.ok((await call("/session", { session: sid, skin: style })).ok);
-    for (const id of ["contacts", "messages", "clock"]) assert.equal((await act(sid, { action: "create_app", id, spec: spec(id), style })).ok, true, id);
-    const run = (id, action_name, input = {}, agent) => act(sid, { action: "app_action", id, action_name, input, ...(agent ? { agent } : {}) });
-    await run("contacts", "add_contact", { name: "Ada Obi", phone: "+237 650 000 111" });
-    assert.deepEqual((await run("contacts", "find_contacts", { text: "ada" })).value.contacts.map((c) => c.name), ["Ada Obi"]);
-    await run("messages", "receive_text", { from: "Ada Obi", body: "Friday at nine?" });
-    await run("messages", "send_text", { to: "Ada Obi", body: "Yes" });
-    const conv = (await run("messages", "list_conversations")).value.threads;
-    assert.deepEqual(conv.map((t) => [t.with, t.last, t.unread]), [["Ada Obi", "Yes", 1]]);
-    assert.equal((await run("messages", "read_conversation", { with: "Ada Obi" })).value.texts.length, 2);
-    assert.equal((await run("messages", "list_conversations")).value.threads[0].unread, 0);
-    assert.equal((await run("clock", "add_alarm", { time: "06:45", label: "Boat" })).value.added, true);
-    assert.equal((await run("clock", "add_alarm", { time: "6:45" })).value.added, false);
-    assert.deepEqual((await run("clock", "list_alarms")).value.alarms.map((a) => [a.time, a.on]), [["06:45", true]]);
-    // the data is on the phone: a restart keeps it
-    await act(sid, { action: "restart" });
-    assert.deepEqual((await run("contacts", "find_contacts", {})).value.contacts.map((c) => c.name), ["Ada Obi"]);
-    assert.equal((await run("clock", "list_alarms")).value.alarms.length, 1);
+    assert.equal((await act(sid, { action: "create_app", id: "inbox", spec: INBOX, style })).ok, true);
+    await act(sid, { action: "app_action", id: "inbox", action_name: "send_message", input: { to: "claude", body: "Order the Marigold lamps" }, agent: "claude-ai" });
+    const hit = await act(sid, { action: "search_phone", query: "marigold" });
+    assert.equal(hit.ok, true, JSON.stringify(hit).slice(0, 300));
+    assert.equal(hit.count, 1); assert.equal(hit.results[0].app, "inbox"); assert.equal(hit.results[0].kind, "row");
+    assert.match(hit.results[0].snippet, /Marigold lamps/);
+    assert.equal((await act(sid, { action: "search_phone", query: "marigold", app: "inbox" })).count, 1);
+    assert.equal((await act(sid, { action: "search_phone", query: "marigold", app: "notifications" })).count, 0);
+    assert.equal((await act(sid, { action: "search_phone", query: "zzz-none" })).count, 0);
+    assert.equal((await act(sid, { action: "search_phone", query: "" })).code, "bad_query");
+    assert.equal((await act(sid, { action: "search_phone", query: "x", app: "nope" })).code, "not_installed");
   });
 }
 
@@ -448,3 +442,28 @@ test("import_apps does not warn about a valid hand-written layout, and names eac
   const str = await act("pl-h", { action: "import_apps", replace: true, apps: [app("pinned")] });
   assert.deepEqual(str.warnings, ["apps[0].placement: not valid, ignored (expected an object)"]);
 });
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: Contacts, Messages and Clock install and keep their data`, async () => {
+    const spec = (n) => JSON.parse(readFileSync(new URL(`../../templates/${n}/app.json`, import.meta.url), "utf8"));
+    const sid = `sp-sys-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    for (const id of ["contacts", "messages", "clock"]) assert.equal((await act(sid, { action: "create_app", id, spec: spec(id), style })).ok, true, id);
+    const run = (id, action_name, input = {}, agent) => act(sid, { action: "app_action", id, action_name, input, ...(agent ? { agent } : {}) });
+    await run("contacts", "add_contact", { name: "Ada Obi", phone: "+237 650 000 111" });
+    assert.deepEqual((await run("contacts", "find_contacts", { text: "ada" })).value.contacts.map((c) => c.name), ["Ada Obi"]);
+    await run("messages", "receive_text", { from: "Ada Obi", body: "Friday at nine?" });
+    await run("messages", "send_text", { to: "Ada Obi", body: "Yes" });
+    const conv = (await run("messages", "list_conversations")).value.threads;
+    assert.deepEqual(conv.map((t) => [t.with, t.last, t.unread]), [["Ada Obi", "Yes", 1]]);
+    assert.equal((await run("messages", "read_conversation", { with: "Ada Obi" })).value.texts.length, 2);
+    assert.equal((await run("messages", "list_conversations")).value.threads[0].unread, 0);
+    assert.equal((await run("clock", "add_alarm", { time: "06:45", label: "Boat" })).value.added, true);
+    assert.equal((await run("clock", "add_alarm", { time: "6:45" })).value.added, false);
+    assert.deepEqual((await run("clock", "list_alarms")).value.alarms.map((a) => [a.time, a.on]), [["06:45", true]]);
+    // the data is on the phone: a restart keeps it
+    await act(sid, { action: "restart" });
+    assert.deepEqual((await run("contacts", "find_contacts", {})).value.contacts.map((c) => c.name), ["Ada Obi"]);
+    assert.equal((await run("clock", "list_alarms")).value.alarms.length, 1);
+  });
+}

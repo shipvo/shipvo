@@ -28,3 +28,4 @@ dist-test-*
 # downloaded music beds (never commit audio)
 /music/
 *.mp3
+dist-sbom

@@ -2,6 +2,7 @@
 // Every query is keyed by the signed-in person's id, taken from the session and never from the request.
 import { Hono } from "hono";
 import { personId, sha256, type PeopleEnv } from "./people";
+import { getLimit, setLimit, spentThisMonth } from "./spend";
 
 export type PhoneEnv = PeopleEnv & { PHONE_APP_DATA_MAX_BYTES?: string; PHONE_CONSENT_URL?: string };
 export const CARD_TTL_MS = 15 * 60_000;
@@ -55,6 +56,28 @@ export function phoneRoutes() {
   });
 
   const installed = (c: any, me: number, app: string) => c.env.DB.prepare("SELECT 1 FROM phone_apps WHERE person_id = ? AND app_id = ?").bind(me, app).first();
+
+  /** Spend limit for one app. Only the signed-in person: an assistant token is refused with 403. */
+  const limitView = async (c: any, me: number, app: string) => ({ spend_limit: await getLimit(c.env, me, app), spent: await spentThisMonth(c.env, me, app) });
+  const limitAuth = async (c: any) => {
+    if (await assistantPersonId(c) !== null) return c.json({ error: "forbidden", message: "The person sets spend limits, not the assistant." }, 403);
+    const me = await personId(c); if (me === null) return c.json({ error: "unauthorized" }, 401);
+    const app = c.req.param("app");
+    if (!ID.test(app) || !(await installed(c, me, app))) return c.json({ error: "not_found" }, 404);
+    return { me, app };
+  };
+  r.get("/apps/:app/spend-limit", async (c) => {
+    const a = await limitAuth(c); if (a instanceof Response) return a;
+    return c.json(await limitView(c, a.me, a.app), 200, noStore);
+  });
+  r.put("/apps/:app/spend-limit", async (c) => {
+    const a = await limitAuth(c); if (a instanceof Response) return a;
+    const b = (await c.req.json().catch(() => null)) as { amount?: unknown; currency?: unknown; period?: unknown } | null;
+    if (!b || !Number.isInteger(b.amount) || (b.amount as number) < 0 || typeof b.currency !== "string" || !/^[A-Z]{3}$/.test(b.currency) || (b.period !== undefined && b.period !== "month"))
+      return c.json({ error: "bad_request", message: "amount is a whole number of minor units, currency is a 3-letter code, period is month" }, 400);
+    await setLimit(c.env, a.me, a.app, { amount: b.amount as number, currency: b.currency });
+    return c.json(await limitView(c, a.me, a.app), 200, noStore);
+  });
 
   r.get("/apps/:app/data/:key", async (c) => {
     const me = await personId(c as any); if (me === null) return c.json({ error: "unauthorized" }, 401);
