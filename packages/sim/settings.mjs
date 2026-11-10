@@ -46,7 +46,29 @@ export function describeSettings(values) {
 
 /** Markup for the Settings screen. Hidden until opened. The rows are drawn by the client script. */
 export function settingsHtml() {
-  return `<div class="sf-settings" data-part="settings-screen" role="dialog" aria-label="Settings" tabindex="-1" hidden><h2 class="sf-sh">Settings</h2><div data-part="settings-rows" role="group" aria-label="Settings"></div><button type="button" class="sf-close" data-part="settings-close">Close</button></div>`;
+  return `<div class="sf-settings" data-part="settings-screen" role="dialog" aria-label="Settings" tabindex="-1" hidden><h2 class="sf-sh">Settings</h2><div data-part="settings-rows" role="group" aria-label="Settings"></div><button type="button" class="sf-srow" data-part="settings-secrets">Secrets</button><button type="button" class="sf-close" data-part="settings-close">Close</button></div>`
+    + `<div class="sf-settings" data-part="secrets-screen" role="dialog" aria-label="Secrets" tabindex="-1" hidden><h2 class="sf-sh">Secrets</h2><div data-part="secrets-rows" role="list" aria-label="Saved keys"></div><button type="button" class="sf-close" data-part="secrets-back">Back</button></div>`;
+}
+
+/** Markup for the saved-keys list. Shows only app, name, domain, access and last used, so a key value can never reach the page. Empty list gives the empty state. Self-contained: the client script embeds it. */
+export function secretRowsHtml(keys) {
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  if (!Array.isArray(keys) || !keys.length) return `<p class="sf-empty" data-part="secrets-empty">No saved keys yet. Keys you save for apps on this phone show up here.</p>`;
+  return keys.map((k) => `<div class="sf-krow" role="listitem" data-part="secret-row"><b data-field="name">${esc(k.name)}</b><span data-field="app">App: ${esc(k.app)}</span><span data-field="domain">Domain: ${esc(k.domain)}</span><span data-field="access">Access: ${esc(k.access)}</span><span data-field="last_used_at">Last used: ${k.last_used_at ? esc(k.last_used_at) : "never"}</span></div>`).join("");
+}
+
+/** Loads the saved keys of each app through /vault-ui/keys. Returns metadata rows only. A failed app is skipped. */
+export async function loadSecrets(fetchFn, appIds) {
+  const out = [];
+  for (const id of appIds) {
+    try {
+      const r = await fetchFn(`/vault-ui/keys?app=${encodeURIComponent(id)}`);
+      if (!r.ok) continue;
+      const j = await r.json();
+      for (const k of Array.isArray(j.keys) ? j.keys : []) out.push({ app: k.app, name: k.name, domain: k.domain, access: k.access, last_used_at: k.last_used_at ?? null });
+    } catch {}
+  }
+  return out;
 }
 /** The Settings icon for the home screen. */
 export function settingsIconHtml() {
@@ -61,6 +83,7 @@ export const settingsCss = [
   `.sf-settings{position:absolute;inset:0;z-index:8;overflow:auto;padding:48px 14px 14px;background:#10151c;color:#fff;font:15px system-ui,sans-serif}.sf-settings[hidden]{display:none}.sf-sh{margin:0 0 12px;font-size:22px}`,
   `.sf-srow{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;box-sizing:border-box;margin:6px 0;padding:12px;border:0;border-radius:14px;background:#2c3036;color:#fff;font:inherit;text-align:start}.sf-srow[role=switch]::after{content:"Off";opacity:.7}.sf-srow[aria-checked=true]::after{content:"On";color:#4da3ff;font-weight:700}`,
   `.sf-group2{margin:6px 0;padding:8px 12px;border-radius:14px;background:#2c3036}.sf-group2 b{display:block;margin-bottom:6px}.sf-opts{display:flex;flex-wrap:wrap;gap:6px}.sf-opt{padding:8px 12px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff;font:inherit}.sf-opt[aria-checked=true]{background:#4da3ff;color:#001;border-color:#4da3ff}`,
+  `.sf-krow{display:flex;flex-direction:column;gap:2px;margin:6px 0;padding:12px;border-radius:14px;background:#2c3036}.sf-krow span{opacity:.8;font-size:13px}.sf-empty{margin:12px 0;opacity:.8}[data-skin="ios"] .sf-krow{border-radius:10px;background:#1c1c1e}`,
   `.sf-gear{margin:0 8px 8px 0;padding:8px 16px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff}`,
   `.sf-settings :focus-visible,.sf-gear:focus-visible{outline:3px solid #4da3ff;outline-offset:2px}`,
 ].join("\n");
@@ -68,7 +91,7 @@ export const settingsCss = [
 /** Browser script for the frame page: opens Settings from the home icon or the shade gear, draws the rows, and writes changes to the app's `__pnDevice`. */
 export function settingsClientScript(iframeId = "app") {
   return `(function(){
-var SETTINGS=${JSON.stringify(SETTINGS)},SETTING_KEYS=${JSON.stringify(SETTING_KEYS)},LANGS=${JSON.stringify(LANGUAGES)},FONT=${JSON.stringify(FONT_SIZES)},settingPatch=${settingPatch.toString()},readSettings=${readSettings.toString()};
+var SETTINGS=${JSON.stringify(SETTINGS)},SETTING_KEYS=${JSON.stringify(SETTING_KEYS)},LANGS=${JSON.stringify(LANGUAGES)},FONT=${JSON.stringify(FONT_SIZES)},settingPatch=${settingPatch.toString()},secretRowsHtml=${secretRowsHtml.toString()},loadSecrets=${loadSecrets.toString()},readSettings=${readSettings.toString()};
 function SettingsError(c,m){var e=new Error(m);e.code=c;return e}
 var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
 var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("settings-screen");if(!sc)return;
@@ -81,11 +104,17 @@ if(s.kind==="boolean")h+='<button type="button" class="sf-srow" role="switch" da
 else{h+='<div class="sf-group2" role="radiogroup" aria-label="'+esc(s.label)+'"><b>'+esc(s.label)+'</b><div class="sf-opts">'+s.values.map(function(o){return '<button type="button" class="sf-opt" role="radio" data-setting="'+k+'" data-value="'+o+'" aria-checked="'+(v[k]===o)+'">'+esc(k==="language"?LANGS[o]:SIZE[o])+'</button>'}).join("")+'</div></div>'}});
 var keep=document.activeElement&&document.activeElement.getAttribute&&document.activeElement.getAttribute("data-setting"),kv=document.activeElement&&document.activeElement.getAttribute&&document.activeElement.getAttribute("data-value");
 rows.innerHTML=h;if(keep){var again=rows.querySelector('[data-setting="'+keep+'"]'+(kv?'[data-value="'+kv+'"]':''));if(again)again.focus({preventScroll:true})}}
+var sec=q("secrets-screen");
+function openSecrets(){if(!sec)return;sec.hidden=false;sc.hidden=true;var rows=q("secrets-rows");rows.innerHTML=secretRowsHtml([]);
+var ids=[].map.call(r.querySelectorAll('[data-part="installed-app"]'),function(b){return b.getAttribute("data-app")});
+loadSecrets(function(u){return fetch(u,{credentials:"same-origin"})},ids).then(function(k){rows.innerHTML=secretRowsHtml(k)});sec.focus({preventScroll:true})}
 var back=null;
 function show(on){if(on){back=document.activeElement;sc.hidden=false;draw();sc.focus({preventScroll:true});try{window.parent.postMessage({type:"pn:settings-open",open:true},"*")}catch(x){}}else{sc.hidden=true;if(back&&back.focus)back.focus({preventScroll:true});back=null}}
 r.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
 if(t.closest('[data-part="settings-icon"],[data-part="settings-gear"]')){show(true);return}
 if(t.closest('[data-part="settings-close"]')){show(false);return}
+if(t.closest('[data-part="settings-secrets"]')){openSecrets();return}
+if(t.closest('[data-part="secrets-back"]')){sec.hidden=true;sc.hidden=false;draw();return}
 var row=t.closest("[data-setting]");if(row){var d=dev();if(!d)return;var k=row.getAttribute("data-setting"),s=SETTINGS[k],val=s.kind==="boolean"?row.getAttribute("aria-checked")!=="true":row.getAttribute("data-value");
 try{d.set(settingPatch(k,val))}catch(x){}draw()}});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!sc.hidden)show(false)});
