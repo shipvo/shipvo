@@ -386,6 +386,12 @@ use(server, tools.push_notification,
     if (r.ok && r.delivered === false) return result(session, { ...r, screen: `Not delivered: notification permission is not granted (use set_device permissions.notifications).\n\n${r.screen ?? ""}` });
     return result(session, r);
   });
+use(server, tools.inbox_wait,
+  async ({ session, subject, from, timeout_ms }) => { need(session); const r = await act({ session, action: "inbox_wait", subject, from, timeout_ms }) as Act & { address?: string; message?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ address: r.address, message: r.message }, null, 2)); });
+use(server, tools.inbox_read,
+  async ({ session, subject, from }) => { need(session); const r = await act({ session, action: "inbox_read", subject, from }) as Act & { address?: string; messages?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ address: r.address, messages: r.messages }, null, 2)); });
+use(server, tools.inbox_clear,
+  async ({ session }) => { need(session); const r = await act({ session, action: "inbox_clear" }) as Act & { cleared?: number }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cleared: r.cleared })); });
 use(server, tools.notifications, 
   async ({ session }) => { need(session); const r = await act({ session, action: "notifications" }) as Act & { notifications?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.notifications ?? [], null, 2)); });
 use(server, tools.open_notification, 

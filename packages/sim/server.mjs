@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { openBuild } from "./build-open.mjs";
 import { parseMockRules } from "./mock-rules.mjs";
+import { createInbox, InboxError, INBOX_DOMAIN } from "./inbox.mjs";
 import { applyProfile, getProfile } from "./network-profiles.mjs";
 import { installNetGate } from "./net-gate.mjs";
 import { pushNotification } from "./push-notification.mjs";
@@ -150,12 +151,12 @@ async function endSession(id) {
   specHost.dropSession(id);
   for (const p of s.peers ?? []) p.close(); closeWatchers(s);
   await (await s.browserP?.catch(() => undefined))?.close(); await s.ctx.close().catch(() => {});
-  sessions.delete(id); leaveRoom(s, id); return true;
+  s.inbox?.close(); sessions.delete(id); leaveRoom(s, id); return true;
 }
 async function newSession(id, opts = {}) {
   const room = opts.room == null ? undefined : String(opts.room);
   if (room !== undefined && !/^[\w-]{1,64}$/.test(room)) throw new SimError("bad_room", "room must be 1 to 64 letters, digits, _ or -");
-  if (sessions.has(id)) { specHost.dropSession(id); const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); sessions.delete(id); leaveRoom(old, id); }
+  if (sessions.has(id)) { specHost.dropSession(id); const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); old.inbox?.close(); sessions.delete(id); leaveRoom(old, id); }
   let target, buildId;
   if (opts.build_url != null) {
     // Fetch the build before anything else is created, so a bad URL leaves no session behind.
@@ -203,7 +204,8 @@ async function newSession(id, opts = {}) {
   const patch = profilePatch(apps);
   if (Object.keys(patch).length) { await page.evaluate((p) => globalThis.__pnDevice?.set?.(p), patch); await syncMedia(page); }
   if (apps.network) { try { getProfile(apps.network); } catch (e) { await ctx.close(); throw new SimError("bad_profile", `phone.json: ${e.message}`); } }
-  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, room, skin: opts.skin === "ios" ? "ios" : "android", startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav() });
+  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, room, skin: opts.skin === "ios" ? "ios" : "android", startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav(), inbox: createInbox() });
+  await ensureNetworkRoute(sessions.get(id), page);   // the mail sink answers from the first page load
   if (buildId) sessions.get(id).build = buildId;
   if (apps.network && apps.network !== "online") await setNetworkProfile(sessions.get(id), page, apps.network);
   watch.refresh();   // /watch viewers move to the new session unless they picked one
@@ -291,8 +293,10 @@ async function ensureNetworkRoute(s, page) {
     const req = route.request();
     const type = req.resourceType();
     if (type !== "fetch" && type !== "xhr") return route.fallback();
+    if (req.url().startsWith(`https://${INBOX_DOMAIN}/send`)) return deliverSink(s, req, route);
     const rule = (s.mocks ?? []).find((m) => (!m.method || m.method === req.method()) && m.match(req.url()));
     if (rule) {
+      if (rule.mail) s.inbox?.deliver(rule.mail);
       if (rule.delayMs) await new Promise((r) => setTimeout(r, rule.delayMs));
       // The app page may come from another origin, so the stub must pass the browser's CORS check.
       return route.fulfill({ status: rule.status, body: rule.body, headers: { "access-control-allow-origin": "*", ...rule.headers } }).catch(() => {});
@@ -303,6 +307,17 @@ async function ensureNetworkRoute(s, page) {
       await route.fulfill({ response: res }).catch(() => {});
     } catch { await route.abort("internetdisconnected").catch(() => {}); }
   });
+}
+
+// The app's outgoing mail: POST https://inbox.shipvo.test/send with JSON { to, from, subject, text }. Only the session's own
+// address is delivered to; any other address gets 550 and nothing is kept.
+async function deliverSink(s, req, route) {
+  const reply = (status, o) => route.fulfill({ status, body: JSON.stringify(o), headers: { "content-type": "application/json", "access-control-allow-origin": "*" } }).catch(() => {});
+  if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "POST" } }).catch(() => {});
+  let m; try { m = JSON.parse(req.postData() ?? ""); } catch { return reply(400, { ok: false, error: "send needs a JSON body { to, from, subject, text }" }); }
+  if (!m || typeof m !== "object" || String(m.to ?? "").trim().toLowerCase() !== s.inbox.address) return reply(550, { ok: false, error: "no such mailbox" });
+  s.inbox.deliver(m);
+  return reply(202, { ok: true });
 }
 
 // Set the session's network profile. Throws unknown_profile for a bad name. Logged in device_log as simulated.
@@ -664,6 +679,15 @@ async function act(id, body) {
       await ensureNetworkRoute(s, page);
       break;
     }
+    // The session's private inbox. Reads change nothing.
+    case "inbox_read": return { address: s.inbox.address, messages: s.inbox.read({ subject: body.subject, from: body.from }) };
+    case "inbox_wait": {
+      const ms = body.timeout_ms == null ? 10000 : Number(body.timeout_ms);
+      if (!Number.isFinite(ms) || ms < 0 || ms > 25000) throw new SimError("bad_timeout", "timeout_ms must be a number from 0 to 25000");
+      try { return { address: s.inbox.address, message: await s.inbox.wait({ subject: body.subject, from: body.from }, ms) }; }
+      catch (e) { if (e instanceof InboxError) throw new SimError(e.code, e.message); throw e; }
+    }
+    case "inbox_clear": return { address: s.inbox.address, cleared: s.inbox.clear() };
     case "set_network_profile": { await setNetworkProfile(s, page, body.profile); break; }
     case "get_network_profile": return { profile: s.netProfile ?? "online", screen: await screen(page) };
     // The phone's Chromium (isolated from the app page). Page text is untrusted: results carry source "web".
@@ -719,7 +743,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
