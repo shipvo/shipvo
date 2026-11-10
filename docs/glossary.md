@@ -147,7 +147,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Element ref.** A short label such as `e12` that the simulator gives each button or field on screen so an assistant can tap it. After a restart the labels carry a prefix (`f1e2`), and an old label gives a `stale_ref` message that tells the assistant to read the screen again. See [agents](agents.md).
 
-**Capacitor.** A way to wrap a web app as an Android and iOS app. Shipvo can open a Capacitor project in the simulator and send it updates. See [Capacitor](capacitor.md).
+**Capacitor.** A way to wrap a web app as an Android and iOS app. Shipvo opens a Capacitor project in the simulator on the Android and iOS skins and builds signed `.aab` and `.ipa` files from your own GitHub Actions. See [Capacitor](capacitor.md).
 
 **Gallery (of specs).** Ready-made example app specs, such as a habit tracker or a trip checklist, that you can copy and change. See [App spec](spec-blocks.md#example-specs).
 

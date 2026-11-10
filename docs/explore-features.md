@@ -45,7 +45,7 @@ Each line holds roles, counts, types and hashes. It never holds app text, label 
 
 ## Troubleshooting
 
-- **No file appears.** The flag needs a file name after it. Check that the run reached the end and that the folder exists.
+- **No file appears.** The flag needs a file name after it, and the folder must exist. The file is created when the run starts, so an empty file means the walker took no actions.
 - **Two runs differ.** Use the same `--seed` and the same app to repeat a walk.
 - **You expected label text.** Lines hold hashes only, so app text never leaves your machine.
 
