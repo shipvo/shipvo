@@ -916,6 +916,41 @@
     }
   },
   {
+    "name": "hide_app",
+    "description": "Hide an installed app from the home screen and the app list, or show it again with hidden: false. The app keeps its data and still opens with switch_app and run_app_action. Works for Store apps and apps made with create_app, and survives update_app. Fails with not_installed. Logged in device_log.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "Installed app id"
+        },
+        "hidden": {
+          "type": "boolean",
+          "description": "true to hide, false to show"
+        }
+      },
+      "required": [
+        "session",
+        "id",
+        "hidden"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "import_phone_apps",
     "description": "Put apps from export_phone_apps on this phone, with their data and settings. Every spec is checked first: all problems come back with their path (for example apps[1].spec.screens) and nothing is installed unless all are valid. An id that is already installed fails with already_installed unless replace is true. Android and iOS styles are kept. Fails with invalid_spec or already_installed.",
     "inputSchema": {
@@ -1434,6 +1469,41 @@
     },
     "annotations": {
       "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "pin_app",
+    "description": "Pin an installed app to the top of the home screen (Android and iOS style), after any apps pinned before it, or unpin it with pinned: false. Works for Store apps and apps made with create_app, and survives update_app. Fails with not_installed. Logged in device_log.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "Installed app id"
+        },
+        "pinned": {
+          "type": "boolean",
+          "description": "true to pin, false to unpin"
+        }
+      },
+      "required": [
+        "session",
+        "id",
+        "pinned"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
       "destructiveHint": false
     },
     "execution": {
