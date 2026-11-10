@@ -1,0 +1,2 @@
+- `@shipvo/spec`: new `parseCsv(text)` expression function reads CSV text into a list of maps keyed by the header row, so apps can import what `csv()` exports.
+- Migration: none; new function.
