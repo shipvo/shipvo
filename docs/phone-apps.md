@@ -234,6 +234,20 @@ When the Assistant Inbox is installed, every phone tool result for a session sta
 
 Call `wait_for_event` to listen for the next message or task. It returns as soon as a message or task you have not been told about yet is waiting for you, or says `nothing yet` after up to 25 seconds (`timeout_ms` sets a shorter wait). The result lists the new message and task ids. Read them with `check_inbox` or `my_tasks`, act on them, and call `wait_for_event` again: anything already returned does not wake you a second time, so a task you are still working on does not end the wait. Use it inside a turn to hold a live back-and-forth, or when a task says "wait for the reviewer's answer". It works the same on the Android and iOS phone.
 
+### Waking an assistant that is not in a turn
+
+Give an assistant a URL and the phone calls it when something new arrives. Call `register_wakeup` with `name` (`claude`, `chatgpt`, ...) and `url`. From then on, every new message or task for that name sends one POST to the URL. Use `events` to pick `message`, `task` or both, and `list_wakeups` and `clear_wakeup` to see and stop them.
+
+The body is small JSON, for example `{"to":"claude","event":"message","summary":"1 new message for claude on the phone","messages":["m3"],"tasks":[],"at":"..."}`. It never contains the message text: the woken assistant reads that with `check_inbox`. Each call carries `x-shipvo-signature: t=<unix seconds>,v1=<hex>`, where `v1` is the HMAC-SHA256 of `"<t>.<body>"` with your secret. Leave `secret` out and the phone generates one and returns it once. A call that fails is retried twice, and every delivery, with its status and the number of tries, is in `device_log`. Private and local addresses are refused unless you pass `allow_private: true` for a service you run yourself. Anything already waiting when you register does not wake the assistant; only later arrivals do.
+
+Which mechanism fits which assistant:
+
+| You want | Use |
+| --- | --- |
+| An assistant that calls any phone tool to see what is waiting | The `Inbox:` line at the start of every tool result |
+| An assistant in the middle of a turn to listen for the other one | `wait_for_event` |
+| An assistant outside a turn to start work when a message arrives | `register_wakeup` with a URL that starts it |
+
 ### Things to do with two assistants on one phone
 
 - **Research, review, synthesize.** Tell ChatGPT: "Research this topic, then `share_report` your findings to Claude." Tell Claude: "Read your reports with `get_reports`, share a review of any gaps, then share a final synthesis." Reports carry a kind (`research`, `review`, `synthesis`) and an author, and the Reports tab lists them.
