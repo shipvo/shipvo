@@ -157,6 +157,16 @@ const need = (_sid: string) => {};
 
 // Register a tool from the shared registry (@shipvo/mcp-tools): name, description, schema and hints come from there.
 const keyRefusal = () => ({ content: [{ type: "text" as const, text: KEY_REFUSAL }], isError: true as const, structuredContent: { ok: false, code: KEY_IN_INPUT, error: KEY_REFUSAL } });
+/** Starts the first text of a tool result with the pending line for the calling assistant ("Inbox: 2 unread for chatgpt, 1 task open"). Nothing is added when nothing waits, the call has no session, or the simulator cannot say. */
+async function withBanner(out: unknown, sid: unknown, agent: string | undefined): Promise<unknown> {
+  const first = (out as { content?: { type?: string; text?: string }[] } | undefined)?.content?.[0];
+  if (typeof sid !== "string" || !sid || first?.type !== "text" || typeof first.text !== "string") return out;
+  let banner = "";
+  try { const r = await sim("/act", { session: sid, action: "pending_banner", ...(agent ? { agent } : {}) }) as Act & { banner?: unknown }; if (r.ok && typeof r.banner === "string") banner = r.banner; } catch { /* the banner is a courtesy: never fail the call for it */ }
+  if (!banner) return out;
+  const content = [{ ...first, text: `${banner}\n${first.text}` }, ...(out as { content: unknown[] }).content.slice(1)];
+  return { ...(out as object), content };
+}
 const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: ToolCallback<S>) => {
   const guarded = async (args: unknown, extra: unknown) => {
     const trace = traceFromMeta((extra as { _meta?: unknown } | undefined)?._meta);
@@ -164,12 +174,13 @@ const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: Tool
     const sid = (args as { session?: unknown } | undefined)?.session;
     const log = typeof sid === "string" ? callLog.get(sid) : undefined;
     if (log) { log.push(entry()); if (log.length > 1000) log.splice(0, log.length - 1000); }
-    const out = inputHasKey(args) ? keyRefusal() : await caller.run(server.server.getClientVersion()?.name, () => (cb as (a: unknown, e: unknown) => unknown)(args, extra));
+    let out: unknown = inputHasKey(args) ? keyRefusal() : await caller.run(server.server.getClientVersion()?.name, () => (cb as (a: unknown, e: unknown) => unknown)(args, extra));
     if (t.name === "open_app") {
       // The session id is only known once the call returns.
       const opened = /^session: (\S+)/.exec((out as { content?: { text?: string }[] })?.content?.[0]?.text ?? "")?.[1];
       if (opened && sessions.has(opened)) callLog.set(opened, [entry()]);
     }
+    out = await withBanner(out, sid, server.server.getClientVersion()?.name);
     return trace && out && typeof out === "object" ? { ...out, _meta: { ...((out as { _meta?: object })._meta ?? {}), traceparent: trace.traceparent } } : out;
   };
   return server.tool(t.name, t.description, t.input, t.annotations, guarded as unknown as ToolCallback<S>);

@@ -121,6 +121,20 @@ test("two assistants on one phone are told apart by the client name, with no nam
   assert.deepEqual(got.value.messages.map((m) => [m.from, m.to, m.body]), [["chatgpt", "claude", "Please test checkout."]]);
 });
 
+for (const style of ["android", "ios"]) {
+  test(`${style}: pending_banner tells each assistant what waits for it`, async () => {
+    const INBOX = JSON.parse(readFileSync(new URL("../../templates/assistant-inbox/app.json", import.meta.url), "utf8"));
+    const sid = `sp-banner-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "inbox", spec: INBOX, style })).ok, true);
+    assert.equal((await act(sid, { action: "pending_banner", agent: "claude-ai" })).banner, "");
+    await act(sid, { action: "app_action", id: "inbox", action_name: "send_message", input: { to: "claude", body: "Review please." }, agent: "openai-mcp" });
+    await act(sid, { action: "app_action", id: "inbox", action_name: "hand_off", input: { to: "claude", title: "Test checkout", detail: "" }, agent: "openai-mcp" });
+    assert.equal((await act(sid, { action: "pending_banner", agent: "claude-ai" })).banner, "Inbox: 1 unread for claude, 1 task open");
+    assert.equal((await act(sid, { action: "pending_banner", agent: "openai-mcp" })).banner, "");
+  });
+}
+
 test("update_app is a new version: entered data stays, the screen changes, a bad spec changes nothing", async () => {
   assert.ok((await call("/session", { session: "sp-up" })).ok);
   assert.equal((await act("sp-up", { action: "create_app", id: "gifts", spec: GIFTS })).ok, true);
