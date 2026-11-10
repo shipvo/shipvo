@@ -42,4 +42,19 @@ describe("shipvo keys root", () => {
     await expect(signingKey(["root", "--out"])).rejects.toThrow("exit 2");
     expect(String(err.mock.calls[0][0])).toContain("Usage: shipvo keys root --out");
   });
+  it("prints a clear error when the folder of --out is missing", async () => {
+    const d = inApp();
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(process, "exit").mockImplementation(((c?: number) => { throw new Error("exit " + c); }) as any);
+    await expect(signingKey(["root", "--out", join(d, "nope", "root.txt")])).rejects.toThrow("exit 1");
+    expect(String(err.mock.calls[0][0])).toContain("the folder does not exist");
+  });
+  it("works without a shipvo.json", async () => {
+    const d = mkdtempSync(join(tmpdir(), "shipvo-root-"));
+    process.chdir(d);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await signingKey(["root", "--out", join(d, "root.txt")]);
+    expect(String(log.mock.calls[0][0])).toContain("Root public key");
+  });
 });

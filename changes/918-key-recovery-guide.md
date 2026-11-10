@@ -2,3 +2,4 @@
 - `shipvo audit` shows key rotation uploads as `key-rotation` rows. The control plane adds them to the first page, with negative ids.
 - Docs: new key recovery guide, `docs/new-machine.md` starts with the rotation path.
 - Migration: none; new command and new rows.
+- `@shipvo/mcp`: `audit_log` skips `key-rotation` rows unless you pass `action` `key-rotation`, so they do not use up the limit. `shipvo keys root` needs no `shipvo.json` and prints a clear error when the folder of `--out` is missing.

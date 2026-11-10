@@ -81,6 +81,15 @@ describe("audit_log", () => {
     expect(urls).toEqual(["/audit/rot?limit=200", "/audit/rot?limit=200&before=101"]);
     await c.close();
   });
+  it("key-rotation rows do not use up the limit unless asked for", async () => {
+    const c = await connect("good");
+    const r: any = await c.callTool({ name: "audit_log", arguments: { app: "rot", limit: 5 } });
+    expect(r.structuredContent.rows).toHaveLength(5);
+    expect(r.structuredContent.rows.every((x: any) => x.action !== "key-rotation")).toBe(true);
+    const k: any = await c.callTool({ name: "audit_log", arguments: { app: "rot", action: "key-rotation", limit: 5 } });
+    expect(k.structuredContent.rows).toEqual([{ actor: "ann", action: "key-rotation", subject: null, at: "2026-10-01" }]);
+    await c.close();
+  });
   it("returns typed unauthorized and not_found errors", async () => {
     const c = await connect("bad");
     const r: any = await c.callTool({ name: "audit_log", arguments: { app: "tide" } });

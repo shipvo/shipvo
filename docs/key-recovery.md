@@ -13,7 +13,7 @@ Two keys:
 shipvo keys root --out root.txt
 ```
 
-This writes the root seed to `root.txt` (owner-only permissions) and prints the root public key. It refuses to overwrite a file.
+This writes the root seed to `root.txt` (owner-only permissions) and prints the root public key. It refuses to overwrite a file. It needs no `shipvo.json`.
 
 Then:
 
@@ -21,7 +21,7 @@ Then:
 2. Put the root public key in the shell build: `dev.shipvo.ROOT_KEY` in `AndroidManifest.xml` and `ShipvoRootKey` in `Info.plist` (the Shipvo config plugin writes both from its `rootKey` and `minSequence` props).
 3. Register the same public key once with `PUT /rotation/<app>/root`, signed in as the owner.
 
-Ship that build to the stores. Installed shells from before this build do not know the root key.
+Ship that build to the stores. From then on, a lost or leaked release key is a rotation (section 2).
 
 ## 2. Rotate a lost or leaked release key
 
@@ -51,10 +51,14 @@ shipvo audit <app>                  # JSON
 shipvo audit <app> --format csv     # CSV
 ```
 
-Each upload is a row with `action` `key-rotation`. The sequence and `validFrom` are in `after`. The control plane puts these rows at the top of the first page. Their `id` is negative, so it never clashes with a publish or halt row. Check this log when you expect no rotation.
+Each upload is a row with `action` `key-rotation`. The sequence and `validFrom` are in `after`. The control plane puts these rows at the top of the first page. Their `id` is negative, so it never clashes with a publish or halt row. They do not count towards `--limit`, and in CSV a negative id shows as `'-1`. The MCP tool `audit_log` lists them when you ask for `action` `key-rotation`. Check this log when you expect no rotation.
 
 ## If the root key is lost or leaked
 
-No over-the-air fix exists, because shells trust nothing else. Build a new shell with a new root key (`shipvo keys root`) and a new release key, and ask users to update from the store.
+1. Make a new root key: `shipvo keys root --out root.txt`.
+2. Make a new release key: `shipvo keygen --out new-seed.txt`, and set `publicKey` in `shipvo.json`.
+3. Build a new shell with the new root public key and release public key, and ship it to the stores.
+4. Register the new root public key with `PUT /rotation/<app>/root`.
+5. Users update from the store. From then on the new root key rotates release keys.
 
 Design: [design/key-rotation.md](design/key-rotation.md). Threats: [threat-model.md](threat-model.md).

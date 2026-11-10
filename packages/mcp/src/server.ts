@@ -643,7 +643,8 @@ use(server, tools.audit_log,
       if (r.status === 404) return fail("not_found", `no app "${app}".`);
       if (!r.ok) return fail("audit_failed", `the control plane answered HTTP ${r.status}.`);
       const got = ((await r.json()) as { rows?: Array<Record<string, unknown> & { id: number }> }).rows ?? [];
-      for (const g of got) if (!action || g.action === action) rows.push({ actor: g.actor, action: g.action, subject: g.release ?? g.release_id ?? null, at: g.at });
+      // Key-rotation rows (negative ids) are listed only when asked for with action "key-rotation"; otherwise they do not use up the limit.
+      for (const g of got) if (action ? g.action === action : g.id > 0) rows.push({ actor: g.actor, action: g.action, subject: g.release ?? g.release_id ?? null, at: g.at });
       // Key-rotation rows have negative ids: they do not fill a page and cannot be a cursor.
       const real = got.filter((g) => g.id > 0);
       if (real.length < (action ? AUDIT_PAGE : want)) break;

@@ -54,7 +54,7 @@ npx -y @shipvo/cli publish
 
 ## If the seed and the root key are both lost
 
-- Phones that already have the app keep working on the release they have. They will never accept another update.
+- Phones that already have the app keep running the release they have.
 - Generate a new key (`shipvo keygen`), put the new public key in `shipvo.json`, build a new shell, and ask users to install it from the store again. Create a root key with `shipvo keys root` for this build so the next loss is a rotation.
 - Apps listed on the Shipvo marketplace need `shipvo app create` to register the new key; contact us if the old registration blocks it.
 

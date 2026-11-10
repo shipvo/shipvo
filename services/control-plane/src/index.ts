@@ -631,6 +631,7 @@ app.get("/audit/:app", async (c) => {
   const plain = (results ?? []) as Record<string, unknown>[];
   // Key rotation uploads are kept in key_rotation_log. The first page also carries the ones inside its time span, with negative ids so they never clash with audit_log ids.
   // `limit` caps the audit_log rows. A full page stops at its oldest row's time; a short page is the end of the log, so it carries every rotation row.
+  // Both tables write `at` with new Date().toISOString() (audit.ts, rotation-store.ts), so the strings compare in time order.
   const oldest = plain.length >= n ? String(plain[plain.length - 1].at) : undefined;
   const rot = bq !== undefined ? [] : (await listRotationLog(c.env.DB, appId, 200))
     .filter((r) => oldest === undefined || !(r.at < oldest))
