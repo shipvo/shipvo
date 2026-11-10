@@ -472,8 +472,14 @@ for (const style of ["android", "ios"]) {
     assert.equal((await act(sid, { action: "get_connectivity" })).connectivity.online, false);
     await shows("Offline");
     await act(sid, { action: "set_network_profile", profile: "online" });
+    // A spec app page has no device layer: the shade and Control Center (and so the tiles) cannot open over it,
+    // so the redraw after a network change never leaves a panel half open, and controls still work after it.
+    assert.equal((await act(sid, { action: style === "ios" ? "open_control_center" : "open_notifications" })).code, "no_device");
+    assert.equal((await act(sid, { action: "set_connectivity", wifi: true })).ok, true);
+    assert.equal((await act(sid, { action: "screen" })).ok, true);
     assert.equal((await act(sid, { action: "set_connectivity" })).code, "bad_value");
     const log = (await act(sid, { action: "device_log" })).log.filter((e) => e.name === "connectivity");
-    assert.equal(log.length, 4); assert.equal(log[1].to.airplane, true);
+    assert.equal(log.length, 5); assert.equal(log[1].to.airplane, true);
   });
 }
+

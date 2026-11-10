@@ -260,7 +260,8 @@ async function syncNetwork(s, page) {
   const sid = sidOf(s), before = JSON.stringify(specHost.network(sid));
   const now = specHost.setNetwork(sid, networkOf(s.conn ?? initialConnectivity(), s.netProfile ?? "online"));
   const open = s.nav.where === "app" && s.apps.installed_apps.some((a) => a.id === s.apps.current_app && a.kind === "spec");
-  if (open && JSON.stringify(now) !== before) { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
+  // A spec app page has no device layer, so no panel can be open over it; the reset keeps the record right if that ever changes.
+  if (open && JSON.stringify(now) !== before) { s.shade.open = "none"; await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
 }
 const specHost = new SpecHost();
 /** One answer per device permission a spec declares: the person's (`given`), or allowed when none was given. */
