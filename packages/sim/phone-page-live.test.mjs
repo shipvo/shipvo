@@ -81,6 +81,30 @@ for (const skin of ["android", "ios"]) {
   });
 }
 
+for (const skin of ["android", "ios"]) {
+  test(`${skin}: the frame page shows the icons of the phone's clock and of pinned and hidden apps`, async () => {
+    const sid = `pc-${skin}`;
+    assert.ok((await call("/session", { session: sid, skin })).ok);
+    const store = (await act(sid, { action: "phone_apps" })).store;
+    for (const a of store.slice(0, 3)) assert.equal((await act(sid, { action: "install_app", id: a.id })).ok, true);
+    const [a, b, c] = store.slice(0, 3);
+    assert.equal((await act(sid, { action: "arrange_apps", id: a.id, schedule: { days: ["sat", "sun"], from: "09:00", to: "23:00" } })).ok, true);
+    assert.equal((await act(sid, { action: "pin_app", id: c.id, pinned: true })).ok, true);
+    assert.equal((await act(sid, { action: "hide_app", id: b.id })).ok, true);
+    const page = await browser.newPage({ viewport: { width: 520, height: 1000 } });
+    try {
+      await page.goto(`${base}/phone?session=${sid}`);
+      const ids = () => page.locator('[data-part="installed-app"]').evaluateAll((els) => els.map((e) => e.getAttribute("data-app")));
+      await act(sid, { action: "set_time", at: "2026-11-14T10:00:00" });   // Saturday
+      await page.waitForFunction((n) => document.querySelectorAll('[data-part="installed-app"]').length === n, 2);
+      assert.deepEqual(await ids(), [c.id, a.id]);   // pinned first, hidden b gone, a showing on Saturday
+      await act(sid, { action: "set_time", at: "2026-11-09T10:00:00" });   // Monday
+      await page.waitForFunction((n) => document.querySelectorAll('[data-part="installed-app"]').length === n, 1);
+      assert.deepEqual(await ids(), [c.id]);
+    } finally { await page.close(); }
+  });
+}
+
 test("the frame page says so for a session that does not exist", async () => {
   const page = await browser.newPage();
   try {
