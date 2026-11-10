@@ -1,0 +1,4 @@
+- `@shipvo/cli`: new `shipvo keys root --out <file>` creates the offline root key for key rotation.
+- `shipvo audit` shows key rotation uploads as `key-rotation` rows. The control plane adds them to the first page, with negative ids.
+- Docs: new key recovery guide, `docs/new-machine.md` starts with the rotation path.
+- Migration: none; new command and new rows.

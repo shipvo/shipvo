@@ -9,7 +9,7 @@ import { auth } from "./auth";
 import { sso } from "./sso";
 import { samlRoutes } from "./saml-routes";
 import { rotationRoutes } from "./rotation";
-import { listRotations } from "./rotation-store";
+import { listRotations, listRotationLog } from "./rotation-store";
 import { vaultRoutes } from "./vault";
 import { peopleRoutes } from "./people";
 import { phoneRoutes } from "./phone";
@@ -625,10 +625,16 @@ app.get("/audit/:app", async (c) => {
   if (!Number.isInteger(limit) || limit < 1) return c.json({ error: "bad_request", message: "limit must be a positive integer" }, 400);
   if (bq !== undefined && !/^\d+$/.test(bq)) return c.json({ error: "bad_request", message: "before must be a row id" }, 400);
   const n = Math.min(limit, 200);
+  // Key rotation uploads are kept in key_rotation_log. The first page also carries them, with negative ids so they never clash with audit_log ids.
+  const rot = bq !== undefined ? [] : (await listRotationLog(c.env.DB, appId, 200)).map((r) => ({
+    id: -r.id, app_id: r.app_id, at: r.at, actor: r.actor, actor_kind: r.actor_kind, action: "key-rotation",
+    release: null, release_id: null, before: null, after: { sequence: r.sequence, valid_from: r.valid_from },
+  }));
   const { results } = await c.env.DB.prepare(
     `SELECT id, app_id, at, actor, actor_kind, action, release, release_id, before, after FROM audit_log WHERE app_id = ?${bq !== undefined ? " AND id < ?" : ""} ORDER BY id DESC LIMIT ?`,
   ).bind(...(bq !== undefined ? [appId, Number(bq), n] : [appId, n])).all();
-  return c.json({ app: appId, rows: results ?? [] }, 200, { "cache-control": "no-store" });
+  const rows: Record<string, unknown>[] = [...((results ?? []) as Record<string, unknown>[]), ...rot].sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  return c.json({ app: appId, rows }, 200, { "cache-control": "no-store" });
 });
 
 app.route("/auth", auth);

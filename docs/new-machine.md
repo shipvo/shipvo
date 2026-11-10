@@ -2,6 +2,20 @@
 
 Switching laptops, or joining a teammate's repo, takes two small steps. One of them matters a lot: the **signing seed**.
 
+## Lost the seed? Rotate with your root key
+
+If your app has a root key (see [Recover a lost or leaked release key](key-recovery.md)), a lost seed is not the end. You sign a rotation with the offline root key, upload it, and phones switch to a new release key the next time they fetch. No store build is needed.
+
+```bash
+npx -y @shipvo/cli keygen --out new-seed.txt                       # new release key; prints its public key
+npx -y @shipvo/cli keys rotate sign --root-seed-file root.txt --new-key <new public key> --sequence 1 > envelope.json
+npx -y @shipvo/cli keys rotate upload envelope.json                # needs a signed-in owner (shipvo login)
+```
+
+Then sign releases with the new seed. The full steps, including emergency rotation, are in [key-recovery.md](key-recovery.md).
+
+Android and iOS check the same rules. The runtime tests for key rotation are `RotationTest.kt` (Android, JVM) and `RotationTests.swift` (iOS), and both read the shared vectors in `packages/cli/test`.
+
 ## What lives where
 
 | Thing | Where it lives | Lost with the old machine? | What to do |
@@ -38,10 +52,10 @@ npx -y @shipvo/cli publish
 
 `keys import` checks the seed against the public key in `shipvo.json` and refuses one that does not match, so you find out now, not when a release is rejected. It writes `.shipvo/seed.txt` with owner-only permissions.
 
-## If the seed is truly lost
+## If the seed and the root key are both lost
 
 - Phones that already have the app keep working on the release they have. They will never accept another update.
-- Generate a new key (`shipvo keygen`), put the new public key in `shipvo.json`, build a new shell, and ask users to install it from the store again.
+- Generate a new key (`shipvo keygen`), put the new public key in `shipvo.json`, build a new shell, and ask users to install it from the store again. Create a root key with `shipvo keys root` for this build so the next loss is a rotation.
 - Apps listed on the Shipvo marketplace need `shipvo app create` to register the new key; contact us if the old registration blocks it.
 
 So back it up once, today, even if you are not moving.

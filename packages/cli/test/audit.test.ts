@@ -64,4 +64,34 @@ describe("shipvo audit", () => {
     inApp();
     await expect(audit(["shop", "--format", "xml"], { fetchFn: vi.fn() as any })).rejects.toThrow("--format");
   });
+
+  const rot = (extra: Record<string, unknown> = {}) => row(-1, { actor: "ann@b.c", actor_kind: "person", action: "key-rotation", release: null, after: { sequence: 2, valid_from: "2026-11-06T00:00:00.000Z" }, ...extra });
+
+  it("prints a key-rotation row in JSON", async () => {
+    inApp();
+    const f = vi.fn(async () => resp([rot(), row(5)]));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await audit(["shop"], { fetchFn: f as any });
+    const out = JSON.parse(String(log.mock.calls[0][0]));
+    expect(out[0]).toMatchObject({ id: -1, action: "key-rotation", after: { sequence: 2, valid_from: "2026-11-06T00:00:00.000Z" } });
+  });
+
+  it("prints a key-rotation row in CSV", async () => {
+    inApp();
+    const f = vi.fn(async () => resp([rot()]));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await audit(["--format", "csv", "shop"], { fetchFn: f as any });
+    const lines = String(log.mock.calls[0][0]).split("\n");
+    expect(lines[1]).toBe(`"-1","shop","2026-01-01T00:00:00Z","ann@b.c","person","key-rotation","","","","{""sequence"":2,""valid_from"":""2026-11-06T00:00:00.000Z""}"`.replace('"-1"', `"'-1"`));
+  });
+
+  it("rotation rows do not move the paging cursor or the limit", async () => {
+    inApp();
+    const first = [rot(), ...Array.from({ length: 200 }, (_, i) => row(400 - i))];
+    const f = vi.fn(async (u: any) => String(u).includes("before=201") ? resp([row(7)]) : resp(first));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await audit(["shop"], { fetchFn: f as any });
+    expect(f.mock.calls.map((c) => String(c[0]))).toEqual(["https://cp.test/audit/shop?limit=200", "https://cp.test/audit/shop?limit=200&before=201"]);
+    expect(JSON.parse(String(log.mock.calls[0][0]))).toHaveLength(202);
+  });
 });

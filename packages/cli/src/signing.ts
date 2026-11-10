@@ -2,6 +2,7 @@
 // The seed is the only thing that can update phones that already have the app installed
 // (every installed shell pins its public key), so moving it is an explicit step, not a hidden file copy.
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { b64, keyFromSeed } from "./index.js";
 import { args, loadConfig, seed } from "./config.js";
@@ -15,6 +16,17 @@ export async function signingKey(argv: string[]) {
   const cfg = loadConfig();
   if (sub === "rotate") {
     try { await rotate(rest, cfg); } catch (e) { if (!(e instanceof RotateError)) throw e; console.error(e.message); process.exit(1); }
+    return;
+  }
+  if (sub === "root") {
+    // New command only: makes the offline root key. It never touches the release seed.
+    if (!a.out || a.out === "true") { console.error("Usage: shipvo keys root --out <file>   (writes the new root seed to a file; keep it offline)"); process.exit(2); }
+    if (existsSync(a.out)) { console.error(`${a.out} already exists. Refusing to overwrite a root seed.`); process.exit(1); }
+    const rs = b64(randomBytes(32));
+    writeFileSync(a.out, rs + "\n", { mode: 0o600 }); try { chmodSync(a.out, 0o600); } catch {}
+    console.error(`Root seed for "${cfg.appId}" written to ${a.out}. Move it to offline storage and delete this file from this machine. Never put it in CI.`);
+    console.log(`Root public key (not secret): ${pub(rs)}`);
+    console.error("Put this value in the shell build (dev.shipvo.ROOT_KEY on Android, ShipvoRootKey on iOS) and register it once with PUT /rotation/<app>/root.");
     return;
   }
   if (sub === "export") {

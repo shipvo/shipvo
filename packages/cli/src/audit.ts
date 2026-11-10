@@ -77,8 +77,11 @@ async function auditRows(argv: string[], deps: { fetchFn?: typeof fetch }) {
     if (!r.ok) throw new CliFailure(`Audit request failed: HTTP ${r.status}${r.status === 401 ? " (the token was not accepted for this app)" : ""}.`, r.status === 401 ? "auth_failed" : "remote_failed", 1, [{ command: r.status === 401 ? "shipvo app create" : "shipvo doctor --json", why: r.status === 401 ? "Get a publish token for this app." : "Check the control plane." }]);
     const page = ((await r.json()) as { rows?: Row[] }).rows ?? [];
     rows.push(...page);
-    if (page.length < want) break;
-    before = page[page.length - 1].id;
+    // Key rotation rows have negative ids and ride on the first page. They do not count towards the page size or the cursor.
+    const plain = page.filter((x) => x.id > 0);
+    if (plain.length < want) break;
+    before = plain[plain.length - 1].id;
   }
+  if (rows.length > max) rows.length = max;
   return { appId, rows, format, limit: Number.isFinite(max) ? max : undefined };
 }

@@ -5,7 +5,7 @@ import { recordAudit } from "../src/audit";
 
 const sha = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
 
-function mkDb(rows: any[], tokens: Record<string, string> = {}) {
+function mkDb(rows: any[], tokens: Record<string, string> = {}, rotLog: any[] = []) {
   const calls: { sql: string; args: unknown[] }[] = [];
   const DB = { prepare: (sql: string) => ({ bind: (...args: unknown[]) => ({
     run: async () => { calls.push({ sql, args }); return {}; },
@@ -16,6 +16,7 @@ function mkDb(rows: any[], tokens: Record<string, string> = {}) {
     },
     all: async () => {
       calls.push({ sql, args });
+      if (sql.includes("key_rotation_log")) return { results: rotLog.filter((x) => x.app_id === args[0]) };
       let r = rows.filter((x) => x.app_id === args[0]);
       if (sql.includes("id < ?")) r = r.filter((x) => x.id < (args[1] as number));
       r = r.sort((a, b) => b.id - a.id).slice(0, args[args.length - 1] as number);
@@ -79,6 +80,16 @@ describe("GET /audit/:app", () => {
     expect(body.rows.map((x: any) => x.id)).toEqual([3, 2, 1]);
     expect(body.rows.every((x: any) => x.app_id === "tide")).toBe(true);
     expect(JSON.stringify(body)).not.toContain(key);
+  });
+  it("merges key rotation log rows into the first page only", async () => {
+    const { DB } = mkDb(mk(2, "tide").map((x, i) => ({ ...x, at: `2026-01-0${i + 1}` })), {}, [{ id: 4, app_id: "tide", at: "2026-01-05", actor: "ann", actor_kind: "person", sequence: 2, valid_from: "2026-01-05" }, { id: 1, app_id: "other", at: "2026-01-06", actor: "x", actor_kind: "person", sequence: 1, valid_from: "v" }]);
+    const env = { DB, POINTERS: {} as any, OWNER_TOKEN: "tok" } as any;
+    const H = { authorization: "Bearer tok" };
+    const p1: any = await (await app.request("/audit/tide", { headers: H }, env)).json();
+    expect(p1.rows.map((x: any) => x.id)).toEqual([-4, 2, 1]);
+    expect(p1.rows[0]).toMatchObject({ action: "key-rotation", actor: "ann", release: null, after: { sequence: 2, valid_from: "2026-01-05" } });
+    const p2: any = await (await app.request("/audit/tide?before=2", { headers: H }, env)).json();
+    expect(p2.rows.map((x: any) => x.id)).toEqual([1]);
   });
   it("pages with limit and before, and caps limit at 200", async () => {
     const { DB, calls } = mkDb(mk(5, "tide"));
