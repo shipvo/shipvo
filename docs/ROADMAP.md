@@ -85,6 +85,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: `room_log` and `room_note` let a lead agent see what the other agents in a room did and leave notes for them ([Agents](agents.md#room-log-and-notes), #1419)
 - 2026-11-10: Exported phone apps carry their home-screen layout, and `import_phone_apps` warns about each invalid layout field ([Phone apps](phone-apps.md), #1401)
 - 2026-11-10: `app_activity` shows what the agent built and changed in each spec app, `refresh_app` fetches a data source now, and `schedule_app` shows or hides an app on a time window ([Phone apps](phone-apps.md#see-what-was-built-and-changed), #1396, #1379, #1357)
 - 2026-11-10: Guide for describing an app: a checked example spec, the tools and troubleshooting ([Describe an app and it appears](describe-an-app.md), #1301, #1302, #1396)

@@ -9,5 +9,5 @@ export { renderScreen, describeTree, unlabelled, toSnapshot } from "./render.js"
 export type { ScreenNode, PhoneStyle, RenderOptions, RenderResult } from "./render.js";
 export { toolsFromSpec } from "./tools.js";
 export type { SpecTool, ToolsFromSpecOptions } from "./tools.js";
-export { createApp, checkField } from "./app.js";
-export type { App, PressResult } from "./app.js";
+export { createApp, checkField, actionDeviceNeeds } from "./app.js";
+export type { App, PressResult, CreateAppOptions } from "./app.js";

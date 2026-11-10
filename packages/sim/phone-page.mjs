@@ -1,7 +1,8 @@
 // /phone: the phone frame for one live session. Its home screen and Store show the session's installed apps, the same ones the MCP tools
 // install and remove. Tapping Install or an app icon here runs install_app or switch_app on that session, so device_log records it.
 import { renderFrame } from "./frame.mjs";
-import { DAYS, appVisible, homeApps, installedIconsHtml, storeRowsHtml } from "./apps.mjs";
+import { DAYS, appVisible, homeApps, installedIconsHtml, storeRowsHtml, permissionRowsHtml } from "./apps.mjs";
+import { settingsClientScript } from "./settings.mjs";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
@@ -11,14 +12,17 @@ body{display:flex;flex-direction:column;align-items:center;gap:12px;padding:12px
 @media (prefers-color-scheme:dark){html,body{background:#15171a;color:#eee}.p-msg{color:#bbb}.p-msg.err{color:#f2b8b5}}`;
 
 const SCRIPT = (session) => `(function(){
-var SESSION=${JSON.stringify(session)},esc=${esc.toString()},DAYS=${JSON.stringify(DAYS)},appVisible=${appVisible.toString()},homeApps=${homeApps.toString()},installedIconsHtml=${installedIconsHtml.toString()},storeRowsHtml=${storeRowsHtml.toString()};
+var SESSION=${JSON.stringify(session)},esc=${esc.toString()},DAYS=${JSON.stringify(DAYS)},appVisible=${appVisible.toString()},homeApps=${homeApps.toString()},installedIconsHtml=${installedIconsHtml.toString()},storeRowsHtml=${storeRowsHtml.toString()},permissionRowsHtml=${permissionRowsHtml.toString()};
 var r=document.querySelector('[data-part="phone-body"]'),q=function(p){return r.querySelector('[data-part="'+p+'"]')},
 home=q("home-screen"),sc=q("store-screen"),rows=q("store-rows"),opened=q("opened-app"),msg=document.querySelector('[data-part="message"]');
 home.hidden=false;var box=document.createElement("div");box.className="sf-apps";box.setAttribute("data-part","installed-apps");home.appendChild(box);
 var st={installed_apps:[],store:[],current_app:null,where:"home"};
 function say(t,bad){msg.textContent=t||"";msg.className="p-msg"+(bad?" err":"")}
 var lastHome=null;
-function draw(){var h=installedIconsHtml(st,new Date(st.now||Date.now()));if(h!==lastHome){lastHome=h;box.innerHTML=h}if(!sc.hidden)rows.innerHTML=storeRowsHtml(st);
+// Settings: one switch per app and permission. A click asks the sim server (set_app_permission) and the row is drawn from its reply, so a switch always matches what the app may do.
+var ss=q("settings-screen"),pbox=null;
+function drawPerms(){if(!ss||ss.hidden)return;if(!pbox){pbox=document.createElement("div");pbox.setAttribute("data-part","permission-rows");pbox.setAttribute("role","group");pbox.setAttribute("aria-label","App permissions");ss.insertBefore(pbox,q("settings-close"))}var h=permissionRowsHtml(st);if(pbox.getAttribute("data-h")!==h){pbox.setAttribute("data-h",h);pbox.innerHTML=h}}
+function draw(){drawPerms();var h=installedIconsHtml(st,new Date(st.now||Date.now()));if(h!==lastHome){lastHome=h;box.innerHTML=h}if(!sc.hidden)rows.innerHTML=storeRowsHtml(st);
 var a=st.where==="app"&&st.installed_apps.filter(function(x){return x.id===st.current_app})[0];
 opened.hidden=!a;opened.textContent=a?a.name+" is open":""}
 function pull(){return fetch("/phone/apps?session="+encodeURIComponent(SESSION)).then(function(x){return x.json()}).then(function(j){
@@ -28,6 +32,8 @@ r.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
 if(t.closest('[data-part="store-icon"]')){sc.hidden=false;draw();sc.focus({preventScroll:true});return}
 if(t.closest('[data-part="store-close"]')){sc.hidden=true;var si=q("store-icon");if(si)si.focus();return}
 var i=t.closest('[data-part="store-install"]');if(i){act({action:"install_app",id:i.getAttribute("data-app")});return}
+if(t.closest('[data-part="settings-icon"],[data-part="settings-gear"]')){setTimeout(function(){pull().then(drawPerms)},0);return}
+var ps=t.closest('[data-part="perm-switch"]');if(ps){ps.setAttribute("aria-checked",String(ps.getAttribute("aria-checked")!=="true"));act({action:"set_app_permission",id:ps.getAttribute("data-app"),permission:ps.getAttribute("data-perm"),allowed:ps.getAttribute("aria-checked")==="true"}).then(drawPerms);return}
 var a=t.closest('[data-part="installed-app"]');if(a){act({action:"switch_app",id:a.getAttribute("data-app")})}});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!sc.hidden)sc.hidden=true});
 pull();setInterval(function(){if(!document.hidden)pull()},1000);
@@ -39,5 +45,5 @@ export function phonePage(skin = "android", session = "") {
   const frame = renderFrame({ skin, screen: `<p class="p-open" data-part="opened-app" role="status" hidden></p>` });
   const title = `Phone (simulated ${skin === "ios" ? "iPhone" : "Android"})`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
-<style>${CSS}\n${frame.css}</style></head><body><p class="p-msg" role="status" data-part="message">${session ? "" : "Add ?session=NAME to show a live session."}</p>${frame.html}<script>${SCRIPT(session).replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
+<style>${CSS}\n${frame.css}</style></head><body><p class="p-msg" role="status" data-part="message">${session ? "" : "Add ?session=NAME to show a live session."}</p>${frame.html}<script>${settingsClientScript("app")}</script><script>${SCRIPT(session).replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
 }

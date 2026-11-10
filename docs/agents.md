@@ -39,6 +39,8 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | --- | --- |
 | `list_apps(query?)` | Apps this key can open: the sample app, your own, and every public app on [shipvo.dev/apps](https://shipvo.dev/apps); `query` searches name, description and category |
 | `list_sessions` | Open sessions on this server, to resume after a reconnect. Each row shows app, platform, room, who opened it (the MCP client name), start time and current screen title |
+| `room_log(room, since?)` | Read-only. What every session in a room did, oldest first, plus the notes agents posted. See [Room log and notes](#room-log-and-notes) |
+| `room_note(room, text)` | Post a plain-text note (up to 500 characters) for the other agents in the room |
 | `open_app(app, session?, seed_cart?, dark?, attach?, platform?, show?, room?)` | A phone-sized session; returns the first screen. If `shipvo run` is up for this app (`.shipvo/run.json` in the working directory or a parent, up to the git root), the session drives that phone instead and the result says `attached to the live shipvo run phone`; otherwise it says `headless session`. `attach`: `auto` (default), `never` (always headless), `always` (error with no live run). `show: true` opens the phone in your browser and starts `shipvo run <platform>` when none is up; by default that happens only on a desktop machine whose project has `shipvo` installed. A server over HTTP never starts a run. `platform` applies only when a phone is started; with `show: false`, `attach: never` or a live run attached as it is, the result says it was ignored. Attached sessions support screen, tap, type, scroll, back and screenshot; other tools return `not_supported_attached`. Attach needs Node 22+; if attach fails in `auto` mode the headless result says why. `app@release` still attaches to the local run. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
 | `upload_build(dir?, app?, skip_build?)` | Build this project, upload it for your key and return a build id. Open it on the hosted phone with `open_app("<app>@build:<id>")`. Local (stdio) server only. See [Test your build](test-your-build.md) |
 | `publish_preview(...)` · `job_status(job, wait_ms?)` | Slow tools (`publish_preview`, `upload_build`) wait up to `wait_ms` (default 20000) and return the result, or `{ status: "running", job }`. Call `job_status` with that `job` to read `running`, `done` or `failed` (`wait_ms` up to 55000 waits for it). See [the CLI guide](cli.md) |
@@ -68,6 +70,41 @@ open_app("tide-and-tackle@latest", room: "demo", platform: "ios")   // session s
 ```
 
 `list_sessions` shows the room of every session.
+
+## Room log and notes
+
+When several agents share a room, one of them (the lead) can see what the others did, and any agent can leave a note for the rest. This is for a lead agent that sends other agents to test different parts of one app, and for you when you want to know who tapped what.
+
+The simulator keeps a log for each room, next to the shared backend. Every action by a session in the room is added with the time, the session, the agent name (the name your MCP client reports, such as `claude-code`), the tool, the element it acted on and the change on screen. The log goes away when the room ends.
+
+1. Open two sessions in the same room, as in [Rooms](#rooms-several-phones-one-backend).
+2. Let an agent act, then ask the lead to call `room_log("demo")`.
+3. Post a note with `room_note("demo", "Checkout fails when the cart has 3 items")`.
+4. Call `room_log("demo", since: "<cursor>")` with the `cursor` from your last read to get only what is new.
+
+Example reply from `room_log`:
+
+```text
+2026-11-10T09:14:02.511Z s1 (claude-code) tap e7: Cart shows 1 item
+2026-11-10T09:14:09.020Z claude-code note: Checkout fails when the cart has 3 items
+cursor: 2
+```
+
+| Tool | Arguments | Result |
+| --- | --- | --- |
+| `room_log` | `room`, `since?` (a cursor from an earlier `room_log` or `room_note`) | `entries` (each with `at`, `kind` of `action` or `note`, `session`, `agent`, `tool`, `target`, `change` or `text`) and the next `cursor`. Without `since`, you get the whole log |
+| `room_note` | `room`, `text` (1 to 500 characters) | The new `cursor` |
+
+The log keeps the latest 1000 entries. Reading it changes nothing, so a lead can poll it as often as it likes.
+
+Errors:
+
+| Code | Meaning |
+| --- | --- |
+| `no_room` | No open session is in that room. Open a session with `room` first, or check the spelling |
+| `bad_cursor` | `since` is not a cursor from an earlier read. Leave `since` out to read from the start |
+| `bad_note` | The note is empty |
+| `note_too_long` | The note is over 500 characters. Shorten it |
 
 ## Driving the live phone
 
@@ -244,6 +281,8 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 **The assistant cannot find a button.** The tree only lists what a person could see and touch (see [What the tree shows](#what-the-tree-shows-and-hides-on-purpose)). Ask the assistant to read the screen again after the app finishes loading, and check that the button has a label.
 
 **The `watch_url` shows an error or does not load.** The link is valid for one hour, for one session. Call `open_app` again for a new one. If there is no `watch_url` in the reply, you are on a local simulator; open `/watch` there instead.
+
+**`room_log` or `room_note` returns `no_room`.** The room ends when its last session ends, and its log goes with it. Open a session with `room` again and read the log while a session is still open.
 
 **Two sessions do not see each other's orders.** They were opened without the same `room`. Open both with the same `room` value on the same simulator (see [Rooms](#rooms-several-phones-one-backend)).
 
