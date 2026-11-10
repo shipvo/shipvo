@@ -56,15 +56,21 @@ npx -y @shipvo/cli keys rotate upload rotation.json
 
 `sign` works offline. `upload` needs `shipvo login` as the app owner; tokens are refused.
 
-## Check that the rotation is recorded
+### See rotations in the audit log
 
-After `upload`, export the audit log and look for the row with `action` `key-rotation`:
+After `upload`, export the audit log. Rotations show up next to publishes and rollbacks as rows with `action` `key-rotation`. The `after` field holds the sequence and the time the new key starts:
 
 ```bash
 npx -y @shipvo/cli audit <app> --limit 20
 ```
 
-The row shows the `sequence` and `valid_from` of the statement in `after`. It sits in time order next to your publishes and rollbacks, so an auditor sees when the key changed. Details: [`shipvo audit`](cli.md#shipvo-audit).
+```json
+{ "action": "key-rotation", "release": null, "after": { "sequence": 1, "valid_from": "2026-11-06T00:00:00Z" } }
+```
+
+`shipvo audit` needs `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create`. Set one first; `shipvo login` alone is not enough.
+
+Rotation rows are merged into the first page only, which holds the newest rows (up to 200). The export includes rotations that fall within the newest 200 rows. A new rotation is the newest row, so it is within `--limit 20` right after `upload`. See [`shipvo audit`](cli.md#shipvo-audit).
 
 ## Troubleshooting
 
