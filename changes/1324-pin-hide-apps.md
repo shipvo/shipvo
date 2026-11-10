@@ -1,0 +1,3 @@
+- `@shipvo/sim`: new `pin_app` and `hide_app` actions. Pinned apps lead the home screen in the order pinned; hidden apps leave the home screen and app list but keep their data. `update_app` keeps both.
+- `@shipvo/mcp`: new tools `pin_app` and `hide_app`.
+- Migration: none; new tools.

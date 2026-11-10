@@ -137,7 +137,7 @@ const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 function cleanPlacement(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   var p = {};
-  if (raw.pinned === true) p.pinned = true;
+  if (raw.pinned === true || (Number.isInteger(raw.pinned) && raw.pinned > 0)) p.pinned = raw.pinned;
   if (raw.hidden === true) p.hidden = true;
   if (Number.isInteger(raw.position) && raw.position >= 0 && raw.position <= 99) p.position = raw.position;
   var sc = raw.schedule;
@@ -154,13 +154,18 @@ function cleanPlacement(raw) {
  * position (a whole number from 0, or null to clear), schedule ({ days: ["mon",...], from: "HH:MM", to: "HH:MM" }, or null
  * to always show). Throws not_installed or bad_placement with the reason.
  */
-export function arrangeApp(st, id, patch = {}) {
+function placeApp(st, id, patch = {}) {
   const a = st.installed_apps.find((x) => x.id === id);
   if (!a) throw new AppsError("not_installed", `'${id}' is not installed`);
   const p = { ...(a.placement ?? {}) };
   const bad = (m) => new AppsError("bad_placement", m);
   for (const k of Object.keys(patch)) if (!["pinned", "hidden", "position", "schedule"].includes(k)) throw bad(`unknown field '${k}'. Fields: pinned, hidden, position, schedule`);
-  for (const k of ["pinned", "hidden"]) if (patch[k] !== undefined) { if (typeof patch[k] !== "boolean") throw bad(`${k} must be true or false`); if (patch[k]) p[k] = true; else delete p[k]; }
+  for (const k of ["pinned", "hidden"]) if (patch[k] !== undefined) {
+    if (typeof patch[k] !== "boolean") throw bad(`${k} must be true or false`);
+    if (!patch[k]) delete p[k];
+    else if (k === "hidden") p.hidden = true;
+    else if (!p.pinned) p.pinned = Math.max(0, ...st.installed_apps.map((x) => x.placement?.pinned ?? 0)) + 1;   // pinned apps keep the order they were pinned in
+  }
   if (patch.position !== undefined) {
     if (patch.position === null) delete p.position;
     else if (!Number.isInteger(patch.position) || patch.position < 0 || patch.position > 99) throw bad("position must be a whole number from 0 to 99, or null");
@@ -178,9 +183,17 @@ export function arrangeApp(st, id, patch = {}) {
     }
   }
   if (Object.keys(p).length) a.placement = p; else delete a.placement;
+  return a;
+}
+export function arrangeApp(st, id, patch = {}) {
+  const a = placeApp(st, id, patch);
   note(st, "arrange_apps", id, { placement: a.placement ?? null });
   return a;
 }
+/** Pin or unpin an app. Pinned apps lead the home screen in the order they were pinned. Throws not_installed. */
+export function pinApp(st, id, pinned) { placeApp(st, id, { pinned: !!pinned }); note(st, "pin_app", id, { pinned: !!pinned }); return st; }
+/** Hide an app from the home screen and the app list, or show it again. Its data stays. Throws not_installed. */
+export function hideApp(st, id, hidden) { placeApp(st, id, { hidden: !!hidden }); note(st, "hide_app", id, { hidden: !!hidden }); return st; }
 
 /** True when the app shows on the home screen at `now` (a Date): not hidden, and inside its schedule if it has one. */
 export function appVisible(a, now = new Date()) {
@@ -198,7 +211,7 @@ export function appVisible(a, now = new Date()) {
 /** The apps on the home screen at `now`, in order: pinned first, then by position, then in the order they were installed. */
 export function homeApps(st, now = new Date()) {
   return st.installed_apps.map((a, i) => ({ a, i })).filter(({ a }) => appVisible(a, now))
-    .sort((x, y) => (y.a.placement?.pinned ? 1 : 0) - (x.a.placement?.pinned ? 1 : 0) || (x.a.placement?.position ?? 1e3) - (y.a.placement?.position ?? 1e3) || x.i - y.i)
+    .sort((x, y) => (x.a.placement?.pinned && y.a.placement?.pinned ? x.a.placement.pinned - y.a.placement.pinned : (y.a.placement?.pinned ? 1 : 0) - (x.a.placement?.pinned ? 1 : 0)) || (x.a.placement?.position ?? 1e3) - (y.a.placement?.position ?? 1e3) || x.i - y.i)
     .map(({ a }) => a);
 }
 
