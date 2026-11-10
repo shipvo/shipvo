@@ -1,0 +1,145 @@
+{
+  "slug": "describe-an-app",
+  "posterAt": 6,
+  "title": "Describe an app and watch it appear on a phone",
+  "tutorial": "docs/tutorials/describe-an-app.md",
+  "voice": "af_heart",
+  "pushIn": true,
+  "retention": {
+    "hook": "0-3 s: one sentence typed into a chat, and an app appears on a phone.",
+    "promise": "By 8 s: you make an app, change it, and see it on Android and iOS, with no code.",
+    "openLoops": [
+      {
+        "question": "Will the app keep what I typed when I ask for a change?",
+        "opens": "use scene (about 36 s)",
+        "paysOff": "change scene (about 50 s), Mum's idea is still in the list"
+      },
+      {
+        "question": "What does the same app look like on iOS?",
+        "opens": "change scene (about 55 s)",
+        "paysOff": "ios scene (about 68 s), side by side with Android"
+      }
+    ],
+    "reHooks": [
+      "flash cards in every scene: 'Said. Made.' (hook), 'A phone in your browser' (sim), 'Assistant connected', 'Checked first', 'Actions run by name', 'Still there', 'Android + iOS'"
+    ],
+    "payoff": "Android and iOS apps from one description, entries kept.",
+    "nextStep": "npx shipvo run android, then the guide at shipvo.dev/learn"
+  },
+  "music": {
+    "id": 343780,
+    "offset": 262.0,
+    "bed": 0.4,
+    "credits": "services/site/public/videos/describe-an-app.credits.json"
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "visual": "daHook",
+      "min": 9,
+      "narration": "One sentence, and an app appears on a phone. By the end, you will have made one, changed it, and seen it on Android and iOS. You write no code.",
+      "flashes": [
+        {
+          "at": 5.2,
+          "text": "Said. Made."
+        }
+      ]
+    },
+    {
+      "id": "sim",
+      "visual": "daSim",
+      "min": 11,
+      "narration": "First, start the simulator. It is a phone that runs in your browser. Type npm run sim, and leave it open.",
+      "caption": "First, start the simulator. It is a phone that runs in your browser. Type npm run sim, and leave it open.",
+      "flashes": [
+        {
+          "at": 5.5,
+          "text": "A phone in your browser"
+        }
+      ]
+    },
+    {
+      "id": "connect",
+      "visual": "daConnect",
+      "min": 12,
+      "narration": "Next, connect your assistant. Type npx shipvo agents setup, then restart the assistant. Now it has Shipvo tools, like create app and update app.",
+      "caption": "Next, connect your assistant. Type npx shipvo agents setup, then restart the assistant. Now it has Shipvo tools, like create_app and update_app.",
+      "flashes": [
+        {
+          "at": 4.2,
+          "text": "One command"
+        },
+        {
+          "at": 8.4,
+          "text": "Assistant connected"
+        }
+      ]
+    },
+    {
+      "id": "describe",
+      "visual": "daDescribe",
+      "min": 15,
+      "narration": "Now ask, in your own words. Make a gift ideas app. I want to write who each idea is for, and the idea. Shipvo checks the description first. Then the app opens, with its own icon.",
+      "flashes": [
+        {
+          "at": 2.2,
+          "text": "Your own words"
+        },
+        {
+          "at": 9,
+          "text": "Checked first"
+        }
+      ]
+    },
+    {
+      "id": "use",
+      "visual": "daUse",
+      "min": 12,
+      "narration": "Use it. Ask the assistant to add an idea, Mum, garden gloves. It shows in the list. Keep an eye on this idea. It matters in a moment.",
+      "flashes": [
+        {
+          "at": 5.2,
+          "text": "Actions run by name"
+        }
+      ]
+    },
+    {
+      "id": "change",
+      "visual": "daChange",
+      "min": 15,
+      "narration": "Now ask for a change. Add an About screen, and a button to open it. The app changes at once. And Mum's idea is still there. Shipvo keeps what people typed.",
+      "flashes": [
+        {
+          "at": 7.5,
+          "text": "Still there"
+        }
+      ]
+    },
+    {
+      "id": "ios",
+      "visual": "daIos",
+      "min": 13,
+      "narration": "Want the iPhone look? Ask again with the iOS look. The same description gives you an Android app and an iOS app, side by side.",
+      "caption": "Want the iPhone look? Ask again with the iOS look. The same description gives you an Android app and an iOS app, side by side.",
+      "flashes": [
+        {
+          "at": 6.5,
+          "text": "Android + iOS"
+        }
+      ]
+    },
+    {
+      "id": "cta",
+      "visual": "daCta",
+      "min": 11,
+      "narration": "That is an app from one sentence. Try it in your own folder. The step by step guide is at shipvo dot dev, slash learn. Next, see your own app on a phone with shipvo run.",
+      "caption": "That is an app from one sentence. Try it in your own folder. The step by step guide is at shipvo.dev/learn. Next, see your own app on a phone with shipvo run.",
+      "flashes": [
+        {
+          "at": 5.5,
+          "text": "Say it. Get the app."
+        }
+      ]
+    }
+  ]
+}
