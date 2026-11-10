@@ -49,7 +49,14 @@ If your coding agent runs the local `@shipvo/mcp` server (`shipvo agents setup` 
 
 ## Open a build from a link
 
-If your build is already hosted at an http or https address, you can open it without uploading from your machine. Send `POST /session` to the simulator with a `build_url`. The simulator downloads the build, unpacks it, opens it as the app and replies with `build: <id>`. You can then use `open_app("<app>@build:<id>")` with that id; the reply names the build that opened.
+If your build is already hosted at an http or https address, you can open it without uploading from your machine. Your own code or script sends `POST /session` to the simulator with a `session` name, an `app` id and the `build_url` of a `.tar.gz` of your web build:
+
+```bash
+curl -X POST http://localhost:11777/session \
+  -d '{"session":"demo","app":"tide","build_url":"https://example.com/app.tgz"}'
+```
+
+The simulator downloads the build, unpacks it, opens it as the app and replies with `{ "ok": true, "app": "tide", "build": "<id>", "screen": "..." }`. `build` names the build that opened, and the session runs that build. `open_app("<app>@build:<id>")` is for ids returned by `upload_build`.
 
 A bad address leaves no session behind. The reply carries one of these codes:
 
@@ -64,10 +71,6 @@ A bad address leaves no session behind. The reply carries one of these codes:
 ## Who can see a build
 
 A build is private to your account. A key from another account gets `build_not_found`, the same answer as for a build that never existed. A build is deleted when it expires.
-
-## Open a build from a link
-
-The simulator's `POST /session` also takes a `build_url`: a link to a `.tar.gz` of your built app. The simulator fetches it into its build cache, unpacks it (an archive that contains links is refused) and serves it at `/b/<id>/`. The reply has `build`: the id you sent, or the content id. `open_app("<app>@build:<id>")` sends it for you. The host must be on the same allow-list the phone's Browser uses. If the fetch fails, the reply is `{ ok: false, code, error }` and no session is created.
 
 ## Errors
 
