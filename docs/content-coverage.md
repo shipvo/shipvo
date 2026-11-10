@@ -110,3 +110,6 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Phone frame page `/phone?session=` with Store and installed apps | [phone-apps](phone-apps.md) | | | |
 | Watch link on the hosted phone (`watch_url`, read-only, sign in to take over) | [agents](agents.md#watch-link-on-the-hosted-phone) | | | |
 | Hosted MCP sign-in with URL client ids (Client ID Metadata Documents) | [agents](agents.md) | | | |
+| Spec data source `refresh` (seconds) and `refresh_app` | [spec-blocks](spec-blocks.md#refresh-on-an-interval), [phone-apps](phone-apps.md) | | | |
+| Spec example gallery (habit tracker, workout log) | [spec-blocks](spec-blocks.md#example-specs) | | | |
+| Faster rebuild after a save in `shipvo run` and `sim --watch` | [run](run.md#edit-and-save-the-phone-updates) | | | |

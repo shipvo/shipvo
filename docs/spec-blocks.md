@@ -240,6 +240,24 @@ A data source can call a service with a key you saved once in the secret form. T
 | `secret_revoked` | The key was revoked. | Save it again; saving clears the revocation. |
 | `secret_domain` | The key is saved for a different service than the URL's host. No request was sent. | Save the key for this domain, or fix the URL. |
 
+## Refresh on an interval
+
+An `http` data source can reload itself while the app is installed on the phone. Add `refresh`, a number of seconds, to the source. To fetch right away, an assistant calls `refresh_app` (see [phone apps](phone-apps.md)). `refresh` on a `collection` or `computed` source is an error: `refresh is only for http data sources.`
+
+```json
+"rates": {
+  "source": "http",
+  "get": "https://api.example.com/rates",
+  "refresh": 60
+}
+```
+
+If a fetch fails, the source keeps its last good data and the screen does not change.
+
+## Example specs
+
+`packages/spec/gallery/` holds specs you can copy: a [habit tracker](../packages/spec/gallery/habit-tracker.json) and a [workout log](../packages/spec/gallery/workout-log.json). Each has a data collection, a computed total, a form, a bar chart and a list. `packages/spec/test/gallery.test.ts` checks that each one validates with no warnings, renders on the Android and iOS skins, and runs its action. Copy one, change the names, then call `validate` as in step 2 above.
+
 ## Errors you may see
 
 `validate` returns the JSON path and a fix for each error.
