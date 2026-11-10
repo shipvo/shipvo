@@ -109,6 +109,16 @@ Any spec app can turn a collection into CSV with the `csv()` function. Return it
 
 The first line holds the column names. Fields with commas, quotes or line breaks are quoted, and lists such as tags are joined with `; `. Leave the column list out to export every field. Spreadsheets treat a cell that starts with `=`, `+`, `-` or `@` as a formula. For text that other people typed, map the field first, for example `data.entries.map(r, {'note': has(r.note) && r.note.startsWith('=') ? "'" + r.note : (has(r.note) ? r.note : '')})`, then pass that list to `csv()`.
 
+## Import data from CSV
+
+`parseCsv(text)` is the other direction. It reads CSV text into a list of maps keyed by the header row, on Android and iOS alike. Quoted fields, CRLF or LF line ends and a leading byte order mark are read, and blank lines are skipped. Every value is text. A row with fewer cells than the header gets empty values.
+
+```json
+{ "actions": { "preview_import": { "description": "Read CSV text and return its rows.", "input": { "text": "text" }, "do": [ { "return": "{{ parseCsv(input.text) }}" } ] } } }
+```
+
+`parseCsv(csv(rows))` returns the same rows, with every value as text.
+
 ## Arrange the home screen
 
 `arrange_apps { session, id, pinned?, hidden?, position?, schedule? }` places an installed app. Pinned apps come first, then apps by `position` (0 first), then in install order. A hidden app is off the home screen but still installed, and `switch_app` still opens it. A `schedule` (`days`, `from`, `to`, for example Monday to Friday 08:00 to 18:00) shows the app only then. A window that crosses midnight belongs to the day it starts: `days: ["fri"], from: "22:00", to: "06:00"` shows Friday 22:00 until Saturday 06:00. `schedule: null` shows it always. Put a weekly planner on weekdays and weekend plans on Saturday, and the home screen follows the phone's clock.
