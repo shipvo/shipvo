@@ -1,0 +1,2 @@
+- Hosted simulator: a client that names a newer MCP protocol version than the server speaks, such as ChatGPT, now connects. The gateway maps an unknown `MCP-Protocol-Version` header to the newest version the server supports, so the handshake settles on that version instead of failing with a 400.
+- Migration: none.

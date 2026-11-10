@@ -57,7 +57,7 @@ The phone below is the finished Tide & Tackle sample shop, not your Sandbar Shop
 
 ![The shop template on a 390 by 844 phone screen. The heading says Sandbar Shop. Below it are five products with prices: Canvas tote $18.00, Enamel mug $12.00, Pocket notebook $6.50, Wool beanie $24.00 and Steel bottle $29.00.](/tutorials/your-own-shop/01-starter-list.png)
 
-Click a product, click **Add to cart**, click **Back**, then click **Cart**. You should see the product and a total. Nothing is charged: this template has no payment step yet.
+Click a product, click **Add to cart**, click **Back**, then click **Cart**. You should see the product and a total. Click **Pay** to pay for the cart. The order confirmation screen then appears with a Back to shop button.
 
 > **If something goes wrong.**
 > - `Port 4545 is in use`: the simulator is already running in another window. Close that window, or press Ctrl + C in it, and try again.
@@ -79,7 +79,7 @@ Your products live in one file: `src/data/products.json` inside the `sandbar` fo
 
 - `id`: a short name with no spaces. Customers never see it. Each product needs a different one.
 - `name`: what customers see on the list. Give every product a different name, and do not make one name a part of another, for example "Mug" and "Mug set".
-- `price`: the price **in cents**, with no dollar sign and no dot. `650` shows as `$6.50`. `1800` shows as `$18.00`.
+- `price`: the price **in cents**, with no dollar sign and no dot. `650` shows as `$6.50`. `1800` shows as `$18.00`. If you write `24.00` or `24`, the shop warns you in plain words (see Troubleshooting).
 - `description`: one or two sentences on the product page.
 
 This file is **JSON**, a plain way to write a list. Keep the quote marks, the curly brackets `{ }` and the commas exactly as they are. Every block ends with `},` except the last, which ends with `}`.
@@ -208,11 +208,16 @@ You:
 
 ## Change the currency
 
-Prices show in dollars until you change `src/data/shop.json`. Set `currency`, `position` (`before` or `after`), `decimals` and `locale`. For FCFA: `{ "currency": "FCFA", "position": "after", "decimals": 0, "locale": "fr-FR" }` shows `6 500 FCFA`. Prices in `products.json` stay whole minor units (6500 with `decimals` 0).
+Open `src/data/shop.json` and set `currency`, `code`, `position` (`before` or `after`), `decimals` and `locale`. `code` is the ISO 4217 code sent to the payment provider. For FCFA: `{ "currency": "FCFA", "code": "XAF", "position": "after", "decimals": 0, "locale": "fr-FR" }` shows `6 500 FCFA`. Prices in `products.json` stay whole numbers in the smallest unit (6500 with `decimals` 0, 650 with `decimals` 2).
 
 ## Troubleshooting
 
-- **The terminal prints `[shop] Fresh tilapia: price 6.5 is not a whole number...` or `...is less than one whole unit...`.** A price is written in dollars, not cents. Write `650` for $6.50 and `2400` for $24.00. The message tells you the number to use. `npm test` fails on the same check until you fix it.
+| What you see | Why | What to do |
+| --- | --- | --- |
+| A price shows as `$0.24` when you meant `$24` | JSON reads `24.00` as `24`, and `24` means 24 cents | Write `2400`. The shop prints `[shop] <name>: price 24 is less than one whole unit... write 2400 for 24.` when the app loads |
+| `[shop] <name>: price 6.5 is not a whole number` | A price has a dot | Write `650` for `6.50` |
+| `npm test` fails on "every price is in the smallest unit" | One or more prices have the problem above | Fix the prices the message names, then run `npm test` again |
+| Prices use the wrong symbol or order | `src/data/shop.json` still has the dollar defaults | See "Change the currency" |
 
 ## What we measured
 

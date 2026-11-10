@@ -51,7 +51,7 @@ Use this to check which keys your apps have saved, without anyone seeing the key
 6. To remove a key, tap **Revoke** on its row and confirm. The prompt says this cannot be undone. The key is deleted and its row disappears. Tap **Cancel** and nothing is sent. Apps that used the key can no longer call the service until you save a key again.
 7. Tap **Back** to return to Settings.
 
-With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate or revoke a key from a script.
+If a revoke does not go through, the screen shows "Could not revoke this key. Try again." and the row stays; tap **Revoke** again. With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate or revoke a key from a script.
 
 ## Open a web page in the phone's Browser
 
@@ -198,6 +198,7 @@ The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action in
 | `placement.… not valid, dropped` in the `warnings` of `import_phone_apps` | An exported layout has a field that is not valid | The valid fields were kept. Fix the field named in the warning and import again with `replace: true` |
 | `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
 | A scheduled app is missing from the home screen | Its schedule is not active at the phone's clock | Read the home text, which says when it starts; call `set_phone_time`, or `switch_app` still opens it |
+| `permission_denied` from an app action | You denied the permission the action needs | Allow it in Settings, in the app's permission row, then run the action again |
 | `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
 
 ## Next steps

@@ -109,7 +109,7 @@ ${frame.css}
 .top{position:fixed;left:12px;right:12px;top:10px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;z-index:6;pointer-events:none}
 .top>*{pointer-events:auto}
 .sheetbtn{flex:none;padding:3px 10px;border-radius:12px;border:0;background:#111;color:#fff;font-size:12px;cursor:pointer}
-.banner{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);max-width:min(90vw,640px);box-sizing:border-box;max-height:30vh;overflow:auto;padding:6px 12px;border-radius:8px;background:#b3261e;color:#fff;font-size:12px;white-space:pre-wrap;z-index:9}
+.banner{position:fixed;left:50%;top:10px;transform:translateX(-50%);max-width:min(90vw,640px);box-sizing:border-box;max-height:30vh;overflow:auto;padding:6px 12px;border-radius:8px;background:#b3261e;color:#fff;font-size:12px;white-space:pre-wrap;z-index:9}
 .banner[hidden]{display:none}
 .updating{position:fixed;left:50%;bottom:6px;transform:translateX(-50%);padding:4px 10px;border-radius:999px;background:#1d2530;color:#fff;font-size:12px;z-index:9}
 .updating[hidden]{display:none}
@@ -128,7 +128,8 @@ function sheet(on){sh.classList.toggle("open",on)}
 document.getElementById("sheetbtn").onclick=function(){sheet(!sh.classList.contains("open"))};
 sh.onclick=function(e){if(e.target===sh||e.target.getAttribute("data-act"))sheet(false)};
 addEventListener("message",function(e){var d=e.data;if(d&&d.type==="shipvo:system-sheet")sheet(d.open!==false)});
-function fit(){var pw=window.__runPanelWidth?window.__runPanelWidth():0;var t=document.getElementById("top"),b=document.getElementById("banner");var top=t.offsetHeight+20,bot=b.hidden?10:b.offsetHeight+20;var ah=Math.max(100,innerHeight-top-bot);var s=Math.min(1,(innerWidth-24-pw)/${frame.outerWidth},ah/${frame.outerHeight});var e=document.getElementById("fit");e.style.left="calc(50% - "+pw/2+"px)";e.style.top=(top+ah/2)+"px";e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${frame.outerWidth}px";e.style.height="${frame.outerHeight}px"}
+// The banner centres on the phone area (the window minus the open device panel). With the panel closed it sits below the panel's title so it never covers it. Its top is only set while it is visible.
+function fit(){var pw=window.__runPanelWidth?window.__runPanelWidth():0;var t=document.getElementById("top"),b=document.getElementById("banner");var top=t.offsetHeight+20,bot=10;if(!b.hidden){var P=document.getElementById("dpanel"),bt=top-10;b.style.left="calc(50% - "+pw/2+"px)";b.style.maxWidth=Math.min(640,innerWidth-24-pw)+"px";if(!pw&&P)bt=Math.max(bt,P.getBoundingClientRect().bottom+8);b.style.top=bt+"px";top=bt+b.offsetHeight+10}var ah=Math.max(100,innerHeight-top-bot);var s=Math.min(1,(innerWidth-24-pw)/${frame.outerWidth},ah/${frame.outerHeight});var e=document.getElementById("fit");e.style.left="calc(50% - "+pw/2+"px)";e.style.top=(top+ah/2)+"px";e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${frame.outerWidth}px";e.style.height="${frame.outerHeight}px"}
 addEventListener("resize",fit);fit();
 </script><script>${runPanelScript()}</script><script>${RELOAD_CLIENT}</script>${render.statusScript ? `<script>${render.statusScript("app", platform, { marketplace: (process.env.PN_CONTROL || "https://api.shipvo.dev").replace(/\/$/, "") }).replace(/<\/script/gi, "<\\/script")}</script>` : ""}${token ? `<script src="/__shipvo/bridge.js" data-token="${token}"></script>` : ""}</body></html>`;
 }
