@@ -2,6 +2,17 @@
 
 This page is for anyone who is switching laptops or joining a teammate's repo. You will end with the new machine able to publish updates to the phones that already have your app. One step matters a lot: the **signing seed**, a secret value that proves an update is yours (see the [glossary](glossary.md)).
 
+## Lost the seed? Rotate with your root key
+
+If you made a root key before the loss (`shipvo keys root`) and pinned it in your app, you can move installed apps to a new release key on Android and iOS. No new store build is needed. This path needs the root key made before the loss.
+
+```bash
+npx -y @shipvo/cli keys rotate sign --root-seed-file root-seed.txt --new-key <new release public key> --sequence 1 > rotation.json
+npx -y @shipvo/cli keys rotate upload rotation.json
+```
+
+Create the new release key with `shipvo keygen --out .shipvo/seed.txt` and use its public key for `--new-key`. Then publish with that key. [Key rotation](key-rotation.md) has the full steps and every option.
+
 ## What lives where
 
 | Thing | Where it lives | Lost with the old machine? | What to do |
@@ -9,7 +20,7 @@ This page is for anyone who is switching laptops or joining a teammate's repo. Y
 | Your code | Git | No | `git clone` |
 | Sign-in key (`shipvo login`) | `~/.shipvo` on the machine | Yes | Run `shipvo login` again (30 seconds) |
 | Publish token | `.shipvo/publish-token` | Yes | Run `shipvo app create` again; it issues a new token and revokes the old one |
-| **Release signing seed** | `.shipvo/seed.txt`, git-ignored | **Yes, and nobody can recover it** | Restore it from your backup with `shipvo keys import` |
+| **Release signing seed** | `.shipvo/seed.txt`, git-ignored | **Yes, and nobody can recover it** | Restore it from your backup with `shipvo keys import`, or rotate with your root key |
 
 The seed is the only thing that can update phones that already have your app installed, because every installed shell pins its public key. Shipvo never has your seed, by design, so we cannot reset it for you.
 
@@ -53,11 +64,12 @@ npx -y @shipvo/cli doctor
 
 The line `signing key matches shipvo.json publicKey` should pass.
 
-## If the seed is truly lost
+## If the seed is lost and there is no root key
 
-- Phones that already have the app keep working on the release they have. They will never accept another update.
-- Generate a new key (`shipvo keygen`), put the new public key in `shipvo.json`, build a new shell, and ask users to install it from the store again.
+- Phones that already have the app keep running the release they have.
+- Generate a new key (`shipvo keygen`), put the new public key in `shipvo.json`, build a new shell, and submit it to the Android and iOS stores. Users get updates again once they install it.
 - Apps listed on the Shipvo marketplace need `shipvo app create` to register the new key; contact us if the old registration blocks it.
+- To avoid this, create a root key now: see [Key rotation](key-rotation.md).
 
 So back it up once, today, even if you are not moving.
 

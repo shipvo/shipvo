@@ -120,7 +120,7 @@ npx shipvo rollback --to 3 --dry-run   # preview
 npx shipvo rollback --to 3
 ```
 
-This signs the code of release 3 as the next release number and publishes it to the bands you name (default all). It needs the control plane, so the preview reads from it too. `--bands` and `--platform` work as in `publish`.
+This signs the code of release 3 as the next release number and publishes it to the bands you name (default all). It needs the control plane, so the preview reads from it too. `--bands` and `--platform` work as in `publish`. If your app saves data on the phone and a newer release changed its layout, set `stateVersion` first: see [Rollbacks and stored data](rollbacks-and-stored-data.md).
 
 ## How Shipvo differs from CodePush
 
@@ -141,11 +141,12 @@ This signs the code of release 3 as the next release number and publishes it to 
 - **Users on the old build get no Shipvo update.** They need the new store binary from Step 5. Shipvo cannot update a build that does not contain its runtime.
 - **Installed apps refuse updates after you changed machines.** The signing seed is missing or different. Restore it with `shipvo keys import` ([new-machine.md](new-machine.md)).
 
-## Next
+## Next steps
 
 - [Build your first app](getting-started.md)
 - [Ship a fix, widen it and roll it back](tutorials/ship-a-fix.md)
 - [The CLI guide](cli.md) for every `publish`, `promote` and `rollback` option
 - [Back up your signing seed](new-machine.md)
+- [Rollbacks and stored data](rollbacks-and-stored-data.md)
 - [Self-hosting the control plane](self-hosting.md)
 - [Glossary](glossary.md)
