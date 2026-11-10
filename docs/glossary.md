@@ -164,3 +164,9 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Gallery.** Ready-made example specs (habit tracker, workout log, expense splitter and more) you can open on a phone and change. See [Spec blocks](spec-blocks.md#example-specs).
 
 **Parity.** How closely the simulator matches an Android emulator and an iOS Simulator: the same buttons with the same names on every screen. Shipvo measures it and publishes the result. See [Simulator vs device parity](parity-results.md).
+
+**Spend limit.** The most an installed app may spend in a month, set by you and only you. It starts at 0. See [Phone apps](phone-apps.md#set-a-spend-limit-for-an-app).
+
+**State version.** A whole number you raise whenever a release changes how your app saves data on the phone. Rollback uses it to stop before sending phones to code that cannot read their data. See [Rollbacks and stored data](rollbacks-and-stored-data.md).
+
+**Quiet tester.** A closed-test tester who has sent no report for 3 days or more. See [Store details](store.md#read-your-tester-numbers).

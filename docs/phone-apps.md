@@ -136,6 +136,19 @@ A `saveFile` step keeps text as a named file on the phone. It needs the `files` 
 
 `parseCsv(csv(rows))` returns the same rows, with every value as text.
 
+## Set a spend limit for an app
+
+For the person who owns the phone. Each installed app has a monthly spend limit that only you can set. It starts at 0, so no money moves until you raise it. An assistant cannot change it: a request with an assistant token gets `403`.
+
+Send these requests to the control plane with your signed-in session:
+
+```
+GET /phone/apps/<app>/spend-limit
+PUT /phone/apps/<app>/spend-limit   {"amount": 5000, "currency": "USD", "period": "month"}
+```
+
+`amount` is a whole number of minor units (5000 is 50.00 USD). `currency` is a three-letter capital code. `period` is `month`. Bad input gives `400` with `amount is a whole number of minor units, currency is a 3-letter code, period is month`. An amount over the limit is refused with `spend_limit`, plus `limit` and `spent` for the current month in the limit's currency. Each change and each refusal is written to an audit table. See the [threat model](threat-model.md#per-app-spend-limit-slice-5a-of-843).
+
 ## Arrange the home screen
 
 `arrange_apps { session, id, pinned?, hidden?, position?, schedule? }` places an installed app. Pinned apps come first, then apps by `position` (0 first), then in install order. A hidden app is off the home screen but still installed, and `switch_app` still opens it. A `schedule` (`days`, `from`, `to`, for example Monday to Friday 08:00 to 18:00) shows the app only then. A window that crosses midnight belongs to the day it starts: `days: ["fri"], from: "22:00", to: "06:00"` shows Friday 22:00 until Saturday 06:00. `schedule: null` shows it always. Put a weekly planner on weekdays and weekend plans on Saturday, and the home screen follows the phone's clock.
