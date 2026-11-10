@@ -172,7 +172,7 @@ test("use log lists time, app, host and outcome; empty says not used yet", async
   const uses = await loadUseLog(fetchFn, { app: "shop", name: "stripe" });
   assert.deepEqual(calls, ["/vault-ui/keys/shop/stripe/uses"]);
   const html = useLogHtml(uses);
-  for (const s of ["2026-11-10T09:00:00Z", "App: shop", "Host: api.stripe.com", "Outcome: allowed", "Host: evil.example", "Outcome: blocked"]) assert.ok(html.includes(s), s);
+  for (const s of ["datetime=\"2026-11-10T09:00:00Z\"", "10 Nov 2026, 09:00 UTC", "App: shop", "Host: api.stripe.com", "Outcome: allowed", "Host: evil.example", "Outcome: blocked"]) assert.ok(html.includes(s), s);
   const empty = useLogHtml(await loadUseLog(async () => ({ ok: true, json: async () => ({ uses: [] }) }), { app: "a", name: "b" }));
   assert.match(empty, /Not used yet\./);
   assert.match(useLogHtml(null), /Could not load/);
@@ -180,9 +180,12 @@ test("use log lists time, app, host and outcome; empty says not used yet", async
   const kids = [];
   const row = { querySelector: () => kids[0] || null, appendChild: (k) => kids.push(k) };
   const doc = { createElement: () => ({ setAttribute() {}, remove() { kids.length = 0; } }) };
-  const btn = { disabled: false, getAttribute: (n) => (n === "data-app" ? "shop" : "stripe") };
+  const attrs = {};
+  const btn = { disabled: false, setAttribute: (n, v) => { attrs[n] = v; }, getAttribute: (n) => (n === "data-app" ? "shop" : "stripe") };
   await useLogClick(btn, row, fetchFn, doc);
   assert.equal(kids.length, 1);
+  assert.equal(attrs["aria-expanded"], "true");
   await useLogClick(btn, row, fetchFn, doc);
   assert.equal(kids.length, 0);
+  assert.equal(attrs["aria-expanded"], "false");
 });
