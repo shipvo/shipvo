@@ -15,12 +15,13 @@ const sid = z.string().describe("Session from open_app");
 const compact = z.boolean().optional().describe("When the change is 'content changed', return only the added/removed lines, not the whole screen");
 const CH = " The result starts with 'Change: none | content changed | new screen | scrolled'.";
 const ASYNC = " Work that starts on a tap (paying, saving, loading) can finish after this returns, so the screen may show 'Paying...' or a spinner. Do not report that as the result: pass wait_for with the text you expect (and gone: true for the spinner), or settle: true, before you read the outcome or do anything else.";
-const waitFor = z.object({ ref: z.string().regex(/^e\d+$/).optional(), text: z.string().optional(), role: z.string().optional(), name: z.string().optional(), gone: z.boolean().optional() })
+const REF = /^(?:p\d+|f\d+)?e\d+$/;   // e42, or with the prefix the phone adds after a restart or reload (f1e42, p1e42)
+const waitFor = z.object({ ref: z.string().regex(REF).optional(), text: z.string().optional(), role: z.string().optional(), name: z.string().optional(), gone: z.boolean().optional() })
   .refine((w) => wantsMatch(w), "give ref, text, or role and name").optional()
   .describe("Use after any action that starts work. Wait until this appears (a ref, a text, or role+name), or disappears with gone: true. The result says Waited: matched or timed out.");
 const timeoutMs = z.number().int().min(0).max(30000).optional().describe("How long wait_for and settle may take, in ms (default 2000)");
 const settle = z.boolean().optional().describe("Wait until the screen stops changing (two equal reads 100 ms apart), up to timeout_ms. Use after any action that starts work. A slow result can still follow a pause, so prefer wait_for when you know the expected text.");
-const ref = z.string().regex(/^e\d+$/).describe("Element ref from the screen, e.g. e42");
+const ref = z.string().regex(REF).describe("Element ref from the screen, e.g. e42. After a restart refs can carry a prefix, such as f1e42; use them exactly as the screen shows them.");
 const bref = z.string().regex(/^(?:f\d+)?e\d+$/).describe("Element ref from browser_snapshot, e.g. e12 or f1e12");
 
 export type ToolDef<S extends ZodRawShape = ZodRawShape> = {
