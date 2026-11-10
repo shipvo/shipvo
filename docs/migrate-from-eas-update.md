@@ -1,6 +1,8 @@
 # Migrate from EAS Update to Shipvo
 
-This guide moves an Expo app that uses `expo-updates` (EAS Update) to Shipvo over-the-air updates. `shipvo migrate --plan` (`packages/cli/src/migrate.ts`) prints the plan for your app. It only reads; it changes no files. `shipvo migrate --apply` makes the safe edits for you (see below). You do the other steps by hand.
+This guide is for developers of an Expo app that uses `expo-updates`. You will end with the same app sending signed Shipvo updates, with staged rollout and rollback.
+
+The steps below move it from EAS Update to Shipvo over-the-air updates. `shipvo migrate --plan` (`packages/cli/src/migrate.ts`) prints the plan for your app. It only reads; it changes no files. `shipvo migrate --apply` makes the safe edits for you (see below). You do the other steps by hand.
 
 Facts about `expo-updates` are from the [Expo EAS Update docs](https://docs.expo.dev/eas-update/introduction/).
 
@@ -92,4 +94,20 @@ After `shipvo migrate --apply` and `shipvo init --yes` on that copy, `init` prin
 - Release status: `shipvo status`, and the control plane admin at `/app/<id>/admin` for content, orders and the owner API (see [getting-started.md](getting-started.md)).
 - Channels and branches: group devices with bands.
 
-See also [Migrate from CodePush](migrate-from-codepush.md) and [cli.md](cli.md).
+
+## Troubleshooting
+
+| You see | Why | What to do |
+| --- | --- | --- |
+| `shipvo init` stops and mentions `expo-updates` | Two update systems in one build would fight over the bundle. | Run `shipvo migrate --plan`, then `shipvo migrate --apply`, then `shipvo init`. |
+| `Git tree is not clean (N changed path(s))` | `--apply` will not edit over uncommitted work. | Commit or stash, or pass `--force`. Backups go in `.shipvo/migrate-backup/`. |
+| `shipvo migrate needs --plan ... or --apply` | No mode flag. | Add `--plan` or `--apply`. |
+| `Use --plan or --apply, not both.` | Both flags were given. | Run them one at a time. |
+| The plan says to check the config by hand | The app uses `app.config.js` or `app.config.ts`, which the command does not read or edit. | Remove the `expo-updates` plugin and the `updates` and `runtimeVersion` keys yourself. |
+| Phones still get EAS updates | Binaries already installed keep using EAS Update. | Ship a new store build. Only that build uses Shipvo. |
+
+## Next steps
+
+- [Back up your signing key](new-machine.md) before the first publish.
+- [CLI guide](cli.md) for `publish`, staged rollout and `rollback`.
+- [Migrate from CodePush](migrate-from-codepush.md) if you have another app on CodePush.
