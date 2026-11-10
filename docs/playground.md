@@ -23,7 +23,7 @@ Pick a panel from the feature list to try one feature.
    - In the console, pick a tool (`screen`, `tap`, `type` or `device_log`), fill in its arguments and press Run. The result appears as JSON below. Run `screen` first: it lists the labelled elements with refs such as `e1`. Then `tap` with `ref` set to `e1` adds the first product to the cart.
    - **Watch Lumi** runs [Lumi](lumi.md) on the sample app. It adds three items to the cart per run and shows a caption for each tap.
    - These are the same tools your assistant uses over MCP. See [Agents](agents.md).
-4. **Many phones.** Shows 1 to 12 phones side by side. Set the number and choose Android, iOS or both. The page starts with 4 phones, Android and iOS together. Numbers outside 1 to 12 are moved to the nearest valid number.
+4. **Many phones.** Shows 1 to 12 phones side by side. Set the number and choose Android, iOS or both. The page starts with 4 phones, Android and iOS together. Numbers above 12 become 12 and numbers below 1 become 1.
 
 ## Share a setup with a link
 
@@ -39,7 +39,7 @@ https://shipvo.dev/playground/?phones=6&mix=both&dark=1#many
 | `mix` | `android`, `ios` or `both` | `both` |
 | `dark`, `large`, `rtl` | `1` to turn on dark mode, large text or right-to-left text | off |
 
-A number above 12 becomes 12 and a number below 1 becomes 1. Any other value for `phones` or `mix` falls back to the default, so a link never breaks the page. Other panels open from their own address: `#agent`, `#many`, and so on. `?platform=android` or `?platform=ios` picks the skin.
+For `phones`, a number above 12 becomes 12, and 0 or a negative number becomes 1. Decimals are rounded first. A value that is not a number falls back to 4. A `mix` other than `android`, `ios` or `both` falls back to `both`, so a link never breaks the page. Other panels open from their own address: `#agent`, `#many`, and so on. `?platform=android` or `?platform=ios` picks the skin.
 
 ## Troubleshooting
 

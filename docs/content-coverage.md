@@ -27,10 +27,10 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Small patches (bsdiff) | [spike-results](spike-results.md) | | | [react-native-ota-update-size-bsdiff-patches](../blog/react-native-ota-update-size-bsdiff-patches.md) |
 | Staged rollout by cohort | [cli](cli.md) | [ship-a-fix](tutorials/ship-a-fix.md) | | [staged-rollouts](../blog/staged-rollouts.md) |
 | Rollback and crash-loop protection | [cli](cli.md) | [ship-a-fix](tutorials/ship-a-fix.md) | | [roll-back-a-bad-react-native-update](../blog/roll-back-a-bad-react-native-update.md) |
-| Agent simulator over MCP | [agents](agents.md#trace-context) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | [Have an AI assistant test your shop](videos.md) | [mcp-servers-for-mobile-app-testing](../blog/mcp-servers-for-mobile-app-testing.md) |
+| Agent simulator over MCP | [agents](agents.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | [Have an AI assistant test your shop](videos.md) | [mcp-servers-for-mobile-app-testing](../blog/mcp-servers-for-mobile-app-testing.md) |
 | Test your app with Claude, ChatGPT or Cursor | [test-with-an-assistant](test-with-an-assistant.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | [Have an AI assistant test your shop](videos.md) | [your-assistant-can-test-your-app](../blog/your-assistant-can-test-your-app.md) |
 | Typed tests (`@shipvo/test`) and `export_test` | [testing](testing.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | | [the-bug-our-first-typed-test-found](../blog/the-bug-our-first-typed-test-found.md) |
-| `shipvo explore` (walk every button) | [agents](agents.md#trace-context) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | | |
+| `shipvo explore` (walk every button) | [agents](agents.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | | |
 | Check every pull request (`shipvo ci init --check`) | [ci-check](ci-check.md) | | | |
 | Measured simulator parity | [parity-results](parity-results.md) | | | |
 | Simulated device features (camera, location, payment, biometrics, notifications) | [device-api](device-api.md) | | | [the-permission-you-never-test](../blog/the-permission-you-never-test.md) |
@@ -48,20 +48,20 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Release policy and `--dry-run-policy` | [CLI guide](cli.md) | | | |
 | Audit log and `shipvo audit` | [CLI guide](cli.md) | | | |
 | `shipvo auto-halt` | [CLI guide](cli.md), [self-hosting](self-hosting.md) | [ship-a-fix](tutorials/ship-a-fix.md) | | |
-| MCP delivery results, `wait_for`, `settle` | [agents](agents.md#trace-context), [mcp](../packages/mcp/README.md) | | | |
+| MCP delivery results, `wait_for`, `settle` | [agents](agents.md), [mcp](../packages/mcp/README.md) | | | |
 | `shipvo run android\|ios` (phone frame in your browser) | [run](run.md) | [run-your-app-on-a-phone](tutorials/run-your-app-on-a-phone.md) | [See your app on a phone in your browser](videos.md#see-your-app-on-a-phone-in-your-browser-with-shipvo-run) | [see-your-react-native-app-on-a-phone-in-your-browser](../blog/see-your-react-native-app-on-a-phone-in-your-browser.md) |
-| Assistant attaches to the live `shipvo run` phone (`open_app`, with `platform` and `show` to start the phone and watch) | [run](run.md), [agents](agents.md#trace-context) | | | |
+| Assistant attaches to the live `shipvo run` phone (`open_app`, with `platform` and `show` to start the phone and watch) | [run](run.md), [agents](agents.md) | | | |
 | Record demo videos (`record_start`, `record_marker`, `record_stop`) | [record](record.md), [worked example](record-a-demo-video.md) | | | |
 | Shipvo Testers and `shipvo store testers` | [store](store.md), [get-your-12-testers](tutorials/get-your-12-testers.md) | [get-your-12-testers](tutorials/get-your-12-testers.md) | [Get your 12 Google Play testers](videos.md) | [google-play-12-testers-14-days](../blog/google-play-12-testers-14-days.md) |
 | Real camera, microphone and location in the browser | [device-api](device-api.md) | | | |
 | Gate a rollout on test results (`shipvo promote --report`, `--report-md`) | [testing](testing.md), [cli](cli.md) | | | |
 | Test secrets (`secret(name)`, `{secret:NAME}`) | [testing](testing.md) | | | |
-| The `shipvo` skill for coding agents | [agents](agents.md#trace-context) | | | |
+| The `shipvo` skill for coding agents | [agents](agents.md) | | | |
 | Policy enforced by the control plane (weekday, staged rollout, max band) | [cli](cli.md) | | | |
 | Hosted MCP `server/discover` support | [mcp](../packages/mcp/README.md) | | | |
 | Phone Settings screen (`get_settings`, `set_setting`) | [phone-apps](phone-apps.md) | | | [test-dark-mode-large-text-and-rtl-in-react-native](../blog/test-dark-mode-large-text-and-rtl-in-react-native.md) |
 | Phone Browser app (`browser_*` tools) | [phone-apps](phone-apps.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
-| Phone home, recents, shade and power controls | [agents](agents.md#trace-context), [phone-apps](phone-apps.md) | | | |
+| Phone home, recents, shade and power controls | [agents](agents.md), [phone-apps](phone-apps.md) | | | |
 | Lumi on Shipvo Phone (captions, reactions, first-run guide) | [lumi](lumi.md) | [test-your-app-with-lumi](tutorials/test-your-app-with-lumi.md) | | [lumi-tests-your-app-while-you-watch](../blog/lumi-tests-your-app-while-you-watch.md) |
 | `shipvo lumi` (test your app while you watch) | [lumi](lumi.md), [cli](cli.md) | [test-your-app-with-lumi](tutorials/test-your-app-with-lumi.md) | [Have Lumi test your app while you watch](videos.md#have-lumi-test-your-app-while-you-watch) | [lumi-tests-your-app-while-you-watch](../blog/lumi-tests-your-app-while-you-watch.md) |
 | Network profiles (`set_network_profile`, `device.net.type`) | [device-api](device-api.md#network-profiles) | | | |
@@ -71,7 +71,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Network off blocks the app's network calls (`TypeError: Network request failed`) | [device-api](device-api.md#network) | | | |
 | Payment cancel returns `cancelled` (`@shipvo/device` 0.1.5) | [device-api](device-api.md#payments) | | | |
 | Deep links: `open_url` and `Linking.openURL` switch to the owning app; one-shot initial URL | [phone-apps](phone-apps.md) | | | [test-links-that-leave-your-app](../blog/test-links-that-leave-your-app.md) |
-| `shipvo agents setup` writes the MCP config for every coding agent (`--for`, `--all`, `--global`, `shipvo mcp`) | [cli](cli.md), [agents](agents.md#trace-context) | | | |
+| `shipvo agents setup` writes the MCP config for every coding agent (`--for`, `--all`, `--global`, `shipvo mcp`) | [cli](cli.md), [agents](agents.md) | | | |
 | Spec blocks (chart, stat, progress, card, toggle, segmented, sheet navigation) | [spec-blocks](spec-blocks.md), [spec](../packages/spec/README.md) | | | |
 | Pull-request screenshots before and after (`shipvo ci shots`) | [ci-check](ci-check.md) | | | |
 | Lumi findings saved as tests (`shipvo explore --save-tests`) | [lumi](lumi.md) | | | |
@@ -82,10 +82,10 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Rooms: phones in one room share one backend (`open_app room`, `list_sessions`) | [agents](agents.md#rooms-several-phones-one-backend) | | | |
 | `shipvo agents setup --hosted` writes the hosted phone config | [cli](cli.md) | | | |
 | Data sources that use a saved key (`auth.secret`, `secret_revoked`, `secret_domain`) | [spec-blocks](spec-blocks.md#data-sources-that-use-a-saved-key) | | | |
-| `open_app` with `platform` and `show` opens the phone in your browser | [agents](agents.md#trace-context), [run](run.md) | | | |
+| `open_app` with `platform` and `show` opens the phone in your browser | [agents](agents.md), [run](run.md) | | | |
 | Fuller shop template checkout (plain payment errors, offline message, Undo, confirmation screen) | [getting-started](getting-started.md#the-shop-checkout) | | | |
 | Watch the agent's phone live (`/watch`) | [agents](agents.md#watch-the-agents-phone) | | | |
-| Hosted MCP sign-in discovery (OAuth metadata, dynamic client registration) | [agents](agents.md#trace-context) | | | |
+| Hosted MCP sign-in discovery (OAuth metadata, dynamic client registration) | [agents](agents.md) | | | |
 | Kanban and timeline spec blocks (`App.move`) | [spec-blocks](spec-blocks.md#boards-and-timelines) | | | |
 | Spec `vector` block and `motion` (fade, slide, scale, countUp, pulse) | [spec-blocks](spec-blocks.md#vector-drawings) | | | |
 | Spec translations, locale formatting and right-to-left | [spec-blocks](spec-blocks.md#translations-and-right-to-left) | | | |
