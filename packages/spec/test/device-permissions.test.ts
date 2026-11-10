@@ -34,4 +34,32 @@ describe("device permissions on actions", () => {
     expect(r.app.call("ping").ok).toBe(true);
     expect(r.app.state.n).toBe(1);
   });
+
+  const scan = {
+    ...spec,
+    permissions: { device: ["camera", "files"] },
+    screens: [
+      { id: "home", body: [{ type: "text", value: "Hi" }] },
+      { id: "scan", body: [{ type: "stack", children: [{ type: "scanner", label: "Scan" }] }] },
+      { id: "upload", body: [{ type: "file", label: "Receipt" }] },
+    ],
+    actions: {
+      open_scan: { do: [{ navigate: "scan" }] },
+      open_upload: { do: [{ if: "{{ true }}", then: [{ navigate: "upload" }] }] },
+      open_home: { do: [{ navigate: "home" }] },
+    },
+  };
+  it("finds permissions for blocks on a screen an action opens", () => {
+    expect(actionDeviceNeeds(scan, "open_scan")).toEqual(["camera"]);
+    expect(actionDeviceNeeds(scan, "open_upload")).toEqual(["files"]);
+    expect(actionDeviceNeeds(scan, "open_home")).toEqual([]);
+  });
+  it("a denied camera gives permission_denied and the screen does not open", () => {
+    const r = createApp(scan, { devicePermissions: { camera: false } });
+    if (!r.ok) throw new Error("bad spec");
+    const out = r.app.call("open_scan");
+    expect("error" in out && out.error).toMatch(/^permission_denied: .*"camera"/);
+    expect(r.app.screen).toBe("home");
+    expect(r.app.call("open_upload").ok).toBe(true);
+  });
 });
