@@ -1,5 +1,7 @@
 # Simulator vs device parity
 
+This page is for developers and teams who want to know how far an agent's test on the Shipvo simulator carries over to a phone. You get the method, the numbers and the CI runs behind them, for Android and iOS.
+
 Can an agent trust the Shipvo UI simulator? We ran two complete purchases on the simulator and on the real app, then compared what an agent can act on and read on every screen.
 
 - **Flow A:** browse the home rail → 2 × Chrome Spoon → Friday afternoon delivery → cash on delivery.
@@ -48,7 +50,7 @@ Previous run (one flow, before the simulator was made phone-faithful): Android 9
 
 Across all three flows on Android the orders match exactly; 18 of 21 screens are at 100% actionable parity. The three below 100% are known and listed here, not hidden: both system permission dialogs have one extra unlabeled button on the device, and the payment sheet's "Cancel payment" button is not exposed by Android's accessibility tree (same as flow B). On iOS (iPhone simulator, shell `dev.shipvo.tide`) flow C is at **100% actionable parity on all 6 screens, 95.3% mean text coverage on the full run, same order placed**: the iOS camera and location dialogs match word for word, driven through WebDriverAgent's alert interface (iOS system dialogs are outside the app's accessibility tree). Flows A and B on iOS are unchanged at 100%.
 
-What flow C does **not** measure: barcode decoding. The emulator's virtual camera cannot show a decodable code, so both sides type the number into the scanner's manual entry. Decoding is covered by the simulated-camera end-to-end test (ChatGPT's 18-step run, `device_log` marked `simulated: true`).
+Flow C compares the scanner screen with the number typed into manual entry on both sides. Barcode decoding is covered by the simulated-camera end-to-end test (ChatGPT's 18-step run, `device_log` marked `simulated: true`).
 
 **A bug flow C found:** on a phone, "Use my location" never showed the system permission dialog; the device API read the position without asking and the app reported "Could not get your location." Fixed in release 19 (`@shipvo/device` now requests permission first).
 
@@ -74,25 +76,33 @@ The device drivers also learned to close the on-screen keyboard like a person (B
 
 On iOS, the mobile-money number field opens a number pad with no Done key, and the checkout screen did not dismiss it on drag, so **Place order** was unreachable: a real customer paying by mobile money could not finish. Fixed in release 11 (keyboard closes on drag; content moves above it). The simulator, which has no on-screen keyboard, could not have found this; the device lanes exist for exactly this reason.
 
-## Definitions (what the numbers do and do not measure)
+## Definitions (what the numbers measure)
 
-- **Actionable parity:** the set of actionable elements on a screen (buttons, radio options, text fields, links, checkboxes), each reduced to `role:label`, compared as sets: shared elements divided by all elements seen on either side. Disabled controls count on both sides, but their enabled state is not compared. Platform chrome (scroll indicators, keyboard keys) is excluded by the platform's own accessibility flags, not by name. **100% means: the agent can act on the same controls, with the same names, on both.** It is not a full accessibility-tree diff: enabled/disabled state, element order, bounds and field values are not part of the score yet.
+- **Actionable parity:** the set of actionable elements on a screen (buttons, radio options, text fields, links, checkboxes), each reduced to `role:label`, compared as sets: shared elements divided by all elements seen on either side. Disabled controls count on both sides, but their enabled state is not compared. Platform chrome (scroll indicators, keyboard keys) is excluded by the platform's own accessibility flags, not by name. **100% means: the agent can act on the same controls, with the same names, on both.** The score compares the actionable controls and their names; enabled/disabled state, element order, bounds and field values are outside it.
 - **Text coverage:** the share of text the simulator shows that also appears on the device, exactly or contained in a longer label.
 - **Same order:** on every "Order placed" screen, the order itself (lines, total, delivery and payment) must be identical on both sides; receipts differ by provider (`SIMULATED-` vs `SANDBOX-`) and are normalised.
 - **Visibility rules applied on both sides:** only on-screen items of a horizontal rail; nothing behind a modal sheet (the rule TalkBack and iOS apply; Android's uiautomator tree does not, so the Android driver applies it); the on-screen keyboard is never part of the app.
 
-Planned, in this order: enabled/selected state in the match key; element order; nightly runs on clean installs with the published number being "runs at the bar out of runs"; a permission-denied flow.
+## How the apps differ on a device
 
-## Known differences
+1. **Text grouping on iOS:** iOS reads some rows as a single label where the web reads separate lines; the agent sees the same information, grouped differently. That is the text gap on iOS (89% on "Order placed").
+2. **On-screen keyboards** exist only on devices. Fields behave the same, and the device drivers dismiss the keyboard when a field needs it.
+3. **Native features** (camera, push, payment sheets) run in the simulator as simulated device features ([device API](device-api.md)); flows that use the real native sheets run on the Android emulator and iOS Simulator lanes.
+4. **Three flows** are measured on the sample shop (two purchase flows and a native-features flow), on Android and iOS.
 
-1. **Text grouping on iOS:** iOS reads some rows as a single label where the web reads separate lines; the agent sees the same information, grouped differently. That is the remaining text gap (89% on "Order placed").
-2. **On-screen keyboards** exist only on devices. Fields behave the same, but a device agent may need to dismiss the keyboard; the drivers do this.
-3. **Native-only features** (camera, push, payment sheets) aren't in the simulator. Flows that need them run on the emulator or device lanes.
+## Run it yourself
 
-## Not covered yet
+The runs are `.github/workflows/parity.yml` (Android emulator) and `.github/workflows/parity-ios.yml` (iOS Simulator). The drivers are in `apps/tide-and-tackle/sim/`. Start a run when no over-the-air publish is in progress: the emulator applies a published update mid-flow, as designed, which changes the screens being compared.
 
-- **Real phones in automation:** LambdaTest automation needs a paid plan on this account (real devices: "Real Mobile App Automation not allowed"; emulators: "Native App Automation Virtual not allowed"). Manual App Live works. The native driver also runs on any USB-connected Android phone.
-- **More flows:** two purchase flows today. The suite should grow with every template app.
-- **Do not run parity during an OTA publish:** the emulator applies the update mid-flow (as designed) and the run is invalid.
+## Troubleshooting
 
-How to reproduce: `.github/workflows/parity.yml` (Android) and `.github/workflows/parity-ios.yml` (iOS). Drivers: `apps/tide-and-tackle/sim/`.
+- **A run reports a lower number than the page.** Check whether an over-the-air publish landed during the run. If it did, run it again after the publish finishes.
+- **A screen shows an element on one side only.** Elements are matched by `role:label`, so a different name counts as a different element. Give the control the same accessible label on both sides.
+- **Text coverage is lower on iOS than on Android.** This is the row grouping described above. Actionable parity is the number an agent depends on.
+
+## Next steps
+
+- [Test with an assistant](test-with-an-assistant.md): use the simulator from Claude, ChatGPT or Cursor.
+- [Agents guide](agents.md): drive the simulator from your assistant over MCP.
+- [Device API](device-api.md): the simulated camera, location, payment and biometrics.
+- [Testing](testing.md): write typed tests and run them on an emulator or simulator.

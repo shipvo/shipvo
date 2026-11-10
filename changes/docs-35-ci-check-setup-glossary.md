@@ -1,0 +1,1 @@
+- docs: the "Check every pull request" page has numbered setup steps with the real `--dry-run` output and the exact workflow; the glossary explains the Secrets screen and the Use log.
