@@ -1,0 +1,2 @@
+- `@shipvo/sim`: the Secrets screen has a Use log button on each saved key. It shows the time, app, host and outcome of each use, in the Android and iOS skins. A key that was never used shows "Not used yet."
+- Migration: none.

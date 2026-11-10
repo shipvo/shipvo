@@ -1,6 +1,6 @@
 # Self-hosting the control plane
 
-The control plane is one Cloudflare Worker (Hono) with a KV namespace and a D1 database. It serves signed release pointers and bundles from the edge, stores content, orders and telemetry, and hosts the per-app admin and owner API. Free-tier Cloudflare is enough to start.
+The control plane is one Cloudflare Worker (Hono) with a KV namespace and a D1 database. It serves signed release pointers and bundles from the edge, stores content, orders and telemetry, and hosts the per-app admin and owner API. This page is for anyone who wants to run their own control plane. You get a working update server on your own Cloudflare account, or on your machine with Docker.
 
 ## Deploy
 
@@ -37,11 +37,11 @@ node ../../scripts/selfhost-smoke.mjs   # in another terminal; prints PASS
 
 On start, the container applies the files in `migrations/` to a local D1 database and adds a local developer key (`SHIPVO_LOCAL_DEV_KEY`, default `sv_test_localdev`). The smoke script uses that key to create an app, publish a signed pointer and read it back. Set the variable to something else if other people can reach your machine, and pass the same value to the script. The value may only contain letters, digits, `_` and `-`. When you change it, the container revokes the earlier local developer key on the next start. The smoke script needs Node 18 or later on the host.
 
-Not covered:
-- No public URL and no TLS. The port is bound to `127.0.0.1` only.
+What the local setup gives you:
+- The port is bound to `127.0.0.1`, so only your machine can reach it.
 - Data lives in the Docker volume `control-plane-data` (`/data` in the container). `docker compose down -v` deletes it.
-- `ADMIN_PASSWORD` and `OWNER_TOKEN` are not set, and GitHub login does not work offline, so only the routes the smoke script uses are exercised.
-- This is not a production setup.
+- The routes the smoke script uses: create an app, publish a signed pointer, read it back. `ADMIN_PASSWORD` and `OWNER_TOKEN` are not set, and GitHub login needs the network.
+- For a public URL with TLS, use the Cloudflare deploy above.
 
 ## D1 Free plan limits
 
@@ -186,10 +186,35 @@ To stop a mismatched bundle at publish time, set `hermesBytecodeVersion` in `shi
 
 `shipvo publish` lists the dependencies in `package.json` that have native code (an `android/` or `ios/` folder, a podspec, or an Expo or React Native config file in `node_modules`) and writes them to the signed release as `required_native_modules`, a map of package name to semver range. `--dry-run` prints the list. A shell may declare `native_modules` (package name to version) and send them as `?nm=name@1.2.3,other@2.0.0` on the pointer request. When both sides are known, the control plane does not offer the release and answers 404 with `native_module_missing` (the shell lacks the module) or `native_module_version` (its version is outside the range), plus the `module` name. If either side is absent, the release is offered. The runtime does not send `?nm=` yet.
 
-Limits. The recorded range is the one in `package.json`, not the installed version. `react-native` and `expo` have native code too, so they are recorded: a shell that sends `?nm=` must list them in `native_modules`, or every release is refused. Ranges that are not plain numeric semver (tags, git, `workspace:`, pre-release such as `^1.0.0-beta.1`) are not recorded, and `shipvo publish` prints a note naming them. An empty `?nm=` means the shell has no native modules.
+The recorded range is the one in `package.json`, not the installed version. `react-native` and `expo` have native code too, so they are recorded: a shell that sends `?nm=` must list them in `native_modules`, or every release is refused. Ranges that are not plain numeric semver (tags, git, `workspace:`, pre-release such as `^1.0.0-beta.1`) are not recorded, and `shipvo publish` prints a note naming them. An empty `?nm=` means the shell has no native modules.
 
 ## Trust model, in one paragraph
 
 The full threat table, with the code and test behind each row and a list of gaps, is in [docs/threat-model.md](threat-model.md).
 
 The shell carries the Ed25519 public key and the control plane URL as native manifest meta-data. Pointers are signed with the matching seed, which lives only in your CI secrets; the control plane never has it, so a compromised control plane can serve stale or no releases but cannot forge one. Bundles are verified by SHA-256 and size before staging; patches are verified by the hash of the *result*. A release can never add a permission the shell did not declare, because it is JavaScript running on the shell's native modules.
+
+## Troubleshooting
+
+| You see | Why | Fix |
+| --- | --- | --- |
+| `wrangler d1 migrations apply` says the database is not found | `database_id` in `wrangler.toml` is not the id printed by `wrangler d1 create` | Copy the id again into `d1_databases[0].database_id`, then re-run the migration command with `--remote` |
+| `/health` does not answer `{ "ok": true }` after `wrangler deploy` | The Worker is not deployed under the name you opened | Open the URL `wrangler deploy` printed, or check `name` in `wrangler.toml` |
+| `docker compose up` works but the smoke script fails to sign in | The script and the container use different `SHIPVO_LOCAL_DEV_KEY` values | Pass the same value to both. It may only hold letters, digits, `_` and `-` |
+| Data is gone after restarting the container | `docker compose down -v` deletes the `control-plane-data` volume | Use `docker compose down` without `-v`, or restore a backup (see [Restore](#restore)) |
+| Phones keep the current release and the pointer answers 404 `release_halted` | [Auto-halt](auto-halt.md) stopped the live release | Publish a new release; it clears the effect |
+| `restore` refuses to run | The volume already holds data | Run `docker compose down -v` first, then restore into the empty volume |
+| `selfhost-upgrade-check.mjs verify` exits 1 | The earlier pointer is no longer served | Read the message it prints, then follow [Roll back](#roll-back) |
+| A call returns 403 `forbidden` with an `action` and a `role` | The publish token's role does not allow that action | Use a token with a role that does (see [Roles](#roles)), or the owner token |
+| Dashboards show fewer events than expected and `telemetry_dropped_today` in `/health` is above 0 | D1 refused some telemetry writes (see above) | Wait for the daily reset or move to a paid plan. Release pointers keep flowing |
+| `set_alert_webhook` answers `bad_webhook_url` | The URL is `http://` or contains a user name or password | Use an `https://` URL without credentials |
+
+Run `shipvo doctor` from your app folder for a check of the control plane URL and key.
+
+## Next steps
+
+- [Back up and upgrade](#back-up-and-upgrade) before your first real release.
+- [Auto-halt](auto-halt.md): stop a bad release on its own.
+- [Telemetry export](telemetry-export.md): query events with SQL.
+- [Key rotation](key-rotation.md): replace the signing key without a new shell.
+- [CLI guide](cli.md): every command that talks to the control plane.

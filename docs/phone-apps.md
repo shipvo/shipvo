@@ -46,11 +46,11 @@ Use this to check which keys your apps have saved, without anyone seeing the key
 1. Open the phone in your browser with `shipvo run` or `shipvo sim`.
 2. Tap Settings, then tap **Secrets**.
 3. Each saved key shows its name, the app, the domain it may call, its access, and when it was last used ("never" if it has not been used).
-4. To remove a key, tap **Revoke** under it and confirm the prompt "Revoke <name> for <app>?". The key is deleted, apps can no longer use it, and the row disappears. This cannot be undone. Revoking the last key brings back "No saved keys yet."
-5. To replace a key, tap **Rotate** under it. The screen shows a one-time link; open it to save the new key. If rotating fails, the screen shows "Could not rotate this key. Try again."
+4. To replace a key, tap **Rotate** next to it. The screen shows a one-time link. Open that link and paste the new value there. The old value keeps working until you do. Only web links (http or https) are shown, and the key value is never displayed.
+5. To remove a key, tap **Revoke** on its row and confirm. The prompt says this cannot be undone. The key is deleted and its row disappears. Tap **Cancel** and nothing is sent. Apps that used the key can no longer call the service until you save a key again.
 6. Tap **Back** to return to Settings.
 
-If a revoke does not go through, the screen shows "Could not revoke this key. Try again." and the row stays; tap **Revoke** again. With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate a key or revoke it from code.
+If a revoke does not go through, the screen shows "Could not revoke this key. Try again." and the row stays; tap **Revoke** again. With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate or revoke a key from a script.
 
 ## Open a web page in the phone's Browser
 
@@ -128,6 +128,12 @@ If the marketplace cannot be reached, `list_store_apps` returns `store_unreachab
 
 Switching sets `current_app` and brings the app to the front. If the app's bundle URL starts with `http`, the session loads it. Other URLs (such as the fixture's) only change state.
 
+### Device permissions per app
+
+The Store's install card lists every device permission an app declares (for example `notifications` or `location`), with an Allow or Deny switch for each. Your answers are kept per app in `installed_apps[].permissions`, saved in `phone.json` (`apps[].permissions`) and carried by `export_phone_apps` and `import_phone_apps`. Settings has one switch per app and permission, so you can change an answer later. `install_app` returns `declared` and `permissions`.
+
+An action that needs a denied permission (a `notify` step needs `notifications`) returns `permission_denied` naming the permission, and nothing else in the action runs. The sim action `set_app_permission { id, permission, allowed }` sets an answer; it returns `not_declared` for a permission the app did not declare.
+
 ### Start from a `phone.json`
 
 A `phone.json` in the folder where the simulator starts (or `--phone <path>`) says what is on the phone at the start. The same file gives the same phone every run.
@@ -186,6 +192,7 @@ The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action in
 | `app_not_foreground` | The home screen or switcher is showing | Call `resume_app` |
 | `phone_locked` | The phone is locked | Call `unlock` |
 | The Secrets screen is empty | No key is saved for the apps on this phone, or the simulator cannot reach the saved-key routes | Save a key for an app first; check that the simulator is running |
+| "Could not revoke this key. Try again." | The simulator did not accept the request or could not be reached; the key is still saved | Check the simulator is running, then tap **Revoke** again |
 | `bad_placement` from `arrange_apps` | A field is unknown, `position` is not a whole number from 0 to 99, or `days`, `from` or `to` is not valid | Use `pinned`, `hidden`, `position` and `schedule`; days are `sun` to `sat` and times look like `09:00` |
 | `placement.… not valid, dropped` in the `warnings` of `import_phone_apps` | An exported layout has a field that is not valid | The valid fields were kept. Fix the field named in the warning and import again with `replace: true` |
 | `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
