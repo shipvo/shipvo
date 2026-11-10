@@ -1,0 +1,1 @@
+- Docs: the agent gate results page has steps to run the check yourself and a troubleshooting section; the Lumi benchmark page has troubleshooting and next steps.

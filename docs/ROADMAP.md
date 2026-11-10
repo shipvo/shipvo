@@ -85,6 +85,8 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: `schedule_app` and `arrange_apps` read a schedule in the time zone you name, for example `Europe/Berlin` ([Phone apps](phone-apps.md#arrange-the-home-screen), #1536)
+- 2026-11-10: Every phone tool result starts with an `Inbox:` line when something waits for the calling assistant ([Phone apps](phone-apps.md), #1545)
 - 2026-11-10: Run the simulator-vs-device parity check yourself on Android and iOS from the Actions tab, with the results page reorganised ([Parity results](parity-results.md#run-it-yourself))
 - 2026-11-10: Releases whose failures look fake are held for the owner instead of halted ([Auto-halt](auto-halt.md#when-the-failures-look-like-an-attack), #988)
 - 2026-11-10: Key rotations appear in `shipvo audit` next to publishes and rollbacks ([Key rotation](key-rotation.md#see-rotations-in-the-audit-log), #1505)

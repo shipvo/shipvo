@@ -166,6 +166,8 @@ export const Telemetry = z.object({
   bytes_downloaded: z.number().int().nonnegative().optional(),
   apply_ms: z.number().nonnegative().optional(),
   device_class: z.enum(["low", "mid", "high"]).optional(),
+  /** Set on `crash_loop_revert`: the load the revert happened in. `reload` is an in-place reload after an apply. */
+  load_kind: z.enum(["cold", "reload"]).optional(),
 });
 export type Telemetry = z.infer<typeof Telemetry>;
 
