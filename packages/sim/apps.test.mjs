@@ -179,3 +179,9 @@ test("find_apps: no match is an empty list; limit is capped at 25", () => {
   assert.equal(findApps(many, { query: "bill", limit: 99 }).length, 25);
   assert.equal(findApps(many, { query: "bill" }).length, 10);
 });
+
+test("old top-level pinned and hidden fields in a profile are ignored without error; pins and hides come from placement", async () => {
+  const { loadProfile, homeApps } = await import("./apps.mjs");
+  const st = loadProfile({ apps: [{ id: "a", name: "A", pinned: 2, hidden: true }, { id: "b", name: "B", placement: { hidden: true } }, { id: "c", name: "C", placement: { pinned: true } }] });
+  assert.deepEqual(homeApps(st, new Date()).map((a) => a.id), ["c", "a"]);
+});

@@ -496,7 +496,7 @@ async function act(id, body) {
       return { where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Read-only: what a frame page needs to draw this phone's home screen and Store. Not in device_log.
-    case "phone_apps": return { where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, store: s.apps.store, locked: s.life.locked, skin: s.skin, screen: null };
+    case "phone_apps": return { now: nowOf(s).getTime(), where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, store: s.apps.store, locked: s.life.locked, skin: s.skin, screen: null };
     // Search the Store by need. Read-only; logged in device_log as simulated.
     case "find_apps": {
       const catalog = Array.isArray(body.catalog) ? body.catalog : s.apps.store;
