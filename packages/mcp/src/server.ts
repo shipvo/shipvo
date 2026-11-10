@@ -102,7 +102,7 @@ async function act1(body: Record<string, unknown>): Promise<Act> {
   const d = attached.get(String(body.session));
   if (!d) return sim("/act", body);
   const { session: _s, action, ...args } = body;
-  if (!ATTACH_TYPES.has(String(action))) return { ok: false, code: "not_supported_attached", error: `"${action}" is not available on the live shipvo run phone yet. Use screen, tap, type, scroll or back, or open a headless session with attach: "never".` };
+  if (!ATTACH_TYPES.has(String(action))) return { ok: false, code: "not_supported_attached", error: `"${action}" is not available on the live shipvo run phone. This session is attached to it and answers screen, tap, type, scroll and back. To use "${action}", call open_app again with attach: "never" for a headless session, and open ${SIM}/watch in a browser to watch it.` };
   const m = await d.request(String(action), args);
   return { ok: m.ok !== false && !m.error, screen: m.screen ?? null, error: m.error, code: m.code, ...(typeof m.image === "string" ? { image: m.image } : {}), ...(typeof m.mime === "string" ? { mime: m.mime } : {}), ...(typeof m.source === "string" ? { source: m.source } : {}), ...(Array.isArray(m.unsupported) ? { unsupported: m.unsupported as string[] } : {}) };
 }
@@ -157,6 +157,16 @@ const need = (_sid: string) => {};
 
 // Register a tool from the shared registry (@shipvo/mcp-tools): name, description, schema and hints come from there.
 const keyRefusal = () => ({ content: [{ type: "text" as const, text: KEY_REFUSAL }], isError: true as const, structuredContent: { ok: false, code: KEY_IN_INPUT, error: KEY_REFUSAL } });
+/** Starts the first text of a tool result with the pending line for the calling assistant ("Inbox: 2 unread for chatgpt, 1 task open"). Nothing is added when nothing waits, the call has no session, or the simulator cannot say. */
+async function withBanner(out: unknown, sid: unknown, agent: string | undefined): Promise<unknown> {
+  const first = (out as { content?: { type?: string; text?: string }[] } | undefined)?.content?.[0];
+  if (typeof sid !== "string" || !sid || first?.type !== "text" || typeof first.text !== "string") return out;
+  let banner = "";
+  try { const r = await sim("/act", { session: sid, action: "pending_banner", ...(agent ? { agent } : {}) }) as Act & { banner?: unknown }; if (r.ok && typeof r.banner === "string") banner = r.banner; } catch { /* the banner is a courtesy: never fail the call for it */ }
+  if (!banner) return out;
+  const content = [{ ...first, text: `${banner}\n${first.text}` }, ...(out as { content: unknown[] }).content.slice(1)];
+  return { ...(out as object), content };
+}
 const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: ToolCallback<S>) => {
   const guarded = async (args: unknown, extra: unknown) => {
     const trace = traceFromMeta((extra as { _meta?: unknown } | undefined)?._meta);
@@ -164,12 +174,13 @@ const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: Tool
     const sid = (args as { session?: unknown } | undefined)?.session;
     const log = typeof sid === "string" ? callLog.get(sid) : undefined;
     if (log) { log.push(entry()); if (log.length > 1000) log.splice(0, log.length - 1000); }
-    const out = inputHasKey(args) ? keyRefusal() : await caller.run(server.server.getClientVersion()?.name, () => (cb as (a: unknown, e: unknown) => unknown)(args, extra));
+    let out: unknown = inputHasKey(args) ? keyRefusal() : await caller.run(server.server.getClientVersion()?.name, () => (cb as (a: unknown, e: unknown) => unknown)(args, extra));
     if (t.name === "open_app") {
       // The session id is only known once the call returns.
       const opened = /^session: (\S+)/.exec((out as { content?: { text?: string }[] })?.content?.[0]?.text ?? "")?.[1];
       if (opened && sessions.has(opened)) callLog.set(opened, [entry()]);
     }
+    out = await withBanner(out, sid, server.server.getClientVersion()?.name);
     return trace && out && typeof out === "object" ? { ...out, _meta: { ...((out as { _meta?: object })._meta ?? {}), traceparent: trace.traceparent } } : out;
   };
   return server.tool(t.name, t.description, t.input, t.annotations, guarded as unknown as ToolCallback<S>);
@@ -452,7 +463,7 @@ use(server, tools.update_app,
 use(server, tools.arrange_apps, 
   async ({ session, ...rest }) => { need(session); return result(session, await act({ session, action: "arrange_apps", ...rest })); });
 use(server, tools.schedule_app, 
-  async ({ session, id, from, to, days }) => { need(session); return result(session, await act({ session, action: "schedule_app", id, ...(from ? { from } : {}), ...(to ? { to } : {}), ...(days ? { days } : {}) })); });
+  async ({ session, id, from, to, days, timezone }) => { need(session); return result(session, await act({ session, action: "schedule_app", id, ...(timezone ? { timezone } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}), ...(days ? { days } : {}) })); });
 use(server, tools.clear_schedule, 
   async ({ session, id }) => { need(session); return result(session, await act({ session, action: "clear_schedule", id })); });
 use(server, tools.refresh_app, 

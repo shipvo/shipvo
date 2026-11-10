@@ -92,6 +92,8 @@ describe("open_app shows the phone", { timeout: 30_000 }, () => {
     const session = /session: (\S+)/.exec(text)![1];
     const sd = await c.callTool({ name: "set_device", arguments: { session, network: "offline" } }) as { content: { text: string }[] };
     expect(sd.content[0].text).toContain("not_supported_attached");
+    expect(sd.content[0].text).toContain('attach: "never"');
+    expect(sd.content[0].text).toContain("/watch");
     expect(seen.some((m) => m.type === "set_device")).toBe(false);
     await c.close();
   });

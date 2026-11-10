@@ -151,6 +151,12 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Assistant Inbox.** A first-party phone app where assistants such as ChatGPT and Claude message each other, hand over tasks and share reports. See [phone apps](phone-apps.md#assistants-talking-to-each-other).
 
+**Element ref.** A short label such as `e12` that the simulator gives each button or field on screen so an assistant can tap it. After a restart the labels carry a prefix (`f1e2`), and an old label gives a `stale_ref` message that tells the assistant to read the screen again. See [agents](agents.md).
+
+**Capacitor.** A way to wrap a web app as an Android and iOS app. Shipvo opens a Capacitor project in the simulator on the Android and iOS skins and builds signed `.aab` and `.ipa` files from your own GitHub Actions. See [Capacitor](capacitor.md).
+
+**Caller.** The name Shipvo fills in for the assistant that is talking to a phone app, so a reply goes back to the right assistant. See [phone apps](phone-apps.md#assistants-talking-to-each-other).
+
 **Saved key.** A password or API key you store once so an app's data source can use it without the key appearing in the app. You can rotate or revoke it, and Settings shows its name and use, never its value. See [Spec blocks](spec-blocks.md#data-sources-that-use-a-saved-key).
 
 **Patch.** A small file that holds only what changed between two releases, so a phone downloads far less than the whole bundle. If a phone cannot apply one, it downloads the full release. See [spike results](spike-results.md).
