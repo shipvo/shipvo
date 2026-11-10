@@ -45,6 +45,6 @@ export async function authorizeSpend(env: SpendEnv, q: { person: number; app: st
   if (ins.meta.changes > 0) return { ok: true };
   const limit = await getLimit(env, q.person, q.app);
   const spent = await spentThisMonth(env, q.person, q.app, now);
-  await audit(env, q.person, q.app, "spend_refused", { limit: limit.amount, spent, amount: q.amount, currency: q.currency }, now);
+  await audit(env, q.person, q.app, "spend_refused", { limit: limit.amount, spent, amount: q.amount, currency: q.currency, limit_currency: limit.currency }, now);
   return { ok: false, code: "spend_limit", limit: limit.amount, spent };
 }

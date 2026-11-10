@@ -85,6 +85,13 @@ describe("per-app spend limit", () => {
     await call("/phone/apps/tide/spend-limit", "PUT", session, { amount: 500, currency: "EUR" });
     expect(await authorizeSpend(env, { ...pay(me, 500), currency: "EUR" })).toEqual({ ok: true });
   });
+  it("refuses amounts that are zero, negative or not whole", async () => {
+    const { env, me, call, session, sql } = await setup();
+    await call("/phone/apps/tide/spend-limit", "PUT", session, { amount: 1000, currency: "USD" });
+    for (const a of [0, -5, 1.5]) expect((await authorizeSpend(env, pay(me, a))).ok).toBe(false);
+    expect(sql.prepare("SELECT COUNT(*) AS n FROM phone_spend").get().n).toBe(0);
+    expect(JSON.parse(sql.prepare("SELECT detail FROM phone_spend_audit WHERE action='spend_refused' ORDER BY id").get().detail).limit_currency).toBe("USD");
+  });
   it("rejects period week with 400", async () => {
     const { call, session } = await setup();
     expect((await call("/phone/apps/tide/spend-limit", "PUT", session, { amount: 5, currency: "USD", period: "week" })).status).toBe(400);
