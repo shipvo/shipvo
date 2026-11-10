@@ -441,7 +441,7 @@ async function act(id, body) {
         s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec" });
         s.apps.log.push({ at: Date.now(), name: "import_apps", app: a.id, source: "real", version: "1", replaced: !!ex });
       }
-      return { imported: list.map((a) => a.id), installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
+      return { imported: list.map((a) => a.id), installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Edit in place: a new spec is a new version. Data and state the person entered carry over; a bad spec changes nothing.
     case "update_app": {
@@ -461,7 +461,7 @@ async function act(id, body) {
       const id = String(body.id ?? "");
       try { (body.action === "pin_app" ? pinApp : hideApp)(s.apps, id, body.action === "pin_app" ? body.pinned !== false : body.hidden !== false); }
       catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
-      return { current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
+      return { current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Run one action of a spec app by name, the way a generated tool does. The open screen shows the result.
     case "app_action": {

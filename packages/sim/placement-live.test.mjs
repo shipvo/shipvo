@@ -109,6 +109,22 @@ for (const skin of ["android", "ios"]) {
   });
 }
 
+test("every home screen answer follows the phone's clock, and the screenshot shows the same icons", async () => {
+  assert.ok((await call("/session", { session: "pl9", phone: PHONE })).ok);
+  assert.equal((await act("pl9", { action: "arrange_apps", id: "wknd", schedule: { days: ["sat", "sun"], from: "09:00", to: "23:00" } })).ok, true);
+  assert.equal((await act("pl9", { action: "arrange_apps", id: "plan", schedule: { days: ["mon", "tue", "wed", "thu", "fri"], from: "08:00", to: "18:00" } })).ok, true);
+  await act("pl9", { action: "press_home" });
+  const shot = async () => { await act("pl9", { action: "press_home" }); const r = await act("pl9", { action: "screenshot", inline: true }); assert.ok(r.data, JSON.stringify(r)); return r.data; };
+  await act("pl9", { action: "set_time", at: "2026-11-14T10:00:00" });   // Saturday
+  const satPin = (await act("pl9", { action: "pin_app", id: "mail", pinned: true })).screen;
+  assert.match(satPin, /button "Weekend plans"/); assert.doesNotMatch(satPin, /button "Weekly planner"/);
+  const satShot = await shot();
+  await act("pl9", { action: "set_time", at: "2026-11-09T10:00:00" });   // Monday
+  const monHide = (await act("pl9", { action: "hide_app", id: "mail" })).screen;
+  assert.match(monHide, /button "Weekly planner"/); assert.doesNotMatch(monHide, /button "Weekend plans"/);
+  assert.notEqual(await shot(), satShot);
+});
+
 test("arrange_apps and set_time return the open screen when an app is in front, and the home text as home", async () => {
   assert.ok((await call("/session", { session: "pl3", phone: PHONE })).ok);
   const r = await act("pl3", { action: "arrange_apps", id: "mail", pinned: true });
