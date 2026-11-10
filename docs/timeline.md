@@ -30,7 +30,16 @@ A row appears when test results reach your control plane.
    ```
 
    Expected output ends with `uploaded report for release 42 (android)`.
-2. For pull requests, send the report to `POST /r/<app>/pr/<number>/tests` with a publish token. Each run adds a row named `p<number>`.
+2. For pull requests, send the report to `POST /r/<app>/pr/<number>/tests` with a publish token. Each run adds a row named `p<number>`:
+
+   ```bash
+   curl -X POST "<controlPlane>/r/<appId>/pr/12/tests" \
+     -H "authorization: Bearer $SHIPVO_PUBLISH_TOKEN" \
+     -H "content-type: application/json" \
+     --data-binary @shipvo-report.json
+   ```
+
+   Use the `controlPlane` and `appId` values from `shipvo.json`. Expected reply: `{"ok":true,"pr":12,"platform":"android","flows":3}`. Open the **Timeline** tab and the row `p12` is there.
 
 `shipvo test --report` writes the flows. `findings` and `screens` appear only when the report you send contains them: add them to the report JSON before you upload or post it (limits and format are in the Reference). Without them, a row shows its flows only.
 
@@ -81,6 +90,10 @@ A test report accepts optional `findings` (up to 50) and `screens` (up to 20, ea
 | `401 unauthorized` from a route | You used a token. | Use the signed-in session. |
 | `404 not_found` on compare | One point has no uploaded results. | Pick two rows that appear in the list. |
 | `400 bad_request` on compare | The ids are not `r<n>` or `p<n>`. | Use `?from=r3&to=p12`. |
+| `Could not upload the report: No publish token. Set SHIPVO_PUBLISH_TOKEN, or run shipvo app create.` | `--upload` found no token. | Set `SHIPVO_PUBLISH_TOKEN` or run `shipvo app create`. |
+| `Could not upload the report: No appId in shipvo.json.` | The config has no `appId`. | Add your app's `appId` to `shipvo.json`. |
+| `--upload needs --report <file>` or `--upload needs --release <number>` | The upload sends a report file and stores it per release. | Add both: `shipvo test --report shipvo-report.json --release 42 --upload`. |
+| `400 bad_report` on upload | The body is not valid JSON, or not a test report. | Send the file `shipvo test --report` wrote, with any `findings` and `screens` added as described above. |
 | `413 report_too_large` | The report is over the size limit. | Send fewer flows or screens. |
 | A screen is missing from the compare | The picture is the same in both points. | Only screens that differ are listed. |
 
