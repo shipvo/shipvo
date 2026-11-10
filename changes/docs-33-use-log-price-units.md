@@ -1,0 +1,1 @@
+- Docs: the Use log button on the phone's Secrets screen, and the shop tutorial now explains the price-unit message with a Troubleshooting section.

@@ -1,0 +1,2 @@
+{"duration": 38, "want": ["cinematic", "inspiring", "upbeat"], "avoid": [], "bpm": [118, 134], "energy": "story",
+ "hits": [{"t": 15, "type": "reveal"}, {"t": 19, "type": "reveal"}, {"t": 31.5, "type": "payoff"}], "narration": true}
