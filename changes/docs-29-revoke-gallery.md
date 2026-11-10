@@ -1,0 +1,2 @@
+- docs: Phone apps page covers Revoke on the Secrets screen and its failure message; App spec page lists all five example specs.
+- Migration: none.

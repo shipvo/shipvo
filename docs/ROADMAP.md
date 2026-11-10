@@ -82,6 +82,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: Revoke a saved key from the Secrets screen, `app_activity` shows what an agent built and changed, and the gallery grows to five example specs ([Phone apps](phone-apps.md#see-saved-keys-in-settings), [Phone apps](phone-apps.md), [Example specs](spec-blocks.md#example-specs), #1388, #1396, #1385)
 - 2026-11-10: Watch link on the hosted phone: `open_app` returns a read-only `watch_url` ([Agents](agents.md#watch-link-on-the-hosted-phone), #1277)
 - 2026-11-10: Data sources refresh on an interval (`refresh`), a gallery of example specs, and faster rebuilds in `shipvo run` after a save ([Keep a data source fresh](spec-blocks.md#keep-a-data-source-fresh), [Example specs](spec-blocks.md#example-specs), [shipvo run](run.md), #1351, #1358, #1367)
 - 2026-11-10: Spec `calendar` and `map` blocks, the Secrets screen in phone Settings, and opening a build from a `build_url` ([App spec](spec-blocks.md#calendars-and-maps), [Phone apps](phone-apps.md#see-saved-keys-in-settings), [Test your build](test-your-build.md#open-a-build-from-a-link), #1353, #1350, #1287)

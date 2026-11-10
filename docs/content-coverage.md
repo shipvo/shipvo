@@ -106,7 +106,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | W3C `traceparent` recorded from MCP tool calls | [mcp](../packages/mcp/README.md) | | | |
 | Spec `calendar` and `map` blocks (month, week, agenda, pins, `onSelect`) | [spec-blocks](spec-blocks.md#calendars-and-maps) | | | |
 | Open a build from a link (`build_url` on `POST /session`) | [test-your-build](test-your-build.md#open-a-build-from-a-link) | | | |
-| Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
+| Secrets screen in the phone's Settings (saved keys, metadata only, Revoke) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
 | Arrange the home screen and set the phone clock (`arrange_apps`, `set_phone_time`) | [phone-apps](phone-apps.md) | | | |
 | Phone frame page `/phone?session=` with Store and installed apps | [phone-apps](phone-apps.md) | | | |
 | Watch link on the hosted phone (`watch_url`, read-only, sign in to take over) | [agents](agents.md#watch-link-on-the-hosted-phone) | | | |
@@ -114,3 +114,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Data sources refresh on an interval (`refresh`, 30 seconds or more) | [spec-blocks](spec-blocks.md#keep-a-data-source-fresh) | | | |
 | Gallery of example specs (`packages/spec/gallery`) | [spec-blocks](spec-blocks.md#example-specs) | | | |
 | Faster rebuild after a save in `shipvo run` (Metro cache kept) | [run](run.md) | | | |
+| `app_activity`: versions, data sources and events of apps an agent built | [phone-apps](phone-apps.md) | | | |
