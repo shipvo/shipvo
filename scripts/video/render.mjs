@@ -33,8 +33,8 @@ writeFileSync(join(out, slug + ".vtt"), vtt(plan));
 
 // Phones put the player controls over the bottom of the poster, so keep text above 70% of the height.
 export const POSTER_CSS = "#cap,#bar{display:none!important}.scene .abs.mute{top:430px!important}";
-const img = (n) => { const d = ["first-app", "test-with-an-assistant", "test-your-app-with-lumi"].find((x) => existsSync(join(here, "../../services/site/public/tutorials", x, n + ".png"))); return "data:image/png;base64," + readFileSync(join(here, "../../services/site/public/tutorials", d, n + ".png")).toString("base64"); };
-const fill = (h) => h.replace(/\{\{SYMBOL:(#[0-9A-Fa-f]+)\}\}/g, (_, c) => symbol(c).replace(/width="\d+" height="\d+"/, 'width="100%"')).replace(/\{\{IMG:([\w-]+)\}\}/g, (_, n) => img(n)).replace("{{MARK}}", mark("deck").replace(/width="512" height="512"/, 'width="100%"'));
+const img = (n) => { const pub = join(here, "../../services/site/public/tutorials"); const [d, f] = n.includes("/") ? n.split("/") : [["first-app", "test-with-an-assistant", "test-your-app-with-lumi"].find((x) => existsSync(join(pub, x, n + ".png"))), n]; return "data:image/png;base64," + readFileSync(join(pub, d, f + ".png")).toString("base64"); };
+const fill = (h) => h.replace(/\{\{SYMBOL:(#[0-9A-Fa-f]+)\}\}/g, (_, c) => symbol(c).replace(/width="\d+" height="\d+"/, 'width="100%"')).replace(/\{\{IMG:([\w/-]+)\}\}/g, (_, n) => img(n)).replace("{{MARK}}", mark("deck").replace(/width="512" height="512"/, 'width="100%"'));
 const body = script.scenes.map((s) => `<section class="scene" id="s-${s.id}">${fill(SCENES[s.visual]())}<svg class="logo" viewBox="0 0 10 10" style="display:none"></svg></section>`).join("\n");
 const html = readFileSync(join(here, "deck.html"), "utf8").replace("{{SCENES}}", body);
 
