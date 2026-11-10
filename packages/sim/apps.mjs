@@ -41,6 +41,7 @@ export function loadProfile(json) {
     seen.add(a.id); st.installed_apps.push(entry(a));
   }
   if (p.current_app != null) { if (!seen.has(p.current_app)) throw new AppsError("bad_profile", `current_app '${p.current_app}' is not in 'apps'`); st.current_app = p.current_app; }
+  if (p.network !== undefined) { if (typeof p.network !== "string") throw new AppsError("bad_profile", "'network' must be a profile name"); st.network = p.network; }
   if (p.settings !== undefined) {
     if (!p.settings || typeof p.settings !== "object") throw new AppsError("bad_profile", "'settings' must be an object");
     for (const [k, v] of Object.entries(p.settings)) { try { settingPatch(k, v); } catch (e) { throw new AppsError("bad_profile", `settings: ${e.message}`); } st.settings[k] = v; }
