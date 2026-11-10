@@ -14,6 +14,7 @@ import { parseMockRules } from "./mock-rules.mjs";
 import { applyProfile, getProfile } from "./network-profiles.mjs";
 import { installNetGate } from "./net-gate.mjs";
 import { pushNotification } from "./push-notification.mjs";
+import { createSecretsForward, isVaultUiPath } from "./secrets-forward.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
@@ -27,7 +28,7 @@ import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.
 import { SettingsError } from "./settings.mjs";
 import { SpecHost } from "./spec-host.mjs";
 import { fetchBuild, BuildCacheError } from "./build-cache.mjs";
-import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, describeApps, installedIconsHtml, storeCss } from "./apps.mjs";
+import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, pinApp, hideApp, describeApps, installedIconsHtml, storeCss } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
@@ -449,6 +450,13 @@ async function act(id, body) {
       if (s.apps.current_app === appId && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
       return { version: up.version, installed_apps: s.apps.installed_apps, warnings: up.warnings, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
     }
+    // Arrange the home screen: pinned apps lead, hidden apps leave the home screen and app list but keep their data.
+    case "pin_app": case "hide_app": {
+      const id = String(body.id ?? "");
+      try { (body.action === "pin_app" ? pinApp : hideApp)(s.apps, id, body.action === "pin_app" ? body.pinned !== false : body.hidden !== false); }
+      catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
+      return { current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
+    }
     // Run one action of a spec app by name, the way a generated tool does. The open screen shows the result.
     case "app_action": {
       const appId = String(body.id ?? "");
@@ -639,7 +647,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, export_apps, import_apps, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, share_to, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, pin_app, hide_app, export_apps, import_apps, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, share_to, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
@@ -647,6 +655,7 @@ async function act(id, body) {
 const DELIVERY = new Set(["tap", "type", "scroll", "back"]);
 const REASONS = new Set(["stale_ref", "not_visible", "disabled", "covered"]);
 const WCACHE = new Map();
+const secretsForward = createSecretsForward({ control: CONTROL, token: (process.env.SHIPVO_OWNER_TOKEN || "").trim() });
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
   // CORS plus Chromium's private-network preflight: the app page comes from the public control plane (https) and
@@ -654,6 +663,7 @@ const server = http.createServer(async (req, res) => {
   const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-private-network": "true" };
   const send = (code, obj, type = "application/json") => { res.writeHead(code, { "content-type": type, ...CORS }); res.end(type === "application/json" ? JSON.stringify(obj) : obj); };
   try {
+    if (isVaultUiPath(url.pathname)) return await secretsForward(req, res, url);   // no CORS headers: same-origin loopback only
     if (req.method === "OPTIONS") return send(204, "", "text/plain");
     // the app's static web build
     if (url.pathname.startsWith("/_expo/") || url.pathname.startsWith("/assets/") || url.pathname === "/favicon.ico") {
