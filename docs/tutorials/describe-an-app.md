@@ -1,5 +1,9 @@
 # Describe an app and watch it appear on a phone
 
+<video controls preload="metadata" playsinline tabindex="0" data-title="Describe an app and watch it appear on a phone" data-length="1 min 44 s" poster="/videos/describe-an-app.jpg" src="/media/videos/describe-an-app-0af0307b.mp4"><track kind="captions" src="/videos/describe-an-app.vtt" srclang="en" label="English">Your browser cannot play this video. Read the captions and transcript on the Videos page.</video>
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Calling for the Blue Dusk" by Régis V. Gronoff (<a href="https://www.jamendo.com">Jamendo</a>, <a href="http://creativecommons.org/licenses/by-nc-sa/3.0/">CC BY-NC-SA 3.0</a>). Source: <a href="https://www.jamendo.com/track/343780">https://www.jamendo.com/track/343780</a></details>
+
 You will tell an AI assistant, in plain words, what small app you want. A few seconds later the app is on a simulated phone in your browser, with its own icon. You will see it on an Android phone and on an iOS phone. You will use it, ask for a change and see the change appear with your entries still in place. You write no code and you need no real phone.
 
 **Level:** beginner. **Time:** a short first-time setup, then a few minutes of talking to your assistant.

@@ -1,0 +1,125 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:03.433
+One sentence, and an app appears on a phone.
+
+2
+00:00:03.433 --> 00:00:08.700
+By the end, you will have made one, changed it, and seen it on Android and iOS.
+
+3
+00:00:08.700 --> 00:00:09.900
+You write no code.
+
+4
+00:00:11.500 --> 00:00:13.446
+First, start the simulator.
+
+5
+00:00:13.446 --> 00:00:16.330
+It is a phone that runs in your browser.
+
+6
+00:00:16.330 --> 00:00:18.925
+Type npm run sim, and leave it open.
+
+7
+00:00:22.500 --> 00:00:24.655
+Next, connect your assistant.
+
+8
+00:00:24.655 --> 00:00:28.889
+Type npx shipvo agents setup, then restart the assistant.
+
+9
+00:00:28.889 --> 00:00:33.050
+Now it has Shipvo tools, like create_app and update_app.
+
+10
+00:00:34.650 --> 00:00:36.531
+Now ask, in your own words.
+
+11
+00:00:36.531 --> 00:00:38.065
+Make a gift ideas app.
+
+12
+00:00:38.065 --> 00:00:41.618
+I want to write who each idea is for, and the idea.
+
+13
+00:00:41.618 --> 00:00:44.127
+Shipvo checks the description first.
+
+14
+00:00:44.127 --> 00:00:46.775
+Then the app opens, with its own icon.
+
+15
+00:00:49.650 --> 00:00:50.157
+Use it.
+
+16
+00:00:50.157 --> 00:00:53.999
+Ask the assistant to add an idea, Mum, garden gloves.
+
+17
+00:00:53.999 --> 00:00:55.521
+It shows in the list.
+
+18
+00:00:55.521 --> 00:00:57.333
+Keep an eye on this idea.
+
+19
+00:00:57.333 --> 00:00:59.000
+It matters in a moment.
+
+20
+00:01:01.650 --> 00:01:03.062
+Now ask for a change.
+
+21
+00:01:03.062 --> 00:01:06.086
+Add an About screen, and a button to open it.
+
+22
+00:01:06.086 --> 00:01:07.700
+The app changes at once.
+
+23
+00:01:07.700 --> 00:01:09.716
+And Mum's idea is still there.
+
+24
+00:01:09.716 --> 00:01:11.800
+Shipvo keeps what people typed.
+
+25
+00:01:16.650 --> 00:01:18.077
+Want the iPhone look?
+
+26
+00:01:18.077 --> 00:01:19.979
+Ask again with the iOS look.
+
+27
+00:01:19.979 --> 00:01:25.075
+The same description gives you an Android app and an iOS app, side by side.
+
+28
+00:01:29.650 --> 00:01:31.881
+That is an app from one sentence.
+
+29
+00:01:31.881 --> 00:01:33.640
+Try it in your own folder.
+
+30
+00:01:33.640 --> 00:01:37.494
+The step by step guide is at shipvo.dev/learn.
+
+31
+00:01:37.494 --> 00:01:40.875
+Next, see your own app on a phone with shipvo run.
