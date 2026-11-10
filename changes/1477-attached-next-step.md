@@ -1,0 +1,1 @@
+- mcp: `create_app`, `update_app`, `run_app_action`, `app_activity`, `press_home` and other tools on a live `shipvo run` phone now say how to continue: open the app with `attach: "never"` and watch it at `/watch`.

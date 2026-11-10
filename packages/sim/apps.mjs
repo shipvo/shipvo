@@ -169,6 +169,20 @@ export function switchApp(st, id, nav) {
 export const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+/** True when `tz` is an IANA zone name this runtime knows, such as Europe/Berlin. */
+export function validZone(tz) {
+  if (typeof tz !== "string" || !tz) return false;
+  try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return true; } catch (e) { return false; }
+}
+
+/** The weekday (0 = Sunday), hour and minute at `now` in zone `tz`, or on the phone's own clock when tz is empty. */
+export function clockIn(now, tz) {
+  if (!tz) return { d: now.getDay(), h: now.getHours(), m: now.getMinutes() };
+  var parts = {};
+  new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now).forEach(function (x) { parts[x.type] = x.value; });
+  return { d: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parts.weekday), h: Number(parts.hour) % 24, m: Number(parts.minute) };
+}
+
 /** A placement from outside (phone.json, an export) reduced to what is valid: bad fields are dropped. Returns an object or null. */
 export function cleanPlacement(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
@@ -181,15 +195,18 @@ export function cleanPlacement(raw) {
   if (sc && typeof sc === "object" && !Array.isArray(sc)) {
     var days = Array.isArray(sc.days) && sc.days.length ? Array.from(new Set(sc.days.map(function (d) { return String(d).toLowerCase().slice(0, 3); }))) : DAYS;
     var from = sc.from == null ? "00:00" : sc.from, to = sc.to == null ? "23:59" : sc.to;
-    if (days.every(function (d) { return DAYS.indexOf(d) >= 0; }) && HHMM.test(from) && HHMM.test(to)) p.schedule = { days: days, from: from, to: to };
+    if (days.every(function (d) { return DAYS.indexOf(d) >= 0; }) && HHMM.test(from) && HHMM.test(to) && (sc.timezone == null || validZone(sc.timezone))) {
+      p.schedule = { days: days, from: from, to: to };
+      if (sc.timezone != null) p.schedule.timezone = sc.timezone;
+    }
   }
   return Object.keys(p).length ? p : null;
 }
 
 /**
  * Where an installed app sits on the home screen. `patch` may set: pinned (true or false), hidden (true or false),
- * position (a whole number from 0, or null to clear), schedule ({ days: ["mon",...], from: "HH:MM", to: "HH:MM" }, or null
- * to always show). Throws not_installed or bad_placement with the reason.
+ * position (a whole number from 0, or null to clear), schedule ({ days: ["mon",...], from: "HH:MM", to: "HH:MM", timezone: "Europe/Berlin" (optional) }, or null
+ * to always show). Throws not_installed, bad_placement or bad_timezone with the reason.
  */
 function placeApp(st, id, patch = {}) {
   const a = st.installed_apps.find((x) => x.id === id);
@@ -217,6 +234,10 @@ function placeApp(st, id, patch = {}) {
       const from = sc?.from ?? "00:00", to = sc?.to ?? "23:59";
       if (!HHMM.test(from) || !HHMM.test(to)) throw bad("from and to must be times like 09:00");
       p.schedule = { days, from, to };
+      if (sc?.timezone != null) {
+        if (!validZone(sc.timezone)) throw new AppsError("bad_timezone", `'${sc.timezone}' is not a time zone name like Europe/Berlin`);
+        p.schedule.timezone = sc.timezone;
+      }
     }
   }
   if (Object.keys(p).length) a.placement = p; else delete a.placement;
@@ -238,7 +259,7 @@ export function appVisible(a, now = new Date()) {
   if (p.hidden) return false;
   const sc = p.schedule;
   if (!sc) return true;
-  const d = now.getDay(), t = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const c = clockIn(now, sc.timezone), d = c.d, t = `${String(c.h).padStart(2, "0")}:${String(c.m).padStart(2, "0")}`;
   const on = (i) => sc.days.includes(DAYS[i]);
   if (sc.from <= sc.to) return on(d) && t >= sc.from && t <= sc.to;
   // A window across midnight belongs to the day it starts: its early-morning tail counts against the day before.
@@ -258,7 +279,7 @@ export function describeApps(st, now = new Date()) {
   if (!st.installed_apps.length) l.push("- none");
   const shown = homeApps(st, now);
   for (const a of shown) l.push(`- button "${a.name}" (${a.id} ${a.version}${a.placement?.pinned ? ", pinned" : ""}${st.current_app === a.id ? ", open" : ""}: switch_app opens it)${a.permissions && Object.keys(a.permissions).length ? ` permissions: ${Object.entries(a.permissions).map(([p, v]) => `${p} ${v ? "allowed" : "denied"}`).join(", ")}` : ""}`);
-  for (const a of st.installed_apps) if (!shown.includes(a)) l.push(`- "${a.name}" (${a.id}): ${a.placement?.hidden ? "hidden" : `not showing now, scheduled ${a.placement.schedule.days.join(",")} ${a.placement.schedule.from}-${a.placement.schedule.to}`}; switch_app still opens it`);
+  for (const a of st.installed_apps) if (!shown.includes(a)) l.push(`- "${a.name}" (${a.id}): ${a.placement?.hidden ? "hidden" : `not showing now, scheduled ${a.placement.schedule.days.join(",")} ${a.placement.schedule.from}-${a.placement.schedule.to}${a.placement.schedule.timezone ? ` ${a.placement.schedule.timezone}` : ""}`}; switch_app still opens it`);
   l.push("Store");
   for (const a of st.store) l.push(st.installed_apps.some((i) => i.id === a.id) ? `- "${a.name}" (${a.id}): installed` : `- button "Install ${a.name}" (${a.id}: install_app installs it)`);
   return l.join("\n");
@@ -300,7 +321,7 @@ export function appsClientScript(iframeId = "app", seed = {}) {
   return `(function(){
 var AppsError=function(c,m){var e=new Error(m);e.code=c;return e},STORE_FIXTURE=${JSON.stringify(STORE_FIXTURE)};
 var DEVICE_PERMISSIONS=${JSON.stringify(DEVICE_PERMISSIONS)},answers=${answers.toString()},consentCardHtml=${consentCardHtml.toString()},permissionRowsHtml=${permissionRowsHtml.toString()},setPermission=${setPermission.toString()};
-var entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},installedIconsHtml=${installedIconsHtml.toString()},DAYS=${JSON.stringify(DAYS)},HHMM=${HHMM.toString()},cleanPlacement=${cleanPlacement.toString()},appVisible=${appVisible.toString()},homeApps=${homeApps.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
+var entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},installedIconsHtml=${installedIconsHtml.toString()},DAYS=${JSON.stringify(DAYS)},HHMM=${HHMM.toString()},validZone=${validZone.toString()},clockIn=${clockIn.toString()},cleanPlacement=${cleanPlacement.toString()},appVisible=${appVisible.toString()},homeApps=${homeApps.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
 var loadProfile=${loadProfile.toString()},settingPatch=function(){};
 var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
 var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("store-screen"),home=q("home-screen");if(!sc||!home)return;
