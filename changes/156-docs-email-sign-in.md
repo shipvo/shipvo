@@ -1,1 +1,1 @@
-- Docs: new page [Test an email sign-in on Android and iOS](../docs/email-sign-in.md) now in the docs menu, with troubleshooting and next steps. The record-a-demo-video example gains a troubleshooting section.
+- Docs: the email sign-in page gains a "session cannot see the mail" troubleshooting row and a link to network calls on the hosted phone. The record-a-demo-video example gains a troubleshooting section.
