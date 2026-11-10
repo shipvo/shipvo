@@ -2,7 +2,7 @@ export type AuditRow = {
   app_id: string;
   actor: string;
   actor_kind: "person" | "agent" | "system";
-  action: "publish" | "rollback" | "halt";
+  action: "publish" | "rollback" | "halt" | "key-rotation";
   release?: number | null;
   release_id?: string | null;
   before?: string | null;
