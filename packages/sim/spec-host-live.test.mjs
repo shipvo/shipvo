@@ -148,8 +148,14 @@ for (const style of ["android", "ios"]) {
     await new Promise((r) => setTimeout(r, 500));
     await act(sid, { action: "app_action", id: "inbox", action_name: "send_message", input: { to: "claude", body: "Review please." }, agent: "openai-mcp" });
     const t0 = Date.now(); const got = await waiting;
-    assert.equal(got.event, true); assert.equal(got.banner, "Inbox: 1 unread for claude"); assert.equal(got.pending.messages.length, 1);
+    assert.equal(got.event, true); assert.equal(got.pending.messages.length, 1); assert.deepEqual(got.pending.tasks, []);
     assert.ok(Date.now() - t0 < 5000);
+    // the same unread message does not wake claude again; a new open task does once, and then not again while it stays open
+    assert.equal((await act(sid, { action: "wait_for_event", timeout_ms: 300, agent: "claude-ai" })).event, false);
+    await act(sid, { action: "app_action", id: "inbox", action_name: "hand_off", input: { to: "claude", title: "Test checkout", detail: "" }, agent: "openai-mcp" });
+    const task = await act(sid, { action: "wait_for_event", timeout_ms: 2000, agent: "claude-ai" });
+    assert.equal(task.event, true); assert.deepEqual(task.pending.messages, []); assert.equal(task.pending.tasks.length, 1);
+    assert.equal((await act(sid, { action: "wait_for_event", timeout_ms: 300, agent: "claude-ai" })).event, false);
     // the sender has nothing waiting; a client with no name cannot wait
     assert.equal((await act(sid, { action: "wait_for_event", timeout_ms: 200, agent: "openai-mcp" })).event, false);
     const anon = await act(sid, { action: "wait_for_event", timeout_ms: 200 });

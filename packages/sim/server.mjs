@@ -35,7 +35,7 @@ import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updat
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
 import { assistantName } from "./identity.mjs";
-import { pendingBanner, pendingIds, waitForPending } from "./banner.mjs";
+import { pendingBanner, waitForNew } from "./banner.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
@@ -688,9 +688,10 @@ async function act(id, body) {
       if (!Number.isFinite(ms) || ms < 0 || ms > 25000) throw new SimError("bad_timeout", "timeout_ms must be a number from 0 to 25000");
       const me = assistantName(body.agent);
       if (!me) throw new SimError("no_caller", "the client did not give a name, so there is no inbox to wait on");
-      const read = () => specHost.dataOf(sidOf(s), "inbox");
-      const banner = await waitForPending(read, me, ms);
-      return banner ? { event: true, banner, pending: pendingIds(read(), me) } : { event: false };
+      // Ids already returned to this caller in this session do not wake it again, so a task that stays open does not make the wait spin.
+      const seen = ((s.waitSeen ??= new Map()).get(me) ?? s.waitSeen.set(me, new Set()).get(me));
+      const fresh = await waitForNew(() => specHost.dataOf(sidOf(s), "inbox"), me, seen, ms);
+      return fresh ? { event: true, pending: fresh } : { event: false };
     }
     // The session's private inbox. Reads change nothing.
     case "inbox_read": return { address: s.inbox.address, messages: s.inbox.read({ subject: body.subject, from: body.from }) };

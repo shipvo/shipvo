@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { pendingBanner, pendingIds, waitForPending } from "./banner.mjs";
+import { pendingBanner, pendingIds, waitForNew } from "./banner.mjs";
 
 const data = {
   messages: [{ to: "chatgpt", read: false }, { to: "chatgpt", read: false }, { to: "chatgpt", read: true }, { to: "claude", read: false }],
@@ -26,10 +26,15 @@ test("pendingIds lists the ids that wait for the caller", () => {
   assert.deepEqual(pendingIds(d, "X"), { messages: ["m1"], tasks: ["h1"] });
   assert.deepEqual(pendingIds(d, ""), { messages: [], tasks: [] });
 });
-test("waitForPending returns at once when something waits, when it arrives, and empty on timeout", async () => {
-  const d = { messages: [], handoffs: [] };
-  assert.equal(await waitForPending(() => d, "x", 60, 10), "");
+test("waitForNew returns only ids it has not returned, waits for the next arrival, and times out with null", async () => {
+  const d = { messages: [], handoffs: [{ id: "h1", to: "x", status: "open" }] };
+  const seen = new Set();
+  assert.deepEqual(await waitForNew(() => d, "x", seen, 500, 10), { messages: [], tasks: ["h1"] });
+  // the task is still open but was already returned: the wait must time out, not spin
+  const t0 = Date.now();
+  assert.equal(await waitForNew(() => d, "x", seen, 80, 10), null);
+  assert.ok(Date.now() - t0 >= 70);
   setTimeout(() => d.messages.push({ id: "m1", to: "x", read: false }), 40);
-  assert.equal(await waitForPending(() => d, "x", 2000, 10), "Inbox: 1 unread for x");
-  const t0 = Date.now(); assert.equal(await waitForPending(() => d, "x", 5000, 10), "Inbox: 1 unread for x"); assert.ok(Date.now() - t0 < 500);
+  assert.deepEqual(await waitForNew(() => d, "x", seen, 2000, 10), { messages: ["m1"], tasks: [] });
+  assert.equal(await waitForNew(() => d, "x", seen, 60, 10), null);
 });

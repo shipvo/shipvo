@@ -22,14 +22,20 @@ export function pendingIds(data, caller) {
   return { messages, tasks };
 }
 
-/** Resolves with the banner text as soon as something waits for `caller`, or "" after `timeoutMs`. `read()` returns the Inbox app's current data. */
-export async function waitForPending(read, caller, timeoutMs, intervalMs = 250) {
+/** Waits for something new for `caller`: a message or task whose id is not in `seen` yet. Adds what it returns to `seen`, so the next call waits for the next arrival.
+ *  `read()` returns the Inbox app's current data. Resolves with { messages, tasks } (the new ids), or null after `timeoutMs`. */
+export async function waitForNew(read, caller, seen, timeoutMs, intervalMs = 250) {
   const end = Date.now() + timeoutMs;
   for (;;) {
-    const banner = pendingBanner(read(), caller);
-    if (banner) return banner;
+    const now = pendingIds(read(), caller);
+    const fresh = { messages: now.messages.filter((id) => !seen.has(`m:${id}`)), tasks: now.tasks.filter((id) => !seen.has(`t:${id}`)) };
+    if (fresh.messages.length || fresh.tasks.length) {
+      for (const id of fresh.messages) seen.add(`m:${id}`);
+      for (const id of fresh.tasks) seen.add(`t:${id}`);
+      return fresh;
+    }
     const left = end - Date.now();
-    if (left <= 0) return "";
+    if (left <= 0) return null;
     await new Promise((r) => setTimeout(r, Math.min(intervalMs, left)));
   }
 }

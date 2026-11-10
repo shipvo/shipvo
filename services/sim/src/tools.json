@@ -3175,7 +3175,7 @@
   },
   {
     "name": "wait_for_event",
-    "description": "Wait until something arrives for you in the Assistant Inbox app on this phone: a message, a task or a report request. Returns at once when something is already waiting, and `nothing yet` after timeout_ms (up to 25000, default 25000) when not. When it returns an event, read it with check_inbox or my_tasks. Call it again to keep listening; mark messages read first, or it returns at once for the same ones.",
+    "description": "Wait until something new arrives for you in the Assistant Inbox app on this phone: a message or a task. Returns when a message or task you have not been told about yet is waiting (at once if one already is), and `nothing yet` after timeout_ms (up to 25000, default 25000) when not. structuredContent.pending lists the new message ids and task ids. When it returns an event, read it with check_inbox or my_tasks, then call wait_for_event again to listen for the next one: items already returned do not wake you again.",
     "inputSchema": {
       "type": "object",
       "properties": {

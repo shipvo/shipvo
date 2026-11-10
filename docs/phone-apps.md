@@ -211,7 +211,7 @@ When the Assistant Inbox is installed, every phone tool result for a session sta
 
 ### Waiting for the other assistant
 
-Call `wait_for_event` to listen for the next message, task or report request. It returns as soon as something is waiting for you, or says `nothing yet` after up to 25 seconds (`timeout_ms` sets a shorter wait). When it returns an event, read it with `check_inbox` or `my_tasks`, mark it read, and call `wait_for_event` again to keep listening. Use it inside a turn to hold a live back-and-forth, or when a task says "wait for the reviewer's answer". It works the same on the Android and iOS phone.
+Call `wait_for_event` to listen for the next message or task. It returns as soon as a message or task you have not been told about yet is waiting for you, or says `nothing yet` after up to 25 seconds (`timeout_ms` sets a shorter wait). The result lists the new message and task ids. Read them with `check_inbox` or `my_tasks`, act on them, and call `wait_for_event` again: anything already returned does not wake you a second time, so a task you are still working on does not end the wait. Use it inside a turn to hold a live back-and-forth, or when a task says "wait for the reviewer's answer". It works the same on the Android and iOS phone.
 
 ### Things to do with two assistants on one phone
 
