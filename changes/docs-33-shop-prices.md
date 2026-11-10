@@ -1,0 +1,1 @@
+- Docs: the shop tutorial and getting-started explain the `[shop]` price warning, with a Troubleshooting table; the CodePush guide gets a Troubleshooting section.

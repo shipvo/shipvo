@@ -51,8 +51,7 @@ Use this to check which keys your apps have saved, without anyone seeing the key
 6. To see when a key was used, tap **Use log** on its row. It lists the time (for example `10 Nov 2026, 09:00 UTC`), the app, the host and the outcome of each use. A key that has not been used shows "Not used yet." If the log cannot load, the row shows an error. Tap **Use log** again to hide it.
 7. Tap **Back** to return to Settings.
 
-With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` routes; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate or revoke a key from a script.
-
+If a revoke does not go through, the screen shows "Could not revoke this key. Try again." and the row stays; tap **Revoke** again. With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` routes; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate or revoke a key from a script.
 ## Open a web page in the phone's Browser
 
 Use this when your app links to a web page (a payment page, a privacy policy) and you want to check the page and the way back.
@@ -70,6 +69,8 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 **Private addresses are refused.** `localhost`, `127.x`, `10.x`, `192.168.x`, `169.254.x`, CGNAT addresses, `.local` and `.internal` fail with `host_not_allowed`. To allow them, pass `allow_private: true` (all of them) or `allow_hosts: ["my-dev-box.local"]` (only these). Each navigation is logged in `device_log`. In the app, `openUrl` logs `browser_open_refused` and returns `false` when the Browser refuses a page, so `await` it.
 
 ## Describe an app and it appears
+
+For a step-by-step walkthrough, see [Describe an app](describe-an-app.md).
 
 `create_app { session, id, spec }` takes an app spec ([app spec](design/app-spec.md), `shipvo.app/v0`), checks it, and puts the app on the phone. A spec with problems is refused with `invalid_spec`: every problem comes back with its path in the spec and a fix, and nothing is installed. A valid spec gets an icon on the home screen and opens (pass `open: false` to stay where you are). Pass `style: "ios"` for the iPhone look; the default is Android.
 
@@ -198,6 +199,7 @@ The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action in
 | `placement.… not valid, dropped` in the `warnings` of `import_phone_apps` | An exported layout has a field that is not valid | The valid fields were kept. Fix the field named in the warning and import again with `replace: true` |
 | `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
 | A scheduled app is missing from the home screen | Its schedule is not active at the phone's clock | Read the home text, which says when it starts; call `set_phone_time`, or `switch_app` still opens it |
+| `permission_denied` from an app action | You denied the permission the action needs | Allow it in Settings, in the app's permission row, then run the action again |
 | `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
 
 ## Next steps

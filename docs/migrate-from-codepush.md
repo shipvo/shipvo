@@ -131,6 +131,14 @@ This signs the code of release 3 as the next release number and publishes it to 
 - `publish` calls `expo export` to build the bundle, so the project is an Expo project.
 - You start with release 1 on Shipvo. Your CodePush history stays in App Center.
 
+## Troubleshooting
+
+| What you see | Why | What to do |
+| --- | --- | --- |
+| `publish` fails before building | The project is not an Expo project, or `expo export` fails | Run `npx expo export` alone and fix its error first |
+| Phones do not get the release | The installed app does not include `@shipvo/runtime` from Step 2 | Install an app build made after Step 2; later releases go over the air |
+| Any other failure | Setup problem | Run `npx shipvo doctor`; each FAIL line ends with the exact fix |
+
 ## Next
 
 - [Build your first app](getting-started.md)
