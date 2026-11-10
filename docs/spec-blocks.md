@@ -144,12 +144,14 @@ The validator reports a bad column list, a card in a column the board does not h
 A `calendar` block shows the rows of a data source as events. A `map` block shows rows as pins. Both work the same on Android and iOS. Both need a `label` and a `from` (the name of a source in `data`); the other options are expressions that run once per row as `item`.
 
 ```json
+{ "blocks": [
 { "type": "calendar", "label": "Plans", "from": "events", "view": "week", "at": "2026-11-10",
   "date": "{{ item.at }}", "title": "{{ item.name }}",
   "onSelect": { "action": "pick", "input": { "id": "{{ item.id }}" } } },
 { "type": "map", "label": "Places", "from": "places",
   "lat": "{{ item.lat }}", "lng": "{{ item.lng }}", "title": "{{ item.name }}",
   "onSelect": { "action": "pick", "input": { "id": "{{ item.id }}" } } }
+] }
 ```
 
 | Option | Block | Meaning |
@@ -267,8 +269,6 @@ A data source can call a service with a key you saved once in the secret form. T
 - **`Pin latitude 95 is not valid.`** Latitude runs from -90 to 90 and longitude from -180 to 180.
 - **A week or month view shows no events.** The view only lists events inside the days it shows. Set `at` to a day in the period you want, or use `agenda`.
 - **A translation does not show.** The key must match the text exactly, including capitals and spaces, and `language` must be the same code you used in `strings` (`fr`, not `fr-FR`). Pass `locale` separately for money and dates.
-- **`Event date "tomorrow" is not a date.` or `Pin latitude 95 is not valid.`** Fix the value in the `seed` rows. Use `2026-11-07` or `2026-11-07T09:30`, latitude -90 to 90 and longitude -180 to 180.
-- **A calendar event does not show.** In `month` and `week` view only the days of the month or week around `at` are drawn. Set `at`, or use `view: "agenda"` to list every event.
 - **A vector shape is missing.** An unknown `shape` is an error; a colour that is not hex, a name or `url(#id)` draws as `none`; a path with other characters draws nothing.
 - **State is empty before the first change.** Declare a `default` for each `state` value. Declared defaults are present from the start.
 
