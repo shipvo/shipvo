@@ -122,13 +122,14 @@ npx shipvo rollback --to 3
 
 This signs the code of release 3 as the next release number and publishes it to the bands you name (default all). It needs the control plane, so the preview reads from it too. `--bands` and `--platform` work as in `publish`.
 
-## What Shipvo does not do
+## How Shipvo differs from CodePush
 
-- It does not read your CodePush history, deployments or keys. There is no import.
-- It has no `--mandatory` flag, no per-release description flag and no `--target-binary-version`. Binary compatibility uses `--min-shell` and the native module check in `publish`.
-- Rollout is by cohort (`b0`, `b1`, `b2`), not by a percentage you choose.
-- It does not update apps that do not contain `@shipvo/runtime`.
-- It is not a drop-in for bare React Native projects without Expo. The publish command calls `expo export`.
+- Your signing seed stays with you. Every release is signed, and installed apps check the signature.
+- Rollout goes by cohort (`b0`, `b1`, `b2`). You choose which cohorts get a release with `--bands`.
+- Binary compatibility is set with `--min-shell` and the native module check in `publish`.
+- Apps receive updates through `@shipvo/runtime`, which Step 2 adds.
+- `publish` calls `expo export` to build the bundle, so the project is an Expo project.
+- You start with release 1 on Shipvo. Your CodePush history stays in App Center.
 
 ## Next
 
