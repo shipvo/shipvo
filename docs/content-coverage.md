@@ -135,3 +135,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Assistant Inbox (`send_message`, `check_inbox`, `hand_off`, `{{ caller }}`) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | |
 | Patch falls back to full download on small heaps (Android, `patchError`) | [runtime](../packages/runtime/README.md#patches-on-small-heaps-android) | | | |
 | Permissions detected from camera, scanner and file blocks | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
+| Key rotations in the audit log (`shipvo audit`, `action: key-rotation`) | [key-rotation](key-rotation.md#see-rotations-in-the-audit-log), [cli](cli.md#shipvo-audit) | | | |
