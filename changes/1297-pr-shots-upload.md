@@ -1,0 +1,2 @@
+- CI: new workflow `pr-shots-upload` uploads PR screenshots pushed under `pr-shots/<pr>/` to the media bucket, served at `shipvo.dev/media/pr-shots/<pr>/<file>`.
+- Migration: none.
