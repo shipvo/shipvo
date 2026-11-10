@@ -24,6 +24,11 @@ export const SHOTS = [
 export const SCREEN_LENGTH = { order: 9.1, rush: 26.6 };
 const screens = {};
 export const setScreen = (name, fn) => { screens[name] = fn; };
+/** Hard cuts inside the shots (film seconds), from the comments on each scene. The vertical cut uses them for sound effects and pacing. */
+export const CUTS = [5, 7.4, 10.4, 14, 17.5, 20, 22, 25, 27.5, 32, 35, 37.5, 40, 44, 48.5, 53, 56.5, 60, 63.5, 67, 71, 74, 76, 79.5, 83, 86.5, 90, 96];
+/** The part of the 1280x720 frame that is shown: the whole frame, or a 9:16 window for the vertical cut. Text is laid out inside it. */
+let VIEW = { x: 0, w: 1280 };
+export const setView = (v) => { VIEW = v || { x: 0, w: 1280 }; };
 export const shotAt = (t) => SHOTS.find((s) => t >= s.t0 && t < s.t1) || SHOTS[SHOTS.length - 1];
 
 const BROWN = "#2b1d24";
@@ -42,7 +47,12 @@ const esc = (x) => String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 function subtitle(t) {
   const l = LINES.find((x) => t >= x.start && t <= x.end + .25);
   if (!l) return "";
-  return `<g><rect x="340" y="656" width="600" height="46" rx="14" fill="#0b1f3a" opacity=".82"/><text x="640" y="688" text-anchor="middle" font-family="system-ui,sans-serif" font-size="26" fill="#fff"><tspan fill="#7fb2ff" font-weight="700">${esc(NAMES[l.who] || l.who)}: </tspan>${esc(l.text)}</text></g>`;
+  const who = esc(NAMES[l.who] || l.who);
+  if (VIEW.w < 700) { // narrow window: the name on its own line, then the words
+    const cx = VIEW.x + VIEW.w / 2, w = VIEW.w - 24;
+    return `<g><rect x="${f(cx - w / 2)}" y="560" width="${w}" height="92" rx="14" fill="#0b1f3a" opacity=".86"/><text x="${f(cx)}" y="590" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="#7fb2ff">${who}</text><text x="${f(cx)}" y="628" text-anchor="middle" font-family="system-ui,sans-serif" font-size="25" fill="#fff">${esc(l.text)}</text></g>`;
+  }
+  return `<g><rect x="340" y="656" width="600" height="46" rx="14" fill="#0b1f3a" opacity=".82"/><text x="640" y="688" text-anchor="middle" font-family="system-ui,sans-serif" font-size="26" fill="#fff"><tspan fill="#7fb2ff" font-weight="700">${who}: </tspan>${esc(l.text)}</text></g>`;
 }
 
 /** A walker: simple silhouette with a phone in hand, bobbing as it walks. */
@@ -139,6 +149,13 @@ function phone(x, y, scale, name, sec) {
 function caption(text, t, t0) {
   if (t < t0 || t > t0 + 1.5) return "";
   const k = progress(t, t0, t0 + .3, EASE.outCubic), out = progress(t, t0 + 1.2, t0 + 1.5, EASE.inCubic);
+  if (VIEW.w < 700) { // narrow window: two lines, centred in the window
+    const cx = VIEW.x + VIEW.w / 2, words = text.replace(/[.]$/, "").split(" "), half = Math.ceil(words.length / 2);
+    const lines = [words.slice(0, half).join(" "), words.slice(half).join(" ") + "."], w = VIEW.w - 24;
+    return `<g opacity="${f(1 - out)}"><clipPath id="cap${f(t0)}"><rect x="${f(cx - w / 2 * k)}" y="440" width="${f(w * k)}" height="130"/></clipPath>
+    <g clip-path="url(#cap${f(t0)})"><rect x="${f(cx - w / 2)}" y="440" width="${w}" height="130" rx="20" fill="#0b1f3a" opacity=".9"/>
+    ${lines.map((x, i) => `<text x="${f(cx)}" y="${496 + i * 50}" text-anchor="middle" font-family="Georgia,serif" font-weight="800" font-size="40" fill="#ff8a3d">${x}</text>`).join("")}</g></g>`;
+  }
   return `<g opacity="${f(1 - out)}"><clipPath id="cap${f(t0)}"><rect x="${f(640 - 420 * k)}" y="560" width="${f(840 * k)}" height="90"/></clipPath>
     <g clip-path="url(#cap${f(t0)})"><rect x="220" y="560" width="840" height="90" rx="20" fill="#0b1f3a" opacity=".88"/>
     <text x="640" y="622" text-anchor="middle" font-family="Georgia,serif" font-weight="800" font-size="46" fill="#ff8a3d">${text}</text></g></g>`;
@@ -246,10 +263,14 @@ export function sunset(t) {
 /** 96 to 100 s: end card. The paper-plane mark flies in, then the line and shipvo.dev. */
 export function endcard(t) {
   const k = progress(t, 96, 96.7, EASE.outCubic), l = progress(t, 96.6, 97.2, EASE.outCubic);
-  const body = `<rect width="1280" height="720" fill="#0b1f3a"/>${glow("ecg", 640, 300, 420, "#ff8a3d", .25)}
-    <g transform="translate(${f(560 + (1 - k) * -200)} ${f(130 + (1 - k) * 120)}) scale(.31)" opacity="${f(k)}">${mark("ec").replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "")}</g>
-    <text x="640" y="400" text-anchor="middle" font-family="Georgia,serif" font-weight="800" font-size="52" fill="#ffffff" opacity="${f(l)}">Every assistant can use your app.</text>
-    <text x="640" y="470" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="40" fill="#ff8a3d" opacity="${f(l)}">shipvo.dev</text>`;
+  const narrow = VIEW.w < 700, cx = VIEW.x + VIEW.w / 2, dx = cx - 640;
+  const line = narrow
+    ? ["Every assistant", "can use your app."].map((x, i) => `<text x="${f(cx)}" y="${380 + i * 56}" text-anchor="middle" font-family="Georgia,serif" font-weight="800" font-size="44" fill="#ffffff" opacity="${f(l)}">${x}</text>`).join("")
+    : `<text x="640" y="400" text-anchor="middle" font-family="Georgia,serif" font-weight="800" font-size="52" fill="#ffffff" opacity="${f(l)}">Every assistant can use your app.</text>`;
+  const body = `<rect x="${f(VIEW.x)}" width="${VIEW.w}" height="720" fill="#0b1f3a"/><rect width="1280" height="720" fill="#0b1f3a"/>${glow("ecg", cx, 300, 420, "#ff8a3d", .25)}
+    <g transform="translate(${f(560 + dx + (1 - k) * -200)} ${f(130 + (1 - k) * 120)}) scale(.31)" opacity="${f(k)}">${mark("ec").replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "")}</g>
+    ${line}
+    <text x="${f(cx)}" y="${narrow ? 520 : 470}" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="40" fill="#ff8a3d" opacity="${f(l)}">shipvo.dev</text>`;
   return wrap("ec", t, body);
 }
 

@@ -1,0 +1,1 @@
+- Docs: the adapters page has troubleshooting and next steps, and states which Capacitor rules are implemented.

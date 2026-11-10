@@ -34,5 +34,33 @@
   ],
   "payoff": "76 to 96 s: three real orders in a list, busy shop at sunset",
   "trailer": "Next-episode trailer is tracked in #871 (E2 is not made yet)"
+ },
+ "vertical": {
+  "slug": "chat-to-app-ad-vertical",
+  "brief": "chat-to-app-ad-vertical.brief.json",
+  "music": {
+   "id": 521021,
+   "offset": 176.5
+  },
+  "segments": "scripts/video/story/vertical.mjs",
+  "retention": {
+   "hook": "0 to 3 s: the golden street, same hook as the main cut",
+   "promise": "4.5 to 7.5 s: Mara, 'Nobody comes in.'",
+   "openLoop": {
+    "opens": 5.3,
+    "pays": 31.8,
+    "q": "Can the shop get customers?"
+   },
+   "rehooks": [
+    4.5,
+    7.3,
+    10.3,
+    14,
+    22,
+    27.8
+   ],
+   "payoff": "31.8 to 37.8 s: busy shop at sunset, end card",
+   "trailer": "Next-episode tease follows with #871"
+  }
  }
 }

@@ -208,7 +208,7 @@ You:
 
 ## Change the currency
 
-Open `src/data/shop.json` and set `currency`, `position` (`before` or `after`), `decimals` and `locale`. For FCFA: `{ "currency": "FCFA", "position": "after", "decimals": 0, "locale": "fr-FR" }` shows `6 500 FCFA`. Prices in `products.json` stay whole numbers in the smallest unit (6500 with `decimals` 0, 650 with `decimals` 2).
+Open `src/data/shop.json` and set `currency`, `code`, `position` (`before` or `after`), `decimals` and `locale`. `code` is the ISO 4217 code sent to the payment provider. For FCFA: `{ "currency": "FCFA", "code": "XAF", "position": "after", "decimals": 0, "locale": "fr-FR" }` shows `6 500 FCFA`. Prices in `products.json` stay whole numbers in the smallest unit (6500 with `decimals` 0, 650 with `decimals` 2).
 
 ## Troubleshooting
 
