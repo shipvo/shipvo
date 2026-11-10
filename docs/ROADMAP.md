@@ -85,6 +85,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: Key rotations appear in `shipvo audit` next to publishes and rollbacks ([Key rotation](key-rotation.md#see-rotations-in-the-audit-log), #1505)
 - 2026-11-10: Every session has a private inbox, so tests and agents can finish email-code and magic-link sign-in on Android and iOS ([Test an email sign-in](email-sign-in.md), #1496)
 - 2026-11-10: Assistant Inbox: assistants on one phone message each other and hand over tasks, and actions read the caller as `{{ caller }}` ([Phone apps](phone-apps.md#assistants-talking-to-each-other), #1472, #1490)
 - 2026-11-10: `csv()` turns a collection into CSV from an action ([Phone apps](phone-apps.md#export-data-as-csv), #1458)

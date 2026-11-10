@@ -6,6 +6,7 @@ Step-by-step tutorials for people who have never used a terminal. Each one ends 
 
 | Tutorial | You will | Time | Level |
 | --- | --- | --- | --- |
+| [Try Shipvo in your browser](try-shipvo-in-your-browser.md) | Tap a shop on an Android phone and an iPhone, test dark mode, a location and a payment, watch a signed update roll back and share a wall of phones | about 15 minutes, nothing to install | Beginner |
 | [Create your first app](first-app.md) | Create an app, open it on a simulated phone, change its words and check a release | a few minutes of commands, plus reading | Beginner |
 | [Describe an app and watch it appear on a phone](describe-an-app.md) | Tell an assistant what app you want, see it on an Android and an iOS phone in your browser, ask for a change and see it update | a few minutes after setup | Beginner |
 
