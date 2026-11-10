@@ -1,0 +1,351 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "contacts",
+    "name": "Contacts",
+    "icon": "users",
+    "description": "People and their phone numbers and emails, kept on this phone."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable",
+    "elevation": "soft"
+  },
+  "data": {
+    "people": {
+      "source": "collection",
+      "fields": {
+        "id": "text",
+        "seq": "number",
+        "name": "text",
+        "phone": "text",
+        "email": "text",
+        "note": "text",
+        "favorite": "bool"
+      },
+      "seed": []
+    },
+    "shown": {
+      "source": "computed",
+      "value": "{{ state.query == '' ? people : people.filter(c, lower(c.name + ' ' + c.phone + ' ' + c.email + ' ' + c.note).contains(lower(state.query))) }}"
+    },
+    "favorites": {
+      "source": "computed",
+      "value": "{{ shown.filter(c, c.favorite) }}"
+    }
+  },
+  "state": {
+    "query": {
+      "type": "text",
+      "default": ""
+    }
+  },
+  "actions": {
+    "add_contact": {
+      "description": "Add a person. Phone, email and note are optional.",
+      "input": {
+        "name": {
+          "type": "text"
+        },
+        "phone": {
+          "type": "text",
+          "default": ""
+        },
+        "email": {
+          "type": "text",
+          "default": ""
+        },
+        "note": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "returns": {
+        "id": "text"
+      },
+      "do": [
+        {
+          "insert": "people",
+          "value": {
+            "id": "{{ 'c' + string(count(people) == 0 ? 1 : last(sortBy(people, 'seq')).seq + 1) }}",
+            "seq": "{{ count(people) == 0 ? 1 : last(sortBy(people, 'seq')).seq + 1 }}",
+            "name": "{{ trim(input.name) }}",
+            "phone": "{{ trim(input.phone) }}",
+            "email": "{{ lower(trim(input.email)) }}",
+            "note": "{{ input.note }}",
+            "favorite": false
+          }
+        },
+        {
+          "toast": "Contact added"
+        },
+        {
+          "return": {
+            "id": "{{ last(people).id }}"
+          }
+        }
+      ]
+    },
+    "find_contacts": {
+      "description": "Find people whose name, phone, email or note contains the text. Leave it empty for everyone. Sorted by name.",
+      "input": {
+        "text": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "returns": {
+        "contacts": "list"
+      },
+      "do": [
+        {
+          "return": {
+            "contacts": "{{ sortBy(people.filter(c, input.text == '' || lower(c.name + ' ' + c.phone + ' ' + c.email + ' ' + c.note).contains(lower(input.text))), 'name') }}"
+          }
+        }
+      ]
+    },
+    "update_contact": {
+      "description": "Change a person's phone, email or note, by id. Leave a field empty to keep it.",
+      "input": {
+        "id": {
+          "type": "text"
+        },
+        "phone": {
+          "type": "text",
+          "default": ""
+        },
+        "email": {
+          "type": "text",
+          "default": ""
+        },
+        "note": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "do": [
+        {
+          "if": "people.exists(c, c.id == input.id)",
+          "then": [
+            {
+              "if": "input.phone != ''",
+              "then": [
+                {
+                  "update": "people",
+                  "where": "item.id == input.id",
+                  "value": {
+                    "phone": "{{ trim(input.phone) }}"
+                  }
+                }
+              ]
+            },
+            {
+              "if": "input.email != ''",
+              "then": [
+                {
+                  "update": "people",
+                  "where": "item.id == input.id",
+                  "value": {
+                    "email": "{{ lower(trim(input.email)) }}"
+                  }
+                }
+              ]
+            },
+            {
+              "if": "input.note != ''",
+              "then": [
+                {
+                  "update": "people",
+                  "where": "item.id == input.id",
+                  "value": {
+                    "note": "{{ input.note }}"
+                  }
+                }
+              ]
+            },
+            {
+              "toast": "Contact updated"
+            },
+            {
+              "return": {
+                "updated": true
+              }
+            }
+          ],
+          "else": [
+            {
+              "return": {
+                "updated": false
+              }
+            }
+          ]
+        }
+      ],
+      "returns": {
+        "updated": "bool"
+      }
+    },
+    "set_favorite": {
+      "description": "Mark a person as a favourite, or not, by id.",
+      "input": {
+        "id": {
+          "type": "text"
+        },
+        "favorite": {
+          "type": "bool",
+          "default": true
+        }
+      },
+      "do": [
+        {
+          "update": "people",
+          "where": "item.id == input.id",
+          "value": {
+            "favorite": "{{ input.favorite }}"
+          }
+        },
+        {
+          "toast": "Favourites updated"
+        }
+      ]
+    },
+    "delete_contact": {
+      "description": "Remove a person, by id.",
+      "input": {
+        "id": {
+          "type": "text"
+        }
+      },
+      "do": [
+        {
+          "delete": "people",
+          "where": "item.id == input.id"
+        },
+        {
+          "toast": "Contact deleted"
+        }
+      ]
+    },
+    "show_matches": {
+      "description": "Show only the people whose name, phone, email or note contain the text on the screen. Leave it empty to show all.",
+      "input": {
+        "query": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "do": [
+        {
+          "set": "state.query",
+          "value": "{{ input.query }}"
+        }
+      ]
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Contacts",
+      "body": [
+        {
+          "type": "form",
+          "label": "Find a contact form",
+          "submit": {
+            "label": "Find",
+            "action": "show_matches"
+          },
+          "fields": [
+            {
+              "name": "query",
+              "type": "text",
+              "label": "Find by name, phone, email or note; leave empty to show all",
+              "maxLength": 200
+            }
+          ]
+        },
+        {
+          "type": "badge",
+          "value": "{{ count(shown) }} contacts"
+        },
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "Favourites"
+        },
+        {
+          "type": "list",
+          "label": "Favourites",
+          "from": "{{ sortBy(favorites, 'name') }}",
+          "item": {
+            "title": "{{ item.name }}",
+            "subtitle": "{{ item.phone }}"
+          },
+          "empty": {
+            "message": "No favourites"
+          }
+        },
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "All contacts"
+        },
+        {
+          "type": "list",
+          "label": "All contacts",
+          "from": "{{ sortBy(shown, 'name') }}",
+          "item": {
+            "title": "{{ item.name }}",
+            "subtitle": "{{ item.phone }}{{ item.email == '' ? '' : ', ' + item.email }}, Id {{ item.id }}"
+          },
+          "empty": {
+            "message": "No contacts yet"
+          }
+        },
+        {
+          "type": "form",
+          "label": "New contact form",
+          "submit": {
+            "label": "Save contact",
+            "action": "add_contact"
+          },
+          "fields": [
+            {
+              "name": "name",
+              "type": "text",
+              "label": "Name",
+              "required": true,
+              "maxLength": 100
+            },
+            {
+              "name": "phone",
+              "type": "text",
+              "label": "Phone",
+              "maxLength": 40
+            },
+            {
+              "name": "email",
+              "type": "text",
+              "label": "Email",
+              "maxLength": 200
+            },
+            {
+              "name": "note",
+              "type": "text",
+              "label": "Note",
+              "maxLength": 500
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

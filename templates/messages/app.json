@@ -1,0 +1,290 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "messages",
+    "name": "Messages",
+    "icon": "message",
+    "description": "Text conversations with people, one thread for each person."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable",
+    "elevation": "soft"
+  },
+  "data": {
+    "texts": {
+      "source": "collection",
+      "fields": {
+        "id": "text",
+        "seq": "number",
+        "with": "text",
+        "direction": "text",
+        "body": "text",
+        "sent_on": "text",
+        "read": "bool"
+      },
+      "seed": []
+    },
+    "unread": {
+      "source": "computed",
+      "value": "{{ sum(threads.map(h, h.unread)) }}"
+    },
+    "threads": {
+      "source": "collection",
+      "fields": {
+        "with": "text",
+        "last": "text",
+        "order": "number",
+        "unread": "number"
+      },
+      "seed": []
+    }
+  },
+  "actions": {
+    "send_text": {
+      "description": "Send a text to a person (their name or number). It joins that person's thread.",
+      "input": {
+        "to": {
+          "type": "text"
+        },
+        "body": {
+          "type": "text"
+        }
+      },
+      "returns": {
+        "id": "text"
+      },
+      "do": [
+        {
+          "insert": "texts",
+          "value": {
+            "id": "{{ 't' + string(count(texts) == 0 ? 1 : last(sortBy(texts, 'seq')).seq + 1) }}",
+            "seq": "{{ count(texts) == 0 ? 1 : last(sortBy(texts, 'seq')).seq + 1 }}",
+            "with": "{{ trim(input.to) }}",
+            "direction": "out",
+            "body": "{{ input.body }}",
+            "sent_on": "{{ formatDate(today(), 'iso') }}",
+            "read": true
+          }
+        },
+        {
+          "if": "threads.exists(h, h.with == trim(input.to))",
+          "then": [
+            {
+              "update": "threads",
+              "where": "item.with == trim(input.to)",
+              "value": {
+                "last": "{{ input.body }}",
+                "order": "{{ 0 - last(sortBy(texts, 'seq')).seq }}",
+                "unread": "{{ count(texts.filter(t, t.with == trim(input.to) && t.direction == 'in' && !t.read)) }}"
+              }
+            }
+          ],
+          "else": [
+            {
+              "insert": "threads",
+              "value": {
+                "with": "{{ trim(input.to) }}",
+                "last": "{{ input.body }}",
+                "order": "{{ 0 - last(sortBy(texts, 'seq')).seq }}",
+                "unread": "{{ count(texts.filter(t, t.with == trim(input.to) && t.direction == 'in' && !t.read)) }}"
+              }
+            }
+          ]
+        },
+        {
+          "toast": "Text sent"
+        },
+        {
+          "return": {
+            "id": "{{ last(texts).id }}"
+          }
+        }
+      ]
+    },
+    "receive_text": {
+      "description": "Put an incoming text from a person into their thread, as if it had just arrived. It counts as unread until you read the thread.",
+      "input": {
+        "from": {
+          "type": "text"
+        },
+        "body": {
+          "type": "text"
+        }
+      },
+      "returns": {
+        "id": "text"
+      },
+      "do": [
+        {
+          "insert": "texts",
+          "value": {
+            "id": "{{ 't' + string(count(texts) == 0 ? 1 : last(sortBy(texts, 'seq')).seq + 1) }}",
+            "seq": "{{ count(texts) == 0 ? 1 : last(sortBy(texts, 'seq')).seq + 1 }}",
+            "with": "{{ trim(input.from) }}",
+            "direction": "in",
+            "body": "{{ input.body }}",
+            "sent_on": "{{ formatDate(today(), 'iso') }}",
+            "read": false
+          }
+        },
+        {
+          "if": "threads.exists(h, h.with == trim(input.from))",
+          "then": [
+            {
+              "update": "threads",
+              "where": "item.with == trim(input.from)",
+              "value": {
+                "last": "{{ input.body }}",
+                "order": "{{ 0 - last(sortBy(texts, 'seq')).seq }}",
+                "unread": "{{ count(texts.filter(t, t.with == trim(input.from) && t.direction == 'in' && !t.read)) }}"
+              }
+            }
+          ],
+          "else": [
+            {
+              "insert": "threads",
+              "value": {
+                "with": "{{ trim(input.from) }}",
+                "last": "{{ input.body }}",
+                "order": "{{ 0 - last(sortBy(texts, 'seq')).seq }}",
+                "unread": "{{ count(texts.filter(t, t.with == trim(input.from) && t.direction == 'in' && !t.read)) }}"
+              }
+            }
+          ]
+        },
+        {
+          "toast": "New text"
+        },
+        {
+          "return": {
+            "id": "{{ last(texts).id }}"
+          }
+        }
+      ]
+    },
+    "list_conversations": {
+      "description": "Every conversation: the person, the last text and how many are unread. Newest first.",
+      "input": {},
+      "returns": {
+        "threads": "list"
+      },
+      "do": [
+        {
+          "return": {
+            "threads": "{{ sortBy(threads, 'order') }}"
+          }
+        }
+      ]
+    },
+    "read_conversation": {
+      "description": "The texts with one person, oldest first, and mark the incoming ones as read.",
+      "input": {
+        "with": {
+          "type": "text"
+        }
+      },
+      "returns": {
+        "texts": "list"
+      },
+      "do": [
+        {
+          "update": "texts",
+          "where": "item.with == input.with && item.direction == 'in'",
+          "value": {
+            "read": true
+          }
+        },
+        {
+          "update": "threads",
+          "where": "item.with == input.with",
+          "value": {
+            "unread": 0
+          }
+        },
+        {
+          "return": {
+            "texts": "{{ sortBy(texts.filter(t, t.with == input.with), 'seq') }}"
+          }
+        }
+      ]
+    },
+    "delete_conversation": {
+      "description": "Delete every text with one person.",
+      "input": {
+        "with": {
+          "type": "text"
+        }
+      },
+      "do": [
+        {
+          "delete": "texts",
+          "where": "item.with == input.with"
+        },
+        {
+          "delete": "threads",
+          "where": "item.with == input.with"
+        },
+        {
+          "toast": "Conversation deleted"
+        }
+      ]
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Messages",
+      "body": [
+        {
+          "type": "badge",
+          "value": "{{ unread }} unread"
+        },
+        {
+          "type": "list",
+          "label": "Conversations",
+          "from": "{{ sortBy(threads, 'order') }}",
+          "item": {
+            "title": "{{ item.with }}{{ item.unread > 0 ? ' (' + string(item.unread) + ' new)' : '' }}",
+            "subtitle": "{{ item.last }}"
+          },
+          "empty": {
+            "message": "No conversations yet"
+          }
+        },
+        {
+          "type": "form",
+          "label": "New text form",
+          "submit": {
+            "label": "Send",
+            "action": "send_text"
+          },
+          "fields": [
+            {
+              "name": "to",
+              "type": "text",
+              "label": "To",
+              "required": true,
+              "maxLength": 100
+            },
+            {
+              "name": "body",
+              "type": "text",
+              "label": "Text",
+              "required": true,
+              "maxLength": 2000
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

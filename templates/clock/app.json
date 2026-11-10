@@ -1,0 +1,410 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "clock",
+    "name": "Clock",
+    "icon": "clock",
+    "description": "Alarms, timers and the time in other places."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable",
+    "elevation": "soft"
+  },
+  "data": {
+    "alarms": {
+      "source": "collection",
+      "fields": {
+        "id": "text",
+        "seq": "number",
+        "time": "text",
+        "label": "text",
+        "days": "text",
+        "on": "bool"
+      },
+      "seed": []
+    },
+    "timers": {
+      "source": "collection",
+      "fields": {
+        "id": "text",
+        "seq": "number",
+        "label": "text",
+        "minutes": "number",
+        "started": "text",
+        "state": "text"
+      },
+      "seed": []
+    },
+    "places": {
+      "source": "collection",
+      "fields": {
+        "id": "text",
+        "seq": "number",
+        "name": "text",
+        "timezone": "text"
+      },
+      "seed": []
+    },
+    "active": {
+      "source": "computed",
+      "value": "{{ count(alarms.filter(a, a.on)) }}"
+    }
+  },
+  "actions": {
+    "add_alarm": {
+      "description": "Add an alarm at a time (HH:MM, 24 hour). Days is a list such as 'mon,tue,wed' or empty for every day. It is on when you add it.",
+      "input": {
+        "time": {
+          "type": "text"
+        },
+        "label": {
+          "type": "text",
+          "default": ""
+        },
+        "days": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "returns": {
+        "id": "text",
+        "added": "bool",
+        "reason": "text"
+      },
+      "do": [
+        {
+          "if": "input.time.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')",
+          "then": [
+            {
+              "insert": "alarms",
+              "value": {
+                "id": "{{ 'a' + string(count(alarms) == 0 ? 1 : last(sortBy(alarms, 'seq')).seq + 1) }}",
+                "seq": "{{ count(alarms) == 0 ? 1 : last(sortBy(alarms, 'seq')).seq + 1 }}",
+                "time": "{{ input.time }}",
+                "label": "{{ input.label }}",
+                "days": "{{ lower(trim(input.days)) }}",
+                "on": true
+              }
+            },
+            {
+              "toast": "Alarm added"
+            },
+            {
+              "return": {
+                "id": "{{ last(alarms).id }}",
+                "added": true,
+                "reason": ""
+              }
+            }
+          ],
+          "else": [
+            {
+              "return": {
+                "id": "",
+                "added": false,
+                "reason": "time must be HH:MM on a 24 hour clock, such as 07:30"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "list_alarms": {
+      "description": "Every alarm, earliest first: id, time, label, days and whether it is on.",
+      "input": {},
+      "returns": {
+        "alarms": "list"
+      },
+      "do": [
+        {
+          "return": {
+            "alarms": "{{ sortBy(alarms, 'time') }}"
+          }
+        }
+      ]
+    },
+    "set_alarm": {
+      "description": "Turn an alarm on or off, by id.",
+      "input": {
+        "id": {
+          "type": "text"
+        },
+        "on": {
+          "type": "bool"
+        }
+      },
+      "do": [
+        {
+          "update": "alarms",
+          "where": "item.id == input.id",
+          "value": {
+            "on": "{{ input.on }}"
+          }
+        },
+        {
+          "toast": "Alarm updated"
+        }
+      ]
+    },
+    "delete_alarm": {
+      "description": "Remove an alarm, by id.",
+      "input": {
+        "id": {
+          "type": "text"
+        }
+      },
+      "do": [
+        {
+          "delete": "alarms",
+          "where": "item.id == input.id"
+        },
+        {
+          "toast": "Alarm deleted"
+        }
+      ]
+    },
+    "start_timer": {
+      "description": "Start a countdown timer of some minutes, with a label. The start time is the phone's time now.",
+      "input": {
+        "minutes": {
+          "type": "number"
+        },
+        "label": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "returns": {
+        "id": "text"
+      },
+      "do": [
+        {
+          "insert": "timers",
+          "value": {
+            "id": "{{ 't' + string(count(timers) == 0 ? 1 : last(sortBy(timers, 'seq')).seq + 1) }}",
+            "seq": "{{ count(timers) == 0 ? 1 : last(sortBy(timers, 'seq')).seq + 1 }}",
+            "label": "{{ input.label }}",
+            "minutes": "{{ input.minutes }}",
+            "started": "{{ formatDate(today(), 'iso') }}",
+            "state": "running"
+          }
+        },
+        {
+          "toast": "Timer started"
+        },
+        {
+          "return": {
+            "id": "{{ last(timers).id }}"
+          }
+        }
+      ]
+    },
+    "stop_timer": {
+      "description": "Stop a timer, by id.",
+      "input": {
+        "id": {
+          "type": "text"
+        }
+      },
+      "do": [
+        {
+          "update": "timers",
+          "where": "item.id == input.id",
+          "value": {
+            "state": "stopped"
+          }
+        },
+        {
+          "toast": "Timer stopped"
+        }
+      ]
+    },
+    "list_timers": {
+      "description": "Every timer: id, label, minutes, when it started and whether it is running or stopped.",
+      "input": {},
+      "returns": {
+        "timers": "list"
+      },
+      "do": [
+        {
+          "return": {
+            "timers": "{{ sortBy(timers, 'seq') }}"
+          }
+        }
+      ]
+    },
+    "add_place": {
+      "description": "Add a place to the world clock by name and time zone, such as Paris and Europe/Paris.",
+      "input": {
+        "name": {
+          "type": "text"
+        },
+        "timezone": {
+          "type": "text"
+        }
+      },
+      "returns": {
+        "id": "text"
+      },
+      "do": [
+        {
+          "insert": "places",
+          "value": {
+            "id": "{{ 'p' + string(count(places) == 0 ? 1 : last(sortBy(places, 'seq')).seq + 1) }}",
+            "seq": "{{ count(places) == 0 ? 1 : last(sortBy(places, 'seq')).seq + 1 }}",
+            "name": "{{ input.name }}",
+            "timezone": "{{ input.timezone }}"
+          }
+        },
+        {
+          "toast": "Place added"
+        },
+        {
+          "return": {
+            "id": "{{ last(places).id }}"
+          }
+        }
+      ]
+    },
+    "delete_place": {
+      "description": "Remove a world clock place, by id.",
+      "input": {
+        "id": {
+          "type": "text"
+        }
+      },
+      "do": [
+        {
+          "delete": "places",
+          "where": "item.id == input.id"
+        },
+        {
+          "toast": "Place removed"
+        }
+      ]
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Clock",
+      "body": [
+        {
+          "type": "badge",
+          "value": "{{ active }} alarms on"
+        },
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "Alarms"
+        },
+        {
+          "type": "list",
+          "label": "Alarms",
+          "from": "{{ sortBy(alarms, 'time') }}",
+          "item": {
+            "title": "{{ item.time }} {{ item.label }}",
+            "subtitle": "{{ item.days == '' ? 'Every day' : item.days }}, {{ item.on ? 'on' : 'off' }}, Id {{ item.id }}"
+          },
+          "empty": {
+            "message": "No alarms"
+          }
+        },
+        {
+          "type": "form",
+          "label": "New alarm form",
+          "submit": {
+            "label": "Add alarm",
+            "action": "add_alarm"
+          },
+          "fields": [
+            {
+              "name": "time",
+              "type": "text",
+              "label": "Time (HH:MM)",
+              "required": true,
+              "maxLength": 5
+            },
+            {
+              "name": "label",
+              "type": "text",
+              "label": "Label",
+              "maxLength": 100
+            },
+            {
+              "name": "days",
+              "type": "text",
+              "label": "Days, such as mon,tue; empty for every day",
+              "maxLength": 40
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "Timers"
+        },
+        {
+          "type": "list",
+          "label": "Timers",
+          "from": "{{ sortBy(timers, 'seq') }}",
+          "item": {
+            "title": "{{ item.label == '' ? 'Timer' : item.label }}, {{ item.minutes }} min",
+            "subtitle": "{{ item.state }}, Id {{ item.id }}"
+          },
+          "empty": {
+            "message": "No timers"
+          }
+        },
+        {
+          "type": "form",
+          "label": "New timer form",
+          "submit": {
+            "label": "Start timer",
+            "action": "start_timer"
+          },
+          "fields": [
+            {
+              "name": "minutes",
+              "type": "number",
+              "label": "Minutes",
+              "required": true
+            },
+            {
+              "name": "label",
+              "type": "text",
+              "label": "Label",
+              "maxLength": 100
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "World clock"
+        },
+        {
+          "type": "list",
+          "label": "World clock",
+          "from": "{{ sortBy(places, 'seq') }}",
+          "item": {
+            "title": "{{ item.name }}",
+            "subtitle": "{{ item.timezone }}"
+          },
+          "empty": {
+            "message": "No places"
+          }
+        }
+      ]
+    }
+  ]
+}
