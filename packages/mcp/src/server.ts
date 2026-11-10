@@ -430,6 +430,10 @@ use(server, tools.update_app,
   async ({ session, id, spec, name }) => { need(session); return result(session, await act({ session, action: "update_app", id, spec, ...(name ? { name } : {}) })); });
 use(server, tools.arrange_apps, 
   async ({ session, ...rest }) => { need(session); return result(session, await act({ session, action: "arrange_apps", ...rest })); });
+use(server, tools.schedule_app, 
+  async ({ session, id, from, to, days }) => { need(session); return result(session, await act({ session, action: "schedule_app", id, ...(from ? { from } : {}), ...(to ? { to } : {}), ...(days ? { days } : {}) })); });
+use(server, tools.clear_schedule, 
+  async ({ session, id }) => { need(session); return result(session, await act({ session, action: "clear_schedule", id })); });
 use(server, tools.set_phone_time, 
   async ({ session, at }) => { need(session); return result(session, await act({ session, action: "set_time", at })); });
 use(server, tools.pin_app, 

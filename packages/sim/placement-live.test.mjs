@@ -51,6 +51,25 @@ test("a weekly planner shows on weekdays and weekend plans on Saturday, by the p
   assert.equal((await act("pl1", { action: "switch_app", id: "plan" })).ok, true);   // not showing on Saturday, still opens by tool
 });
 
+test("schedule_app shows an app in a window on the phone's clock and clear_schedule returns to pin and hide", async () => {
+  assert.ok((await call("/session", { session: "pl4", phone: PHONE })).ok);
+  const r = await act("pl4", { action: "schedule_app", id: "mail", days: ["mon"], from: "08:00", to: "10:00" });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const at = async (iso) => (await act("pl4", { action: "set_time", at: iso })).home;
+  assert.match(await at("2026-11-09T09:00:00"), /button "Mail"/);
+  const out = await at("2026-11-09T11:00:00");
+  assert.doesNotMatch(out, /button "Mail"/); assert.match(out, /"Mail" \(mail\): not showing now/);
+  assert.doesNotMatch(await at("2026-11-10T09:00:00"), /button "Mail"/);   // Tuesday
+  assert.equal((await act("pl4", { action: "clear_schedule", id: "mail" })).ok, true);
+  assert.match(await at("2026-11-09T11:00:00"), /button "Mail"/);
+  await act("pl4", { action: "hide_app", id: "mail" });
+  assert.doesNotMatch(await at("2026-11-09T09:00:00"), /button "Mail"/);   // hide is the fallback again
+  const bad = await act("pl4", { action: "schedule_app", id: "mail", from: "8am", to: "09:00" });
+  assert.equal(bad.ok, false); assert.equal(bad.code, "bad_placement");
+  assert.equal((await act("pl4", { action: "schedule_app", id: "nope", from: "08:00", to: "09:00" })).code, "not_installed");
+  assert.equal((await act("pl4", { action: "clear_schedule", id: "nope" })).code, "not_installed");
+});
+
 test("pin, hide and position change the order; errors are typed; changes are in device_log", async () => {
   assert.ok((await call("/session", { session: "pl2", phone: PHONE })).ok);
   const order = (screen) => [...screen.matchAll(/button "([^"]+)"/g)].map((m) => m[1]).filter((n) => n !== "Store").join(",");

@@ -1,0 +1,3 @@
+- `@shipvo/sim`: new actions `schedule_app` (show an app in a daily time window on the phone's clock) and `clear_schedule`. They set and remove the same schedule as `arrange_apps`.
+- `@shipvo/mcp`: new tools `schedule_app` and `clear_schedule`.
+- Migration: none; new tools.
