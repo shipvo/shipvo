@@ -139,7 +139,7 @@ This signs the code of release 3 as the next release number and publishes it to 
 - **The native build fails after `--apply`.** Files such as `MainApplication.kt`, `AppDelegate.mm`, `settings.gradle` and the `Podfile` still call CodePush. `--apply` lists each one with its line under the manual steps. Remove those calls by hand.
 - **`shipvo migrate needs --plan ... or --apply ...`** (exit code 2). Pass one of the two flags. Passing both prints `Use --plan or --apply, not both.`
 - **A `shipvo doctor` line says FAIL.** The line ends with the fix. Make it, then run `npx shipvo doctor` again.
-- **Users on the old build get no update.** They need the new store build from Step 5. Shipvo cannot update a build that has no Shipvo runtime.
+- **Users on the old build get no update.** Ship the new store build from Step 5. Every build that includes it receives Shipvo updates.
 
 ## Next steps
 

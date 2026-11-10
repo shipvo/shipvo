@@ -96,9 +96,7 @@ After `shipvo migrate --apply` and `shipvo init --yes` on that copy, `init` prin
 
 ## Troubleshooting
 
-Each message below is printed by the CLI on this branch.
-
-- **`shipvo: this app uses expo-updates ... I stopped and changed nothing.`** `shipvo init` found `expo-updates`. Run `npx shipvo migrate --apply`, install with your package manager, then run `shipvo init` again.
+- **`shipvo: this app uses expo-updates ... I stopped and changed nothing.`** `shipvo init` found `expo-updates`. Run `npx shipvo migrate --plan` to see the steps, then `npx shipvo migrate --apply`, install with your package manager, and run `shipvo init` again.
 - **`Git tree is not clean (N changed path(s)). Commit or stash first, or pass --force.`** `--apply` will not edit a repo with uncommitted changes, so you can review its edits with `git diff`. Commit or stash, then run it again. Backups are also in `.shipvo/migrate-backup/`.
 - **`shipvo migrate needs --plan ... or --apply ...`** (exit code 2). Pass one of the two flags. Passing both prints `Use --plan or --apply, not both.`
 - **The plan tells you to check entries by hand.** Your config is `app.config.js` or `app.config.ts`, which the CLI does not edit. Remove the `expo-updates` plugin and the `updates` and `runtimeVersion` keys yourself.
@@ -109,7 +107,7 @@ Each message below is printed by the CLI on this branch.
 ## Next steps
 
 - [Back up your signing key](new-machine.md) before your first store build.
-- [Publish your first release and widen it by cohort](cli.md).
-- [Roll back a bad release](cli.md).
+- [Widen a release by cohort with `shipvo promote`](cli.md#shipvo-promote).
+- [Machine-readable output for `publish` and `rollback`](cli.md#--json-for-publish-promote-rollback-and-auto-halt).
 - [Migrate from CodePush](migrate-from-codepush.md) if you have other apps on CodePush.
 - [Key rotation](key-rotation.md): change the signing key later without a store build.
