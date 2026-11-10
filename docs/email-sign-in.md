@@ -61,7 +61,7 @@ Agents use three tools. Each takes the `session` from `open_app`.
 
 ## What you will see
 
-`inbox_read` returns the address and the mail so far as `{ address, messages }`. In a test, `phone.inbox.address()` gives the address and `phone.inbox.list()` gives the messages array. After the sign-in request in the example above, one message is there:
+`inbox_read` returns the address and the mail so far as `{ address, messages }`. In a test, `phone.inbox.address()` gives the address and `phone.inbox.list()` gives the messages array. After the sign-in request in the example above, one message is there (example values):
 
 ```json
 { "address": "s-1a2b3c4d5e6f@inbox.shipvo.test",
