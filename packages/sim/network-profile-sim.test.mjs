@@ -108,3 +108,25 @@ test("2g applies the bandwidth limit to the response and still returns the real 
   await act("e", { action: "set_network_profile", profile: "2g" });
   assert.match(await press("e", "Load items"), /Got 200 real/);
 });
+
+test("get_network_profile reads the current profile", async () => {
+  assert.ok((await call("/session", { session: "g" })).ok);
+  assert.equal((await act("g", { action: "get_network_profile" })).profile, "online");
+  await act("g", { action: "set_network_profile", profile: "slow-4g" });
+  assert.equal((await act("g", { action: "get_network_profile" })).profile, "slow-4g");
+});
+
+test("phone.json network applies at start", async () => {
+  assert.ok((await call("/session", { session: "h", phone: { network: "offline" } })).ok);
+  assert.equal((await act("h", { action: "get_network_profile" })).profile, "offline");
+  assert.match(await press("h", "Load items"), /Failed/);
+});
+
+test("phone.json with an unknown network is a bad_profile error", async () => {
+  const r = await call("/session", { session: "i", phone: { network: "5g" } });
+  assert.equal(r.ok, false);
+  assert.equal(r.code, "bad_profile");
+  assert.match(r.error, /Unknown network profile "5g"/);
+  const t = await call("/session", { session: "j", phone: { network: 5 } });
+  assert.equal(t.code, "bad_profile");
+});

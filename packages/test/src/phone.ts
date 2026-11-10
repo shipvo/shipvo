@@ -49,7 +49,7 @@ export class PhoneError extends Error { constructor(message: string, readonly co
 export type MockResponse = { status: number; body?: string | Record<string, unknown> | unknown[] | null; headers?: Record<string, string>; delayMs?: number };
 /** A string `url` must equal the full request URL. A RegExp is tested against it. Without `method`, any method matches. The first matching rule wins. */
 export type MockRule = { url: string | RegExp; method?: string } & MockResponse;
-type Reply = { ok: boolean; code?: string; screen?: string | null; error?: string; path?: string; notifications?: Notification[]; log?: unknown[]; capabilities?: unknown; release?: string | number; delivered?: boolean; id?: string };
+type Reply = { ok: boolean; profile?: string; code?: string; screen?: string | null; error?: string; path?: string; notifications?: Notification[]; log?: unknown[]; capabilities?: unknown; release?: string | number; delivered?: boolean; id?: string };
 
 /** A simulated phone running your app. Every action returns once the screen has settled, and updates `screen`. */
 export class Phone {
@@ -139,6 +139,10 @@ export class Phone {
   async mockNetwork(rules: MockRule[]): Promise<this> { await this.act("set_network_mocks", { rules: encodeMockRules(rules) }); return this; }
   /** Remove every network mock. */
   async clearNetworkMocks(): Promise<this> { await this.act("set_network_mocks", { rules: [] }); return this; }
+  /** Make the app's network behave like a profile: "online", "offline", "2g", "3g", "slow-4g", "spotty" or "low-end-4g". The numbers are simulation settings. Throws a `PhoneError` with code `unknown_profile` for any other name. */
+  async setNetwork(profile: string): Promise<this> { await this.act("set_network_profile", { profile }); return this; }
+  /** The current network profile name ("online" until set). */
+  async getNetwork(): Promise<string> { return (await this.act("get_network_profile")).profile as string; }
   /** What the app did with the device: permission prompts and answers, location reads, scans, fingerprint checks, payments. */
   async deviceLog(): Promise<unknown[]> { return (await this.act("device_log")).log ?? []; }
   /** A PNG of the screen. Works when the test runs on the same machine as the simulator, as in CI. */
