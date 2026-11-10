@@ -6,6 +6,7 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
+0. Assistant Inbox (assistants message and hand tasks to each other on one phone; launch kit written 10 Nov; docs: [phone-apps](phone-apps.md#assistants-talking-to-each-other); tutorial, video and blog needed) and testing an email sign-in with the session inbox (launch kit written 10 Nov; docs: [email-sign-in](email-sign-in.md); tutorial, video and blog needed)
 1. Describe an app and it appears (`create_app`, `update_app`, `app_activity`; launch kit written 10 Nov; docs: [describe-an-app](describe-an-app.md); tutorial done 10 Nov; video done 10 Nov; blog done 10 Nov) and the browser playground (launch kit written 10 Nov; tutorial and video done 10 Nov; blog needed)
 1b. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog done (10 Nov), tutorial done; video now for the live page; the agent-vs-agent video and launch kit once #1166 merges. Docs: [demos/chess](demos/chess.md) (live page, `--agents`, `--record`, troubleshooting).
 2. ~~Shipvo Testers and `shipvo store testers`~~ (done)
@@ -23,6 +24,8 @@ Content agents take their next item from this list first (top to bottom, skippin
 | --- | --- | --- | --- | --- |
 | Chess on Shipvo Phone: live demo and two agents playing through MCP (`--agents`, `--record`) | [demos/chess](demos/chess.md) | [chess-on-two-phones](tutorials/chess-on-two-phones.md) | | [two-ai-agents-play-chess-on-two-phones](../blog/two-ai-agents-play-chess-on-two-phones.md) |
 | Describe an app and it appears (`create_app`, `update_app`, `app_activity`) | [describe-an-app](describe-an-app.md) | [describe-an-app](tutorials/describe-an-app.md) | [Describe an app and watch it appear on a phone](videos.md#describe-an-app-and-watch-it-appear-on-a-phone) | [describe-an-app-and-it-appears-on-a-phone](../blog/describe-an-app-and-it-appears-on-a-phone.md) |
+| Assistant Inbox (assistants message, hand off tasks and share reports on one phone) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | |
+| Test an email sign-in (`inbox_wait`, `phone.inbox`) | [email-sign-in](email-sign-in.md) | | | |
 | Browser playground (sample app on Android and iOS, device API, signed updates, many phones link) | [playground](playground.md) | [try-shipvo-in-your-browser](tutorials/try-shipvo-in-your-browser.md) | [Try Shipvo in your browser](videos.md#try-shipvo-in-your-browser-a-phone-device-features-and-a-rollback) | |
 | Create an app and run it in the simulator | [getting-started](getting-started.md) | [first-app](tutorials/first-app.md) | [Create your first app](videos.md) | [build-a-mobile-app-without-coding](../blog/build-a-mobile-app-without-coding.md) |
 | Shop template with your own products and prices | [getting-started](getting-started.md) | [your-own-shop](tutorials/your-own-shop.md) | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
