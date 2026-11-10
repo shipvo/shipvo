@@ -87,6 +87,7 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 
 - 2026-11-10: Playground Many phones (1 to 12 Android and iOS phones) with a shareable link and Copy link, and an Agent panel with a tool console and Watch Lumi ([Playground](playground.md), #1323, #1335, #1290)
 - 2026-11-10: Network profile tools, `setNetwork` in the test API and `network` in phone.json ([Phone network](phone-network.md), #1338)
+- 2026-11-10: Exported phone apps carry their home-screen layout, and `import_phone_apps` warns about each invalid layout field ([Phone apps](phone-apps.md), #1401)
 - 2026-11-10: `app_activity` shows what the agent built and changed in each spec app, `refresh_app` fetches a data source now, and `schedule_app` shows or hides an app on a time window ([Phone apps](phone-apps.md#see-what-was-built-and-changed), #1396, #1379, #1357)
 - 2026-11-10: Arrange the home screen with `arrange_apps` (pin, hide, position, schedule) and set the phone's clock with `set_phone_time`, on Android and iOS ([Phone apps](phone-apps.md#arrange-the-home-screen), #1349)
 - 2026-11-10: Watch link on the hosted phone: `open_app` returns a read-only `watch_url` ([Agents](agents.md#watch-link-on-the-hosted-phone), #1277)

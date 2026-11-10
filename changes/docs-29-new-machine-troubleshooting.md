@@ -1,0 +1,1 @@
+- Docs: troubleshooting and next steps for "Moving to a new machine", positive "How Shipvo differs from CodePush" section, layout warnings in Phone apps, four new glossary terms.
