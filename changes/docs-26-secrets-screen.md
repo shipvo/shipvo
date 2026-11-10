@@ -1,0 +1,3 @@
+- docs: The simulated phone page now explains the Secrets screen in Settings and has a Troubleshooting row for it.
+- Migration: none.
+- docs: The Capacitor page opens with who it is for and what you get, and links to next steps.
