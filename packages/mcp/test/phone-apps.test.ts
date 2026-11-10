@@ -54,6 +54,11 @@ beforeAll(async () => {
       if (installed.has(body.id)) return fail("already_installed", "already");
       installed.set(body.id, body.name ?? body.id); if (body.open !== false) current = body.id; return ok();
     }
+    if (body.action === "type" || body.action === "tap") {
+      // Spec apps show refs with the frame prefix, as the real simulator does.
+      if (body.ref !== "f1e7") return fail("stale_ref", "no such ref");
+      return res.end(JSON.stringify({ ok: true, screen: `- textbox "Who is it for?" [ref=f1e7] value="${body.text ?? ""}"` }));
+    }
     if (!installed.has(body.id)) return fail("not_installed", "not installed");
     if (body.action === "pin_app" || body.action === "hide_app") return ok();
     if (body.action === "switch_app") { current = body.id; return ok(); }
@@ -101,6 +106,18 @@ describe("phone app tools", () => {
     expect((await call(c, "uninstall_app", { session: s, id: "weather" })).structuredContent.code).toBe("not_installed");
     expect((await call(c, "switch_app", { session: s, id: "notes" })).content[0].text).toMatch(/current: notes/);
     expect((await call(c, "uninstall_app", { session: s, id: "notes" })).content[0].text).toMatch(/current: null/);
+    await c.close();
+  });
+  it("type reaches a form field of an app made with create_app, by its f1e7 ref", async () => {
+    const c = await connect();
+    const s = "s-type";
+    const spec = { spec: "shipvo.app/v0", app: { id: "gifts2", name: "Gifts" }, screens: [{ id: "home", title: "Gifts", body: [{ type: "input", id: "who", label: "Who is it for?" }] }] };
+    expect((await call(c, "create_app", { session: s, id: "gifts2", spec })).isError).toBeFalsy();
+    const r = await call(c, "type", { session: s, ref: "f1e7", text: "Mum" });
+    expect(r.isError).toBeFalsy();
+    expect(r.content[0].text).toMatch(/\[ref=f1e7\].*Mum/);
+    expect(seen.filter((b: any) => b.action === "type").at(-1)).toMatchObject({ ref: "f1e7", text: "Mum" });
+    await call(c, "uninstall_app", { session: s, id: "gifts2" });
     await c.close();
   });
   it("create_app sends the spec to the phone and reports a bad spec with its code", async () => {
