@@ -201,3 +201,21 @@ describe("fuzz", () => {
     for (const v of [undefined, NaN, Infinity, "x", 1n, () => 1, Symbol("s")]) expect(() => validate(v as unknown)).not.toThrow();
   });
 });
+
+describe("data source refresh", () => {
+  const src = (extra: Record<string, unknown>) => mini([], { permissions: { network: ["api.example.com"] }, data: { price: { source: "http", get: "https://api.example.com/p", ...extra } } });
+  it("accepts 30 or more on an http source", () => {
+    expect(validate(src({ refresh: 30 })).errors).toEqual([]);
+  });
+  it("rejects below 30 with a path and a fix", () => {
+    const e = validate(src({ refresh: 10 })).errors.find((x) => x.path === "$.data.price.refresh")!;
+    expect(e.fix).toMatch(/30/);
+  });
+  it("rejects a non-number", () => {
+    expect(paths(validate(src({ refresh: "60" })).errors)).toContain("$.data.price.refresh");
+  });
+  it("rejects refresh on a non-http source", () => {
+    const r = validate(mini([], { data: { goals: { source: "collection", fields: { t: "text" }, refresh: 60 } } }));
+    expect(paths(r.errors)).toContain("$.data.goals.refresh");
+  });
+});
