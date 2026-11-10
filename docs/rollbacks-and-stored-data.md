@@ -59,7 +59,7 @@ shipvo audit tide
 
 **The rollback stops and I did not set `stateVersion`.** The target release declares none, and a newer release does. Phones already run that newer number. Add `stateVersion` to the releases that change stored data, or pass `--allow-state-downgrade` if you are sure the data is safe.
 
-**I use `--bands` or `--platform`.** The check uses the highest `state_version` across the bands you name, for each platform, so a rollback of one band is still checked against what phones in it run.
+**I use `--bands` or `--platform`.** Without `--platform`, the rollback covers `android` only. The check uses the highest `state_version` across the bands you name, for each platform, so a rollback of one band is still checked against what phones in it run.
 
 **I roll back to an old release and nothing stops me.** Releases published before you set `stateVersion` carry no number. A rollback stops only when phones run a higher `state_version` than the target, so you can roll back freely to a release with no number when phones run none either.
 
