@@ -108,7 +108,7 @@ await scenario("first update after install: patch against the APK's own bundle",
     BAND = await_band();
     trials.push({ ...(await updateTrial(bundle("v1"), [embedded])), band: BAND });
   }
-  const gap = (k) => median(trials.map((t) => t.timeline.gaps[k]));
+  const gap = (k) => median(trials.map((t) => t.timeline?.gaps?.[k]));
   return { pass: trials.every((t) => t.ok && t.via === "patch" && t.timeline?.gaps?.pointerToPatchMs != null), trials, trialCount: FIRST_TRIALS, fullBundleBytes: trials[0].bundleBytes,
     median: summarize(trials, ["pointerToHealthyMs", "downloadBytes", "downloadMs", "applyMs"]),
     phaseMedianMs: { pointerToPatchMs: gap("pointerToPatchMs"), patchToStagedMs: gap("patchToStagedMs"), stagedToHealthyMs: gap("stagedToHealthyMs") } };
@@ -125,7 +125,7 @@ await scenario("update: bsdiff patch from the running release", async () => {
   const trials = [];
   for (let i = 0; i < PATCH_TRIALS; i++) { const n = 2 + TRIALS + i, prev = history.at(-1).bytes; trials.push(await updateTrial(bundle("v" + n), [prev])); }
   const steady = steadyTrials(trials), keys = ["pointerToHealthyMs", "downloadBytes", "downloadMs", "applyMs"];
-  const phase = (k) => median(steady.map((t) => t.timeline.gaps[k]));
+  const phase = (k) => median(steady.map((t) => t.timeline?.gaps?.[k]));
   return { pass: trials.every((t) => t.ok && t.via === "patch"), trials, trialCount: PATCH_TRIALS, trialsInMedian: steady.length, median: summarize(steady, keys),
     phaseMedianMs: { publishToPointerMs: phase("publishToPointerMs"), pointerToPatchMs: phase("pointerToPatchMs"), patchToStagedMs: phase("patchToStagedMs"), stagedToHealthyMs: phase("stagedToHealthyMs"), unaccountedMs: median(steady.map((t) => t.timeline.unaccountedMs)) } };
 });
