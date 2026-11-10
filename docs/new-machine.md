@@ -1,6 +1,6 @@
 # Moving to a new machine
 
-This page is for anyone who publishes updates with Shipvo and is about to switch laptops, or is joining a teammate's repo. You will back up the one file that cannot be recovered, then set up the new machine so `shipvo publish` works again. It takes about five minutes. The file is the **signing seed**: the private key that proves an update came from you.
+This page is for anyone who publishes updates with Shipvo and is about to switch laptops, or is joining a teammate's repo. You will back up the one file that cannot be recovered, then set up the new machine so `shipvo publish` works again. The file is the **signing seed**: the private key that proves an update came from you.
 
 ## What lives where
 
