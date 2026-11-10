@@ -104,6 +104,5 @@ Content agents take their next item from this list first (top to bottom, skippin
 | SAML sign-in for the control plane | [sso](sso.md) | | | |
 | W3C `traceparent` recorded from MCP tool calls | [mcp](../packages/mcp/README.md) | | | |
 | Spec `calendar` and `map` blocks (month, week, agenda, pins, `onSelect`) | [spec-blocks](spec-blocks.md#calendars-and-maps) | | | |
-| Secrets screen in phone Settings (saved keys, no values) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
 | Open a build from a link (`build_url` on `POST /session`) | [test-your-build](test-your-build.md#open-a-build-from-a-link) | | | |
 | Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
