@@ -38,3 +38,38 @@ test("openURL delivers to listeners and logs a simulated entry", async () => {
   assert.equal(entry.simulated, true);
   assert.deepEqual(entry.detail, { url: "myapp://item/7", handled: true });
 });
+
+test("Share.share hands {message,url} to __pnShare and resolves sharedAction", async () => {
+  const { Share } = await import("../src/index.web.ts");
+  const calls = [];
+  globalThis.__pnShare = async (s) => { calls.push(s); };
+  const r = await Share.share({ message: "hi", url: "myapp://x", title: "t" });
+  assert.deepEqual(calls, [{ message: "hi", url: "myapp://x" }]);
+  assert.deepEqual(r, { action: "sharedAction" });
+  delete globalThis.__pnShare;
+});
+
+test("Share.share resolves when no simulator hook is present", async () => {
+  const { Share } = await import("../src/index.web.ts");
+  delete globalThis.__pnShare;
+  assert.deepEqual(await Share.share({ message: "solo" }), { action: "sharedAction" });
+});
+
+test("receiveShare logs, dispatches pn:share and calls URL listeners only with a url", () => {
+  dev.reset();
+  const events = [];
+  const prev = globalThis.window.dispatchEvent;
+  globalThis.window.dispatchEvent = (e) => { events.push(e.type); return true; };
+  const seen = [];
+  return import("../src/index.web.ts").then(({ Linking }) => {
+    const s = Linking.addEventListener("url", (e) => seen.push(e.url));
+    dev.receiveShare({ message: "only text" });
+    assert.deepEqual(seen, []);
+    dev.receiveShare({ message: "m", url: "myapp://s/1" });
+    s.remove();
+    globalThis.window.dispatchEvent = prev;
+    assert.deepEqual(seen, ["myapp://s/1"]);
+    assert.equal(events.filter((t) => t === "pn:share").length, 2);
+    assert.equal(dev.log().filter((l) => l.kind === "share_received").length, 2);
+  });
+});

@@ -219,6 +219,8 @@ A message to `anyone` reaches whichever assistant checks first. The Messages and
 
 `open_url myapp://item/42` finds the installed app that declares the `myapp` scheme. If that app is not the current one, the simulator switches to it. The app's `getInitialURL()` returns the link once, and its `onUrl` listener gets the `url` event. Switching to another app or reloading afterwards does not deliver the link again. Android and iOS skins behave the same. `Linking.openURL` from inside an app does the same for another app's scheme.
 
+`share_to <app_id>` delivers what the app last passed to `Share.share` to another installed app, as choosing it in the share sheet would. It works the same on Android and iOS. Use `copy` as the app id to put the text on the phone clipboard. It fails with `no_share_sheet` when nothing is being shared and `no_such_app` when the app is not installed. The receiving app gets the share's URL through `onUrl`.
+
 ## Troubleshooting
 
 | You see | Why | Fix |

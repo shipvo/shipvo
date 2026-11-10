@@ -22,7 +22,7 @@ window.__pnDevice = {
   set(d) { if (d.clipboard !== undefined) document.getElementById("h").textContent = "Clip " + d.clipboard; },
   setInitialUrl() {}, log() { return []; }, capabilities() { return null; },
 };
-</script><button onclick="__pnShare({ message: 'hello', url: 'https://x.dev/a' })">Share</button></body></html>`;
+</script><button onclick="__pnShare({ message: 'hello', url: 'https://x.dev/a' })">Share</button><button onclick="__pnShare({ message: 'second', url: 'https://x.dev/b' })">Again</button></body></html>`;
 const call = async (path, body) => (await fetch(`http://localhost:${PORT}${path}`, { method: "POST", body: JSON.stringify(body) })).json();
 const act = (session, body) => call("/act", { session, ...body });
 
@@ -77,4 +77,14 @@ test("copy fills the clipboard", async () => {
   assert.ok((await act("c", { action: "tap", ref: shareBtn(first) })).ok);
   const r = await act("c", { action: "share_to", app_id: "copy" });
   assert.equal(r.ok, true, r.error); assert.match(r.screen, /Clip hello\s+https:\/\/x\.dev\/a/);
+});
+
+test("a second Share.share replaces the first", async () => {
+  const first = await call("/session", { session: "d", phone: PHONE });
+  assert.ok((await act("d", { action: "tap", ref: shareBtn(first) })).ok);
+  const again = /Again[^\n]*\[ref=(\w+)\]/.exec(first.screen)[1];
+  assert.ok((await act("d", { action: "tap", ref: again })).ok);
+  const r = await act("d", { action: "share_to", app_id: "notes" });
+  assert.equal(r.ok, true, r.error);
+  assert.match(r.screen, /Got second \| https:\/\/x\.dev\/b/);
 });
