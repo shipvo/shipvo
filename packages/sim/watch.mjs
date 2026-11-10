@@ -33,7 +33,7 @@ function nameOf(screen, ref) {
 /** A short sentence for what the agent did, or null for actions that are not worth a line (screen reads). */
 export function describeStep(body, prevScreen) {
   const a = body?.action;
-  if (!a || a === "screen" || a === "errors" || a === "sizes" || a === "device_log" || a === "locate" || a === "get_settings" || a === "notifications") return null;
+  if (!a || a === "screen" || a === "errors" || a === "sizes" || a === "device_log" || a === "phone_apps" || a === "locate" || a === "get_settings" || a === "notifications") return null;
   const el = body.ref ? nameOf(prevScreen, body.ref) : null;
   const q = el?.name ? ` "${el.name}"` : "";
   if (a === "tap") return `Tapped${q || (el ? ` ${el.role}` : "")}`;

@@ -3,6 +3,7 @@ import { checkNames, type NameScope } from "./check.js";
 import { estimateCost, MAX_COST } from "./eval.js";
 import { celSyntaxError, expressionSteps, extractExpressions, MAX_EXPRESSION_STEPS } from "./cel.js";
 import { VECTOR_SHAPES, ENTER_MOTIONS, CHANGE_MOTIONS } from "./vector.js";
+import { CALENDAR_VIEWS, isDay, validCoords } from "./calendar-map.js";
 import { AGGREGATES, CHART_KINDS } from "./chart.js";
 import { checkSchema } from "./jsonschema.js";
 import { childPath, isObject, type Issue, type ValidationResult } from "./types.js";
@@ -327,6 +328,8 @@ class Run {
     if (type === "vector") this.vector(b, path);
     if (b.motion !== undefined) this.motion(b.motion, childPath(path, "motion"));
     if (type === "timeline") this.timeline(b, path);
+    if (type === "calendar") this.calendar(b, path);
+    if (type === "map") this.map(b, path);
     if (type === "text" && typeof b.variant === "string") screen.sizes.add(`variant:${b.variant}`);
     if (isObject(b.style)) {
       const st = b.style;
@@ -471,6 +474,57 @@ class Run {
         }
       });
     }
+  }
+
+  /** An optional `onSelect` must name a declared action. */
+  onSelect(b: Record<string, unknown>, path: string) {
+    if (b.onSelect === undefined) return;
+    const a = isObject(b.onSelect) ? b.onSelect.action : undefined;
+    if (typeof a !== "string" || !(isObject(this.spec.actions) && a in this.spec.actions)) {
+      this.error(childPath(childPath(path, "onSelect"), "action"), `Select action ${JSON.stringify(a ?? null)} is not declared.`, "Name an action from \"actions\"; it receives the event or pin in {{ item }}.");
+    }
+  }
+
+  seedPath(b: Record<string, unknown>, i: number, field: string) {
+    return childPath(childPath(childPath(childPath("$.data", String(b.from)), "seed"), i), field);
+  }
+
+  calendar(b: Record<string, unknown>, path: string) {
+    this.itemBlock(b, path, "Calendar", ["date", "title"]);
+    if (b.view !== undefined && !(CALENDAR_VIEWS as readonly unknown[]).includes(b.view)) {
+      this.error(childPath(path, "view"), `Calendar view ${JSON.stringify(b.view)} is not supported.`, `Use one of: ${CALENDAR_VIEWS.join(", ")}.`);
+    }
+    if (typeof b.at === "string" && !b.at.includes("{{") && !isDay(b.at)) {
+      this.error(childPath(path, "at"), `Calendar start ${JSON.stringify(b.at)} is not a date.`, "Use a date like 2026-11-07, or an expression in {{ }}.");
+    }
+    const field = this.itemField(b.date);
+    const seed = this.seedOf(b);
+    if (field && seed) {
+      seed.forEach((row, i) => {
+        const v = isObject(row) ? row[field] : undefined;
+        if (!(typeof v === "string" && /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?)?$/.test(v) && isDay(v.slice(0, 10)))) {
+          this.error(this.seedPath(b, i, field), `Event date ${JSON.stringify(v ?? null)} is not a date.`, "Use a date like 2026-11-07, or a date and time like 2026-11-07T09:30.");
+        }
+      });
+    }
+    this.onSelect(b, path);
+  }
+
+  map(b: Record<string, unknown>, path: string) {
+    this.itemBlock(b, path, "Map", ["lat", "lng", "title"]);
+    const lat = this.itemField(b.lat), lng = this.itemField(b.lng);
+    const seed = this.seedOf(b);
+    if (seed) {
+      seed.forEach((row, i) => {
+        for (const [f, kind] of [[lat, "latitude"], [lng, "longitude"]] as const) {
+          if (!f) continue;
+          const v = isObject(row) ? row[f] : undefined;
+          const other = f === lat ? validCoords(v, 0) : validCoords(0, v);
+          if (!other) this.error(this.seedPath(b, i, f), `Pin ${kind} ${JSON.stringify(v ?? null)} is not valid.`, kind === "latitude" ? "Use a number from -90 to 90." : "Use a number from -180 to 180.");
+        }
+      });
+    }
+    this.onSelect(b, path);
   }
 
   checkScreens() {
