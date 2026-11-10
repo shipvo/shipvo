@@ -36,7 +36,7 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
           s.addEvent("crash_loop_revert:${s.pendingRelease}")
           s.block(s.pendingRelease)
           File(pending).delete()
-          s.pendingPath = null; s.pendingRelease = 0; s.trialBoots = 0
+          s.pendingPath = null; s.pendingRelease = 0; s.trialBoots = 0; StateVersion.dropPending(s)
         } else {
           Store.gate.selectTrial(s, visible)
           Store.runningRelease = s.pendingRelease
@@ -113,6 +113,7 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
 
     internal fun revertToPrevious(s: Store) {
       s.currentPath?.let { if (it != s.previousPath) File(it).delete() }
+      StateVersion.revert(s)
       s.currentPath = s.previousPath; s.currentRelease = s.previousRelease; s.currentSha = null
       s.previousPath = null; s.previousRelease = 0
       BootRules.clear(s)
