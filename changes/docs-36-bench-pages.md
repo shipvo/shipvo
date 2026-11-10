@@ -1,0 +1,1 @@
+- Docs: the Simulator cost and Lumi benchmark pages now say who they are for, give numbered steps and every option, list real error messages with fixes, and link next steps. Both are in the sidebar.

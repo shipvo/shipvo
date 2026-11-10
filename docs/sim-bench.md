@@ -1,13 +1,24 @@
 # Simulator cost
 
-How long does a simulator session take to start, and how much memory does it use? These numbers come from `scripts/sim-bench/run.mjs`. Nothing here is an estimate.
+This page is for developers who run the simulator on their own machine or in CI and want to size it. You will get the measured session start time and memory for the Shipvo simulator, and a script that measures them on your hardware. These numbers come from `scripts/sim-bench/run.mjs`. Nothing here is an estimate.
 
 ## Run it
 
-```bash
-cd apps/tide-and-tackle && PN_SIM=1 npx expo export --platform web --output-dir sim-dist && cd ../..
-node scripts/sim-bench/run.mjs --sessions 5 --out .shipvo/sim-bench.json
-```
+1. Build the sample app for the web (from the repository root):
+
+   ```bash
+   cd apps/tide-and-tackle && PN_SIM=1 npx expo export --platform web --output-dir sim-dist && cd ../..
+   ```
+
+2. Run the benchmark:
+
+   ```bash
+   node scripts/sim-bench/run.mjs --sessions 5 --out .shipvo/sim-bench.json
+   ```
+
+   Options: `--sessions <n>` (whole number, 1 or more, default 5), `--out <file>` (JSON result, default `.shipvo/sim-bench.json`), `--port <n>` (default 4749).
+
+3. Read the table it prints (session start in ms, then memory after 1, 3 and 5 open sessions) and the JSON file with the same data.
 
 The script starts `@shipvo/sim` for the sample app, waits for Chromium to launch, then opens sessions one after another and keeps them open.
 
@@ -42,3 +53,16 @@ Measured on 2026-11-05, 5 sessions, sample app `apps/tide-and-tackle` (local web
 From the table, each extra session added about 135 MB on this run (1142.1 − 599.8, over 4 sessions: 135.6 MB).
 
 This is a single run, so treat it as one data point, not a range. It covers the sample app only and says nothing about the hosted `services/sim`.
+
+## Troubleshooting
+
+- **`No web build found. Run: cd apps/tide-and-tackle && PN_SIM=1 npx expo export ...`**: step 1 has not run, or it ran in another folder. Run it again and check that `apps/tide-and-tackle/sim-dist/index.html` exists.
+- **`--sessions must be a whole number, 1 or more`**: pass a whole number such as `--sessions 3`.
+- **Memory shows `n/a`**: memory is read from `/proc`, which exists on Linux. Run the script on Linux, for example in CI.
+- **The port is in use**: pass another one with `--port 4750`.
+
+## Next steps
+
+- [Agents and the simulator](agents.md): what a session is and how an assistant drives it.
+- [Measured simulator parity](parity-results.md): how closely the simulator matches Android and iOS.
+- [Self-hosting](self-hosting.md): run the simulator and control plane on your own account.

@@ -1,12 +1,14 @@
 # Lumi benchmark
 
-`scripts/lumi/bench.mjs` measures Lumi Autotest on a fixed set of apps with a fixed step budget. It reports three numbers per app and budget:
+This page is for developers who tune or check Lumi, the walker behind `shipvo explore`. You will get a repeatable benchmark and the measured results. `scripts/lumi/bench.mjs` runs Lumi Autotest on a fixed set of apps with a fixed step budget. It reports three numbers per app and budget:
 
 - **Screens reached**: distinct screens the walker saw.
 - **Flows finished**: how many of the five flows (sign up, log in, search, add to cart, checkout) ended with a pass on valid input.
 - **Planted bugs found**: how many of the bugs switched on in the app showed up as a finding or a failed invalid-input flow.
 
 ## Run it
+
+1. Build the CLI, then run the benchmark from the repository root:
 
 ```bash
 pnpm --filter @shipvo/schema build && pnpm --filter @shipvo/cli build
@@ -16,7 +18,9 @@ node scripts/lumi/bench.mjs --start-sim --platform android   # also run Tide and
 node scripts/lumi/bench.mjs --sim http://localhost:4546 --platform ios
 ```
 
-The script prints a table and then the same data as JSON (`--json` prints only JSON). The same seed gives the same output.
+2. Read the table it prints, then the same data as JSON (`--json` prints only JSON). The same seed gives the same output.
+
+Options: `--budgets <list>` (whole numbers, 1 or more), `--seed <n>`, `--bugs on|off`, `--ranker on|off`, `--platform android|ios`, `--sim <url>`, `--start-sim`, `--json`, `--out <file>`.
 
 ## Apps
 
@@ -46,3 +50,16 @@ Measured on 2026-11-07 with `node scripts/lumi/bench.mjs --budgets 50,200 --seed
 | `shop` | 200 | 44 | 5 | 2 of 5 | 3 of 3 |
 | `account` | 50 | 50 | 0 | 2 of 5 | 1 of 3 |
 | `account` | 200 | 71 | 8 | 2 of 5 | 3 of 3 |
+
+## Troubleshooting
+
+- **`--budgets must be whole numbers of 1 or more and --seed a whole number of 0 or more`**: write budgets as a comma list such as `--budgets 50,200`.
+- **`--bugs must be on or off`**, **`--ranker must be on or off`**, **`--platform must be android or ios`**: use one of the listed values.
+- **`tide-and-tackle skipped: pass --sim <url> or --start-sim to run it on a simulator.`**: the sample app only runs on a simulator. Add `--start-sim`, or `--sim <url>` for one that is already running.
+- **`--ranker on: no trained model in this build.`**: leave `--ranker` off. The [ranker page](lumi-ranker.md) explains the model.
+
+## Next steps
+
+- [Lumi](lumi.md): test your own app while you watch.
+- [Explore feature log](explore-features.md): what the walker records for each action.
+- [Lumi action ranker](lumi-ranker.md): the model comparison that uses this benchmark.
