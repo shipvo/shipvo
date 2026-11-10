@@ -1,5 +1,15 @@
 # Action feature log (`--record-features`)
 
+This page is for developers who want a record of how `shipvo explore` walks an app, to rank actions or study a walk. You get the exact line format and the flag.
+
+## Record a walk
+
+1. Start from your app folder with the simulator available (see [getting started](getting-started.md)).
+2. Run `shipvo explore --seed 1 --record-features features.jsonl`.
+3. Open `features.jsonl`. It has one line per step, numbered from `n` 1.
+
+The same `--seed` walks the same way. The flag needs a file name: `--record-features` alone stops with `--record-features needs a file`. The file is emptied at the start of each run.
+
 `shipvo explore --record-features <file>` writes one JSON line per action the walker takes. The lines are training data for ranking actions. The flag is off by default. Without it the run and the JSON report are the same as before.
 
 Each line holds roles, counts, types and hashes. It never holds app text, label values, typed values or screenshots. Hashes are the first 16 hex characters of SHA-256.
@@ -32,3 +42,9 @@ Each line holds roles, counts, types and hashes. It never holds app text, label 
 | `outcome.finding` | boolean | The action produced at least one new finding. |
 | `outcome.findings` | integer | How many new findings. |
 | `outcome.failed` | boolean | The action failed or the app crashed. |
+
+## Next steps
+
+- [CLI guide](cli.md#shipvo-explore---record-features-file): every `explore` flag and the `--json` envelope.
+- [Lumi](lumi.md): watch the same walk on a phone and save findings as tests with `--save-tests`.
+- [Testing](testing.md): turn a finding into a typed test.
