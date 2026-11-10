@@ -99,6 +99,7 @@ After `shipvo migrate --apply` and `shipvo init --yes` on that copy, `init` prin
 - **`shipvo init` refuses to run**: `expo-updates` is still in the app. Run `shipvo migrate --plan` and remove every entry it lists.
 - **`migrate --apply` says the git tree is not clean** (`dirty_tree`): commit or stash your work and run it again. `--force` applies anyway. Backups are in `.shipvo/migrate-backup/`.
 - **The plan says to check the config by hand**: your app uses `app.config.js` or `app.config.ts`, which `migrate` does not read or edit. Remove the `expo-updates` plugin, `updates` and `runtimeVersion` there yourself.
+- **`shipvo migrate needs --plan ... or --apply`**: no mode flag. Add `--plan` or `--apply`, one at a time.
 - **Lockfile still lists `expo-updates`**: `--apply` does not touch the lockfile. Run your package manager's install.
 - **Phones still get EAS updates**: installed apps keep the old update system until a new store build ships. That is expected. Only the new build uses Shipvo.
 
