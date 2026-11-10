@@ -134,7 +134,7 @@ The first line holds the column names. Fields with commas, quotes or line breaks
 
 `schedule_app { session, id, days?, from?, to?, timezone? }` sets only the schedule: `days` defaults to every day, `from` to `00:00` and `to` to `23:59`. `clear_schedule { session, id }` removes it, so pin and hide decide again. They set the same schedule as `arrange_apps`, and a window that crosses midnight (`from: "22:00", to: "06:00"`) belongs to the day it starts. `device_log` records them as `schedule_app` and `clear_schedule`. `export_phone_apps` carries each app's placement, including its schedule, and `import_phone_apps` restores it on the other phone.
 
-**Time zone.** Pass `timezone` (an IANA name such as `Europe/Berlin` or `Asia/Tokyo`) to `schedule_app`, or inside `schedule` for `arrange_apps`, and `days`, `from` and `to` are read in that zone. Without it, the phone clock decides as before. A name that is not a time zone fails with `bad_timezone`. The home screen text shows the zone next to a hidden app's window.
+Add `timezone` (an IANA name such as `Europe/Berlin` or `America/New_York`) and `days`, `from` and `to` are read in that zone, whatever the phone's clock says. Use it when the people who use the app live in one place and the test runs in another. With `set_phone_time` at `2026-11-09T23:00:00` on a UTC host (23:00 on Monday), `schedule_app { id: "mail", from: "08:00", to: "10:00", timezone: "Asia/Tokyo" }` shows the app, because it is 08:00 Tuesday in Tokyo. `arrange_apps` takes the same field inside `schedule`. The home screen text names the zone next to the window of an app that is not showing yet. An unknown name fails with `bad_timezone`. Without `timezone`, the phone clock decides as before. This works the same on the Android and iOS phone.
 
 `set_phone_time { session, at }` sets that clock (`2026-11-14T09:00:00`, or `null` for real time), so a test can check what shows on a Saturday morning. The clock stays at the time you set and a time without an offset is read in the simulator host's time zone. In `shipvo run`, the home screen follows the computer's clock and updates when a schedule starts or ends. The home screen text lists the apps that are showing as buttons and, for the others, says whether they are hidden or when their schedule starts. In a phone.json, an app can carry the same `placement` object. Errors are `not_installed`, `bad_placement`, `bad_timezone` and `bad_time`. The result has `home` (the home screen text) and `screen` (the open app's screen when an app is in front, otherwise the home text). A placement in a phone.json that is not valid is left out. Every change is in `device_log`.
 
@@ -234,6 +234,20 @@ When the Assistant Inbox is installed, every phone tool result for a session sta
 
 Call `wait_for_event` to listen for the next message or task. It returns as soon as a message or task you have not been told about yet is waiting for you, or says `nothing yet` after up to 25 seconds (`timeout_ms` sets a shorter wait). The result lists the new message and task ids. Read them with `check_inbox` or `my_tasks`, act on them, and call `wait_for_event` again: anything already returned does not wake you a second time, so a task you are still working on does not end the wait. Use it inside a turn to hold a live back-and-forth, or when a task says "wait for the reviewer's answer". It works the same on the Android and iOS phone.
 
+### Waking an assistant that is not in a turn
+
+Give an assistant a URL and the phone calls it when something new arrives. Call `register_wakeup` with `name` (`claude`, `chatgpt`, ...) and `url`. From then on, every new message or task for that name sends one POST to the URL. Use `events` to pick `message`, `task` or both, and `list_wakeups` and `clear_wakeup` to see and stop them.
+
+The body is small JSON, for example `{"to":"claude","event":"message","summary":"1 new message for claude on the phone","messages":["m3"],"tasks":[],"at":"..."}`. It never contains the message text: the woken assistant reads that with `check_inbox`. Each call carries `x-shipvo-signature: t=<unix seconds>,v1=<hex>`, where `v1` is the HMAC-SHA256 of `"<t>.<body>"` with your secret. Leave `secret` out and the phone generates one and returns it once. A call that fails is retried twice, and every delivery, with its status and the number of tries, is in `device_log`. Private and local addresses are refused unless you pass `allow_private: true` for a service you run yourself. Anything already waiting when you register does not wake the assistant; only later arrivals do.
+
+Which mechanism fits which assistant:
+
+| You want | Use |
+| --- | --- |
+| An assistant that calls any phone tool to see what is waiting | The `Inbox:` line at the start of every tool result |
+| An assistant in the middle of a turn to listen for the other one | `wait_for_event` |
+| An assistant outside a turn to start work when a message arrives | `register_wakeup` with a URL that starts it |
+
 ### Things to do with two assistants on one phone
 
 - **Research, review, synthesize.** Tell ChatGPT: "Research this topic, then `share_report` your findings to Claude." Tell Claude: "Read your reports with `get_reports`, share a review of any gaps, then share a final synthesis." Reports carry a kind (`research`, `review`, `synthesis`) and an author, and the Reports tab lists them.
@@ -260,7 +274,7 @@ Call `wait_for_event` to listen for the next message or task. It returns as soon
 | "Could not revoke this key. Try again." | The simulator did not accept the request or could not be reached; the key is still saved | Check the simulator is running, then tap **Revoke** again |
 | `bad_placement` from `arrange_apps` | A field is unknown, `position` is not a whole number from 0 to 99, or `days`, `from` or `to` is not valid | Use `pinned`, `hidden`, `position` and `schedule`; days are `sun` to `sat` and times look like `09:00` |
 | `placement.… not valid, dropped` in the `warnings` of `import_phone_apps` | An exported layout has a field that is not valid | The valid fields were kept. Fix the field named in the warning and import again with `replace: true` |
-| `bad_timezone` from `schedule_app` or `arrange_apps` | The `timezone` is not an IANA name | Use a name like `Europe/Berlin` or `America/New_York` |
+| `bad_timezone` from `schedule_app` or `arrange_apps` | The `timezone` is not a name the simulator's runtime knows | Use an IANA name such as `Europe/Berlin` or `America/New_York`, not a city alone like `Berlin` |
 | `not_supported_attached` | The session is attached to the live `shipvo run` phone, which does not take this tool | Call `open_app` again with `attach: "never"`, or open `<sim>/watch` in a browser |
 | `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
 | A scheduled app is missing from the home screen | Its schedule is not active at the phone's clock | Read the home text, which says when it starts; call `set_phone_time`, or `switch_app` still opens it |
