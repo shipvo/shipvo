@@ -59,7 +59,6 @@ Run the script on your own machine to get your numbers.
 - **`No web build found. Run: cd apps/tide-and-tackle && PN_SIM=1 npx expo export ...`**: step 1 has not run, or it ran in another folder. Run it again and check that `apps/tide-and-tackle/sim-dist/index.html` exists.
 - **`--sessions must be a whole number, 1 or more`**: pass a whole number such as `--sessions 3`.
 - **Memory shows `n/a`**: memory is read from `/proc`, which exists on Linux. Run the script on Linux, for example in CI.
-- **The port is in use**: pass another one with `--port 4750`.
 
 ## Next steps
 

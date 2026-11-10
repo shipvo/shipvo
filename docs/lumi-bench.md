@@ -42,7 +42,7 @@ Each bug has a flag in `scripts/lumi/spec-app.mjs` and a check that says which f
 
 ## Results
 
-Measured on 2026-11-07 with `node scripts/lumi/bench.mjs --budgets 50,200 --seed 1` (bugs on, ranker off). `tide-and-tackle` was not run in this measurement.
+Measured on 2026-11-07 with `node scripts/lumi/bench.mjs --budgets 50,200 --seed 1` (bugs on, ranker off).
 
 | App | Budget | Steps used | Screens | Flows finished | Planted bugs found |
 | --- | --- | --- | --- | --- | --- |
@@ -56,7 +56,7 @@ Measured on 2026-11-07 with `node scripts/lumi/bench.mjs --budgets 50,200 --seed
 - **`--budgets must be whole numbers of 1 or more and --seed a whole number of 0 or more`**: write budgets as a comma list such as `--budgets 50,200`.
 - **`--bugs must be on or off`**, **`--ranker must be on or off`**, **`--platform must be android or ios`**: use one of the listed values.
 - **`tide-and-tackle skipped: pass --sim <url> or --start-sim to run it on a simulator.`**: the sample app only runs on a simulator. Add `--start-sim`, or `--sim <url>` for one that is already running.
-- **`--ranker on: no trained model in this build.`**: leave `--ranker` off. The [ranker page](lumi-ranker.md) explains the model.
+- **`--ranker on: no trained model in this build. Run node scripts/lumi/train.mjs and build.`**: run `node scripts/lumi/train.mjs`, build again, then repeat with `--ranker on`. The [ranker page](lumi-ranker.md) explains the model.
 
 ## Next steps
 
