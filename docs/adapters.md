@@ -1,6 +1,6 @@
 # Adapters: what a runtime port must do
 
-This page is for a maintainer planning another runtime, such as the Capacitor adapter (epic #297). It lists what the current runtimes do, which release-decision rules exist, and where each one lives. It describes the code as it is. It does not propose moving anything.
+This page is for a maintainer planning another runtime, such as the Capacitor adapter (epic #297). It lists what the current runtimes do, which release-decision rules exist, and where each one lives. It describes the code as it is.
 
 There are two runtimes today: Android (Kotlin) and iOS (Swift). Both sit behind one JS API in TypeScript.
 
@@ -43,30 +43,17 @@ Telemetry event names are in `packages/schema/src/index.ts` (`Telemetry.event`).
 
 ## Capacitor (web bundles)
 
-`@shipvo/capacitor` (`packages/capacitor`) is a third implementation, in TypeScript, for a signed web bundle. A web pointer has `kind: "web"`. These rules are now implemented in `packages/capacitor/src/engine.ts` and tested in `packages/capacitor/test/capacitor.test.ts`: 1 (platform and kind), 2, 3 (uses `bandForCohort` from `@shipvo/schema`), 4, 5, 10, 11, 12, 13, 14 and 15 (events are `pointer_rejected:<why>`, queued once per distinct reason). Signature, size and sha-256 checks use WebCrypto. Not done: 6 (no bytecode in plain web assets), 7 and 8 (the control plane decides), 9 (no patches yet), and applying the bundle in the web view (next slice). These are one TypeScript copy that Android and iOS Capacitor shells both use, not a fourth copy per OS.
+`@shipvo/capacitor` (`packages/capacitor`) is a third implementation, in TypeScript, for a signed web bundle. A web pointer has `kind: "web"`. These rules are now implemented in `packages/capacitor/src/engine.ts` and tested in `packages/capacitor/test/capacitor.test.ts`: 1 (platform and kind), 2, 3 (uses `bandForCohort` from `@shipvo/schema`), 4, 5, 10, 11, 12, 13, 14 and 15 (events are `pointer_rejected:<why>`, queued once per distinct reason). Signature, size and sha-256 checks use WebCrypto. Rule 6 does not apply (plain web assets have no bytecode), and rules 7 and 8 are decided by the control plane. These are one TypeScript copy that Android and iOS Capacitor shells both use, not a fourth copy per OS.
 
-## What a Capacitor port would need to redo
+## Where each rule runs
 
-From the table, these are per platform today, so a Capacitor adapter on each OS would have to write them again or call into the existing Kotlin and Swift:
+Per platform on the device (Android and iOS each have their own code): rules 2 to 5, the device side of 6, and 9 to 15. On the control plane for both platforms: 1, 6 (server side), 7 and 8. The device sends `?hbc=` and `?nm=` and reads the typed 404 answer.
 
-- Pointer fetch, signature check and hash checks (rules 2, 4, 5, and Verify).
-- Cohort and band choice (rule 3).
-- Bytecode check against the embedded bundle (rule 6). Only needed if the Capacitor bundle is Hermes bytecode. A plain JS bundle has no header, so the check returns "unknown" and allows the release.
-- Patch choice and apply (rule 9).
-- Trial boots, crash-loop window, promotion, stability, new-shell reset and rollback (rules 10 to 14). These depend on how the host picks its bundle at load time. React Native uses `getJSBundleFile` (Android) and a React delegate handler (iOS). Capacitor loads web assets from a server path, so this hook is different and has not been looked at in this slice.
-- The `Native` JS API (`packages/runtime/src/index.ts`).
+A runtime port that loads web assets from a server path (as Capacitor does) picks its bundle through its own host hook, so rules 10 to 14 are written against that hook. `@shipvo/capacitor` does this in `packages/capacitor/src/engine.ts`.
 
-These need no new work, because the control plane decides them (rules 1, 6 on the server side, 7, 8). The adapter must send `?hbc=` and `?nm=` and handle the typed 404:
+## Next steps
 
-- Platform paths and path/platform match.
-- Native module match.
-- Halted release.
-
-## Gaps found
-
-- Rule 3: `bandForCohort` in TypeScript is not used by either device. Three copies of the 10/100 thresholds exist (schema, `packages/runtime/android/src/main/java/dev/shipvo/runtime/Store.kt`, `packages/runtime/ios/Store.swift`).
-- Rule 7: there is no on-device native module check. A shell that does not send `?nm=` is offered every release.
-- Rule 1: Android does not check `platform` on device, iOS does.
-- Rule 15: not matched between platforms (see above).
-
-Slice 2 of #307 (moving code) is out of scope here.
+- [Capacitor](capacitor.md): the web-bundle adapter in use.
+- [Framework adapters in the CLI guide](cli.md).
+- [Self-hosting](self-hosting.md): the control plane that decides rules 1, 6, 7 and 8.
+- [Glossary](glossary.md).

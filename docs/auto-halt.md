@@ -33,6 +33,21 @@ All of these must hold:
 
 The Tide and Tackle sample app signs its reports. If it cannot register, it sends them unsigned, and they count as unverified.
 
+## When the failures look like an attack
+
+If the halt rule passes but the failures look fake, Shipvo does not halt the release. It holds it and asks you. A hold is raised when either is true:
+
+- **Fresh installs.** More than half of the failing installs registered within the last hour (`fresh_installs`).
+- **A burst.** There were at least 10 failure reports in the last 10 minutes, and that is more than 5 times the app's normal rate (`burst`). An app with no history never raises a burst hold.
+
+The release keeps serving while it is held. The hold shows in `approvals_list` and in the app admin with its reason. There is one hold per release.
+
+1. Open the app admin and read the hold.
+2. Press Approve to halt the release now. The halt is written to the audit log with your approval.
+3. Press Deny if the failures are not real. The hold clears and the release keeps serving.
+
+An agent or a token cannot decide a hold. Failures from established installs halt at once, as above.
+
 ## What does not count
 
 - Unsigned reports, and reports with a bad signature or from an unknown install.

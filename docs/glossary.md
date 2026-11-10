@@ -130,3 +130,5 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Rotation statement.** A note signed by the root key that tells phones to trust a new release key. `shipvo keys rotate sign` makes it.
 
 **App permission.** A device permission (such as notifications or location) an app declares and you allow or deny on its install card or in Settings. See [phone apps](phone-apps.md#device-permissions-per-app).
+
+**Held release.** A release Shipvo did not halt on its own because the failures looked fake (mostly brand-new installs, or a sudden burst). It keeps serving until you approve the halt or deny the hold. See [Auto-halt](auto-halt.md#when-the-failures-look-like-an-attack).

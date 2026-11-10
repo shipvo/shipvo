@@ -124,3 +124,5 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Show or hide an app on a time window (`schedule_app`, `clear_schedule`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
 | Network proxy refusal codes (`x-shipvo-net-error`) | [phone-network](phone-network.md#troubleshooting) | | | |
 | Room log and notes (`room_log`, `room_note`): a lead agent sees what the others did | [agents](agents.md#room-log-and-notes) | | | |
+| Held release when failures look fake (fresh installs or a burst; owner approves or denies) | [auto-halt](auto-halt.md#when-the-failures-look-like-an-attack) | | | |
+| `--json` envelope for `store`, `app` and `sim` | [cli](cli.md) | | | |

@@ -1,6 +1,6 @@
 # Migrate from CodePush to Shipvo
 
-This guide moves a React Native app that used `react-native-code-push` to Shipvo over-the-air (OTA) updates. Every command and flag below comes from `packages/cli` (`src/help.ts`, `src/init.ts`, `src/publish.ts`). The dry-run output was captured by running the CLI on the sample app in this repo.
+This guide is for a developer who ships a React Native app with `react-native-code-push` and wants Shipvo over-the-air (OTA) updates instead. You will end with a signed release on a staged rollout and a one-command rollback. It takes seven steps. Every command and flag below comes from `packages/cli` (`src/help.ts`, `src/init.ts`, `src/publish.ts`). The dry-run output was captured by running the CLI on the sample app in this repo.
 
 Run `shipvo migrate --plan` in your app first. It is read-only. It lists what it finds with file and line (the `react-native-code-push` dependency, `codePush()` and `CodePush.sync` calls, `CodePushDeploymentKey` and `CodePushPublicKey` in `Info.plist` and `strings.xml`, and `appcenter codepush` commands in `package.json` and CI files) and prints the steps in order. `--json` returns the same data.
 
@@ -131,7 +131,21 @@ This signs the code of release 3 as the next release number and publishes it to 
 - `publish` calls `expo export` to build the bundle, so the project is an Expo project.
 - You start with release 1 on Shipvo. Your CodePush history stays in App Center.
 
-## Next
+## Troubleshooting
+
+- **`Git tree is not clean (N changed path(s)). Commit or stash first, or pass --force.`** `shipvo migrate --apply` will not edit a dirty tree. Commit or stash, then run it again. With `--force`, backups of each edited file go in a backup folder, so you can undo.
+- **`<dir> already exists`** from `shipvo init`. `init` never writes into an existing folder. Run it in a new scratch folder as in Step 1 and copy the files across.
+- **The native build fails after `--apply`.** A native file still calls CodePush, for example `CodePush.getJSBundleFile()` or `[CodePush bundleURL]`. `--apply` lists each file and line under its manual steps. Change them by hand.
+- **`shipvo doctor` prints a FAIL line.** The line ends with the fix. Make that change and run `doctor` again until every line says PASS.
+- **`shipvo publish` fails on a project that is not Expo.** `publish` runs `npx expo export`, so the project needs Expo installed.
+- **Users on the old build get no Shipvo update.** They need the new store binary from Step 5. Shipvo cannot update a build that does not contain its runtime.
+- **Installed apps refuse updates after you changed machines.** The signing seed is missing or different. Restore it with `shipvo keys import` ([new-machine.md](new-machine.md)).
+
+## Next steps
 
 - [Build your first app](getting-started.md)
+- [Ship a fix, widen it and roll it back](tutorials/ship-a-fix.md)
+- [The CLI guide](cli.md) for every `publish`, `promote` and `rollback` option
+- [Back up your signing seed](new-machine.md)
 - [Self-hosting the control plane](self-hosting.md)
+- [Glossary](glossary.md)
