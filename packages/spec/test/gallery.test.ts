@@ -13,6 +13,8 @@ const inputs: Record<string, [string, Record<string, unknown>]> = {
   "reading-board": ["add_book", { title: "Dune", author: "Herbert", pages: 412 }],
   "meal-planner": ["add_meal", { name: "Paella", day: "2026-11-11", note: "Table for four" }],
   "favourite-places": ["add_place", { name: "Castle", lat: 38.71, lng: -9.13 }],
+  "project-timeline": ["add_milestone", { title: "Beta", due: "2026-12-01", note: "Invite 20 testers" }],
+  "focus-timer": ["log_session", { task: "Write spec", minutes: 30 }],
 };
 
 const expected: Record<string, { row: Record<string, unknown>; text: string }> = {
@@ -24,6 +26,8 @@ const expected: Record<string, { row: Record<string, unknown>; text: string }> =
   "reading-board": { row: { title: "Dune", author: "Herbert", status: "To read", pages: 412 }, text: "Pages on the board: 412" },
   "meal-planner": { row: { name: "Paella", day: "2026-11-11", note: "Table for four" }, text: "Meals planned: 1" },
   "favourite-places": { row: { name: "Castle", lat: 38.71, lng: -9.13 }, text: "Places saved: 1" },
+  "project-timeline": { row: { title: "Beta", due: "2026-12-01", note: "Invite 20 testers", status: "open" }, text: "Open milestones: 1" },
+  "focus-timer": { row: { task: "Write spec", minutes: 30 }, text: "Minutes focused: 30" },
 };
 
 // The block that must show the new row, by spec.
@@ -31,6 +35,8 @@ const blocks: Record<string, [string, string]> = {
   "reading-board": ["listitem", "Dune, Herbert"],
   "meal-planner": ["event", "Paella"],
   "favourite-places": ["pin", "Castle"],
+  "project-timeline": ["listitem", "Beta"],
+  "focus-timer": ["image", "Daily goal ring: 25%"],
 };
 
 function screenText(spec: unknown, data: Record<string, unknown>): string {
@@ -60,7 +66,7 @@ describe("spec gallery", () => {
         expect(Object.keys(spec.data).length).toBeGreaterThan(0);
         expect(Object.keys(spec.actions).length).toBeGreaterThan(0);
         expect(types).toContain('"type":"form"');
-        expect(types).toMatch(/"type":"(list|chart|kanban|calendar|map)"/);
+        expect(types).toMatch(/"type":"(list|chart|kanban|calendar|map|timeline|vector)"/);
       });
 
       it("renders the same tree on the Android and iOS skins", () => {
@@ -104,6 +110,35 @@ describe("spec gallery", () => {
     r.app.call("add_book", { title: "Dune", author: "Herbert", pages: 412 });
     expect(r.app.move("Dune", "Done").ok).toBe(true);
     expect((r.app.data.books as any[])[0].status).toBe("Done");
+  });
+
+  it("project-timeline: complete_milestone marks a milestone done", () => {
+    const spec = JSON.parse(readFileSync(new URL("project-timeline.json", dir), "utf8"));
+    const r = createApp(spec, {});
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    r.app.call("add_milestone", { title: "Beta", due: "2026-12-01" });
+    expect(r.app.call("complete_milestone", { title: "Beta" }).ok).toBe(true);
+    expect((r.app.data.milestones as any[])[0].status).toBe("done");
+    expect(screenText(spec, r.app.data)).toContain("Open milestones: 0");
+  });
+
+  it("focus-timer: start_session sets the timer and log_session stops it", () => {
+    const spec = JSON.parse(readFileSync(new URL("focus-timer.json", dir), "utf8"));
+    const r = createApp(spec, {});
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    expect(r.app.call("start_session", {}).ok).toBe(true);
+    expect(r.app.state.active).toBe(true);
+    r.app.call("log_session", { task: "Write spec", minutes: 30 });
+    expect(r.app.state.active).toBe(false);
+  });
+
+  it("focus-timer: the ring animates unless motion is reduced", () => {
+    const spec = JSON.parse(readFileSync(new URL("focus-timer.json", dir), "utf8"));
+    const on = renderScreen(spec, { style: "ios" });
+    const off = renderScreen(spec, { style: "ios", reduceMotion: true });
+    if (!on.ok || !off.ok) throw new Error("render failed");
+    expect(JSON.stringify(on.tree)).toContain("pulse");
+    expect(JSON.stringify(off.tree)).not.toContain("pulse");
   });
 
   it("habit-tracker: check_in rejects a missing habit", () => {

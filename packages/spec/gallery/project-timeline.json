@@ -1,0 +1,137 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "project-timeline",
+    "name": "Project timeline",
+    "description": "Plan milestones by date and tick them off as they land."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable"
+  },
+  "data": {
+    "milestones": {
+      "source": "collection",
+      "fields": {
+        "title": "text",
+        "due": "text",
+        "note": "text",
+        "status": "text"
+      },
+      "seed": []
+    },
+    "open": {
+      "source": "computed",
+      "value": "{{ milestones.filter(m, m.status == 'open').size() }}"
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Timeline",
+      "body": [
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "Open milestones: {{ open }}"
+        },
+        {
+          "type": "timeline",
+          "label": "Milestones",
+          "from": "milestones",
+          "date": "{{ item.due }}",
+          "title": "{{ item.title }}",
+          "detail": "{{ item.status }}"
+        },
+        {
+          "type": "form",
+          "label": "Add milestone form",
+          "submit": {
+            "label": "Add milestone",
+            "action": "add_milestone"
+          },
+          "fields": [
+            {
+              "name": "title",
+              "type": "text",
+              "label": "Milestone",
+              "required": true,
+              "maxLength": 80
+            },
+            {
+              "name": "due",
+              "type": "date",
+              "label": "Due",
+              "required": true
+            },
+            {
+              "name": "note",
+              "type": "text",
+              "label": "Note",
+              "maxLength": 120
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "actions": {
+    "add_milestone": {
+      "description": "Add an open milestone on a date.",
+      "input": {
+        "title": {
+          "type": "text"
+        },
+        "due": {
+          "type": "text"
+        },
+        "note": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "do": [
+        {
+          "insert": "milestones",
+          "value": {
+            "title": "{{ input.title }}",
+            "due": "{{ input.due }}",
+            "note": "{{ input.note }}",
+            "status": "open"
+          }
+        },
+        {
+          "toast": "Milestone added"
+        }
+      ]
+    },
+    "complete_milestone": {
+      "description": "Mark a milestone as done.",
+      "input": {
+        "title": {
+          "type": "text"
+        }
+      },
+      "do": [
+        {
+          "update": "milestones",
+          "where": "item.title == input.title",
+          "value": {
+            "status": "done"
+          }
+        },
+        {
+          "toast": "Milestone done"
+        }
+      ]
+    }
+  }
+}
