@@ -1,5 +1,7 @@
 # Spike results
 
+This page is for developers and founders who want to know how Shipvo's over-the-air updates behave on a low-cost phone. You will get update size, apply time, cold start, rollback and crash-loop revert, measured on Android, plus the iOS Simulator numbers from CI.
+
 Measured numbers only. The Android sections come from a real phone, with raw rows from the control plane's `telemetry` table (D1). The iOS section comes from the iOS Simulator in CI, measured on every change to the iOS runtime.
 
 ## Device

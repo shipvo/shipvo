@@ -1,5 +1,7 @@
 # Agent gate results
 
+This page is for founders and developers who want to know whether an AI agent can use an app without screenshots or an emulator. You will get the measured scores, the tasks and the one gap the test found, with the raw results linked at the end.
+
 **Kill gate:** an off-the-shelf agent, given only the app's typed surface and a real user task, must succeed on at least 70% of the first five tasks, without screenshots or an emulator.
 
 **Result: pass.** Round 1 scored 4/5 (80%) on the first five tasks. After adding promo discovery, Haiku scored 5/5 (100%) and the Sonnet re-run of the failed task passed.
@@ -44,3 +46,9 @@
 3. The surface comes from the app's own logic, so an agent can do exactly what a user can, and nothing more.
 
 Raw results: `apps/tide-and-tackle/agent-eval/results/`.
+
+## Next steps
+
+- [Score an agent on your own app task](eval.md): `shipvo eval run` records every step and scores it with checks you write.
+- [Agents](agents.md): let your assistant drive the Android and iOS simulator over MCP.
+- [Testing](testing.md): turn what an agent did into a typed test.

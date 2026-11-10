@@ -22,6 +22,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Control plane.** The Shipvo service that keeps your releases and decides who gets them. You can use the hosted one or run your own.
 
+**Crash-loop revert.** What the phone does when a new release keeps crashing on start: after 3 failed runs it drops that release, blocks it and goes back to the one before. See [Crash-loop revert on Android](android-crash-loop-paths.md).
+
 **Eval (agent evaluation).** A scored try-out for an assistant. You give it a task, such as buying one tote bag, and Shipvo records every step and checks the result. See [Score an agent](eval.md).
 
 **Dry run.** A practice run. Shipvo does all the work of a release but sends nothing to anyone.
@@ -43,6 +45,10 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Release.** One numbered version of your app that phones can download.
 
+**Secrets screen.** The screen in the Settings app on Shipvo Phone that lists the keys you saved for an app, such as a payment key. You can rotate or remove a key there. See [Phone apps](phone-apps.md#see-saved-keys-in-settings).
+
+**Use log.** The list under a saved key that shows when the key was used, where, and what happened. Use it to check that only your app used the key. See [Phone apps](phone-apps.md#see-saved-keys-in-settings).
+
 **Signing.** Putting a secret stamp on a release so phones can check it really came from you. The stamp comes from a key file kept on your computer.
 
 **Signing seed.** The secret file (`.shipvo/seed.txt`) that makes the stamp. Back it up once: without it you cannot update phones that already have your app. See [Moving to a new machine](new-machine.md).
@@ -55,7 +61,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Terminal.** A window where you type commands instead of clicking. On a Mac it is called Terminal. On Windows use "Windows Terminal" or "PowerShell". On Linux it is also called Terminal.
 
-**Audit log.** A list of what happened to your app's releases: who published, who rolled back, and when a release was stopped. You can export it with `shipvo audit`.
+**Audit log.** A list of what happened to your app's releases: who published, who rolled back, when a release was stopped, and when you rotated your release key. You can export it with `shipvo audit`.
 
 **Cohort.** A slice of your users that gets an update before everyone else. See also cohort band.
 
@@ -152,3 +158,10 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Gallery (of specs).** Ready-made example app specs, such as a habit tracker or a trip checklist, that you can copy and change. See [App spec](spec-blocks.md#example-specs).
 
 **Caller.** The name Shipvo fills in for the assistant that is talking to a phone app, so a reply goes back to the right assistant. See [phone apps](phone-apps.md#assistants-talking-to-each-other).
+**Saved key.** A password or API key you store once so an app's data source can use it without the key appearing in the app. You can rotate or revoke it, and Settings shows its name and use, never its value. See [Spec blocks](spec-blocks.md#data-sources-that-use-a-saved-key).
+
+**Patch.** A small file that holds only what changed between two releases, so a phone downloads far less than the whole bundle. If a phone cannot apply one, it downloads the full release. See [spike results](spike-results.md).
+
+**Gallery.** Ready-made example specs (habit tracker, workout log, expense splitter and more) you can open on a phone and change. See [Spec blocks](spec-blocks.md#example-specs).
+
+**Parity.** How closely the simulator matches an Android emulator and an iOS Simulator: the same buttons with the same names on every screen. Shipvo measures it and publishes the result. See [Simulator vs device parity](parity-results.md).

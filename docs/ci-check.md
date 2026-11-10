@@ -6,17 +6,36 @@ You need: an app made with `shipvo init` (or adopted with it), flows in `tests/*
 
 ## Set up
 
-```bash
-npm i -D @shipvo/cli @shipvo/sim @shipvo/test
-npx shipvo ci init --check
-git add .github/workflows/shipvo-check.yml && git commit -m "ci: Shipvo check" && git push
-```
+1. Install the packages in your app:
 
-That writes a workflow whose steps are three lines:
+   ```bash
+   npm i -D @shipvo/cli @shipvo/sim @shipvo/test
+   ```
+
+2. Preview the workflow. Nothing is written yet:
+
+   ```bash
+   npx shipvo ci init --check --dry-run
+   ```
+
+   You see `Would write .github/workflows/shipvo-check.yml. Nothing was written.` followed by the file.
+
+3. Write it, commit it and push:
+
+   ```bash
+   npx shipvo ci init --check
+   git add .github/workflows/shipvo-check.yml && git commit -m "ci: Shipvo check" && git push
+   ```
+
+4. Open a pull request. The check runs and posts its comment.
+
+The workflow runs on `pull_request`, asks for `contents: read` and `pull-requests: write`, and has two steps:
 
 ```yaml
 steps:
   - uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
   - uses: shipvo/shipvo/actions/check@main
 ```
 

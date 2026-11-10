@@ -456,9 +456,34 @@ use(server, tools.schedule_app,
 use(server, tools.clear_schedule, 
   async ({ session, id }) => { need(session); return result(session, await act({ session, action: "clear_schedule", id })); });
 use(server, tools.refresh_app, 
-  async ({ session, id }) => { need(session); return result(session, await act({ session, action: "refresh_app", id })); });
+  async ({ session, id }) => {
+    need(session);
+    const r = await act({ session, action: "refresh_app", id }) as Act & { updated?: string[]; errors?: { source?: string; error?: string; message?: string }[] };
+    if (!r.ok) return result(session, r);
+    const updated = r.updated ?? [], errors = r.errors ?? [];
+    const lines = [`Refreshed ${id}: ${updated.length ? `updated ${updated.join(", ")}` : "no source changed"}`, ...errors.map((e) => `Error in ${e.source ?? "source"}: ${e.error ?? e.message ?? "failed"} (kept last good data)`)];
+    const res = result(session, { ...r, screen: lines.join("\n") + (r.screen ? `\n\n${r.screen}` : "") });
+    return { ...res, structuredContent: { updated, errors } };
+  });
 use(server, tools.app_activity, 
-  async ({ session, id, limit }) => { need(session); return result(session, await act({ session, action: "app_activity", ...(id ? { id } : {}), ...(limit ? { limit } : {}) })); });
+  async ({ session, id, limit }) => {
+    need(session);
+    const r = await act({ session, action: "app_activity", ...(id ? { id } : {}), ...(limit ? { limit } : {}) }) as Act & { apps?: { id: string; name?: string; version?: number; history?: { version: number; at?: number; changes?: string[] }[]; sources?: { name: string; refresh: number | null }[]; events?: { at?: number; name?: string; changes?: string[] }[] }[] };
+    if (!r.ok) return result(session, r);
+    const apps = r.apps ?? [];
+    const out: string[] = [];
+    for (const a of apps) {
+      out.push(`${a.id}${a.name ? ` (${a.name})` : ""}: version ${a.version}`);
+      out.push("Versions:");
+      for (const h of a.history ?? []) out.push(`  v${h.version}: ${(h.changes ?? []).join("; ") || "no changes listed"}`);
+      out.push(`Sources: ${(a.sources ?? []).map((s) => `${s.name} (${s.refresh == null ? "refresh on request" : `every ${s.refresh} s`})`).join(", ") || "none"}`);
+      out.push("Events:");
+      for (const e of a.events ?? []) out.push(`  ${e.at ? new Date(e.at).toISOString() + " " : ""}${e.name}${e.changes?.length ? `: ${e.changes.join("; ")}` : ""}`);
+      if (!a.events?.length) out.push("  none");
+    }
+    const s = sessions.get(session); if (s) s.steps++;
+    return { ...text(out.join("\n") || "No spec apps on this phone."), structuredContent: { apps } };
+  });
 use(server, tools.set_phone_time, 
   async ({ session, at }) => { need(session); return result(session, await act({ session, action: "set_time", at })); });
 use(server, tools.pin_app, 
@@ -471,7 +496,7 @@ use(server, tools.export_phone_apps,
     const r = await act({ session, action: "export_apps", ...(ids ? { ids } : {}) }) as Act & { format?: string; apps?: unknown[] };
     if (!r.ok) return result(session, r);
     const s = sessions.get(session); if (s) s.steps++;
-    return text(JSON.stringify({ format: r.format, apps: r.apps }));
+    return { ...text(JSON.stringify({ format: r.format, apps: r.apps })), structuredContent: { format: r.format, apps: r.apps ?? [] } };
   });
 use(server, tools.import_phone_apps, 
   async ({ session, apps, replace }) => { need(session); return result(session, await act({ session, action: "import_apps", apps, ...(replace ? { replace: true } : {}) })); });

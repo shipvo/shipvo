@@ -58,3 +58,4 @@ The file is created empty at the start and gets one line per action. Each line i
 - [CLI guide](cli.md#shipvo-explore---record-features-file)
 - [Lumi](lumi.md): watch an app being tested and save findings as tests
 - [Lumi ranker](lumi-ranker.md)
+- [Lumi](lumi.md): test your app while you watch on Shipvo Phone, and turn a finding into a test with Save as test.
