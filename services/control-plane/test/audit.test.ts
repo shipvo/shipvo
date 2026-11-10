@@ -97,6 +97,44 @@ describe("GET /audit/:app", () => {
   });
 });
 
+describe("GET /audit/:app with key rotations", () => {
+  function mkDb2(audit: any[], rot: any[]) {
+    return { prepare: (sql: string) => ({ bind: (...args: unknown[]) => ({
+      first: async () => null,
+      all: async () => {
+        const src = sql.includes("FROM key_rotation_log") ? rot : audit;
+        return { results: src.filter((x) => x.app_id === args[0]).sort((a, b) => b.id - a.id).slice(0, args[args.length - 1] as number) };
+      },
+    }) }) } as any;
+  }
+  const au = (id: number, app_id: string, at: string, action: string) => ({ id, app_id, at, actor: "a", actor_kind: "person", action, release: 1, release_id: null, before: null, after: null });
+  const ro = (id: number, app_id: string, at: string, sequence: number) => ({ id, app_id, at, actor: "ann", actor_kind: "person", sequence, valid_from: "2026-11-01T00:00:00Z" });
+  const H = { authorization: "Bearer tok" };
+  const get = async (DB: any, q = "") => ((await (await app.request(`/audit/tide${q}`, { headers: H }, { DB, POINTERS: {} as any, OWNER_TOKEN: "tok" } as any)).json()) as any).rows;
+
+  it("returns a key-rotation row with sequence and valid_from", async () => {
+    const rows = await get(mkDb2([], [ro(1, "tide", "2026-11-02T00:00:00Z", 3)]));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ action: "key-rotation", actor: "ann", actor_kind: "person", at: "2026-11-02T00:00:00Z", release: null, release_id: null, before: null });
+    expect(JSON.parse(rows[0].after)).toEqual({ sequence: 3, valid_from: "2026-11-01T00:00:00Z" });
+  });
+  it("orders publish, rotate, rollback newest first", async () => {
+    const rows = await get(mkDb2([au(1, "tide", "2026-11-01T00:00:00Z", "publish"), au(2, "tide", "2026-11-03T00:00:00Z", "rollback")], [ro(1, "tide", "2026-11-02T00:00:00Z", 1)]));
+    expect(rows.map((r: any) => r.action)).toEqual(["rollback", "key-rotation", "publish"]);
+  });
+  it("respects limit across both sources and ignores other apps", async () => {
+    const DB = mkDb2([au(1, "tide", "2026-11-01T00:00:00Z", "publish"), au(2, "tide", "2026-11-04T00:00:00Z", "publish")],
+      [ro(1, "tide", "2026-11-03T00:00:00Z", 1), ro(2, "other", "2026-11-05T00:00:00Z", 9)]);
+    const rows = await get(DB, "?limit=2");
+    expect(rows.map((r: any) => r.at)).toEqual(["2026-11-04T00:00:00Z", "2026-11-03T00:00:00Z"]);
+    expect(rows.every((r: any) => r.app_id === "tide")).toBe(true);
+  });
+  it("omits rotation rows when before is set", async () => {
+    const rows = await get(mkDb2([au(1, "tide", "2026-11-01T00:00:00Z", "publish")], [ro(1, "tide", "2026-11-02T00:00:00Z", 1)]), "?before=5");
+    expect(rows.map((r: any) => r.action)).toEqual(["publish"]);
+  });
+});
+
 describe("audit on publish", () => {
   const pub = Buffer.alloc(32, 7).toString("base64");
   async function pointer(band = "b0", url = "x", extra: Record<string, unknown> = {}) {
