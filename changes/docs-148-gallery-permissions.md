@@ -1,2 +1,0 @@
-- docs: the spec blocks page lists all eight gallery specs, the phone apps page says camera, scanner and file blocks need their permission, and the demo video worked example has a Troubleshooting table.
-- Migration: none.

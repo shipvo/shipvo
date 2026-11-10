@@ -87,7 +87,8 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 
 - 2026-11-10: Every session has a private inbox, so tests and agents can finish email-code and magic-link sign-in on Android and iOS ([Test an email sign-in](email-sign-in.md), #1496)
 - 2026-11-10: Assistant Inbox: assistants on one phone message each other and hand over tasks, and actions read the caller as `{{ caller }}` ([Phone apps](phone-apps.md#assistants-talking-to-each-other), #1472, #1490)
-- 2026-11-10: `csv()` turns a collection into CSV from an action, and the spec gallery has eight examples including a board, a calendar and a map ([Phone apps](phone-apps.md#export-data-as-csv), [Spec blocks](spec-blocks.md#example-specs), #1458, #1474)
+- 2026-11-10: `csv()` turns a collection into CSV from an action ([Phone apps](phone-apps.md#export-data-as-csv), #1458)
+- 2026-11-10: The spec gallery has eight examples including a board, a calendar and a map ([Spec blocks](spec-blocks.md#example-specs), #1474)
 - 2026-11-10: A denied camera or files permission now stops a `navigate` to a screen with a camera, scanner or file block ([Phone apps](phone-apps.md#device-permissions-per-app), #1491)
 - 2026-11-10: An Android patch that runs out of memory or is over the memory budget falls back to the full download ([Getting started](getting-started.md), #1454)
 - 2026-11-10: Agents can use the prefixed refs the phone returns after a restart ([Agents](agents.md), #1459)
