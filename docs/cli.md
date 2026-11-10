@@ -84,6 +84,8 @@ Testers can tap **Comment** (a button that stays visible on phones), tap a point
 
 Agents can call the MCP tool `publish_preview`; it runs `shipvo preview --json` in `PN_APP_DIR` (or the current folder) and returns `{ url, claimUrl, expiresAt }`.
 
+A preview can take longer than some clients wait for one tool call. `publish_preview` (and `upload_build`) take an optional `wait_ms` (default 20000). They wait up to that long and return the result, or `{ status: "running", job }`. Call `job_status { job, wait_ms? }` to read it: it returns `running`, `done` with the result, or `failed` with a typed error `{ code, error }`, and with `wait_ms` it waits for the job to finish. Calling the tool again while the job runs returns the same job, so a retry never starts a second publish. Jobs belong to the key that started them and are kept for 15 minutes after they finish.
+
 `shipvo init` adds `.github/workflows/preview.yml`, which publishes each pull request's web build and comments the link on the pull request. Pull requests from forks are skipped.
 
 ### Device panel

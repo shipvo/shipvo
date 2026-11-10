@@ -118,6 +118,38 @@
   ["android", "ios"].forEach(function (p) { $("pg-" + p).addEventListener("click", function () { if (state.platform === p) return; state.platform = p; paintBar(); loadPhone(); }); });
   ["dark", "large", "rtl"].forEach(function (k) { $("pg-" + k).addEventListener("click", function () { state[k] = !state[k]; paintBar(); send(); }); });
 
+  // Many phones: N frames of the same phone files, Android, iOS or alternating.
+  var many = { count: 4, mix: "both" };
+  function manyPanel(panel) {
+    var ctl = document.createElement("div"); ctl.className = "pg-many-ctl";
+    var l1 = document.createElement("label"); l1.textContent = "Phones";
+    var num = document.createElement("input"); num.type = "number"; num.id = "pg-many-count"; num.min = "1"; num.max = "12"; num.step = "1"; num.value = String(many.count); l1.appendChild(num);
+    var l2 = document.createElement("label"); l2.textContent = "Mix";
+    var sel = document.createElement("select"); sel.id = "pg-many-mix";
+    [["android", "Android"], ["ios", "iOS"], ["both", "Android and iOS"]].forEach(function (o) { var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
+    sel.value = many.mix; l2.appendChild(sel);
+    ctl.appendChild(l1); ctl.appendChild(l2); panel.appendChild(ctl);
+    var grid = document.createElement("div"); grid.className = "pg-many"; grid.id = "pg-many-grid"; panel.appendChild(grid);
+    function render() {
+      var n = Math.round(Number(num.value));
+      if (!(n >= 1)) return;
+      n = Math.min(12, n); many.count = n; many.mix = sel.value;
+      var want = [];
+      for (var i = 0; i < n; i++) want.push(many.mix === "both" ? (i % 2 ? "ios" : "android") : many.mix);
+      grid.textContent = "";
+      want.forEach(function (pl, i) {
+        var fr = document.createElement("iframe");
+        fr.setAttribute("data-platform", pl);
+        fr.title = (pl === "ios" ? "iOS" : "Android") + " phone " + (i + 1);
+        fr.src = phone.getAttribute("data-src-" + pl);
+        grid.appendChild(fr);
+      });
+    }
+    num.addEventListener("input", render); num.addEventListener("change", function () { render(); num.value = String(many.count); });
+    sel.addEventListener("change", render);
+    render();
+  }
+
   function show() {
     var id = location.hash.slice(1), f = features.filter(function (x) { return x.id === id; })[0] || features[0];
     Array.prototype.forEach.call(document.querySelectorAll("#pg-side a"), function (a) {
@@ -131,6 +163,8 @@
     if (f.doc) { var a = document.createElement("a"); a.className = "link"; a.href = f.doc; a.textContent = "Read the docs"; panel.appendChild(a); }
     if (f.id === "device") deviceControls(panel);
     if (f.id === "agent") agentPanel(panel);
+    if (f.id === "many") manyPanel(panel);
+    phone.style.display = f.id === "many" ? "none" : "";
     panel.setAttribute("data-feature", f.id);
   }
   // OTA walkthrough. Every number comes from /playground/ota-run.json, which the site build records from the real signer,

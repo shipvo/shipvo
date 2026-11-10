@@ -25,6 +25,11 @@ beforeAll(async () => {
     seen.push(body);
     const fail = (code: string, error: string) => res.end(JSON.stringify({ ok: false, code, error }));
     const ok = () => res.end(JSON.stringify({ ok: true, screen: `Home screen\ninstalled: ${[...installed.keys()].join(",")} current: ${current}` }));
+    if (body.action === "find_apps") {
+      const { findApps } = await import("../../sim/apps.mjs");
+      const { query, country, language, currency, limit } = body;
+      return res.end(JSON.stringify({ ok: true, apps: findApps(body.catalog ?? [], { query, country, language, currency, limit }, [...installed.keys()]) }));
+    }
     if (body.action === "install_app") {
       const app = (body.catalog ?? []).find((a: any) => a.id === body.id);
       if (!app) return fail("unknown_app", "no such app");
@@ -35,6 +40,13 @@ beforeAll(async () => {
       if (!installed.has(body.id)) return fail("not_installed", "not a spec app");
       if (!body.spec?.screens?.length) return fail("invalid_spec", "$.screens: Must have at least one screen.");
       return ok();
+    }
+    if (body.action === "export_apps") return res.end(JSON.stringify({ ok: true, format: "shipvo.phone-apps/v0", apps: [...installed].map(([id, name]) => ({ id, name, style: "android", spec: { screens: [{}] }, data: {}, settings: {} })) }));
+    if (body.action === "import_apps") {
+      const bad = (body.apps ?? []).findIndex((a: any) => !a.spec?.screens?.length);
+      if (bad >= 0) return fail("invalid_spec", `apps[${bad}].spec.screens: Must have at least one screen.`);
+      if (!body.replace && body.apps.some((a: any) => installed.has(a.id))) return fail("already_installed", "already");
+      for (const a of body.apps) installed.set(a.id, a.name); return ok();
     }
     if (body.action === "create_app") {
       if (!body.spec?.screens?.length) return fail("invalid_spec", "$.screens: Must have at least one screen.");
@@ -74,7 +86,7 @@ describe("phone app tools", () => {
     await c.close();
     const f = await connect({ PN_STORE_FIXTURE: "1" });
     const ok = await call(f, "list_store_apps");
-    expect(ok.structuredContent.apps.map((a: any) => a.id)).toEqual(["tide", "notes", "weather"]);
+    expect(ok.structuredContent.apps.map((a: any) => a.id)).toEqual(["tide", "notes", "weather", "splitly"]);
     await f.close();
   });
   it("install, switch and uninstall return typed codes", async () => {
@@ -104,6 +116,15 @@ describe("phone app tools", () => {
     expect((await call(c, "update_app", { session: s, id: "ghost", spec })).structuredContent.code).toBe("not_installed");
     expect((await call(c, "update_app", { session: s, id: "gifts", spec: { spec: "shipvo.app/v0", screens: [] } })).structuredContent.code).toBe("invalid_spec");
     expect((await call(c, "update_app", { session: s, id: "gifts", spec })).isError).toBeFalsy();
+    const ex = JSON.parse((await call(c, "export_phone_apps", { session: s, ids: ["gifts"] })).content[0].text);
+    expect(seen.at(-1)).toMatchObject({ action: "export_apps", ids: ["gifts"] });
+    expect(ex.apps[0]).toMatchObject({ id: "gifts", style: "android" });
+    const good = { id: "copy", name: "Copy", style: "ios", spec, data: {}, settings: {} };
+    expect((await call(c, "import_phone_apps", { session: s, apps: [good, { id: "x", spec: { screens: [] } }] })).structuredContent.code).toBe("invalid_spec");
+    expect((await call(c, "import_phone_apps", { session: s, apps: [good] })).isError).toBeFalsy();
+    expect((await call(c, "import_phone_apps", { session: s, apps: [good] })).structuredContent.code).toBe("already_installed");
+    expect((await call(c, "import_phone_apps", { session: s, apps: [good], replace: true })).isError).toBeFalsy();
+    expect(seen.at(-1)).toMatchObject({ action: "import_apps", replace: true });
     await c.close();
   });
   it("marketplace apps get an app:// url that the sim resolves like open_app", async () => {
@@ -117,5 +138,26 @@ describe("phone app tools", () => {
     const r = await call(c, "list_store_apps");
     expect(r.structuredContent.apps.map((a: any) => a.url)).toEqual(["app://tide@r13", "app://fresh@latest"]);
     await c.close(); cp.close();
+  });
+});
+
+describe("find_apps", () => {
+  it("is store_unreachable when the Store cannot be reached", async () => {
+    const c = await connect();
+    const r = await call(c, "find_apps", { session: "s1", query: "split bills" });
+    expect(r.isError).toBe(true); expect(r.structuredContent.code).toBe("store_unreachable");
+    await c.close();
+  });
+  it("sends the fixture catalog to the phone and returns the best match first", async () => {
+    const c = await connect({ PN_STORE_FIXTURE: "1" });
+    const r = await call(c, "find_apps", { session: "s-find", query: "split bills" });
+    expect(r.isError).toBeFalsy();
+    expect(r.structuredContent.apps[0].id).toBe("splitly");
+    const sent = seen.filter((b: any) => b.action === "find_apps").at(-1);
+    expect(sent.catalog.map((a: any) => a.id)).toContain("splitly");
+    const usd = await call(c, "find_apps", { session: "s-find", query: "split bills", currency: "USD" });
+    expect(usd.isError).toBeFalsy();
+    expect(usd.structuredContent.apps.map((a: any) => a.id)).not.toContain("splitly");
+    await c.close();
   });
 });

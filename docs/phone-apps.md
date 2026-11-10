@@ -79,6 +79,8 @@ The app is real HTML with every control labelled, so `screen`, `tap`, `type` and
 
 `update_app { session, id, spec }` changes the app by giving its whole new spec. It is a new version of the same app: the data and settings the person entered stay, and the open screen shows the new look at once. A spec with problems comes back with each problem's path and a fix, and the running version is not touched. The version shows on the installed app. Data and settings the person entered stay; the open screen's back stack and any form text not yet submitted start again, because the app is rebuilt and the page reloaded.
 
+`export_phone_apps { session }` returns every spec app on the phone as JSON: per app its id, name, style (Android or iOS), spec, data and settings. Pass `ids` to export some. Vault secrets and keys are never part of it. `import_phone_apps { session, apps }` takes the `apps` array from that JSON and recreates the apps on another phone, Android and iOS styles alike, with their data and settings, so each app shows the same `screen`. Every spec is checked first: all problems come back with their path (for example `apps[1].spec.screens`) and nothing is installed. An id already on the phone fails with `already_installed` unless you pass `replace: true`.
+
 `device_log` records the create, each action and each update (old and new version) with `source: "real"`.
 
 An app's data lives for the session: it starts from the spec's seed data when the app is created, and it is dropped when the session ends or the app is uninstalled.
@@ -91,6 +93,7 @@ A frame page without a session (`shipvo run`) lists the marketplace apps and ins
 
 | Tool | What it does | Typed errors |
 | --- | --- | --- |
+| `find_apps` | Searches the Store by need, country, language and currency; install a result with `install_app` or `request_app_install` | `store_unreachable` |
 | `list_store_apps` | Lists the marketplace apps (id, name, bundle URL, version) from the control plane | `store_unreachable` |
 | `install_app { id }` | Fetches the app's bundle and installs it; its icon appears on the home screen | `unknown_app`, `already_installed`, `store_app_unreachable`, `too_large`, `host_not_allowed` |
 | `switch_app { id }` | Opens an installed app; it becomes `current_app` | `not_installed` |
@@ -98,7 +101,7 @@ A frame page without a session (`shipvo run`) lists the marketplace apps and ins
 
 Installing a marketplace app is real. `install_app` fetches the app's published bundle (`app://<id>@rN`, `@latest` or an `http(s)` URL) through the same host guard and size cap as `build_url`, and keeps its `sha256` and `bytes` on the installed app. `device_log` marks the install `source: "real"` and includes the `sha256`. If the bundle cannot be fetched the app is not installed and the error is `store_app_unreachable` (or `too_large` or `host_not_allowed`). Switching and uninstalling record state changes in `device_log`. Fixture apps (`fixture://…`) have no bundle, so their installs are marked `simulated`.
 
-If the marketplace cannot be reached, `list_store_apps` returns `store_unreachable` and does not guess. `install_app` then falls back to the phone's own Store list. Set `PN_STORE_FIXTURE=1` on the MCP server to use a local list of three apps (`tide`, `notes`, `weather`) with no network.
+If the marketplace cannot be reached, `list_store_apps` returns `store_unreachable` and does not guess. `install_app` then falls back to the phone's own Store list. Set `PN_STORE_FIXTURE=1` on the MCP server to use a local list of four apps (`tide`, `notes`, `weather`, `splitly`) with no network.
 
 Switching sets `current_app` and brings the app to the front. If the app's bundle URL starts with `http`, the session loads it. Other URLs (such as the fixture's) only change state.
 
