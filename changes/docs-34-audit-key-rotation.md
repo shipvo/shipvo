@@ -1,0 +1,2 @@
+- Docs: the audit log section of the CLI guide and the key rotation page explain the `key-rotation` rows in `shipvo audit`.
+- Migration: none.
