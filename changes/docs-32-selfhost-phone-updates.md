@@ -1,0 +1,1 @@
+- docs: the self-hosting and OTA-updates-on-the-phone pages now open with who they are for and end with Troubleshooting and Next steps.
