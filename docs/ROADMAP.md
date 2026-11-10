@@ -89,7 +89,7 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 - 2026-11-10: `shipvo keys root` creates the offline root key for key rotation ([Key rotation](key-rotation.md), #1417)
 - 2026-11-10: The Store install card lists each device permission an app declares, with Allow and Deny ([Phone apps](phone-apps.md#device-permissions-per-app), #1356)
 - 2026-11-10: `room_log` and `room_note` let a lead agent see what the other agents in a room did and leave notes for them ([Agents](agents.md#room-log-and-notes), #1419)
-- 2026-11-10: New-machine troubleshooting for saved keys, a clear message when a revoke fails, and a "cannot be undone" prompt on Revoke ([New machine](new-machine.md), [Phone apps](phone-apps.md#see-saved-keys-in-settings), #1400)
+- 2026-11-10: One Troubleshooting table on the New machine page for saved-key errors, and the revoke failure message in the Phone apps steps ([New machine](new-machine.md#troubleshooting), [Phone apps](phone-apps.md#see-saved-keys-in-settings), #1400)
 - 2026-11-10: Exported phone apps carry their home-screen layout, and `import_phone_apps` warns about each invalid layout field ([Phone apps](phone-apps.md), #1401)
 - 2026-11-10: `app_activity` shows what the agent built and changed in each spec app, `refresh_app` fetches a data source now, and `schedule_app` shows or hides an app on a time window ([Phone apps](phone-apps.md#see-what-was-built-and-changed), #1396, #1379, #1357)
 - 2026-11-10: Arrange the home screen with `arrange_apps` (pin, hide, position, schedule) and set the phone's clock with `set_phone_time`, on Android and iOS ([Phone apps](phone-apps.md#arrange-the-home-screen), #1349)
