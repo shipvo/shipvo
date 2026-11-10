@@ -48,21 +48,20 @@ npx -y @shipvo/cli publish
 
 So back it up once, today, even if you are not moving.
 
+## Troubleshooting
+
+| You see | Why | Fix |
+| --- | --- | --- |
+| `This seed does not match the public key in shipvo.json` | The seed is from a different app or key | Import the seed you backed up for this app. Do not change `publicKey` in `shipvo.json`: installed apps pin it |
+| `Usage: shipvo keys import <seed>` | No seed was given | Pass the seed, `--file seed.txt`, or pipe it in: `echo <seed> \| shipvo keys import` |
+| `Set SHIPVO_SIGNING_SEED or SHIPVO_SIGNING_SEED_FILE ... or keep it at .shipvo/seed.txt` | `publish` found no seed | Run `shipvo keys import` on this machine, or set `SHIPVO_SIGNING_SEED` in CI |
+
 ## Teams
 
 Do not share the seed over chat. Put it in the CI secrets (`SHIPVO_SIGNING_SEED`) and let CI publish, or keep it in a shared vault your team already trusts. Each person runs their own `shipvo login` and `shipvo app create`; publish tokens are per machine.
 
-## Troubleshooting
-
-Each message below is printed by the CLI.
-
-- **"That does not look like a Shipvo signing seed (a 32-byte value in base64)."** The text you pasted is cut off or has extra characters. Copy it again from your password manager, or use `keys import --file seed.txt`.
-- **"This seed belongs to a different key … but shipvo.json pins …".** This is the seed of another app or an older key. Nothing was written. Find the backup made for this app, or check that you are in the right folder.
-- **"Set SHIPVO_SIGNING_SEED or SHIPVO_SIGNING_SEED_FILE … or keep it at .shipvo/seed.txt."** The machine has no seed yet. Run `keys import` first, or set `SHIPVO_SIGNING_SEED` in your CI secrets.
-- **"This seed does not match the public key in shipvo.json".** Publishing stopped on purpose, because installed apps would reject the update. Import the matching seed.
-
 ## Next steps
 
-- [Getting started](getting-started.md): the full path from a new app to a published update.
-- [CLI guide](cli.md): `keys`, `login`, `app create` and `publish`.
-- [Self-host the control plane](self-hosting.md): run your own server.
+- [Ship a fix](tutorials/ship-a-fix.md): publish your first update from the new machine.
+- [Self-hosting](self-hosting.md): run your own control plane.
+- [Glossary](glossary.md): signing seed, publish token, shell.

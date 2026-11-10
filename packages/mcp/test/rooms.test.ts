@@ -23,6 +23,8 @@ beforeAll(async () => {
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "tide", name: "Tide" }] }));
     if (req.url === "/session") { live.set(body.session, { app: "tide", room: body.room ?? null }); return res.end(JSON.stringify({ ok: true, app: "tide", release: "local", screen: '- heading "Shop"' })); }
     if (req.url === "/sessions") return res.end(JSON.stringify({ ok: true, sessions: [...live].map(([session, s]) => ({ session, app: s.app, release: "local", started_at: "2026-11-07T10:00:00.000Z", room: s.room, title: "Shop" })) }));
+    if (req.url === "/room_log") return res.end(JSON.stringify({ ok: true, entries: [{ n: 2, at: "t", kind: "note", agent: "x", text: "hi" }], cursor: "2", seen: body }));
+    if (req.url === "/room_note") return res.end(JSON.stringify(body.text.length > 500 ? { ok: false, code: "note_too_long", error: "note is too long" } : { ok: true, cursor: "3" }));
     if (req.url === "/end") { ended.push(body.session); live.delete(body.session); return res.end(JSON.stringify({ ok: true, ended: true })); }
     res.end(JSON.stringify({ ok: true }));
   });
@@ -49,6 +51,22 @@ describe("rooms", () => {
     const e: any = await c.callTool({ name: "end_session", arguments: { session: "a" } });
     expect(JSON.parse(e.content[0].text)).toMatchObject({ session: "a", room: "r1" });
     expect(ended).toEqual(["a"]);
+    await c.close();
+  }, 30000);
+
+  it("room_log and room_note pass through; a long note gives a typed error", async () => {
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${port}`, PN_CONTROL: "http://127.0.0.1:1" };
+    delete env.PN_APPS;
+    const c = new Client({ name: "room-test-client", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const l: any = await c.callTool({ name: "room_log", arguments: { room: "r1", since: "1" } });
+    expect(l.structuredContent).toMatchObject({ cursor: "2", entries: [{ text: "hi" }] });
+    expect(l.content[0].text).toContain("note: hi");
+    const n: any = await c.callTool({ name: "room_note", arguments: { room: "r1", text: "ok" } });
+    expect(n.structuredContent.cursor).toBe("3");
+    const big: any = await c.callTool({ name: "room_note", arguments: { room: "r1", text: "x".repeat(501) } });
+    expect(big.isError).toBe(true);
+    expect(big.structuredContent.code).toBe("note_too_long");
     await c.close();
   }, 30000);
 });

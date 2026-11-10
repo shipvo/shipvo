@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { frameAt, shotAt, SHOTS, FPS, setScreen, SCREEN_LENGTH } from "./scenes.mjs";
+import { frameAt, shotAt, SHOTS, FPS, setScreen, SCREEN_LENGTH, setDialogue } from "./scenes.mjs";
 
 test("shots are contiguous and match the storyboard (0 to 100 s)", () => {
   assert.equal(SHOTS[0].t0, 0);
@@ -64,4 +64,18 @@ test("caption 3 shows at 79 s only, and the end card carries the line and the si
   assert.doesNotMatch(frameAt(82), /Every order, in one list\./);
   assert.match(frameAt(98), /Every assistant can use your app\./);
   assert.match(frameAt(98), /shipvo\.dev/);
+});
+
+test("setDialogue burns the line in, escapes it, and resets cleanly", () => {
+  const base = frameAt(5);
+  assert.ok(!base.includes("Nobody comes in."));
+  setDialogue({ lines: [{ start: 4, end: 6, who: "mara", text: "Nobody comes in." }, { start: 8, end: 9, who: "jun", text: "Tide & <Tackle>" }] });
+  assert.ok(frameAt(5).includes("Mara: </tspan>Nobody comes in."));
+  assert.ok(!frameAt(7).includes("tspan"));
+  assert.ok(frameAt(8.5).includes("Tide &amp; &lt;Tackle&gt;"));
+  setDialogue({ mouth: { mara: new Array(100 * FPS).fill(3) }, lines: [] });
+  assert.notEqual(frameAt(5), base); // mouth level 3 changes the picture
+  assert.ok(!frameAt(5).includes("Nobody comes in."));
+  setDialogue({});
+  assert.equal(frameAt(5), base); // mouthFn back to null, lines cleared
 });

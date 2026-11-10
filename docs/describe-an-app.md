@@ -1,6 +1,6 @@
 # Describe an app and it appears
 
-For founders and developers who want a small app on a phone in under a minute, without writing React Native. You describe the app to your coding agent. The agent sends a short description (an *app spec*) to the Shipvo Phone, and the app appears on an Android or iOS phone with its own icon. You can tap it, type in it and ask for changes. Your entries stay when the app changes.
+For founders and developers who want a small app on a phone, without writing React Native. You describe the app to your coding agent. The agent sends a short description (an *app spec*) to the Shipvo Phone, and the app appears on an Android or iOS phone with its own icon. You can tap it, type in it and ask for changes. Your entries stay when the app changes.
 
 ## What you need
 
@@ -27,6 +27,8 @@ If step 2 fails, the agent gets a list of problems, each with where it is and ho
 | `refresh_app { session, id }` | Fetches the app's `http` data sources now. |
 | `app_activity { session, id?, limit? }` | Versions with plain change lines, data sources, and events (create, update, action, data refresh). |
 | `export_phone_apps` / `import_phone_apps` | Copy spec apps, with their data and layout, to another phone. |
+
+The `id` you pass to `create_app` uses lowercase letters, digits and dashes, up to 40 characters. The `app.id` inside the spec follows the spec schema and is a separate rule.
 
 Every call is logged in `device_log`. Details for each tool are in [phone apps](phone-apps.md#describe-an-app-and-it-appears). The spec format is in [app spec](design/app-spec.md), and every block you can use is in [spec blocks](spec-blocks.md). Five complete examples are in `packages/spec/gallery`.
 
@@ -100,8 +102,8 @@ fix: Add "label": a short name that people and agents see, for example "Add goal
 
 ## Troubleshooting
 
-- **`invalid_spec`.** Read the `path` and `fix` of each problem. Common ones: a button or field without a `label`, an `app.id` that is not lowercase letters, digits and dashes (2 to 63 characters, starting with a letter), a name used in `{{ }}` that is not in `data`, or palette text with too little contrast.
-- **`bad_app_id`.** The id has characters the phone does not accept. Use lowercase letters, digits and dashes.
+- **`invalid_spec`.** Read the `path` and `fix` of each problem. Common ones: a button or field without a `label`, an `app.id` that is not a lowercase letter followed by lowercase letters, digits, dashes or underscores (1 to 64 characters in all), a name used in `{{ }}` that is not in `data`, or palette text with too little contrast.
+- **`bad_app_id`.** The id has characters the phone does not accept. The `create_app` id may use lowercase letters, digits and dashes, up to 40 characters. This is a separate rule from the `app.id` in the spec.
 - **`already_installed`.** An app with that id is on the phone. Use `update_app` to change it, or uninstall it first.
 - **`not_installed` from `update_app` or `app_activity`.** The id is not an app made with `create_app`. Check the id on the home screen or with `list_apps`.
 - **`action_failed`.** The action refused the input. The reason is in the error: for example a required field was empty.

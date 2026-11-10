@@ -2,6 +2,39 @@
 
 Short videos for people who are new to Shipvo. Each one has captions and a written transcript.
 
+## Watch the story
+
+### S1 · E1 · From a chat to an app
+
+<video controls preload="metadata" playsinline tabindex="0" data-title="S1 · E1 · From a chat to an app" data-length="1 min 40 s" poster="/videos/chat-to-app-ad.jpg" src="/media/videos/chat-to-app-ad-93cc13ad.mp4"><track kind="captions" src="/videos/chat-to-app-ad.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+
+1 minute 40 seconds. Mara runs a small shop and nobody comes in. Jun asks an assistant to make the shop an app. Dana's assistant finds it and orders. Then three orders arrive in a row. Every Shipvo screen in the film is a real recording of the Tide & Tackle sample app on the Shipvo simulator: order TT-1001 is 2 800 FCFA, TT-1002 is 3 900 FCFA and TT-1003 is 4 200 FCFA.
+
+[Captions (.vtt)](/videos/chat-to-app-ad.vtt)
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Awakening" by Celestial Aeon Project (<a href="https://www.jamendo.com">Jamendo</a>, <a href="http://creativecommons.org/licenses/by-nc-sa/2.5/">CC BY-NC-SA 2.5</a>). Source: <a href="https://www.jamendo.com/track/26436">https://www.jamendo.com/track/26436</a></details>
+
+<details>
+<summary>Transcript</summary>
+
+Mara: Nobody comes in.
+
+Jun: Wait, I can fix that.
+
+Pip: Found it. Ordering now.
+
+Dana: Whoa, that was quick.
+
+Mara: Another one?
+
+Mara: Three orders!
+
+Pip: All done.
+
+Every assistant can use your app. shipvo.dev
+
+</details>
+
 ## Test your app
 
 ### Have Lumi test your app while you watch

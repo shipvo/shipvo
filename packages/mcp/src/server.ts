@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { AsyncLocalStorage } from "node:async_hooks";
 // Shipvo MCP: agents use Shipvo apps with no phone.
 //   PN_SIM=http://localhost:4545  PN_CONTROL=https://api.shipvo.dev  PN_OWNER_TOKEN=...  shipvo-mcp
 // Remote (Streamable HTTP, what Claude, ChatGPT, Cursor connect to over the network):
@@ -52,10 +53,13 @@ async function localApps(): Promise<AppInfo> {
 type Act = { ok: boolean; screen?: string | null; error?: string; code?: string; path?: string; locate?: { x: number; y: number; w: number; h: number }; image?: string; mime?: string; source?: string; unsupported?: string[]; delivered?: boolean; delivery?: "delivered" | "not_delivered"; reason?: string; safe_to_retry?: boolean; value?: string | null };
 // A call that gets no answer in time returns ok:false with code sim_timeout (a typed error for this one tool
 // call). It is never retried: the action may have run, so the agent should call `screen` and look.
+// The MCP client name of the call being served, so the simulator can log who acted in a room.
+const caller = new AsyncLocalStorage<string | undefined>();
 async function sim(path: string, body: Record<string, unknown>): Promise<Act> {
   const ms = simTimeoutMs();
   let r: Response;
   try {
+    const agent = caller.getStore(); if (path === "/act" && body.agent === undefined && agent) body = { ...body, agent };
     r = await fetch(SIM + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(ms) });
     if (!r.ok) throw new Error(`simulator ${path} -> ${r.status}. Is it running at ${SIM}?`);
     return (await r.json()) as Act;
@@ -160,7 +164,7 @@ const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: Tool
     const sid = (args as { session?: unknown } | undefined)?.session;
     const log = typeof sid === "string" ? callLog.get(sid) : undefined;
     if (log) { log.push(entry()); if (log.length > 1000) log.splice(0, log.length - 1000); }
-    const out = inputHasKey(args) ? keyRefusal() : await (cb as (a: unknown, e: unknown) => unknown)(args, extra);
+    const out = inputHasKey(args) ? keyRefusal() : await caller.run(server.server.getClientVersion()?.name, () => (cb as (a: unknown, e: unknown) => unknown)(args, extra));
     if (t.name === "open_app") {
       // The session id is only known once the call returns.
       const opened = /^session: (\S+)/.exec((out as { content?: { text?: string }[] })?.content?.[0]?.text ?? "")?.[1];
@@ -327,6 +331,17 @@ use(server, tools.list_sessions, async () => {
   }
   const line = (s: (typeof rows)[number]) => `${s.session}: ${s.app} on ${s.platform}${s.release !== undefined ? ` release ${s.release}` : ""}${s.room ? `, room ${s.room}` : ""}${s.opened_by ? `, opened by ${s.opened_by}` : ""}${s.started_at ? `, since ${s.started_at}` : ""}${s.screen_title ? `, screen "${s.screen_title}"` : ""}`;
   return { ...text(rows.length ? rows.map(line).join("\n") : "no open sessions"), structuredContent: { sessions: rows } };
+});
+use(server, tools.room_log, async ({ room, since }) => {
+  const r = await sim("/room_log", { room, ...(since ? { since } : {}) }) as Act & { entries?: Record<string, unknown>[]; cursor?: string };
+  if (!r.ok) return result("", r);
+  const rows = r.entries ?? [];
+  const line = (e: Record<string, unknown>) => e.kind === "note" ? `${e.at} ${e.agent ?? "agent"} note: ${e.text}` : `${e.at} ${e.session} (${e.agent ?? "agent"}) ${e.tool}${e.target ? " " + e.target : ""}${e.change ? ": " + e.change : ""}`;
+  return { ...text((rows.length ? rows.map(line).join("\n") : "no new entries") + `\ncursor: ${r.cursor}`), structuredContent: { room, entries: rows, cursor: r.cursor } };
+});
+use(server, tools.room_note, async ({ room, text: note }) => {
+  const r = await sim("/room_note", { room, text: note, agent: server.server.getClientVersion()?.name }) as Act & { cursor?: string };
+  return r.ok ? { ...text(`noted, cursor: ${r.cursor}`), structuredContent: { room, cursor: r.cursor } } : result("", r);
 });
 type Wait = { wait_for?: WaitFor; timeout_ms?: number; settle?: boolean };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
