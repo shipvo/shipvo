@@ -79,8 +79,9 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 | `action_failed` from `run_app_action` | The action refused the input | The reason is in the reply; send input the action accepts |
 | `already_installed` from `import_phone_apps` | An app with that id is on the phone | Pass `replace: true`, or change the id |
 | `not_installed` from `arrange_apps`, `schedule_app` or `refresh_app` | No app has that id | Check the id with `app_activity` |
-| `bad_placement` or `bad_time` | A schedule or clock value is not valid | Use `days` such as `mon`, times as `HH:MM`, and a clock such as `2026-11-14T09:00:00` |
-| An app is missing from the home screen | It is hidden or its schedule is not showing now | Read the home screen text; it says hidden or when the schedule starts. Use `clear_schedule` or `set_phone_time` |
+| `bad_placement` from `arrange_apps` | A field is unknown, `position` is not a whole number from 0 to 99, or `days`, `from` or `to` is not valid | Use `pinned`, `hidden`, `position` and `schedule`; days are `sun` to `sat` and times look like `09:00` |
+| `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
+| A scheduled app is missing from the home screen | Its schedule is not active at the phone's clock | Read the home text, which says when it starts; call `set_phone_time`, or `switch_app` still opens it |
 | `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
 
 ## Next steps
