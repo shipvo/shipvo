@@ -9,12 +9,12 @@ const NOW = "2026-11-10T12:00:00Z";
 function phone() {
   let saved: unknown;
   return {
-    call(tool: string, input: Record<string, unknown>) {
+    call(tool: string, input: Record<string, unknown>, caller = "") {
       const t = toolsFromSpec(spec).find((x) => x.name === tool);
       if (!t) throw new Error(`no tool ${tool}`);
       const r = createApp(spec, { data: saved as never, now: NOW });
       if (!r.ok) throw new Error(JSON.stringify(r.errors));
-      const out = r.app.call(t.action, input) as any;
+      const out = r.app.call(t.action, input, { caller }) as any;
       if (out.ok) saved = { messages: r.app.data.messages, handoffs: r.app.data.handoffs };
       return { out, app: r.app };
     }
@@ -60,6 +60,28 @@ describe("Assistant Inbox spec app", () => {
     expect(thread.map((m: any) => m.id)).toEqual(["m1", "m2"]);
   });
 
+  it("fills in who is calling, so assistants never say their own name", () => {
+    const p = phone();
+    p.call("send_message", { to: "claude", body: "Test the export." }, "chatgpt");
+    const got = p.call("check_inbox", {}, "claude").out.value.messages;
+    expect(got.map((m: any) => [m.from, m.to])).toEqual([["chatgpt", "claude"]]);
+    expect(p.call("check_inbox", {}, "chatgpt").out.value.messages).toEqual([]);
+
+    p.call("hand_off", { to: "chatgpt", title: "Try to break Daybook", detail: "Edge cases: empty title, long text." }, "claude");
+    const task = p.call("my_tasks", {}, "chatgpt").out.value.tasks;
+    expect(task.map((h: any) => [h.from, h.to, h.title])).toEqual([["claude", "chatgpt", "Try to break Daybook"]]);
+    p.call("finish_task", { id: "h1", reply: "Found 2 issues." }, "chatgpt");
+    expect(p.call("sent_tasks", {}, "claude").out.value.tasks[0].reply).toBe("Found 2 issues.");
+    expect(p.call("sent_tasks", {}, "chatgpt").out.value.tasks).toEqual([]);
+  });
+
+  it("an explicit name wins, and a caller with no name is 'unknown'", () => {
+    const p = phone();
+    p.call("send_message", { from: "Cursor", to: "claude", body: "hi" }, "chatgpt");
+    p.call("send_message", { to: "claude", body: "who am I" });
+    expect(p.call("check_inbox", {}, "claude").out.value.messages.map((m: any) => m.from)).toEqual(["cursor", "unknown"]);
+  });
+
   it("a message to anyone reaches whoever checks", () => {
     const p = phone();
     p.call("send_message", { from: "claude", to: "anyone", body: "Standup at 10." });
@@ -101,9 +123,9 @@ describe("Assistant Inbox spec app", () => {
     expect(describeTree(t.tree)).toContain("1 open");
   });
 
-  it("refuses a message with no sender or body", () => {
+  it("refuses a message with no recipient or body", () => {
     const p = phone();
-    expect(p.call("send_message", { to: "claude", body: "hi" }).out.ok).toBe(false);
+    expect(p.call("send_message", { body: "hi" }, "claude").out.ok).toBe(false);
     expect(p.call("send_message", { from: "a", to: "b" }).out.ok).toBe(false);
   });
 });

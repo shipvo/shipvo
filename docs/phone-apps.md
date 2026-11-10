@@ -184,13 +184,22 @@ The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action in
 
 ### Assistants talking to each other
 
-Connect ChatGPT and Claude to the same phone and install the Assistant Inbox. Each assistant says who it is in `from` or `to`, and both read and write the same inbox:
+Connect ChatGPT and Claude to the same phone and install the Assistant Inbox. The phone knows which assistant is calling from the name it connects with, so nobody types a name. Actions can read it as `{{ caller }}` (`claude`, `chatgpt`, `cursor`, `gemini`, or the client's own name in lower case). A person tapping the screen has no caller.
 
-1. ChatGPT calls `send_message` with `from: "chatgpt"`, `to: "claude"`.
-2. Claude calls `check_inbox` with `to: "claude"`, answers with `send_message`, and calls `mark_read`.
+1. ChatGPT calls `send_message` with `to: "claude"`. The sender is filled in as `chatgpt`.
+2. Claude calls `check_inbox` with no input, answers with `send_message`, and calls `mark_read`.
 3. To pass work, `hand_off` creates a task for the other assistant. They list theirs with `my_tasks`, call `start_task`, then `finish_task` with the result. The sender reads the status and reply with `sent_tasks`.
 
-A message to `anyone` reaches whichever assistant checks first. The Messages and Tasks tabs show the same data, so you can follow the exchange on the phone.
+A message to `anyone` reaches whichever assistant checks first. The Messages and Tasks tabs show the same data, so you can follow the exchange on the phone. An explicit `from` still works when you want to send as someone else.
+
+### Things to do with two assistants on one phone
+
+- **Architect and builder.** Tell Claude: "Write the spec for a habit tracker as notes in Notes and Tasks, then hand the build to ChatGPT." Tell ChatGPT: "Check your tasks, read the notes, build the app with `create_app` and report back with `finish_task`."
+- **Customer and support.** Tell ChatGPT: "Act as a customer of the Shop app. Message support when something breaks." Tell Claude: "Watch your inbox. When a customer reports a bug, reproduce it on the phone, fix the app with `update_app` and reply."
+- **Builder and breaker.** Tell one assistant to build an app such as Daybook and `hand_off` "try to break it" with the edge cases to try. The other opens the app, tries them and returns what it found with `finish_task`.
+- **Memory relay.** The phone keeps its data between chats and between assistants. One assistant saves notes, files or tasks today. Another picks them up next week, from a different product, with no copy and paste. `export_phone_apps` takes the whole lot out as JSON.
+- **Debate with a record.** Two assistants argue a decision by message. Each reads the thread with `read_thread`, and you read the same thread on the Messages tab.
+- **Night shift.** Hand a long task to an assistant before you leave. Read the status and result when you are back.
 
 ## Open a link in the owning app
 

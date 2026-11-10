@@ -199,10 +199,11 @@
   ],
   "actions": {
     "send_message": {
-      "description": "Send a message from one assistant to another (or to 'anyone'). Say who you are in from. The other assistant reads it with check_inbox.",
+      "description": "Send a message to another assistant (or to 'anyone'). Your name is added for you; the other assistant reads it with check_inbox.",
       "input": {
         "from": {
-          "type": "text"
+          "type": "text",
+          "default": ""
         },
         "to": {
           "type": "text"
@@ -219,7 +220,7 @@
           "insert": "messages",
           "value": {
             "id": "{{ 'm' + string(count(messages) + 1) }}",
-            "from": "{{ lower(trim(input.from)) }}",
+            "from": "{{ lower(trim((input.from != '' ? input.from : (caller != '' ? caller : 'unknown')))) }}",
             "to": "{{ lower(trim(input.to)) }}",
             "body": "{{ input.body }}",
             "sent_on": "{{ today() }}",
@@ -237,10 +238,11 @@
       ]
     },
     "check_inbox": {
-      "description": "List the messages waiting for you (sent to your name or to 'anyone') that you have not marked read. Pass your name in to. Call mark_read for each one you have dealt with.",
+      "description": "List the messages waiting for you (sent to your name or to 'anyone') that you have not marked read. Your name is known, so no input is needed. Call mark_read for each one you have dealt with.",
       "input": {
         "to": {
-          "type": "text"
+          "type": "text",
+          "default": ""
         }
       },
       "returns": {
@@ -249,7 +251,7 @@
       "do": [
         {
           "return": {
-            "messages": "{{ messages.filter(m, !m.read && (m.to == lower(trim(input.to)) || m.to == 'anyone')) }}"
+            "messages": "{{ messages.filter(m, !m.read && (m.to == lower(trim((input.to != '' ? input.to : (caller != '' ? caller : 'unknown')))) || m.to == 'anyone')) }}"
           }
         }
       ]
@@ -296,10 +298,11 @@
       ]
     },
     "hand_off": {
-      "description": "Give a task to another assistant. Say who you are in from and who should do it in to. They see it with my_tasks and report back with finish_task.",
+      "description": "Give a task to another assistant. Your name is added for you. They see it with my_tasks and report back with finish_task.",
       "input": {
         "from": {
-          "type": "text"
+          "type": "text",
+          "default": ""
         },
         "to": {
           "type": "text"
@@ -320,7 +323,7 @@
           "insert": "handoffs",
           "value": {
             "id": "{{ 'h' + string(count(handoffs) + 1) }}",
-            "from": "{{ lower(trim(input.from)) }}",
+            "from": "{{ lower(trim((input.from != '' ? input.from : (caller != '' ? caller : 'unknown')))) }}",
             "to": "{{ lower(trim(input.to)) }}",
             "title": "{{ input.title }}",
             "detail": "{{ input.detail }}",
@@ -340,10 +343,11 @@
       ]
     },
     "my_tasks": {
-      "description": "List the tasks handed to you (or to 'anyone') that are not done. Pass your name in to.",
+      "description": "List the tasks handed to you (or to 'anyone') that are not done. No input is needed.",
       "input": {
         "to": {
-          "type": "text"
+          "type": "text",
+          "default": ""
         }
       },
       "returns": {
@@ -352,7 +356,7 @@
       "do": [
         {
           "return": {
-            "tasks": "{{ handoffs.filter(h, h.status != 'done' && (h.to == lower(trim(input.to)) || h.to == 'anyone')) }}"
+            "tasks": "{{ handoffs.filter(h, h.status != 'done' && (h.to == lower(trim((input.to != '' ? input.to : (caller != '' ? caller : 'unknown')))) || h.to == 'anyone')) }}"
           }
         }
       ]
@@ -403,10 +407,11 @@
       ]
     },
     "sent_tasks": {
-      "description": "List the tasks you handed to others, with their status and reply. Pass your name in from.",
+      "description": "List the tasks you handed to others, with their status and reply. No input is needed.",
       "input": {
         "from": {
-          "type": "text"
+          "type": "text",
+          "default": ""
         }
       },
       "returns": {
@@ -415,7 +420,7 @@
       "do": [
         {
           "return": {
-            "tasks": "{{ handoffs.filter(h, h.from == lower(trim(input.from))) }}"
+            "tasks": "{{ handoffs.filter(h, h.from == lower(trim((input.from != '' ? input.from : (caller != '' ? caller : 'unknown'))))) }}"
           }
         }
       ]

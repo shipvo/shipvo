@@ -181,6 +181,7 @@ class Run {
       const a = this.spec.actions[action[1] ?? action[2]!];
       names.input = isObject(a) && isObject(a.input) ? Object.keys(a.input) : undefined;
       names.result = undefined;
+      names.caller = undefined;   // the assistant that called the action, "" when a person tapped
     } else if (path.startsWith("$.schedules")) {
       names.input = undefined;
       names.result = undefined;
