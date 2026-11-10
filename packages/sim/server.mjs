@@ -439,7 +439,7 @@ async function act(id, body) {
     case "schedule_app": case "clear_schedule":   // the same schedule as arrange_apps, under the names an assistant looks for
     case "arrange_apps": {
       const { id: appId, ...rest } = body; delete rest.action; delete rest.session;
-      const patch = body.action === "clear_schedule" ? { schedule: null } : body.action === "schedule_app" ? { schedule: { days: body.days, from: body.from, to: body.to } } : rest;
+      const patch = body.action === "clear_schedule" ? { schedule: null } : body.action === "schedule_app" ? { schedule: { days: body.days, from: body.from, to: body.to, timezone: body.timezone } } : rest;
       try { arrangeApp(s.apps, String(appId ?? ""), patch, body.action); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       return { installed_apps: s.apps.installed_apps, home: `Home screen\n${describeApps(s.apps, nowOf(s))}`, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
