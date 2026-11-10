@@ -129,6 +129,24 @@ export class SpecHost {
     if (handles.length) this.refreshing.set(k, handles);
   }
 
+  /** Runs the app's http data sources now (all, or the ones named), ignoring the cache. Resolves { updated, errors }; a failed source keeps its last data. */
+  async refresh(session, id, { sources } = {}) {
+    const k = key(session, id);
+    const cur = this.running.get(k);
+    const out = { updated: [], errors: [] };
+    if (!cur) return out;
+    const names = Object.entries(cur.spec?.data ?? {}).filter(([n, s]) => s?.source === "http" && (!sources || sources.includes(n))).map(([n]) => n);
+    for (const name of names) {
+      try {
+        const { cache: _cache, ...ctx } = this.context(session, id);
+        const value = await runSource(cur.spec, name, { ...ctx, scope: { state: cur.app.state, data: cur.app.data, ...cur.app.data } });
+        if (this.running.get(k) !== cur) break; // the app was removed or replaced while the request ran
+        if (JSON.stringify(cur.app.data[name]) !== JSON.stringify(value)) { cur.app.data[name] = value; out.updated.push(name); }
+      } catch (e) { out.errors.push({ source: name, message: String(e?.message ?? e).slice(0, 200) }); }
+    }
+    return out;
+  }
+
   unschedule(k) {
     for (const h of this.refreshing.get(k) ?? []) this.timers.clearInterval(h);
     this.refreshing.delete(k);
