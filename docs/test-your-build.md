@@ -49,17 +49,17 @@ If your coding agent runs the local `@shipvo/mcp` server (`shipvo agents setup` 
 
 ## Open a build from a link
 
-If your build is already hosted at an https address, you can open it without uploading from your machine. Send `POST /session` to the simulator with a `build_url`. The simulator downloads the build, unpacks it, opens it as the app and replies with `build: <id>`. You can then use `open_app("<app>@build:<id>")` with that id; the reply names the build that opened.
+If your build is already hosted at an http or https address, you can open it without uploading from your machine. Send `POST /session` to the simulator with a `build_url`. The simulator downloads the build, unpacks it, opens it as the app and replies with `build: <id>`. You can then use `open_app("<app>@build:<id>")` with that id; the reply names the build that opened.
 
 A bad address leaves no session behind. The reply carries one of these codes:
 
 | Code | Meaning | What to do |
 | --- | --- | --- |
 | `bad_url` | The address is not a valid address. | Check the link. |
-| `host_not_allowed` | The simulator does not fetch from that host. | Host the build somewhere reachable, or use `shipvo sim --hosted`. |
+| `host_not_allowed` | The simulator does not fetch from that host. | Host the build somewhere reachable, or upload it from your machine with `shipvo sim --hosted` (see "Upload from the terminal" above). |
 | `too_large` | The download is over the size limit. | Remove unused assets and try again. |
 | `unreachable` | The simulator could not download it. | Open the link in a browser to check that it works without signing in. |
-| `bad_build` | The file is not a `.tar.gz` archive, contains links, has no `index.html` at its top level, or could not be unpacked. | Create the archive again from your web build folder, or use `shipvo sim --hosted`. |
+| `bad_build` | The file is not a `.tar.gz` archive, contains links, has no `index.html` at its top level, or could not be unpacked. | Create the archive again from your web build folder, or upload it from your machine with `shipvo sim --hosted` (see "Upload from the terminal" above). |
 
 ## Who can see a build
 
