@@ -1,6 +1,6 @@
 # Describe an app and watch it appear on a phone
 
-You will tell an AI assistant, in plain words, what small app you want. A few seconds later the app is on a simulated phone in your browser, with its own icon, on Android and iOS alike. You will use it, ask for a change and see the change appear with your entries still in place. You write no code and you need no real phone.
+You will tell an AI assistant, in plain words, what small app you want. A few seconds later the app is on a simulated phone in your browser, with its own icon. You will see it on an Android phone and on an iOS phone. You will use it, ask for a change and see the change appear with your entries still in place. You write no code and you need no real phone.
 
 **Level:** beginner. **Time:** a short first-time setup, then a few minutes of talking to your assistant.
 
@@ -127,23 +127,23 @@ The open screen changes at once. Look for two things: an **About** button under 
 > - Your ideas are gone: they stay while the simulator runs. If you restart it, ask the assistant for the app again.
 > - The About button is missing: say "The About button is missing, please update the app again".
 
-## 7. Try the iPhone look
+## 7. See the same app on iOS
 
 Say:
 
 ```text
-Make a second copy of the app with the iOS look, with the id gift-ideas-ios and a different app id inside the spec.
+Make the same app again with the iOS look, with the id gift-ideas-ios and a different app id inside the spec.
 ```
 
-The app opens with a centred bold title and softer boxes, the way an iPhone app looks. The same description gives you Android and iOS.
+The app opens on an iOS phone with a centred bold title and softer boxes, the way an iPhone app looks. The same description gives you the Android app from step 4 and this iOS app.
 
-![The Gift ideas app with the iPhone look: a centred bold title, a Who for box, an Idea box, a blue Add button and a grey No ideas yet box.](/tutorials/describe-an-app/06-ios.png)
+![The Gift ideas app on a simulated iOS phone: a centred bold title, a Who for box, an Idea box, a blue Add button and a grey No ideas yet box.](/tutorials/describe-an-app/06-ios.png)
 
 When you are done, go to the first terminal window and press **Ctrl+C** to stop the simulator.
 
 ## Recap
 
-You started a simulated phone, connected an assistant, described an app in plain words and saw it appear on the phone. You used it, asked for a change that kept your entries, and made the iPhone version from the same description.
+You started a simulated phone, connected an assistant, described an app in plain words and saw it appear on the phone. You used it, asked for a change that kept your entries, and made the iOS version from the same description.
 
 ## Next steps
 
