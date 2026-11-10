@@ -246,7 +246,7 @@ Add `refresh` to an `http` data source to run it again on a timer while the app 
 
 ## Example specs
 
-`packages/spec/gallery/` holds example specs to copy and change: a habit tracker and a workout log. Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.
+`packages/spec/gallery/` holds example specs to copy and change: a habit tracker, a workout log, an expense splitter, a trip checklist and flashcards. Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.
 
 ## Data sources that use a saved key
 
@@ -300,6 +300,7 @@ A data source can call a service with a key you saved once in the secret form. T
 - **A week or month view shows no events.** The view only lists events inside the days it shows. Set `at` to a day in the period you want, or use `agenda`.
 - **A translation does not show.** The key must match the text exactly, including capitals and spaces, and `language` must be the same code you used in `strings` (`fr`, not `fr-FR`). Pass `locale` separately for money and dates.
 - **A vector shape is missing.** An unknown `shape` is an error; a colour that is not hex, a name or `url(#id)` draws as `none`; a path with other characters draws nothing.
+- **A refreshed value never changes.** Check that `refresh` is 30 or more and the source is `http`. A failed refresh keeps the last value, so check the domain is in `permissions.network`.
 - **State is empty before the first change.** Declare a `default` for each `state` value. Declared defaults are present from the start.
 
 ## Next steps

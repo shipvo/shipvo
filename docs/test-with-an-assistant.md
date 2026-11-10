@@ -116,7 +116,7 @@ A sandbox sleeps after 30 idle minutes and wakes on the next call, so a slow fir
 
 **The assistant tapped the wrong thing or says it cannot find a button.** Ask it to read the screen first and list what it sees. If a button has no name there, give it an accessible label in your app.
 
-**Nothing happens after you sign in.** Run `shipvo mcp` again and compare the key in your client config with the one it prints.
+**The assistant stops answering after a few weeks.** The key expires after 30 days. Run `shipvo login` again, then `shipvo mcp`, and put the new key in your client config.
 
 ## Next steps
 
