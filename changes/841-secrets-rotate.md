@@ -1,2 +1,2 @@
-- `@shipvo/sim`: each key on the Secrets screen in Settings has a Rotate button. It shows a one-time link to save the new key, never a key value, on Android and iPhone skins.
+- `@shipvo/sim`: each key on the Secrets screen in Settings has a Rotate button. It shows a one-time link to save the new key, never a key value, on Android and iOS skins.
 - Migration: none.

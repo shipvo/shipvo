@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { settingPatch, readSettings, describeSettings, SettingsError, SETTING_KEYS, settingsHtml, secretRowsHtml, loadSecrets, revokeSecret, rotateSecret, rotateLinkHtml, applyRevoke, settingsClientScript } from "./settings.mjs";
+import { settingPatch, readSettings, describeSettings, SettingsError, SETTING_KEYS, settingsHtml, secretRowsHtml, loadSecrets, revokeSecret, rotateSecret, rotateLinkHtml, rotateClick, applyRevoke, settingsClientScript } from "./settings.mjs";
 import { renderFrame } from "./frame.mjs";
 import { settingsAction } from "./settings-actions.mjs";
 
@@ -138,4 +138,29 @@ test("rotate shows a one-time ticket link and no key value", async () => {
   assert.equal(await rotateSecret(async () => ({ ok: true, json: async () => ({ url: "javascript:x" }) }), { app: "a", name: "b" }), null);
   assert.match(rotateLinkHtml(null), /Could not rotate/);
   assert.match(settingsClientScript(), /secret-rotate/);
+});
+
+test("clicking Rotate adds one output, a second click replaces it, and the button is disabled while pending", async () => {
+  const kids = [];
+  const row = {
+    querySelector: () => kids.find((k) => k.part === "secret-rotate-out") || null,
+    appendChild: (k) => kids.push(k),
+  };
+  const doc = { createElement: () => { const a = {}; return { attrs: a, setAttribute(n, v) { a[n] = v; if (n === "data-part") this.part = v; }, remove() { kids.splice(kids.indexOf(this), 1); }, set innerHTML(v) { this.html = v; } }; } };
+  const btn = { disabled: false, getAttribute: (n) => ({ "data-app": "shop", "data-name": "stripe" })[n] };
+  let n = 0, release;
+  const fetchFn = () => new Promise((res) => { release = () => res({ ok: true, json: async () => ({ url: `https://x.dev/vault/t/t${++n}` }) }); });
+  const p1 = rotateClick(btn, row, fetchFn, doc);
+  assert.equal(btn.disabled, true);
+  await rotateClick(btn, row, fetchFn, doc); // double tap while pending: ignored
+  release(); await p1;
+  assert.equal(btn.disabled, false);
+  assert.equal(kids.length, 1);
+  assert.match(kids[0].html, /t1/);
+  assert.equal(kids[0].attrs.role, "status");
+  const p2 = rotateClick(btn, row, fetchFn, doc);
+  release(); await p2;
+  assert.equal(kids.length, 1);
+  assert.match(kids[0].html, /t2/);
+  assert.match(settingsClientScript(), /rotateClick\(ro,/);
 });
