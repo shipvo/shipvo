@@ -1,0 +1,102 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "expense-splitter",
+    "name": "Expense splitter",
+    "description": "Record who paid and see the total and each person's share."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable"
+  },
+  "data": {
+    "expenses": {
+      "source": "collection",
+      "fields": {
+        "who": "text",
+        "what": "text",
+        "amount": "number"
+      },
+      "seed": []
+    },
+    "total": {
+      "source": "computed",
+      "value": "{{ sum(expenses.map(e, e.amount)) }}"
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Expenses",
+      "body": [
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "Total {{ total }}"
+        },
+        {
+          "type": "chart",
+          "kind": "bar",
+          "from": "expenses",
+          "x": "{{ item.who }}",
+          "y": "{{ item.amount }}",
+          "aggregate": "sum",
+          "label": "Paid by person"
+        },
+        {
+          "type": "form",
+          "label": "Add expense form",
+          "submit": { "label": "Add expense", "action": "add_expense" },
+          "fields": [
+            { "name": "who", "type": "text", "label": "Paid by", "required": true, "maxLength": 60 },
+            { "name": "what", "type": "text", "label": "For what", "required": true, "maxLength": 60 },
+            { "name": "amount", "type": "number", "label": "Amount", "required": true, "min": 0 }
+          ]
+        },
+        {
+          "type": "list",
+          "label": "Expenses",
+          "from": "{{ expenses }}",
+          "item": {
+            "title": "{{ item.what }}",
+            "subtitle": "{{ item.who }} paid {{ item.amount }}"
+          },
+          "empty": {
+            "message": "No expenses yet"
+          }
+        }
+      ]
+    }
+  ],
+  "actions": {
+    "add_expense": {
+      "description": "Record one expense.",
+      "input": {
+        "who": { "type": "text" },
+        "what": { "type": "text" },
+        "amount": { "type": "number" }
+      },
+      "do": [
+        {
+          "insert": "expenses",
+          "value": {
+            "who": "{{ input.who }}",
+            "what": "{{ input.what }}",
+            "amount": "{{ input.amount }}"
+          }
+        },
+        {
+          "toast": "Expense added"
+        }
+      ]
+    }
+  }
+}
