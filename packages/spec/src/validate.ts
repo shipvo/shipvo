@@ -267,6 +267,12 @@ class Run {
         if (typeof a.description !== "string" || a.description === "") {
           this.warn(p, "Action has no description.", "Add \"description\": agents read it to decide when to call this action.");
         }
+        if (typeof a.share === "string") {
+          const f = isObject(a.input) ? a.input[a.share] : undefined;
+          if (!isObject(f) || f.type !== "text") {
+            this.error(childPath(p, "share"), `Share input ${JSON.stringify(a.share)} is not a text input of this action.`, "Name a text input from \"input\", for example \"body\"; it receives the shared text.");
+          }
+        }
       }
     }
     if (Array.isArray(this.spec.schedules)) {

@@ -219,3 +219,19 @@ describe("data source refresh", () => {
     expect(paths(r.errors)).toContain("$.data.goals.refresh");
   });
 });
+
+describe("share targets", () => {
+  const act = (a: Record<string, unknown>) => mini([], { actions: { add_note: { description: "Add a note", input: { body: { type: "text" }, size: { type: "number" } }, do: [{ toast: "ok" }], ...a } } });
+  it("accepts share naming a text input", () => {
+    expect(validate(act({ share: "body" })).errors).toEqual([]);
+  });
+  it("rejects share naming a missing or non-text input", () => {
+    expect(paths(validate(act({ share: "title" })).errors)).toContain("$.actions.add_note.share");
+    expect(paths(validate(act({ share: "size" })).errors)).toContain("$.actions.add_note.share");
+  });
+  it("the shipped Notes and Tasks app is a share target for notes and tasks", () => {
+    const s = JSON.parse(readFileSync(new URL("../../../templates/notes-tasks/app.json", import.meta.url), "utf8"));
+    expect(validate(s).errors).toEqual([]);
+    expect([s.actions.add_note.share, s.actions.add_task.share]).toEqual(["body", "title"]);
+  });
+});

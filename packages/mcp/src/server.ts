@@ -402,6 +402,12 @@ use(server, tools.wait_for_event,
   async ({ session, timeout_ms }) => { need(session); const r = await act({ session, action: "wait_for_event", timeout_ms }) as Act & { event?: boolean; banner?: string; pending?: unknown };
     if (!r.ok) return result(session, r);
     return { ...text(r.event ? "Something is waiting for you. Read it with check_inbox or my_tasks." : "nothing yet"), structuredContent: { event: r.event === true, ...(r.pending ? { pending: r.pending } : {}) } }; });
+use(server, tools.set_reminder,
+  async ({ session, title, body, at, in_minutes, repeat }) => { need(session); const r = await act({ session, action: "set_reminder", title, body, at, in_minutes, repeat }) as Act & { reminder?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.reminder, null, 2)); });
+use(server, tools.list_reminders,
+  async ({ session }) => { need(session); const r = await act({ session, action: "list_reminders" }) as Act & { reminders?: unknown; fired?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ reminders: r.reminders, fired: r.fired }, null, 2)); });
+use(server, tools.cancel_reminder,
+  async ({ session, id }) => { need(session); const r = await act({ session, action: "cancel_reminder", id }) as Act & { cancelled?: boolean }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cancelled: r.cancelled === true })); });
 use(server, tools.register_wakeup,
   async ({ session, name, url, events, secret, format, allow_private }) => { need(session); const r = await act({ session, action: "register_wakeup", name, url, events, secret, format, allow_private }) as Act & { wakeup?: unknown };
     if (!r.ok) return result(session, r);
@@ -412,6 +418,18 @@ use(server, tools.clear_wakeup,
   async ({ session, name }) => { need(session); const r = await act({ session, action: "clear_wakeup", name }) as Act & { cleared?: boolean }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cleared: r.cleared === true })); });
 use(server, tools.permission_log,
   async ({ session, app, permission, event, limit }) => { need(session); const r = await act({ session, action: "permission_log", app, permission, event, limit }) as Act & { entries?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ entries: r.entries }, null, 2)); });
+use(server, tools.share_targets,
+  async ({ session }) => { need(session); const r = await act({ session, action: "share_targets" }) as Act & { targets?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ targets: r.targets }, null, 2)); });
+use(server, tools.share,
+  async ({ session, to, text: body, title, action, from }) => { need(session); const r = await act({ session, action: "share", to, text: body, title, action_name: action, from }) as Act & { shared?: unknown; value?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ shared: r.shared, value: r.value }, null, 2)); });
+use(server, tools.get_clipboard,
+  async ({ session }) => { need(session); const r = await act({ session, action: "get_clipboard" }) as Act & { text?: string }; if (!r.ok) return result(session, r); return text(JSON.stringify({ text: r.text ?? "" })); });
+use(server, tools.set_clipboard,
+  async ({ session, text: body }) => { need(session); const r = await act({ session, action: "set_clipboard", text: body }) as Act & { text?: string }; if (!r.ok) return result(session, r); return text(JSON.stringify({ text: r.text ?? "" })); });
+use(server, tools.backup_phone,
+  async ({ session }) => { need(session); const r = await act({ session, action: "backup_phone" }) as Act & { backup?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.backup)); });
+use(server, tools.restore_phone,
+  async ({ session, backup, replace }) => { need(session); const r = await act({ session, action: "restore_phone", backup, replace }) as Act & { restored?: unknown; skipped?: unknown; failed?: unknown; warnings?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ restored: r.restored, ...(r.skipped ? { skipped: r.skipped } : {}), ...(r.failed ? { failed: r.failed } : {}), ...(r.warnings ? { warnings: r.warnings } : {}) }, null, 2)); });
 use(server, tools.search_phone,
   async ({ session, query, app, limit }) => { need(session); const r = await act({ session, action: "search_phone", query, app, limit }) as Act & { results?: unknown; count?: number; truncated?: boolean; query?: string }; if (!r.ok) return result(session, r); return text(JSON.stringify({ query: r.query, count: r.count, truncated: r.truncated, results: r.results }, null, 2)); });
 use(server, tools.inbox_wait,

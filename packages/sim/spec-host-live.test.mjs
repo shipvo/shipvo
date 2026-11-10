@@ -222,6 +222,31 @@ for (const style of ["android", "ios"]) {
   });
 }
 
+for (const style of ["android", "ios"]) {
+  test(`${style}: share puts text into another app, and the clipboard survives switching apps`, async () => {
+    const NOTES = JSON.parse(readFileSync(new URL("../../templates/notes-tasks/app.json", import.meta.url), "utf8"));
+    const sid = `sp-share-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "notes", spec: NOTES, style })).ok, true);
+    const tg = await act(sid, { action: "share_targets" });
+    assert.deepEqual(tg.targets.map((x) => `${x.app}.${x.action}:${x.field}`).sort(), ["notes.add_note:body", "notes.add_task:title"]);
+    assert.equal((await act(sid, { action: "share", to: "notes", text: "Buy rope" })).code, "pick_action");
+    const r = await act(sid, { action: "share", to: "notes", action_name: "add_note", text: "Harbour list\nrope, hooks", from: "browser" });
+    assert.equal(r.ok, true, JSON.stringify(r).slice(0, 300));
+    const notes = (await act(sid, { action: "export_apps", ids: ["notes"] })).apps[0].data.notes;
+    assert.deepEqual(notes.map((n) => [n.title, n.body]), [["Harbour list", "Harbour list\nrope, hooks"]]);
+    const ev = (await act(sid, { action: "app_activity", id: "notes" })).apps[0].events.filter((e) => e.name === "share");
+    assert.equal(ev.length, 1); assert.equal(ev[0].action, "add_note"); assert.equal(ev[0].from, "browser");
+    assert.equal((await act(sid, { action: "share", to: "nope", text: "x" })).code, "not_installed");
+    assert.equal((await act(sid, { action: "set_clipboard", text: "lamp order 42" })).ok, true);
+    assert.equal((await act(sid, { action: "get_clipboard" })).text, "lamp order 42");
+    assert.equal((await act(sid, { action: "switch_app", id: "notes" })).ok, true);
+    assert.equal((await act(sid, { action: "get_clipboard" })).text, "lamp order 42");
+    await act(sid, { action: "device_reset" });
+    assert.equal((await act(sid, { action: "get_clipboard" })).text, "");
+  });
+}
+
 test("update_app is a new version: entered data stays, the screen changes, a bad spec changes nothing", async () => {
   assert.ok((await call("/session", { session: "sp-up" })).ok);
   assert.equal((await act("sp-up", { action: "create_app", id: "gifts", spec: GIFTS })).ok, true);
@@ -442,3 +467,83 @@ test("import_apps does not warn about a valid hand-written layout, and names eac
   const str = await act("pl-h", { action: "import_apps", replace: true, apps: [app("pinned")] });
   assert.deepEqual(str.warnings, ["apps[0].placement: not valid, ignored (expected an object)"]);
 });
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: backup_phone and restore_phone move apps, data, layout, settings and the clipboard to a new phone`, async () => {
+    const NOTES = JSON.parse(readFileSync(new URL("../../templates/notes-tasks/app.json", import.meta.url), "utf8"));
+    const a = `sp-bk-a-${style}`, b = `sp-bk-b-${style}`;
+    assert.ok((await call("/session", { session: a, skin: style, phone: { settings: { dark_mode: true } } })).ok);
+    { const _r = await act(a, { action: "create_app", id: "notes", spec: NOTES, style, open: false }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+    { const _r = await act(a, { action: "app_action", id: "notes", action_name: "add_note", input: { title: "Harbour", body: "rope, hooks" } }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+    { const _r = await act(a, { action: "pin_app", id: "notes", pinned: true }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+    { const _r = await act(a, { action: "install_app", id: "tidewatch", permissions: { location: false } }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+    const bk = await act(a, { action: "backup_phone" });
+    assert.equal(bk.ok, true, JSON.stringify(bk).slice(0, 300));
+    assert.equal(bk.backup.format, "shipvo.phone-backup/v0");
+    assert.equal(bk.backup.settings.dark_mode, true); assert.equal(typeof bk.backup.clipboard, "string");
+    const wire = { ...JSON.parse(JSON.stringify(bk.backup)), clipboard: "lamp order 42" };
+
+    assert.ok((await call("/session", { session: b, skin: style })).ok);
+    assert.equal((await act(b, { action: "restore_phone", backup: { ...wire, settings: { dark_mode: "on" } } })).code, "bad_backup");
+    assert.ok(!(await act(b, { action: "phone_apps" })).installed_apps.some((x) => x.id === "notes"));
+    const r = await act(b, { action: "restore_phone", backup: wire });
+    assert.equal(r.ok, true, JSON.stringify(r).slice(0, 400));
+    assert.deepEqual(r.restored.apps, ["notes"]); assert.deepEqual(r.restored.store_apps, ["tidewatch"]);
+    assert.deepEqual(r.installed_apps.find((x) => x.id === "tidewatch").permissions, { notifications: true, location: false }); assert.ok(r.restored.settings.includes("dark_mode")); assert.equal(r.restored.clipboard, true);
+    const back = (await act(b, { action: "backup_phone" })).backup;
+    const notes = back.apps.find((x) => x.id === "notes");
+    assert.deepEqual(notes.data.notes.map((n) => [n.title, n.body]), [["Harbour", "rope, hooks"]]);
+    assert.deepEqual(notes.placement, wire.apps.find((x) => x.id === "notes").placement);
+    assert.equal(back.settings.dark_mode, true); assert.equal(back.clipboard, "lamp order 42");
+    assert.deepEqual(back.store_apps.map((x) => x.id).sort(), wire.store_apps.map((x) => x.id).sort());
+    assert.equal((await act(b, { action: "restore_phone", backup: wire })).code, "already_installed");
+    { const _r = await act(b, { action: "restore_phone", backup: wire, replace: true }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+  });
+}
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: with a spec app open (no device layer) the phone keeps the reminder itself, at the phone time, and it can be dismissed`, async () => {
+    const sid = `sp-remsys-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "gifts", spec: GIFTS, style })).ok, true);
+    assert.equal((await act(sid, { action: "set_time", at: "2026-11-14T09:00:00" })).ok, true);
+    await act(sid, { action: "set_reminder", title: "Pay rent", in_minutes: 5 });
+    await act(sid, { action: "set_time", at: "2026-11-14T09:05:00" });
+    const got = (await act(sid, { action: "notifications" })).notifications.filter((n) => n.title === "Pay rent");
+    assert.equal(got.length, 1); assert.match(got[0].id, /^sys\d+$/); assert.equal(got[0].app, "Reminders");
+    assert.equal(new Date(got[0].at).toISOString().slice(0, 16), new Date("2026-11-14T09:05:00").toISOString().slice(0, 16));
+    assert.deepEqual((await act(sid, { action: "list_reminders" })).fired.map((f) => [f.title, f.delivered]), [["Pay rent", true]]);
+    assert.equal((await act(sid, { action: "dismiss_notification", id: got[0].id })).ok, true);
+    assert.equal((await act(sid, { action: "notifications" })).notifications.filter((n) => n.title === "Pay rent").length, 0);
+    assert.equal((await act(sid, { action: "dismiss_notification", id: got[0].id })).code, "not_found");
+  });
+}
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: a reminder arrives as a notification when the phone clock reaches it, with the app closed`, async () => {
+    const sid = `sp-rem-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "set_time", at: "2026-11-14T09:00:00" })).ok, true);
+    const set = await act(sid, { action: "set_reminder", title: "Call Ada", body: "About the invoice", in_minutes: 10 });
+    assert.equal(set.ok, true); assert.equal(set.reminder.at, "2026-11-14T09:10");
+    await act(sid, { action: "press_home" });
+    assert.equal((await act(sid, { action: "notifications" })).notifications.length, 0);
+    await act(sid, { action: "set_time", at: "2026-11-14T09:09:00" });
+    assert.equal((await act(sid, { action: "notifications" })).notifications.length, 0);
+    await act(sid, { action: "set_time", at: "2026-11-14T09:10:00" });
+    const got = (await act(sid, { action: "notifications" })).notifications;
+    assert.equal(got.length, 1); assert.equal(got[0].title, "Call Ada"); assert.equal(got[0].body, "About the invoice"); assert.equal(got[0].data.reminder, set.reminder.id);
+    const list = await act(sid, { action: "list_reminders" });
+    assert.deepEqual(list.reminders, []); assert.deepEqual(list.fired.map((f) => [f.title, f.delivered]), [["Call Ada", true]]);
+    // a daily reminder comes back the next day; cancelling stops it
+    const d = await act(sid, { action: "set_reminder", title: "Standup", at: "2026-11-14T09:30", repeat: "daily" });
+    await act(sid, { action: "set_time", at: "2026-11-14T09:30:00" });
+    await act(sid, { action: "set_time", at: "2026-11-15T09:30:00" });
+    assert.equal((await act(sid, { action: "notifications" })).notifications.filter((n) => n.title === "Standup").length, 2);
+    assert.equal((await act(sid, { action: "cancel_reminder", id: d.reminder.id })).cancelled, true);
+    await act(sid, { action: "set_time", at: "2026-11-16T09:30:00" });
+    assert.equal((await act(sid, { action: "notifications" })).notifications.filter((n) => n.title === "Standup").length, 2);
+    const bad = await act(sid, { action: "set_reminder", title: "x" });
+    assert.equal(bad.ok, false); assert.equal(bad.code, "bad_time");
+  });
+}

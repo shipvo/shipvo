@@ -276,6 +276,7 @@
         },
         "returns": { "type": "object" },
         "effect": { "enum": ["none", "external"] },
+        "share": { "type": "string", "minLength": 1, "description": "Makes this action a share target: the text input that receives text shared from another app." },
         "do": { "type": "array", "items": { "$ref": "#/$defs/step" } }
       }
     },
