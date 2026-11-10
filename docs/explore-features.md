@@ -1,5 +1,7 @@
 # Action feature log (`--record-features`)
 
+This page is for developers who want to rank or analyse the actions `shipvo explore` takes. It describes the file the flag writes and every field in it. For the walker itself, see [agents](agents.md#walk-an-app-with-shipvo-explore).
+
 `shipvo explore --record-features <file>` writes one JSON line per action the walker takes. The lines are training data for ranking actions. The flag is off by default. Without it the run and the JSON report are the same as before.
 
 Each line holds roles, counts, types and hashes. It never holds app text, label values, typed values or screenshots. Hashes are the first 16 hex characters of SHA-256.
@@ -32,3 +34,24 @@ Each line holds roles, counts, types and hashes. It never holds app text, label 
 | `outcome.finding` | boolean | The action produced at least one new finding. |
 | `outcome.findings` | integer | How many new findings. |
 | `outcome.failed` | boolean | The action failed or the app crashed. |
+
+## Record a file
+
+```bash
+shipvo explore --seed 1 --max-steps 20 --record-features features.jsonl
+head -n 1 features.jsonl
+```
+
+The file is created empty at the start and gets one line per action. Each line is one JSON object in the format above.
+
+## Troubleshooting
+
+- **`--record-features needs a file`.** You gave the flag without a path. Add one, for example `--record-features features.jsonl`.
+- **The file is empty.** The walk took no actions, for example because the start screen has nothing to tap or type into. Open the start screen with `shipvo sim` and check it.
+- **Two runs give different lines.** Pass the same `--seed` to repeat a walk.
+
+## Next steps
+
+- [Walk an app with `shipvo explore`](agents.md#walk-an-app-with-shipvo-explore)
+- [CLI guide](cli.md)
+- [Lumi ranker](lumi-ranker.md)
