@@ -1,0 +1,2 @@
+- docs: `shipvo audit` documents the `key-rotation` row and the four action values; the key rotation page shows how to see a rotation in the log.
+- Migration: none.

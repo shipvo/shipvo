@@ -1,5 +1,7 @@
 # Simulator vs device parity
 
+This page is for developers and teams who want to know how far an agent's test on the Shipvo simulator carries over to a phone. You get the method, the numbers and the CI runs behind them, for Android and iOS.
+
 Can an agent trust the Shipvo UI simulator? We ran two complete purchases on the simulator and on the real app, then compared what an agent can act on and read on every screen.
 
 - **Flow A:** browse the home rail → 2 × Chrome Spoon → Friday afternoon delivery → cash on delivery.
@@ -48,7 +50,7 @@ Previous run (one flow, before the simulator was made phone-faithful): Android 9
 
 Across all three flows on Android the orders match exactly; 18 of 21 screens are at 100% actionable parity. The three below 100% are known and listed here, not hidden: both system permission dialogs have one extra unlabeled button on the device, and the payment sheet's "Cancel payment" button is not exposed by Android's accessibility tree (same as flow B). On iOS (iPhone simulator, shell `dev.shipvo.tide`) flow C is at **100% actionable parity on all 6 screens, 95.3% mean text coverage on the full run, same order placed**: the iOS camera and location dialogs match word for word, driven through WebDriverAgent's alert interface (iOS system dialogs are outside the app's accessibility tree). Flows A and B on iOS are unchanged at 100%.
 
-What flow C does **not** measure: barcode decoding. The emulator's virtual camera cannot show a decodable code, so both sides type the number into the scanner's manual entry. Decoding is covered by the simulated-camera end-to-end test (ChatGPT's 18-step run, `device_log` marked `simulated: true`).
+Flow C compares the scanner screen with the number typed into manual entry on both sides. Barcode decoding is covered by the simulated-camera end-to-end test (ChatGPT's 18-step run, `device_log` marked `simulated: true`).
 
 **A bug flow C found:** on a phone, "Use my location" never showed the system permission dialog; the device API read the position without asking and the app reported "Could not get your location." Fixed in release 19 (`@shipvo/device` now requests permission first).
 
@@ -74,7 +76,7 @@ The device drivers also learned to close the on-screen keyboard like a person (B
 
 On iOS, the mobile-money number field opens a number pad with no Done key, and the checkout screen did not dismiss it on drag, so **Place order** was unreachable: a real customer paying by mobile money could not finish. Fixed in release 11 (keyboard closes on drag; content moves above it). The simulator, which has no on-screen keyboard, could not have found this; the device lanes exist for exactly this reason.
 
-## Definitions (what the numbers do and do not measure)
+## Definitions (what the numbers measure)
 
 - **Actionable parity:** the set of actionable elements on a screen (buttons, radio options, text fields, links, checkboxes), each reduced to `role:label`, compared as sets: shared elements divided by all elements seen on either side. Disabled controls count on both sides, but their enabled state is not compared. Platform chrome (scroll indicators, keyboard keys) is excluded by the platform's own accessibility flags, not by name. **100% means: the agent can act on the same controls, with the same names, on both.** The score is computed on role and label.
 - **Text coverage:** the share of text the simulator shows that also appears on the device, exactly or contained in a longer label.
