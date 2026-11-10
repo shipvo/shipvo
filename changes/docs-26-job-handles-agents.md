@@ -1,0 +1,2 @@
+- docs: The agents page lists `job_status` and `wait_ms` for slow tools and explains the `running` answer. The glossary has a Job entry.
+- Migration: none.
