@@ -33,6 +33,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Over the air (OTA).** Sending an update to phones through the internet, so people do not have to go to the app store.
 
 
+**Job.** A slow task, such as publishing a preview, that keeps running after the assistant's request has waited long enough. The assistant gets a job name back and asks `job_status` for the result later. See [Agents](agents.md#troubleshooting).
+
 **Vault.** A safe place for keys you give an app, such as a payment key. You paste a key once into a private page, it is stored encrypted, and the assistant never sees it. You can replace a key, remove it, and see when it was used. See [Self-hosting](self-hosting.md#saved-key-routes-vault).
 
 **Release.** One numbered version of your app that phones can download.
