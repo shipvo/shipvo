@@ -139,6 +139,12 @@ If the marketplace cannot be reached, `list_store_apps` returns `store_unreachab
 
 Switching sets `current_app` and brings the app to the front. If the app's bundle URL starts with `http`, the session loads it. Other URLs (such as the fixture's) only change state.
 
+### Device permissions per app
+
+The Store's install card lists every device permission an app declares (for example `notifications` or `location`), with an Allow or Deny switch for each. Your answers are kept per app in `installed_apps[].permissions`, saved in `phone.json` (`apps[].permissions`) and carried by `export_phone_apps` and `import_phone_apps`. Settings has one switch per app and permission, so you can change an answer later. `install_app` returns `declared` and `permissions`.
+
+An action that needs a denied permission (a `notify` step needs `notifications`) returns `permission_denied` naming the permission, and nothing else in the action runs. The sim action `set_app_permission { id, permission, allowed }` sets an answer; it returns `not_declared` for a permission the app did not declare.
+
 ### Start from a `phone.json`
 
 A `phone.json` in the folder where the simulator starts (or `--phone <path>`) says what is on the phone at the start. The same file gives the same phone every run.

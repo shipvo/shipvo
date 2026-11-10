@@ -1,6 +1,6 @@
 # Moving to a new machine
 
-This page is for anyone who is switching laptops or joining a teammate's repo. You will back up and restore your **signing seed**, the one secret that lets you update phones that already have your app.
+This page is for anyone who is switching laptops or joining a teammate's repo. You will end with the new machine able to publish updates to the phones that already have your app. One step matters a lot: the **signing seed**, a secret value that proves an update is yours (see the [glossary](glossary.md)).
 
 ## What lives where
 
@@ -37,6 +37,21 @@ npx -y @shipvo/cli publish
 ```
 
 `keys import` checks the seed against the public key in `shipvo.json` and refuses one that does not match, so you find out now, not when a release is rejected. It writes `.shipvo/seed.txt` with owner-only permissions.
+
+You should see:
+
+```text
+Signing key for "<your app>" restored to .shipvo/seed.txt (matches shipvo.json).
+Next: `shipvo login` then `shipvo app create` to get a publish token on this machine.
+```
+
+Check it worked:
+
+```bash
+npx -y @shipvo/cli doctor
+```
+
+The line `signing key matches shipvo.json publicKey` should pass.
 
 ## If the seed is truly lost
 

@@ -41,7 +41,7 @@ PUT /rotation/<app>/root
 { "root_key": "<root public key>" }
 ```
 
-`<root public key>` is the value `keys root` printed. A good reply is `{ "ok": true, "app": "<app>", "root_key": "…" }`. Put the same value in your shell build as `dev.shipvo.ROOT_KEY` (Android and iOS), so phones can verify a statement. The registered key cannot be changed over the air.
+`<root public key>` is the value `keys root` printed. A good reply is `{ "ok": true, "app": "<app>", "root_key": "…" }`. Put the same value in your shell build so phones can verify a statement. Android: manifest meta-data `dev.shipvo.ROOT_KEY`. iOS: Info.plist `ShipvoRootKey`. The registered key cannot be changed over the air.
 
 ## 3. Sign a rotation
 

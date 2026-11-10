@@ -128,3 +128,5 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Root key.** A second signing key you keep offline. It does not sign updates. It signs a rotation statement that replaces your release key. Create it with `shipvo keys root`; see [Root key and key rotation](key-rotation.md).
 
 **Device permission.** A phone feature an app asks to use, such as notifications, camera or location. You allow or deny each one when you install the app and can change it in Settings. See [phone apps](phone-apps.md#allow-or-deny-what-an-app-can-use).
+**Rotation statement.** A note signed by the root key that tells phones to trust a new release key. `shipvo keys rotate sign` makes it.
+
