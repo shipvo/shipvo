@@ -1,1 +1,1 @@
-- Docs: [Test an email sign-in](../docs/email-sign-in.md) now has troubleshooting and next steps, and is in the docs sidebar and the README. The demo video worked example has a troubleshooting table.
+- Docs: [Test an email sign-in](../docs/email-sign-in.md) now has troubleshooting and next steps, and the README lists it. The demo video worked example has a troubleshooting table.

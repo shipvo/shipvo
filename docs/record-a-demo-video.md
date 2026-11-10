@@ -74,17 +74,16 @@ duration=0.733
 
 ## Troubleshooting
 
-| What you see | What to do |
-| --- | --- |
-| `recorder_unavailable` | Run `npm i -D playwright && npx playwright install chromium`, then ask again |
-| `frame_unreachable` | Start the simulator (`shipvo sim`) or `shipvo run`, then record again |
-| `recording_active` | A recording is already running. Ask the assistant to stop it first |
-| The video is under a second long | Waits longer than 0.6 s are cut, and steps with no wait are fast. Ask the assistant to tap and scroll through the real screens |
-| The file has no sound | Read `notes` in the `record_stop` result. `music_unavailable`, `music_failed` and `narration_unreadable` each keep the silent video; the fix for each is in the table in [record](record.md#troubleshooting) |
-| `encode_failed` | `ffmpeg` is missing. Install it, then record again |
+| What you see | What it means | What to do |
+| --- | --- | --- |
+| `recorder_unavailable` | The tool that films the phone is not installed | Ask your assistant to run `npm i -D playwright && npx playwright install chromium`, then try again |
+| `frame_unreachable` | The phone is not running | Start it with `shipvo sim` or `shipvo run`, then record again |
+| `recording_active` | A recording is already running | Ask the assistant to stop it first |
+| `encode_failed` | `ffmpeg` is missing | Install ffmpeg, then record again |
+| `narration_unreadable` or `music_failed` | The voice file or music step failed | Your silent video is kept. Fix the file path or install `python3`, then add sound again |
+| The video is under a second long | Waits longer than 0.6 s are cut, and steps with no wait are fast | Ask the assistant to tap and scroll through the real screens |
 
 Every error code is explained in [Record a demo video of the phone](record.md#troubleshooting).
-
 
 ## Next steps
 

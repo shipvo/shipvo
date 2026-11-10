@@ -67,7 +67,7 @@ The inbox, the tools and `phone.inbox` are the same on the Android and iOS phone
 
 | What you see | Why | What to do |
 | --- | --- | --- |
-| `inbox_timeout` ("no mail ... arrived at s-...@inbox.shipvo.test within 10000 ms") | No mail matched `subject` and `from` in time. The app may have sent it to a different address, or the filter is too strict | Type the address from `inbox.address()` (or `inbox_read`) into the app, not your own. Call `list()` or `inbox_read` with no filter to see what arrived. Raise `timeout` (at most 25000 ms) |
+| `inbox_timeout` ("no mail ... arrived at s-...@inbox.shipvo.test within 10000 ms") | No mail matched `subject` and `from` in time. The app may have sent it to a different address, or the filter is too strict | Type the address from `inbox.address()` (or `inbox_read`) into the app, not your own. Call `list()` or `inbox_read` with no filter to see what arrived. Raise `timeout` (`timeout_ms` in the MCP tool; at most 25000 ms) |
 | `bad_timeout` | `timeout_ms` is below 0 or above 25000 | Use a number from 0 to 25000 |
 | `inbox_no_code` | The matching mail has no 4 to 8 digit number | Read `text` from `waitFor` and check the mail. Codes with letters are not picked up, so take them from `text` yourself |
 | `session_ended` | The session closed while you waited. Its inbox is gone | Open a new session and use its new address |

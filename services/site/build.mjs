@@ -50,7 +50,6 @@ const NAV = [
   ]},
   { group: "Test", pages: [
     { slug: "test-with-an-assistant", src: "docs/test-with-an-assistant.md", title: "Test with an assistant", desc: "Connect Claude, ChatGPT or Cursor to the hosted Shipvo simulator over MCP and have it test your React Native app, step by step." },
-    { slug: "email-sign-in", src: "docs/email-sign-in.md", title: "Test an email sign-in", desc: "Finish a code or magic-link sign-in on Android and iOS with a private inbox per session, in a typed test or through an agent." },
     { slug: "testing", src: "docs/testing.md", title: "Test your app in CI", desc: "Run your real React Native app flows in a headless simulator on every pull request, with typed Vitest tests. No emulator, no device farm." },
     { slug: "email-sign-in", src: "docs/email-sign-in.md", title: "Test an email sign-in", desc: "Give every test session a private inbox so a test or an agent can read an emailed code or magic link and finish sign-in on Android and iOS." },
     { slug: "spec-blocks", src: "docs/spec-blocks.md", title: "App spec: screens and controls", desc: "Write a Shipvo app spec with charts, boards, calendars, maps and live data, copy a gallery example, check it, and render it the same on Android and iOS." },
