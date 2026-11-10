@@ -46,7 +46,7 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `publish_preview(...)` · `job_status(job, wait_ms?)` | Slow tools (`publish_preview`, `upload_build`) wait up to `wait_ms` (default 20000) and return the result, or `{ status: "running", job }`. Call `job_status` with that `job` to read `running`, `done` or `failed` (`wait_ms` up to 55000 waits for it). See [the CLI guide](cli.md) |
 | `attach_session(app?, session?)` | Attach to the live `shipvo run` phone (Android or iOS) from `.shipvo/run.json`, without an app id. Returns `no_live_run` when no run is up (or `app` does not match it) and `attach_failed` when the phone cannot be reached |
 | `screen(session)` | The accessibility tree with refs (`[ref=e12]`) |
-| `tap(session, ref)` · `type(session, ref, text)` · `scroll(session, direction, ref?)` · `back(session)` | Act like a thumb |
+| `tap(session, ref)` · `type(session, ref, text)` · `scroll(session, direction, ref?)` · `back(session)` | Act like a thumb. Refs can carry a prefix, such as `f1e2` (what `screen` returns after a restart) or `p1e5`; pass them back exactly as returned. A ref from before a restart fails with `stale_ref`: call `screen` again for fresh ones |
 | `screenshot(session)` | PNG of the phone |
 | `set_device(...)` · `device_reset(...)` | What the simulated phone has: platform, permissions, location, barcode in view, biometrics, payment outcome, network |
 | `lock` · `unlock` · `restart` | Press the power button (lock screen), swipe up to unlock, or restart the phone (boot screen, the app starts fresh, storage is kept). While locked, tap, type, scroll and back fail with `phone_locked` |
