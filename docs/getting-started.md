@@ -32,10 +32,11 @@ Each step exited with code 0, and no step failed on any system in this run. The 
 
 ## Try it in your browser first
 
-Open [shipvo.dev/playground](https://shipvo.dev/playground/). No install. The sample app runs on an Android phone and an iPhone side by side. Two panels let you try the main features:
+Open [shipvo.dev/playground](https://shipvo.dev/playground/). No install. The sample app runs on an Android phone and an iPhone side by side. Three entries let you try the main features:
 
 - **Device API:** set location, camera, biometrics, payment, notification and airplane mode, and see the sample app show each result.
 - **Over-the-air updates:** publish a signed update, stage it to 10% and then 100% of phones, crash it, and watch the rollback. The signature result, cohort counts and crash-loop threshold on that panel come from the real signer, verifier, cohort bands and runtime code, recorded when the site was built.
+- **Many phones:** show 1 to 12 Android and iOS phones side by side. Pick the count, choose Android, iOS or both, and turn dark mode on for every phone. **Copy link** shares your setup. You can also write it yourself: `https://shipvo.dev/playground/?phones=6&mix=both&dark=1#many`. `phones` is clamped to 1 to 12, `mix` is `android`, `ios` or `both` (anything else gives `both`), and `dark=1` turns on dark mode.
 
 If a panel does not load, reload the page; it needs JavaScript on. [The playground](playground.md) page lists every panel and the shareable Many phones link.
 

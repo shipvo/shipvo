@@ -96,3 +96,13 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Playground Many phones (1 to 12 phones, shareable `?phones=&mix=&dark=` link) and Agent panel (tool console, Watch Lumi) | [playground](playground.md) | | | |
 | Job handles for slow tools (`job_status`, `wait_ms`) | [agents](agents.md#slow-tools-and-job_status) | | | |
 | W3C `traceparent` recorded from tool calls | [agents](agents.md) | | | |
+| Job handles for slow tools (`job_status`, `wait_ms` on `publish_preview` and `upload_build`) | [cli](cli.md), [mcp](../packages/mcp/README.md) | | | |
+| Saved-key routes: list, rotate, revoke and use log (`/vault/keys`, `/vault-ui/*` in the simulator) | [self-hosting](self-hosting.md#saved-key-routes-vault) | | | |
+| Key rotations in the pointer response (`rotations`) | [self-hosting](self-hosting.md#pointer-response-and-key-rotations) | | | |
+| Playground Many phones (1 to 12 Android and iOS phones, shareable link) | [getting-started](getting-started.md#try-it-in-your-browser-first) | | | |
+| Pin and hide apps on the home screen (`pin_app`, `hide_app`) | [phone-apps](phone-apps.md) | | | |
+| Describe an app and it appears (`create_app`, `update_app`) | [phone-apps](phone-apps.md) | | | |
+| Export and import a phone's apps (`export_phone_apps`, `import_phone_apps`) | [phone-apps](phone-apps.md) | | | |
+| Real app install from the Store (`install_app`, `find_apps`) | [phone-apps](phone-apps.md) | | | |
+| SAML sign-in for the control plane | [sso](sso.md) | | | |
+| W3C `traceparent` recorded from MCP tool calls | [mcp](../packages/mcp/README.md) | | | |
