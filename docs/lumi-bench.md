@@ -8,17 +8,22 @@ This page is for developers who tune or check Lumi, the walker behind `shipvo ex
 
 ## Run it
 
-1. Build the CLI, then run the benchmark from the repository root:
+1. Build the CLI from the repository root:
 
 ```bash
 pnpm --filter @shipvo/schema build && pnpm --filter @shipvo/cli build
+```
+
+2. Run the benchmark:
+
+```bash
 node scripts/lumi/bench.mjs                      # spec apps, budgets 50 and 200, seed 1
 node scripts/lumi/bench.mjs --budgets 100 --seed 3 --out bench.json
 node scripts/lumi/bench.mjs --start-sim --platform android   # also run Tide and Tackle on the Android simulator
 node scripts/lumi/bench.mjs --sim http://localhost:4546 --platform ios
 ```
 
-2. Read the table it prints, then the same data as JSON (`--json` prints only JSON). The same seed gives the same output.
+3. Read the table it prints, then the same data as JSON (`--json` prints only JSON). The same seed gives the same output.
 
 Options: `--budgets <list>` (whole numbers, 1 or more), `--seed <n>`, `--bugs on|off`, `--ranker on|off`, `--platform android|ios`, `--sim <url>`, `--start-sim`, `--json`, `--out <file>`.
 
