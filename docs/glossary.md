@@ -16,6 +16,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Assistant.** An AI helper such as Claude or ChatGPT. With Shipvo it can open your app and use it like a customer.
 
+**CSV.** A plain text table: the first line names the columns and each line after it is a row, with commas between values. Spreadsheets open it. A spec app makes one with `csv()`. See [Export data as CSV](spec-blocks.md#export-data-as-csv).
+
 **Command.** One line of text you type in the terminal and run by pressing Enter.
 
 **Control plane.** The Shipvo service that keeps your releases and decides who gets them. You can use the hosted one or run your own.
@@ -54,6 +56,10 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Terminal.** A window where you type commands instead of clicking. On a Mac it is called Terminal. On Windows use "Windows Terminal" or "PowerShell". On Linux it is also called Terminal.
 
 **Audit log.** A list of what happened to your app's releases: who published, who rolled back, and when a release was stopped. You can export it with `shipvo audit`.
+
+**Cohort.** A slice of your users that gets an update before everyone else. See also cohort band.
+
+**Over-the-air update.** A new version of your app that phones download directly, without a new store release. Shipvo signs each one and the phone checks the signature before it runs.
 
 **Cohort band.** A group of people who get a release first (`b0`), then more (`b1`, `b2`). Starting small limits the damage if something is wrong.
 
@@ -133,7 +139,6 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **App permission.** A device permission (such as notifications or location) an app declares and you allow or deny on its install card or in Settings. See [phone apps](phone-apps.md#device-permissions-per-app).
 
-**Session inbox.** A private mailbox that every test session gets, with its own address. A test or an assistant reads emailed sign-in codes and links there, and the mail is gone when the session ends. See [email sign-in](email-sign-in.md).
 **Session inbox.** A private mailbox every test session has, with its own address, so a test or an agent can read an emailed sign-in code or link. See [Test an email sign-in](email-sign-in.md).
 
 **Assistant Inbox.** A first-party phone app where assistants such as ChatGPT and Claude message each other, hand over tasks and share reports. See [phone apps](phone-apps.md#assistants-talking-to-each-other).

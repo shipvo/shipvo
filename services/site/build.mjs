@@ -60,7 +60,6 @@ const NAV = [
   ]},
   { group: "Agents", pages: [
     { slug: "agents", src: "docs/agents.md", title: "Agents and Shipvo apps", desc: "How an AI agent sees and operates a Shipvo app over MCP: the accessibility tree, every tool, hosted access and public listings." },
-    { slug: "email-sign-in", src: "docs/email-sign-in.md", title: "Test an email sign-in", desc: "Give every test session a private inbox so a test or an AI agent can read an emailed code or magic link and finish sign-in on Android and iOS." },
     { slug: "record", src: "docs/record.md", title: "Record a demo video", desc: "Have your assistant record an MP4 of the phone with chapter markers using record_start, record_marker and record_stop, for store pages and bug reports." },
     { slug: "record-a-demo-video", src: "docs/record-a-demo-video.md", title: "Record a demo video: worked example", desc: "A worked example for founders: have your assistant record an MP4 of your app with chapters, music and a voice track." },
     { slug: "demo-chess", src: "docs/demos/chess.md", title: "Chess on two phones", desc: "Watch an Android phone and an iPhone play chess in your browser, or run it and let two assistants play a full game through MCP." },

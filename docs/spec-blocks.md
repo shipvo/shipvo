@@ -246,21 +246,15 @@ Add `refresh` to an `http` data source to run it again on a timer while the app 
 
 ## Export data as CSV
 
-Use `csv(rows, columns?)` in any expression to turn a list into CSV text: a header row, then one line per row. Fields with commas, quotes or line breaks are quoted, lines end with CRLF and a list value is joined with `; `. Without `columns`, the header holds every key found in the rows, in the order first seen.
+Who it is for: anyone whose app keeps a list (a diary, an expense log, a stock sheet) and wants to hand it to a spreadsheet or an agent.
 
-```
-csv(rows, ["name", "qty"])
-```
+`csv(rows)` turns a list into CSV text. `csv(rows, ['date', 'title'])` writes only those columns, in that order.
 
-With `rows` of `{ name: "Tea, green", qty: 2 }` and `{ name: "Salt", qty: 5 }`, the result is:
+1. Keep the list in a data source or in state, for example `data.entries`.
+2. Add an action that returns the text: `{ "return": "{{ csv(data.entries, ['date', 'title']) }}" }`.
+3. Call the action. The first line holds the column names, one row follows per item, lines end with CRLF, and a list such as tags is joined with `; `.
 
-```
-name,qty
-"Tea, green",2
-Salt,5
-```
-
-`csv()` returns the same text on Android and iOS.
+Fields with commas, quotes or line breaks are quoted, and a missing value is empty. The full action, and a way to protect cells that start with `=`, are in [phone apps](phone-apps.md#export-data-as-csv).
 
 ## Example specs
 
@@ -319,6 +313,7 @@ A data source can call a service with a key you saved once in the secret form. T
 - **A translation does not show.** The key must match the text exactly, including capitals and spaces, and `language` must be the same code you used in `strings` (`fr`, not `fr-FR`). Pass `locale` separately for money and dates.
 - **A vector shape is missing.** An unknown `shape` is an error; a colour that is not hex, a name or `url(#id)` draws as `none`; a path with other characters draws nothing.
 - **A refreshed value never changes.** Check that `refresh` is 30 or more and the source is `http`. A failed refresh keeps the last value, so check the domain is in `permissions.network`.
+- **`csv()` shows `=` or `+` at the start of a cell in a spreadsheet.** Spreadsheets read those as formulas. Map the field first, as shown in [phone apps](phone-apps.md#export-data-as-csv).
 - **State is empty before the first change.** Declare a `default` for each `state` value. Declared defaults are present from the start.
 
 ## Next steps

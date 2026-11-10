@@ -1,7 +1,5 @@
 # Test an email sign-in on Android and iOS
 
-This page is for developers and for anyone whose assistant tests an app that signs in by email. You will finish an emailed-code or magic-link sign-in in a test or through an agent, with no real mailbox.
-
 Many apps sign in with a code or a link sent by email. Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
 
 The inbox works the same on the Android and iOS phones.
@@ -65,16 +63,17 @@ The inbox, the tools and `phone.inbox` are the same on the Android and iOS phone
 
 ## Troubleshooting
 
-| You see | Why | What to do |
+| You see | Cause | Fix |
 | --- | --- | --- |
-| `inbox_timeout` | No mail matched the `subject` or `from` before the timeout | Call `inbox_read` (or `phone.inbox.list()`) to see what arrived. Loosen the filter, or raise `timeout` (at most 25000 ms). Check that the app really sent the request |
-| `inbox_no_code` | The matching mail has no 4 to 8 digit code | Read `text` from `waitFor`. If the mail holds a link, use `links[0]` |
-| Status 550 from `https://inbox.shipvo.test/send` | The `to` address is not this session's address | Use the address from `inbox_read` or `phone.inbox.address()`. Each session has its own |
-| The address changed between runs | Each session gets a new address, and the inbox is removed when the session ends | Read the address again at the start of every session |
-| The inbox tools are missing in your agent | The session was not opened on Shipvo Phone | Open the app with `open_app` on `platform: "android"` or `"ios"` |
+| `inbox_timeout` | No mail matched `subject` or `from` before `timeout` ran out | Call `inbox_read` (or `phone.inbox.list()`) to see what arrived. If it is empty, check that the app tapped the send button and that your `mockNetwork` rule has a `mail` field. If mail is there, loosen `subject`. |
+| `inbox_no_code` | The matching mail has no 4 to 8 digit number | Read the mail with `waitFor` and look at `text`. For a link, use `links[0]` instead. |
+| `bad_timeout` | `timeout_ms` is above 25000 or not a whole number | Use a whole number from 0 to 25000. |
+| `session_ended` | The session closed while you waited | Open the app again. The inbox and its address are new for each session. |
+| Status 550 from `https://inbox.shipvo.test/send` | The `to` address is not this session's address | Send to the address from `inbox_read` or `phone.inbox.address()`. |
+| An old code is picked up | The inbox still holds mail from an earlier attempt | Call `inbox_clear` (or `phone.inbox.clear()`) before each attempt. |
 
 ## Next steps
 
-- [Agents and Shipvo apps](agents.md): every MCP tool, including the three inbox tools.
-- [Typed tests](testing.md): `@shipvo/test` and `mockNetwork`.
-- [Device API](device-api.md): simulated device features your sign-in flow may use.
+- [Testing](testing.md) for `mockNetwork` and the rest of the typed test API.
+- [Agents](agents.md) for the other tools an assistant can call on the phone.
+- [Phone apps](phone-apps.md) for the apps on the phone that send and read mail.
