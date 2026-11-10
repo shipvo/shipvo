@@ -98,3 +98,5 @@ The last one is where most pages stop at a claim. Ours is the crash-loop revert 
 Build a sample app and practise a rollback before you need one: [Build your first Shipvo app](/docs/getting-started/). Publish two releases, break the second, and run `shipvo rollback --to 1`. The whole loop takes a few minutes.
 
 Related: [how big is a React Native OTA update](/blog/react-native-ota-update-size-bsdiff-patches/), with measured patch sizes.
+
+You can watch a crash-loop rollback on Android and iOS phones in your browser: [try over-the-air updates in the playground](/blog/try-react-native-ota-updates-in-your-browser/).

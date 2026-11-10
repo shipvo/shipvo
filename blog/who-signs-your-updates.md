@@ -42,3 +42,5 @@ On the phone, every release is checked in three steps: the signed release pointe
 
 - Expo, [Code signing for EAS Update](https://docs.expo.dev/eas-update/code-signing/).
 - Shipvo, [Moving to a new machine](/docs/new-machine/) and [`@shipvo/runtime`](/docs/runtime/).
+
+Want to see signing, staged rollout and rollback before you install anything? Try them in the [Shipvo playground](/blog/try-react-native-ota-updates-in-your-browser/).
