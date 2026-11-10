@@ -157,6 +157,15 @@ describe("rebuildInto", () => {
   });
 });
 
+describe("expoExportArgs", () => {
+  it("clears the Metro cache on the first build and keeps it for warm rebuilds", async () => {
+    const { expoExportArgs } = await import("../src/sim");
+    expect(expoExportArgs("out")).toContain("--clear");
+    expect(expoExportArgs("out", true)).not.toContain("--clear");
+    expect(expoExportArgs("out", true).slice(-2)).toEqual(["--output-dir", "out"]);
+  });
+});
+
 describe("shouldOpenWatch", () => {
   it("opens by default, not with --no-open or --json", async () => {
     const { shouldOpenWatch } = await import("../src/sim");
