@@ -47,27 +47,21 @@ If your coding agent runs the local `@shipvo/mcp` server (`shipvo agents setup` 
 
 `upload_build` reads your project, so it runs only on the local (stdio) server. Add `npx @shipvo/mcp` next to the hosted one. A key with read scope cannot upload.
 
-## Open a build from a URL
-
-If your build is already hosted as a file, the simulator can fetch it for you. `POST /session` on the simulator accepts a `build_url`. It downloads the build into a size-capped build cache, unpacks it, opens it as the app and replies with `build: <id>`. The id is the build's sha256 content id, so the same file gives the same id. Over MCP, `open_app("<app>@build:<id>")` sends that id and the reply names the build that opened.
-
-The host must be on the same allow-list the phone browser uses. This is checked again on every redirect. A failed fetch leaves no session and no file behind.
-
-| Code | Meaning | What to do |
-| --- | --- | --- |
-| `bad_url` | The URL is not a valid `http(s)` URL. | Check the address. |
-| `host_not_allowed` | The host (or a redirect target) is not on the allow-list. | Use an allowed host, or upload with `shipvo sim --hosted`. |
-| `too_large` | The file is over the size cap. | Remove unused assets and try again. |
-| `unreachable` | The fetch timed out or the host did not answer. | Check the link opens in a browser, then retry. |
-| `bad_build` | The file is not a `.tar.gz` build with an `index.html` at its top level, or it contains links. | Pack the `sim-dist` folder from `shipvo sim` and try again. |
-
 ## Who can see a build
 
 A build is private to your account. A key from another account gets `build_not_found`, the same answer as for a build that never existed. A build is deleted when it expires.
 
 ## Open a build from a link
 
-The simulator's `POST /session` also takes a `build_url`: a link to a `.tar.gz` of your built app. The simulator fetches it into its build cache, unpacks it (an archive that contains links is refused) and serves it at `/b/<id>/`. The reply has `build`: the id you sent, or the content id. `open_app("<app>@build:<id>")` sends it for you. The host must be on the same allow-list the phone's Browser uses. If the fetch fails, the reply is `{ ok: false, code, error }` and no session is created.
+The simulator's `POST /session` also takes a `build_url`: a link to a `.tar.gz` of your built app. The simulator fetches it into its size-capped build cache (stored by sha256 content id), unpacks it (an archive that contains links is refused) and serves it at `/b/<id>/`. The reply has `build`: the id you sent, or the content id. `open_app("<app>@build:<id>")` sends it for you. The host must be an allowed host. This is checked again on every redirect. If the fetch fails, the reply is `{ ok: false, code, error }`, no session is created and no file is left behind. The codes:
+
+| Code | Meaning | What to do |
+| --- | --- | --- |
+| `bad_url` | The URL is not a valid `http(s)` URL. | Check the address. |
+| `host_not_allowed` | The host (or a redirect target) is not an allowed host. | Use an allowed host. To host a build without a link, use [Upload from the terminal](#upload-from-the-terminal). |
+| `too_large` | The file is over the size cap. | Remove unused assets and try again. |
+| `unreachable` | The fetch timed out or the host did not answer. | Check the link opens in a browser, then retry. |
+| `bad_build` | The file must be a `.tar.gz` with `index.html` at the top level and no links. | Fix the archive and try again. |
 
 ## Errors
 
