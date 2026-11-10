@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { satisfiesRange, checkNativeModules, ShellManifest, ReleasePointer, GateReport, bandForCohort, canonicalize, parsePolicy } from "../src/index";
+import { satisfiesRange, checkNativeModules, ShellManifest, ReleasePointer, Telemetry, GateReport, bandForCohort, canonicalize, parsePolicy } from "../src/index";
 
 const sig = "AAAA".repeat(16);
 const manifest = {
@@ -192,5 +192,21 @@ describe("network.allow", () => {
     expect(networkHostMatches(["*.example.com"], "evilexample.com")).toBe(false);
     expect(networkHostMatches(["api.example.com"], "API.example.com.")).toBe(true);
     expect(networkHostMatches(["api.example.com"], "x.api.example.com")).toBe(false);
+  });
+});
+
+describe("release pointer state_version", () => {
+  const base = { schema_version: "1.0", app_id: "tide", shell_major: 1, band: "b0", release: 1,
+    issued_at: "2026-10-29T21:00:00Z", core: { version: "1.0.0", sha256: "a".repeat(64), size: 10, url: "c" }, min_shell_version: "1.0.0", signature: sig };
+  it("round-trips, is optional and must be a positive integer", () => {
+    const none = ReleasePointer.safeParse(base);
+    expect(none.success && none.data.state_version).toBeUndefined();
+    const v = ReleasePointer.safeParse({ ...base, state_version: 3 });
+    expect(v.success && v.data.state_version).toBe(3);
+    for (const bad of [0, -1, 1.5, "2"]) expect(ReleasePointer.safeParse({ ...base, state_version: bad }).success).toBe(false);
+  });
+  it("crash_loop_revert telemetry carries state_version_from and state_version_to", () => {
+    const t = Telemetry.safeParse({ schema_version: "1.0", app_id: "tide", release: 4, event: "crash_loop_revert", state_version_from: 3, state_version_to: 2 });
+    expect(t.success && [t.data.state_version_from, t.data.state_version_to]).toEqual([3, 2]);
   });
 });

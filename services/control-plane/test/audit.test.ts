@@ -99,11 +99,11 @@ describe("GET /audit/:app", () => {
 
 describe("audit on publish", () => {
   const pub = Buffer.alloc(32, 7).toString("base64");
-  async function pointer(band = "b0", url = "x") {
+  async function pointer(band = "b0", url = "x", extra: Record<string, unknown> = {}) {
     const kp: any = await crypto.subtle.generateKey({ name: "Ed25519" } as any, true, ["sign", "verify"]);
     const pk = Buffer.from(await crypto.subtle.exportKey("raw", kp.publicKey)).toString("base64");
     const h = "a".repeat(64);
-    const body = JSON.stringify({ schema_version: "1.0", app_id: "tide", shell_major: 1, band, release: 7, issued_at: "2026-01-01T00:00:00Z", core: { version: "1.0.0", sha256: h, size: 1, url }, min_shell_version: "1.0.0" });
+    const body = JSON.stringify({ schema_version: "1.0", app_id: "tide", shell_major: 1, band, release: 7, issued_at: "2026-01-01T00:00:00Z", core: { version: "1.0.0", sha256: h, size: 1, url }, min_shell_version: "1.0.0", ...extra });
     const sig = Buffer.from(await crypto.subtle.sign({ name: "Ed25519" } as any, kp.privateKey, new TextEncoder().encode(body))).toString("base64");
     return { pk, buf: JSON.stringify({ body, signature: sig }) };
   }
@@ -143,6 +143,15 @@ describe("audit on publish", () => {
     expect(calls[0].args[4]).toBe("rollback");
     expect(JSON.parse(calls[0].args[7] as string)).toEqual({ release: 6 });
     expect(JSON.parse(calls[0].args[8] as string).rolled_back_to).toBe(3);
+  });
+  it("records the state_version downgrade of a rollback", async () => {
+    const { pk, buf } = await pointer("b0", "b/tide/r3.hbc", { state_version: 2 });
+    const prev = JSON.stringify({ body: JSON.stringify({ release: 6, state_version: 3 }), signature: "s" });
+    const { calls } = await run(pk, buf, false, prev);
+    const after = JSON.parse(calls[0].args[8] as string);
+    expect(after.state_downgrade).toEqual({ from: 3, to: 2 });
+    expect(after.allowed_by).toBe("--allow-state-downgrade");
+    expect(JSON.parse(calls[0].args[7] as string)).toEqual({ release: 6, state_version: 3 });
   });
   it("records a normal publish (bundle matches release) as publish", async () => {
     const { pk, buf } = await pointer("b0", "b/tide/r7.hbc");

@@ -90,6 +90,8 @@ export const ReleasePointer = z.object({
   required_native_modules: z.record(z.string().min(1), z.string().min(1)).optional(),
   /** The agent-facing web build of this same release, served by the control plane at `base` (sim.shipvo.dev opens it). */
   web: z.object({ base: z.string().min(1), entry: z.string().min(1), sha256, files: z.number().int().nonnegative() }).optional(),
+  /** Version of the data format this release reads and writes in AsyncStorage, SQLite or MMKV. Absent = no declaration. A rollback to a lower value needs an explicit choice. */
+  state_version: z.number().int().positive().optional(),
   new_control_plane: z.object({ base_url: z.string().url(), cdn_url: z.string().url() }).optional(),
   signature: b64,
 });
@@ -164,6 +166,9 @@ export const Telemetry = z.object({
   bytes_downloaded: z.number().int().nonnegative().optional(),
   apply_ms: z.number().nonnegative().optional(),
   device_class: z.enum(["low", "mid", "high"]).optional(),
+  /** On crash_loop_revert: the state_version of the release that was reverted and of the one the device went to (0 = none declared). */
+  state_version_from: z.number().int().nonnegative().optional(),
+  state_version_to: z.number().int().nonnegative().optional(),
 });
 export type Telemetry = z.infer<typeof Telemetry>;
 

@@ -286,6 +286,39 @@ describe("publish and the Hermes bytecode check", () => {
     });
   });
 
+  describe("state_version", () => {
+    const ptr = (sv: number | undefined) => JSON.stringify({ body: JSON.stringify({ release: 5, ...(sv ? { state_version: sv } : {}) }), signature: "s" });
+    const seedState = (applied: number, target: number | undefined) => {
+      blobs.set("b/demo/r2.hbc", fakeHbc(96));
+      values.set("h/demo/r2", JSON.stringify({ min_shell_version: "1.0.0", ...(target ? { state_version: target } : {}) }));
+      values.set("p/demo/1/b0", ptr(applied));
+    };
+    it("rollback from state_version 3 to 2 fails with an actionable message", async () => {
+      seedState(3, 2);
+      const exit = vi.spyOn(process, "exit").mockImplementation((() => { throw new Error("exit"); }) as never);
+      await expect(rollback(["--to", "2", "--bands", "b0"])).rejects.toThrow("exit");
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(String((console.error as any).mock.calls.at(-1)[0])).toMatch(/state_version 2.*state_version 3.*--allow-state-downgrade/);
+      expect(puts).toEqual([]);
+    });
+    it("with --allow-state-downgrade it succeeds and the new pointer carries the lower state_version", async () => {
+      seedState(3, 2);
+      await rollback(["--to", "2", "--bands", "b0", "--allow-state-downgrade"]);
+      expect(puts).toEqual(["p/demo/1/b0"]);
+      expect(JSON.parse(JSON.parse(values.get("p/demo/1/b0")!).body).state_version).toBe(2);
+    });
+    it("a rollback to the same or a higher state_version needs no flag", async () => {
+      seedState(2, 2);
+      await rollback(["--to", "2", "--bands", "b0"]);
+      expect(puts).toEqual(["p/demo/1/b0"]);
+    });
+    it("releases without a declaration roll back as before", async () => {
+      seedState(0, undefined);
+      await rollback(["--to", "2", "--bands", "b0"]);
+      expect(puts).toEqual(["p/demo/1/b0"]);
+    });
+  });
+
   it("--out followed by a --flag counts as no value", async () => {
     withBundle(96);
     await expect(publish([...flags, "--dry-run", "--out", "--bands", "b0"])).rejects.toThrow(/--out needs a directory/);

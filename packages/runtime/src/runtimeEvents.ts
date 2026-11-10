@@ -22,10 +22,10 @@ const NATIVE_MODULE_REASONS: string[] = ["native_module_missing", "native_module
  */
 export function forwardRuntimeEvents(
   events: string[],
-  send: (event: ForwardedEvent, release?: number) => void,
+  send: (event: ForwardedEvent, release?: number, extra?: { state_version_from: number; state_version_to: number }) => void,
 ): void {
   for (const e of events) {
-    const [name, id] = e.split(":");
+    const [name, id, from, to] = e.split(":");
     if (name === "pointer_rejected") {
       // "pointer_rejected:<reason>": only the two native-module reasons are reported.
       if (id !== undefined && NATIVE_MODULE_REASONS.includes(id)) send(id as ForwardedEvent);
@@ -33,6 +33,10 @@ export function forwardRuntimeEvents(
     }
     if (!(FORWARDED_EVENTS as readonly string[]).includes(name)) continue;
     const release = CARRIES_RELEASE.includes(name) && id !== undefined && /^\d+$/.test(id) ? Number(id) : undefined;
-    send(name as ForwardedEvent, release);
+    // "crash_loop_revert:<release>:<state_version_from>:<state_version_to>" (0 = none declared). Older shells send no versions.
+    const num = /^\d+$/;
+    const extra = name === "crash_loop_revert" && from !== undefined && to !== undefined && num.test(from) && num.test(to)
+      ? { state_version_from: Number(from), state_version_to: Number(to) } : undefined;
+    if (extra) send(name as ForwardedEvent, release, extra); else send(name as ForwardedEvent, release);
   }
 }
