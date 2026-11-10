@@ -123,7 +123,7 @@ For the spec above the output is:
 { errors: [], warnings: [] }
 ```
 
-We ran that on 10 November 2026 against `@shipvo/spec` built from this repository. Then we added a button with no label. The result:
+We ran that on 10 November 2026 against [`@shipvo/spec`](https://github.com/shipvo/shipvo/tree/main/packages/spec) built from this repository. Then we added a button with no label. The result:
 
 ```json
 {
@@ -170,7 +170,7 @@ If you build with an agent in code, these are the MCP tools behind the steps abo
 
 Every call is logged in `device_log`, so you can see what the agent did. The `id` you pass to `create_app` uses lowercase letters, digits and dashes, up to 40 characters. `gift-ideas` works; `Gift_Ideas` does not, and you get `bad_app_id` back.
 
-An app's data lives for the session. If you want to keep it, use `export_phone_apps`. The full reference is in [describe an app and it appears](/docs/describe-an-app/) and [phone apps](/docs/phone-apps/).
+Use `export_phone_apps` to copy your apps, with their data and layout, to another phone. The full reference is in [describe an app and it appears](/docs/describe-an-app/) and [phone apps](/docs/phone-apps/).
 
 ## Who this is for
 
