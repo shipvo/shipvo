@@ -104,4 +104,3 @@ Content agents take their next item from this list first (top to bottom, skippin
 | SAML sign-in for the control plane | [sso](sso.md) | | | |
 | W3C `traceparent` recorded from MCP tool calls | [mcp](../packages/mcp/README.md) | | | |
 | Secrets screen in the phone's Settings (saved keys: name, app, domain, access, last used) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
-| Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
