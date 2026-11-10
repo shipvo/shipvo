@@ -85,6 +85,9 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: An Android patch that runs out of memory or is over the memory budget falls back to the full download ([Getting started](getting-started.md), #1454)
+- 2026-11-10: Agents can use the prefixed refs the phone returns after a restart ([Agents](agents.md), #1459)
+- 2026-11-10: `csv()` exports a spec app's collection as CSV ([Phone apps](phone-apps.md), #1458)
 - 2026-11-10: A page for founders and developers on describing an app and watching it appear, with a checked example spec and troubleshooting ([Describe an app](describe-an-app.md))
 - 2026-11-10: Revoke a saved key from the Secrets screen, and the gallery grows to five example specs ([Revoke](phone-apps.md#see-saved-keys-in-settings), [Example specs](spec-blocks.md#example-specs), #1388, #1385)
 - 2026-11-10: `shipvo keys root` creates the offline root key for key rotation ([Key rotation](key-rotation.md), #1417)
