@@ -246,7 +246,7 @@ Add `refresh` to an `http` data source to run it again on a timer while the app 
 
 ## Export data as CSV
 
-Use `csv(rows, columns?)` in any expression to turn a list into CSV text: a header row, then one line per row. Fields with commas, quotes or line breaks are quoted, lines end with CRLF and a list value is joined with `; `. Without `columns`, the keys of the first row are used.
+Use `csv(rows, columns?)` in any expression to turn a list into CSV text: a header row, then one line per row. Fields with commas, quotes or line breaks are quoted, lines end with CRLF and a list value is joined with `; `. Without `columns`, the header holds every key found in the rows, in the order first seen.
 
 ```
 csv(rows, ["name", "qty"])
@@ -260,11 +260,11 @@ name,qty
 Salt,5
 ```
 
-The text works the same on Android and iOS, so you can pass it to a share or save action.
+`csv()` returns the same text on Android and iOS.
 
 ## Example specs
 
-`packages/spec/gallery/` holds example specs to copy and change: a habit tracker, a workout log, an expense splitter, a trip checklist and flashcards. Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.
+`packages/spec/gallery/` holds example specs to copy and change: a habit tracker, a workout log, an expense splitter, a trip checklist and flashcards. Three more show the board, calendar and map blocks: a reading board (`kanban` with `move_book`), a meal planner (`calendar`, week view) and favourite places (`map`). Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.
 
 ## Data sources that use a saved key
 
