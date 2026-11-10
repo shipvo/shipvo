@@ -398,6 +398,10 @@ use(server, tools.push_notification,
     if (r.ok && r.delivered === false) return result(session, { ...r, screen: `Not delivered: notification permission is not granted (use set_device permissions.notifications).\n\n${r.screen ?? ""}` });
     return result(session, r);
   });
+use(server, tools.wait_for_event,
+  async ({ session, timeout_ms }) => { need(session); const r = await act({ session, action: "wait_for_event", timeout_ms }) as Act & { event?: boolean; banner?: string; pending?: unknown };
+    if (!r.ok) return result(session, r);
+    return { ...text(r.event ? "Something is waiting for you. Read it with check_inbox or my_tasks." : "nothing yet"), structuredContent: { event: r.event === true, ...(r.pending ? { pending: r.pending } : {}) } }; });
 use(server, tools.inbox_wait,
   async ({ session, subject, from, timeout_ms }) => { need(session); const r = await act({ session, action: "inbox_wait", subject, from, timeout_ms }) as Act & { address?: string; message?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ address: r.address, message: r.message }, null, 2)); });
 use(server, tools.inbox_read,
