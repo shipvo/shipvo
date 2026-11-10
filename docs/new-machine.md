@@ -46,6 +46,14 @@ npx -y @shipvo/cli publish
 
 So back it up once, today, even if you are not moving.
 
+## Troubleshooting
+
+| You see | Why | Fix |
+| --- | --- | --- |
+| `This seed does not match the public key in shipvo.json` | The seed is from a different app or key | Import the seed you backed up for this app. Do not change `publicKey` in `shipvo.json`: installed apps pin it |
+| `Usage: shipvo keys import <seed>` | No seed was given | Pass the seed, `--file seed.txt`, or pipe it in: `echo <seed> \| shipvo keys import` |
+| `Set SHIPVO_SIGNING_SEED or SHIPVO_SIGNING_SEED_FILE ... or keep it at .shipvo/seed.txt` | `publish` found no seed | Run `shipvo keys import` on this machine, or set `SHIPVO_SIGNING_SEED` in CI |
+
 ## Teams
 
 Do not share the seed over chat. Put it in the CI secrets (`SHIPVO_SIGNING_SEED`) and let CI publish, or keep it in a shared vault your team already trusts. Each person runs their own `shipvo login` and `shipvo app create`; publish tokens are per machine.
@@ -60,6 +68,6 @@ Do not share the seed over chat. Put it in the CI secrets (`SHIPVO_SIGNING_SEED`
 
 ## Next steps
 
-- [CLI guide](cli.md): every `keys` command.
-- [Self-hosting](self-hosting.md): where your updates are stored.
-- [Glossary](glossary.md): signing seed, publish token and shell in plain words.
+- [Ship a fix](tutorials/ship-a-fix.md): publish your first update from the new machine.
+- [Self-hosting](self-hosting.md): run your own control plane.
+- [Glossary](glossary.md): signing seed, publish token, shell.

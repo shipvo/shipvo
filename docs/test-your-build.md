@@ -49,17 +49,25 @@ If your coding agent runs the local `@shipvo/mcp` server (`shipvo agents setup` 
 
 ## Open a build from a link
 
-If you run the simulator yourself, `POST /session` can take a `build_url` instead of a published app. The simulator fetches the web build (a `.tar.gz`) into its build cache, unpacks it, serves it at `/b/<id>/`, opens it as the app and answers with `build: <id>`. The id is the build's content hash, so the same file always gets the same id. In an MCP tool call, `open_app("tide@build:<id>")` sends that id along.
+If your build is already hosted at an http or https address, you can open it without uploading from your machine. Most readers use `shipvo sim --hosted` (see "Upload from the terminal" above) and do not need this. Your own code or script sends `POST /session` to the simulator (start it with `shipvo sim`; it listens on port 4545) with a `session` name, an `app` id and the `build_url` of a `.tar.gz` of your web build:
 
-The host must be public. A private or local host is refused; to allow your own, set `PN_BUILD_ALLOW_HOSTS`. The download is checked before any session is made. If it fails, you get one of these errors and no session is left behind:
+```bash
+curl -X POST http://localhost:4545/session \
+  -H 'content-type: application/json' \
+  -d '{"session":"demo","app":"tide","build_url":"https://example.com/app.tgz"}'
+```
+
+The simulator downloads the build, unpacks it, opens it as the app and replies with `{ "ok": true, "app": "tide", "build": "<id>", "screen": "..." }`. `build` names the build that opened, and the session runs that build. `open_app("<app>@build:<id>")` is for ids returned by `upload_build`.
+
+A bad address leaves no session behind. The reply carries one of these codes:
 
 | Code | Meaning | What to do |
 | --- | --- | --- |
-| `bad_url` | The address is not an `http(s)` URL. | Use a full `https://` address. |
-| `host_not_allowed` | The host is private or local, on the first request or on a redirect, and is not in `PN_BUILD_ALLOW_HOSTS`. | Use a public host, or set `PN_BUILD_ALLOW_HOSTS` to a comma-separated list of host names before you start the simulator. |
-| `too_large` | The file is over the simulator's size cap. | Remove unused assets and upload again. |
-| `unreachable` | The host did not answer in time, refused, or redirected too many times. | Check the address from a browser, then try again. |
-| `bad_build` | The file is not a `.tar.gz` with an `index.html` at its top level, or it contains links. | Pack the contents of your `sim-dist` folder so `index.html` is at the top, with no links. |
+| `bad_url` | The address is not a valid address. | Check the link. |
+| `host_not_allowed` | The simulator does not fetch from that host. Private and local addresses (such as `localhost` and `192.168.x.x`) are refused by default. If you run the simulator yourself, set `PN_BUILD_ALLOW_HOSTS` to a comma-separated list of host names before you start it. | Host the build somewhere reachable, or upload it from your machine with `shipvo sim --hosted` (see "Upload from the terminal" above). |
+| `too_large` | The download is over the size limit. | Remove unused assets and try again. |
+| `unreachable` | The simulator could not download it. | Open the link in a browser to check that it works without signing in. |
+| `bad_build` | The file is not a `.tar.gz` archive, contains links, has no `index.html` at its top level, or could not be unpacked. | Create the archive again from your web build folder, or upload it from your machine with `shipvo sim --hosted` (see "Upload from the terminal" above). |
 
 ## Who can see a build
 

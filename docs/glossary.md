@@ -12,6 +12,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **App id.** A short name for your app with no spaces, such as `tideshop`. Shipvo uses it to find your app.
 
+**App activity.** The record of what an assistant built and changed in an app on the phone: each version with plain lines for what changed, the data sources, and recent events. Ask for it with `app_activity`. See [Phone apps](phone-apps.md#see-what-was-built-and-changed).
+
 **Assistant.** An AI helper such as Claude or ChatGPT. With Shipvo it can open your app and use it like a customer.
 
 **Command.** One line of text you type in the terminal and run by pressing Enter.
@@ -115,4 +117,14 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Publish token.** A key that lets one machine upload releases for your app. Each machine has its own. `shipvo app create` makes a new one. See [Moving to a new machine](new-machine.md).
 
+**Live reload.** While `shipvo run` is open, Shipvo rebuilds your app each time you save a file and shows the new version in the phone, with no restart. If the save has a mistake, the phone keeps the last good version and a red bar names the file and line. See [Run your app on a phone](run.md#edit-and-save-the-phone-updates).
+
 **Refresh (data source).** A number of seconds on a web data source in an app spec. Shipvo asks the service again on that timer while the app is installed. See [App spec](spec-blocks.md#keep-a-data-source-fresh).
+
+**Signing seed.** The secret key that signs your releases. Every installed app pins its matching public key and accepts only updates signed with it. Shipvo never holds your seed, so back it up (see [Moving to a new machine](new-machine.md)).
+
+**Publish token.** A key that lets one machine or CI job publish releases for your app. `shipvo app create` issues a new one and revokes the old one.
+
+**Shell.** The app build you install from a store. It carries the runtime and your public key. Over-the-air updates change the code inside it.
+
+**Home-screen layout (`placement`).** How an app sits on the phone's home screen: pinned, hidden, its position and the days and hours it shows. `export_phone_apps` carries it and `import_phone_apps` restores it.

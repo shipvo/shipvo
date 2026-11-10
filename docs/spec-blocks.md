@@ -114,8 +114,8 @@ app.select("Period", "year");          // { ok: false, error: '"year" is not one
 | `segmented` | One choice from a few | `label`, `bind` to an `enum` state value, `options` |
 | `kanban` | Cards in columns | `label`, `from`, `columns`, `column`, `title`, `detail`, `onMove` |
 | `timeline` | Dated entries, newest day first | `label`, `from`, `date`, `title`, `detail` |
-| `calendar` | Events in a month, a week or an agenda | `label`, `from`, `date`, `title`, `detail`, `view`, `at`, `onSelect` |
-| `map` | Pins on a canvas | `label`, `from`, `lat`, `lng`, `title`, `onSelect` |
+| `calendar` | Events as a month, week or agenda | `label`, `from`, `date`, `title`, `detail`, `view`, `at`, `onSelect`, `empty` |
+| `map` | Pins on a canvas | `label`, `from`, `lat`, `lng`, `title`, `onSelect`, `empty` |
 | `vector` | A small drawing that follows your data | `label`, `value`, `width`, `height`, `shapes`, `motion` |
 
 In the screen tree, a toggle reads `Failed payment alerts: off` or `: on`, a segmented control reads `Period: week`, and a progress block reads `Monthly goal: 40%`. Assistants and `@shipvo/test` find them by those names.
@@ -198,22 +198,20 @@ main "Trip"
     button "Castle"
 ```
 
-Calendar options:
+| Option | Block | Meaning |
+| --- | --- | --- |
+| `date` | calendar | `2026-11-07` or `2026-11-07T09:30`. Rows without a valid date are left out. |
+| `view` | calendar | `month` (default), `week` (Monday first) or `agenda` (a list of the days that have events). |
+| `at` | calendar | A day (`2026-11-07`) or an expression. The month or week shown is the one that contains it. Default: the day of the first event. |
+| `detail` | calendar | Optional second line for each event. |
+| `lat`, `lng` | map | Numbers. Latitude from -90 to 90, longitude from -180 to 180. Rows with other values are left out. |
+| `title` | both | The name of the event or pin. |
+| `onSelect` | both | An action to run when someone taps an event or pin. |
+| `empty` | both | `{ "message": "..." }`, shown when there is nothing to draw. |
 
-- `date` is `2026-11-07` or `2026-11-07T09:30` (seconds are allowed). Events sort by date.
-- `view` is `month` (the default), `week` (Monday first) or `agenda` (a list of the days that have events).
-- `at` is the day the month or week is built around, as `2026-11-07` or an expression. Without it the first event's day is used. Events outside the shown month or week are not drawn.
-- `detail` is optional text after the title. `empty` takes `{ "message": "..." }` for when nothing is shown.
+The map is a canvas of pins fitted to their bounds. It makes no network calls and loads no map tiles, so it works offline and in tests.
 
-Map options:
-
-- `lat` is a number from -90 to 90 and `lng` is a number from -180 to 180.
-- The map is a canvas that fits all pins in view. It makes no network calls and has no street tiles, so tests run the same offline.
-
-Both blocks:
-
-- Each event or pin is in the screen tree by its title, so an assistant or `@shipvo/test` finds it by name. With `onSelect` each one is a `button`, and `app.press("Hotel")` runs the action with `{{ item }}` set to that row. Without `onSelect` each is a `listitem`.
-- A bad `view`, an event date that is not a date, or a pin latitude or longitude out of range is a validation error with a JSON path and a fix. An undeclared `onSelect` action is an error too.
+In the screen tree each event or pin is a node named by its title (an event with `detail` reads `Dinner, Table for two`). With `onSelect` it is a button, so `press` by title runs the action. The validator reports a bad `view`, a bad `at`, a seed date that is not a date and a seed latitude or longitude out of range, each with a path and a fix.
 
 ## Vector drawings
 
@@ -281,6 +279,7 @@ Add `refresh` to an `http` data source to run it again on a timer while the app 
 - Each refresh calls the service again. It does not read `cache`, and refreshed values are not written to it.
 - If a refresh fails, the screen keeps the last value and the next tick tries again.
 - Only public `http` and `https` hosts are called, and redirects are not followed.
+- Call `refresh_app` with the app id to run every `http` source now and skip the cache. See [phone apps](phone-apps.md).
 - The timer stops when the app is removed or replaced.
 
 | Error path | Meaning | Fix |
@@ -291,7 +290,7 @@ Add `refresh` to an `http` data source to run it again on a timer while the app 
 
 ## Example specs
 
-`packages/spec/gallery/` holds example specs to copy and change: a habit tracker and a workout log. Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.
+`packages/spec/gallery/` holds example specs to copy and change: a habit tracker, a workout log, an expense splitter, a trip checklist and flashcards. Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.
 
 ## Data sources that use a saved key
 

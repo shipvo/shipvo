@@ -65,6 +65,9 @@ The planner keeps this list current: the epics in flight, newest owner direction
 - Secret vault: keys go from the person straight into an encrypted vault, never through the model (#841)
 - Security hardening from the external review (#732)
 
+**Spaces on Shipvo Phone:**
+- Describe an app and it appears: create, edit, arrange, schedule, refresh and audit spec apps on the assistant's phone (#1297)
+
 **Agents together (planner epic):**
 - Agents use apps together: shared rooms, sub-agent teams and agent evaluation (#1188)
 
@@ -82,6 +85,8 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: Exported phone apps carry their home-screen layout, and `import_phone_apps` warns about each invalid layout field ([Phone apps](phone-apps.md), #1401)
+- 2026-11-10: `app_activity` shows what the agent built and changed in each spec app, `refresh_app` fetches a data source now, and `schedule_app` shows or hides an app on a time window ([Phone apps](phone-apps.md#see-what-was-built-and-changed), #1396, #1379, #1357)
 - 2026-11-10: `/phone?session=<name>` draws a live session's Store and installed apps in an Android or iOS frame ([Phone apps](phone-apps.md#install-apps-and-switch-between-them), #1337)
 - 2026-11-09: MCP tool calls record the W3C `traceparent` ([@shipvo/mcp](../packages/mcp/README.md), #1288)
 - 2026-11-09: `shipvo sim` accepts Client ID Metadata Documents and sends `iss` on redirects ([Agents](agents.md), #1286)
