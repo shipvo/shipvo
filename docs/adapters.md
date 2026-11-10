@@ -47,7 +47,21 @@ Telemetry event names are in `packages/schema/src/index.ts` (`Telemetry.event`).
 
 ## Where each rule runs
 
-For the React Native runtimes, per platform on the device (Android and iOS each have their own code): rules 2 to 5, the device side of rule 6 (sending the bytecode version), and 9 to 15. Rule 1 runs on the control plane for both platforms, plus a device check on iOS. Rule 15 is per platform. On the control plane for both platforms: 1, 6 (server side), 7 and 8. The device sends `?hbc=` and `?nm=` and reads the typed 404 answer.
+For the React Native runtimes:
+
+On the control plane, for both platforms:
+- Rule 1: serving and storing the pointer by platform.
+- Rule 6: the server side (`?hbc=`).
+- Rules 7 and 8.
+
+On the device, per platform (Android and iOS each have their own code):
+- Rule 1: the iOS platform check.
+- Rules 2 to 5.
+- Rule 6: the device side (the bytecode header check and sending the versions).
+- Rules 9 to 14.
+- Rule 15: the device reads the typed 404 reason on both platforms. The queued `pointer_rejected:<reason>` event exists on Android only.
+
+The device sends `?hbc=` and `?nm=` and reads the typed 404 answer.
 
 A runtime port that loads web assets from a server path (as Capacitor does) picks its bundle through its own host hook, so rules 10 to 14 are written against that hook. `@shipvo/capacitor` does this in `packages/capacitor/src/engine.ts`.
 
@@ -64,4 +78,3 @@ A runtime port that loads web assets from a server path (as Capacitor does) pick
 - [Store release](store.md): ship the shell to Google Play and the App Store.
 - [Threat model for signed updates](threat-model.md): why verification is never skipped.
 - [Glossary](glossary.md).
-

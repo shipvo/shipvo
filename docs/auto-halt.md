@@ -48,7 +48,7 @@ The release keeps serving while it is held. The hold shows in `approvals_list` a
 
 A hold you do not answer expires after 10 minutes. If the release fails again, Shipvo asks again.
 
-An agent or a token cannot decide a hold. Failures from established installs halt at once, as above.
+An agent or a token cannot decide a hold. If neither condition is true, the release halts at once as above.
 
 ## What does not count
 
