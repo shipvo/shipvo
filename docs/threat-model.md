@@ -24,7 +24,7 @@ The public key is written into the app at build time as native manifest meta-dat
 Assets:
 
 - **Publisher seed.** The Ed25519 private key. Only the seed can create a release that phones accept. It lives in your CI secrets or `.shipvo/seed.txt` (`packages/cli/src/config.ts`, `packages/cli/src/signing.ts`).
-- **Pinned public keys.** In every installed app: the release public key and, if you created one with `shipvo keys root`, the root public key. A root-signed rotation statement replaces the release key (`shipvo keys rotate sign`, then `shipvo keys rotate upload`; see [Recover a lost or leaked release key](key-recovery.md)). The root key itself cannot change over the air: losing the root key means shipping a new store build.
+- **Pinned public key.** In every installed app. It cannot be rotated for apps already installed. Losing the seed means shipping a new store build.
 - **Users' phones.** They run whatever JavaScript bundle passes the checks above, with the native permissions of the installed shell.
 
 Actors and what each holds:
@@ -65,7 +65,7 @@ Trust boundaries, from least to most trusted:
 
 ## What we do not defend against
 
-- **A stolen or leaked seed.** There is no second factor on signing. The fix is a root-signed rotation to a new release key ([key recovery](key-recovery.md)); until phones fetch it they still trust the leaked key. Release policy and approval slow a release down. They do not make a signed release invalid.
+- **A stolen or leaked seed.** There is no second factor on signing and no key rotation for installed apps. Release policy and approval slow a release down. They do not make a signed release invalid.
 - **A malicious publisher or a compromised CI.** Whatever your CI signs is accepted.
 - **A downgrade by an attacker who controls the network path or control plane**, for a device that has not yet reached the replayed release number. The device checks the release number only against its own state, not against a signed expiry or a signed "latest".
 - **Withholding.** A compromised control plane, CDN or network can serve nothing, or serve a stale pointer. Devices then keep running what they have. There is no signed freshness proof, so a device cannot tell "no update" from "update hidden".

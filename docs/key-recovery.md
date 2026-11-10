@@ -1,8 +1,8 @@
-# Recover a lost or leaked release key
+# Prepare for a lost or leaked release key
 
-Use this guide when the release signing seed is lost or has leaked, and you want to fix it without a new store build. It works the same for the Android and iOS builds of your app.
+Use this guide to set up an offline root key and to sign a rotation statement that names a new release key. It works the same for the Android and iOS builds of your app.
 
-The idea: your app pins two public keys. The **release key** signs every `shipvo publish`. The **root key** stays offline and only signs rotation statements. To replace a lost or leaked release key, you sign a statement with the root key that names a new release key. See [the design](design/key-rotation.md) for the full model.
+The idea: your app pins two public keys. The **release key** signs every `shipvo publish`. The **root key** stays offline and only signs rotation statements. To replace a release key, you sign a statement with the root key that names a new release key. See [the design](design/key-rotation.md) for the full model.
 
 ## 1. Create the root key (once, before you need it)
 
@@ -16,21 +16,12 @@ It writes a new seed to `root-seed.txt` (owner-only permissions, never overwritt
 
 1. Copy `root-seed.txt` to an offline place: a password manager or a vault. Then delete the file from the machine.
 2. Give the root public key to your build: pass it as `rootKey` to the `@shipvo/runtime` config plugin, and set `minSequence` to `0` for a first build. The same value goes on Android and iOS.
-3. Register the same public key with the control plane as the owner. Use the `controlPlane` and `appId` values from `shipvo.json`, and your owner token (the key `shipvo login` saves, or `SHIPVO_OWNER_TOKEN`):
-
-```bash
-curl -X PUT "<controlPlane>/rotation/<appId>/root" \
-  -H "authorization: Bearer $SHIPVO_OWNER_TOKEN" -H "content-type: application/json" \
-  -d '{"root_key":"<root public key>"}'
-```
-
-   It answers `{"ok":true,...}`. Publish tokens and agent tokens are refused.
 
 Never put the root seed in CI, in git or in chat. Anyone who holds it can rotate your release key.
 
-## 2. Recover a lost or leaked release key
+## 2. Sign a rotation for a new release key
 
-You need the root seed file, a signed-in owner session, and the app folder (it holds `shipvo.json`).
+You need the root seed file and the app folder (it holds `shipvo.json`).
 
 **a. Make a new release key.**
 
@@ -52,18 +43,9 @@ npx -y @shipvo/cli keys rotate sign --root-seed-file root-seed.txt \
 
 The command works offline and reads only the root seed.
 
-**c. Upload it.**
+**c. Keep the statement.** `rotation.json` is public data: it holds the new public key and the root key's signature. Keep it with your records. Move the seed file back to offline storage and delete it from this machine.
 
-```bash
-npx -y @shipvo/cli login
-npx -y @shipvo/cli keys rotate upload rotation.json
-```
-
-`upload` needs a signed-in owner session. Publish tokens and agent tokens are refused by the control plane.
-
-**d. Publish with the new key.** Use `new-seed.txt` as `SHIPVO_SIGNING_SEED_FILE` (or put it at `.shipvo/seed.txt`) and update the `SHIPVO_SIGNING_SEED` secret in CI. Replace the CI secret in the same step, so the old key cannot publish again. Then delete the root seed file again.
-
-Phones switch to the new release key when they fetch the statement. Until then they still trust the old key, so replace a leaked key in your CI secrets right away.
+**d. Use the new seed.** Use `new-seed.txt` as `SHIPVO_SIGNING_SEED_FILE` (or put it at `.shipvo/seed.txt`) for new publishes, and replace the `SHIPVO_SIGNING_SEED` secret in CI in the same step.
 
 ## Back up the root key
 
@@ -75,6 +57,5 @@ The root key is what lets Android and iOS phones accept a new release key, so ke
 | --- | --- |
 | `shipvo keys root --out <file>` | Creates the offline root key |
 | `shipvo keys rotate sign --root-seed-file <file> --new-key <public key> --sequence <n> [--valid-from <ISO time>] [--json]` | Signs a rotation statement offline |
-| `shipvo keys rotate upload <envelope.json> [--json]` | Sends it to the control plane |
 
 See [CLI reference](cli.md) and the [threat model](threat-model.md).

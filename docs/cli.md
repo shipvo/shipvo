@@ -379,17 +379,15 @@ Without `--json`, `publish` and `rollback` print a single plain sentence.
 
 ## `shipvo keys root` and `shipvo keys rotate`
 
-Recover a lost or leaked release key without a new store build. Full steps: [Recover a lost or leaked release key](key-recovery.md).
+Create an offline root key and sign a rotation statement. Full steps: [Prepare for a lost or leaked release key](key-recovery.md).
 
 ```bash
 shipvo keys root --out <file>
 shipvo keys rotate sign --root-seed-file <file> --new-key <public key> --sequence <n> [--valid-from <ISO time>] [--json]
-shipvo keys rotate upload <envelope.json> [--json]
 ```
 
 - `keys root` writes a new root seed to `<file>` (mode 0600, never overwritten) and prints the root public key to pin. It needs no `shipvo.json`.
 - `keys rotate sign` works offline. It reads the root seed, never the release seed, and prints the signed envelope. `--valid-from` defaults to now and may be at most 90 days ahead. Pick a `--sequence` above every statement you signed before.
-- `keys rotate upload` needs a signed-in owner session (`shipvo login`). Tokens are refused.
 
 ## `--json` for `init`, `login`, `audit` and `keys`
 
