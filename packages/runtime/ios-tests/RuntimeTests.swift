@@ -115,6 +115,24 @@ final class RuntimeTests: XCTestCase {
     XCTAssertTrue(s.consumeEvents().contains("patch_failed"))
   }
 
+  func testPatchDecisionFollowsTheBudget() {
+    // Budget is 0.4 of 1000 = 400 bytes.
+    XCTAssertEqual(Updater.patchDecision(baseSize: 200, patchSize: 50, newSize: 150, availableBytes: 1000), .apply)
+    XCTAssertEqual(Updater.patchDecision(baseSize: 200, patchSize: 50, newSize: 151, availableBytes: 1000), .skip)
+    XCTAssertEqual(Updater.patchDecision(baseSize: nil, patchSize: 1, newSize: 1, availableBytes: 1_000_000), .skip)
+  }
+
+  func testOverBudgetSkipsThePatchAndTakesTheFullDownload() async throws {
+    let s = try storeRunningRelease5("patch")
+    Updater.availableMemoryOverride = 1
+    defer { Updater.availableMemoryOverride = nil }
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["status"] as? String, "staged")
+    XCTAssertEqual(r["via"] as? String, "full")
+    XCTAssertEqual(r["patchError"] as? String, "over_memory_budget")
+    XCTAssertTrue(s.consumeEvents().contains("patch_failed"))
+  }
+
   // MARK: resumed downloads
 
   private func bundleBytes() throws -> Data { try Data(contentsOf: URL(string: "\(base)/b/good/ios-r5.hbc")!) }
