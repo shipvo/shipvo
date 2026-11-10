@@ -43,7 +43,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Share a preview link (`shipvo preview`) | [getting-started](getting-started.md) | | | |
 | Telemetry export to R2 | [telemetry-export](telemetry-export.md) | | | |
 | Move from EAS Update (`shipvo migrate --plan`, `--apply`) | [migrate-from-eas-update](migrate-from-eas-update.md) | | | |
-| Move from CodePush | [migrate-from-codepush](migrate-from-codepush.md#troubleshooting) | | | [a-codepush-alternative-after-app-center](../blog/a-codepush-alternative-after-app-center.md) |
+| Move from CodePush | [migrate-from-codepush](migrate-from-codepush.md) | | | [a-codepush-alternative-after-app-center](../blog/a-codepush-alternative-after-app-center.md) |
 | New machine and key backup | [new-machine](new-machine.md) | | | |
 | Release health dashboard and alerts | [self-hosting](self-hosting.md#revert-alerts-webhook), [telemetry-export](telemetry-export.md) | | | |
 | Take mobile money payments | [device-api](device-api.md) | | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |

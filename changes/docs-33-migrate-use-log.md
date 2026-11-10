@@ -1,1 +1,1 @@
-- Docs: the Secrets screen page now describes the Use log button, and both migration guides (EAS Update and CodePush) say who they are for and have Troubleshooting and Next steps.
+- Docs: both migration guides (EAS Update and CodePush) say who they are for and have Troubleshooting and Next steps.
