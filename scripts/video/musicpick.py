@@ -285,10 +285,7 @@ def main():
         sys.exit("no track in the corpus matches this brief; loosen 'want' or 'avoid'")
     rows = []
     for s1, r in cands:
-        lic = track_license(r["id"])
-        if lic not in ALLOWED_LICENSES:
-            print(f"{r['id']}: skipped (licence cc-{lic}: only CC BY, CC BY-SA, CC0 and public domain are used)", file=sys.stderr)
-            continue
+        # Owner decision (5 Nov 2026): any Jamendo track may be used, always credited; the licence is not a filter.
         try:
             f = features(r["id"], a.outdir)
         except Exception as e:
@@ -305,7 +302,7 @@ def main():
         print(f"{x['id']:>8}  score {x['score']:.3f}  start {x['offset']:5.1f}s  curve {x['curve_corr']:+.2f}  "
               f"{x['bpm']:5.1f} BPM  LRA {x['lra']:4.1f}  {'LOOPS ' if x['loops'] else ''}{' '.join(x['moods'][:6])}")
     if not rows:
-        sys.exit("no candidate with a CC BY / CC BY-SA licence; loosen 'want' or raise --top")
+        sys.exit("no candidate could be measured; loosen 'want' or raise --top")
     pick = rows[0]
     pick["source"] = f"https://www.jamendo.com/track/{pick['id']}"
     if a.out:

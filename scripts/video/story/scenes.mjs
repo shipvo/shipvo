@@ -28,7 +28,21 @@ export const shotAt = (t) => SHOTS.find((s) => t >= s.t0 && t < s.t1) || SHOTS[S
 
 const BROWN = "#2b1d24";
 const wrap = (id, t, body, blur = 0) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720"><rect width="1280" height="720" fill="#2a2140"/>${motionBlur(id + "mb", blur, body)}${vignette(id + "v")}${grain(id + "g", t, { fps: FPS })}</svg>`;
+  `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720"><rect width="1280" height="720" fill="#2a2140"/>${motionBlur(id + "mb", blur, body)}${vignette(id + "v")}${grain(id + "g", t, { fps: FPS })}${subtitle(t)}</svg>`;
+
+/** Voices recorded by dialogue.py: mouth levels per frame and the lines (start, end, who, text). Set before rendering. */
+let LINES = [];
+const NAMES = { mara: "Mara", jun: "Jun", dana: "Dana", pip: "Pip" };
+export function setDialogue({ mouth = {}, lines = [] } = {}) {
+  LINES = lines;
+  for (const [who, c] of Object.entries({ mara, jun, dana, pip })) c.mouthFn = mouth[who] ? (t) => mouth[who][Math.round(t * FPS)] ?? 0 : null;
+}
+/** The line being spoken, burned into the picture so the film works on mute. */
+function subtitle(t) {
+  const l = LINES.find((x) => t >= x.start && t <= x.end + .25);
+  if (!l) return "";
+  return `<g><rect x="340" y="656" width="600" height="46" rx="14" fill="#0b1f3a" opacity=".82"/><text x="640" y="688" text-anchor="middle" font-family="system-ui,sans-serif" font-size="26" fill="#fff"><tspan fill="#7fb2ff" font-weight="700">${NAMES[l.who] || l.who}: </tspan>${l.text}</text></g>`;
+}
 
 /** A walker: simple silhouette with a phone in hand, bobbing as it walks. */
 function walker(x, y, t, { color, hair, scale = 1, flip = false }) {
@@ -69,12 +83,14 @@ export function street(t) {
 
 const mara = createCharacter(CAST.mara, { seed: 1 });
 mara.pose("idle", { at: 5 }).expression("sad", { at: 5.5 }).lookAt(.5, .2, { at: 5.5 }).lookAt(-.6, 0, { at: 9 }).lookAt(.6, .1, { at: 12 });
-mara.pose("talk", { at: 9.2 }).say("Nobody comes in.", { at: 9.4 });
+mara.pose("talk", { at: 9.2 });
 mara.expression("worried", { at: 10.5 });
 
 /** 5 to 14 s: Mara at an empty counter. Push-in on her face. */
 export function counter(t) {
-  const camera = cameraAt([{ type: "pushIn", t0: 5, t1: 14, from: 1, to: 1.45, x: 460, y: 300 }], t);
+  const camera = cameraAt([ // hard cuts at 7.4 (close on her face) and 10.4 (the empty shelf of products)
+    { type: "pushIn", t0: 5, t1: 7.4, from: 1, to: 1.15, x: 520, y: 340 }, { type: "pushIn", t0: 7.4, t1: 10.4, from: 1.5, to: 1.7, x: 380, y: 230 },
+    { type: "pushIn", t0: 10.4, t1: 14, from: 1.25, to: 1.4, x: 900, y: 380 }], t);
   const bg = sky("csky", "golden") + `<rect width="1280" height="720" fill="#c98a4b" opacity=".35"/>`
     + `<rect y="470" width="1280" height="250" fill="#5a3a2a"/>`
     + [0, 1, 2].map((i) => `<rect x="${140 + i * 380}" y="100" width="240" height="260" rx="10" fill="#ffe2a8" stroke="${BROWN}" stroke-width="6"/>`).join("")
@@ -90,7 +106,18 @@ export function counter(t) {
 /** 14 to 22 s: a customer reads their phone at the window, then walks away. Whip-pan out. */
 export function walkaway(t) {
   const wp = whipPan(t, { t0: 14, t1: 14.5, from: { x: 1000, y: 360 }, to: { x: 640, y: 360 } });
-  const camera = cameraAt([{ type: "pushIn", t0: 14.5, t1: 22, from: 1, to: 1.2, x: 620, y: 340 }], t, wp);
+  const camera = cameraAt([ // hard cuts at 17.5 (close on the customer) and 20 (wide, she leaves)
+    { type: "pushIn", t0: 14.5, t1: 17.5, from: 1, to: 1.1, x: 620, y: 340 }, { type: "pushIn", t0: 17.5, t1: 20, from: 1.8, to: 1.95, x: 580, y: 360 },
+    { type: "pushIn", t0: 20, t1: 22, from: 1.1, to: 1.2, x: 760, y: 340 }], t, wp);
+  if (t >= 17.5 && t < 20) { // insert: what she sees on her phone
+    const k = progress(t, 17.5, 20, EASE.inOutCubic), z = 1 + .06 * k;
+    return wrap("wa", t, `<rect width="1280" height="720" fill="#0b1f3a"/>${glow("wig", 640, 360, 520, "#7fb2ff", .25)}
+      <g transform="translate(640 360) scale(${f(z)}) translate(-640 -360)"><rect x="440" y="40" width="400" height="640" rx="44" fill="#10202f" stroke="${BROWN}" stroke-width="6"/>
+      <rect x="458" y="70" width="364" height="580" rx="30" fill="#eaf4ff"/>
+      <text x="640" y="150" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="700" font-size="26" fill="#0b1f3a">Tide &amp; Tackle</text>
+      <rect x="490" y="190" width="300" height="70" rx="16" fill="#d9dfe8"/><text x="640" y="235" text-anchor="middle" font-family="system-ui,sans-serif" font-size="24" fill="#5b6678">No app. Call to order.</text>
+      <rect x="490" y="290" width="300" height="70" rx="16" fill="#ff8a3d" opacity="${f(.3 + .7 * Math.abs(Math.sin(t * 5)))}"/><text x="640" y="335" text-anchor="middle" font-family="system-ui,sans-serif" font-size="24" fill="#fff" font-weight="700">Closed</text></g>`);
+  }
   const away = progress(t, 18.5, 22, EASE.inOutCubic);
   const x = 560 + away * 900;
   const bg = sky("wsky", "golden") + glow("wsun", 1000, 200, 380, "#ffd37a", .6) + shopFront(false);
@@ -117,14 +144,14 @@ function caption(text, t, t0) {
 }
 
 const jun = createCharacter(CAST.jun, { seed: 2 });
-jun.pose("lean", { at: 22 }).expression("worried", { at: 22 }).lookAt(.6, .1, { at: 22 }).say("Wait, I can fix that.", { at: 22.4 });
+jun.pose("lean", { at: 22 }).expression("worried", { at: 22 }).lookAt(.6, .1, { at: 22 });
 jun.expression("determined", { at: 24.2 }).pose("talk", { at: 24.2 }).gesture("point", { at: 25, dur: 1.2 }).lookAt(.9, .2, { at: 26 });
 jun.expression("happy", { at: 29.5 });
 mara.pose("idle", { at: 32 }).expression("surprised", { at: 38 }).lookAt(-.4, .3, { at: 36 }).expression("relieved", { at: 41 });
 const dana = createCharacter(CAST.dana, { seed: 3 });
 const pip = createCharacter(CAST.pip, { seed: 4 });
-pip.expression("happy", { at: 44 }).say("Found it. Ordering now.", { at: 44.4 });
-dana.pose("idle", { at: 44 }).expression("neutral", { at: 44 }).lookAt(.7, .1, { at: 44 }).expression("surprised", { at: 53 }).pose("cheer", { at: 53.2 }).say("Whoa, that was quick.", { at: 53.4 });
+pip.expression("happy", { at: 44 });
+dana.pose("idle", { at: 44 }).expression("neutral", { at: 44 }).lookAt(.7, .1, { at: 44 }).expression("surprised", { at: 53 }).pose("cheer", { at: 53.2 });
 
 const TYPED = "Make my shop an app every assistant can use.";
 const bubble = (x, y, w, text, fill, ink, op = 1) => `<g opacity="${f(op)}"><rect x="${x}" y="${y}" width="${w}" height="64" rx="22" fill="${fill}"/><text x="${x + 22}" y="${y + 40}" font-family="system-ui,sans-serif" font-size="22" fill="${ink}">${text}</text></g>`;
@@ -177,9 +204,7 @@ export function order(t) {
 }
 
 mara.expression("surprised", { at: 61 }).lookAt(.8, 0, { at: 61 }).pose("lean", { at: 66 });
-mara.say("Another one?", { at: 62 }); mara.say("Three orders!", { at: 68.5 });
 mara.expression("relieved", { at: 78 }).pose("idle", { at: 78 }).lookAt(.5, .2, { at: 78 });
-pip.say("All done.", { at: 74.4 });
 
 /** 60 to 76 s: the rush. Cuts between Mara and the phone as three orders land (real recording, 1.25x). */
 export function rush(t) {
@@ -197,7 +222,9 @@ export function rush(t) {
 
 /** 76 to 90 s: the orders list fills on the phone, Mara relieved. Push-in. Caption 3 at 78 s. */
 export function list(t) {
-  const camera = cameraAt([{ type: "pushIn", t0: 76, t1: 83, from: 1, to: 1.25, x: 640, y: 380 }, { type: "pushIn", t0: 83, t1: 90, from: 1.3, to: 1.55, x: 330, y: 300 }], t);
+  const camera = cameraAt([ // hard cuts at 79.5 (the list), 83 (Mara), 86.5 (the list again)
+    { type: "pushIn", t0: 76, t1: 79.5, from: 1, to: 1.12, x: 640, y: 380 }, { type: "pushIn", t0: 79.5, t1: 83, from: 1.7, to: 1.85, x: 900, y: 260 },
+    { type: "pushIn", t0: 83, t1: 86.5, from: 1.3, to: 1.45, x: 330, y: 300 }, { type: "pushIn", t0: 86.5, t1: 90, from: 1.6, to: 1.8, x: 900, y: 420 }], t);
   const bg = sky("lisky", "golden") + `<rect y="470" width="1280" height="250" fill="#5a3a2a"/>` + glow("lig", 760, 360, 420, "#ffd37a", .4);
   const ph = phone(700, 40, .66, "rush", 20.6 + Math.min(t - 76, 6));
   const fg = mara.render(t, { x: 120, y: 120, scale: .9 });
