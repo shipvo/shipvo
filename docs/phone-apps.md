@@ -184,6 +184,9 @@ The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action in
 | `app_not_foreground` | The home screen or switcher is showing | Call `resume_app` |
 | `phone_locked` | The phone is locked | Call `unlock` |
 | The Secrets screen is empty | No key is saved for the apps on this phone, or the simulator cannot reach the saved-key routes | Save a key for an app first; check that the simulator is running |
+| `bad_placement` from `arrange_apps` | A field is unknown, `position` is not a whole number from 0 to 99, or `days`, `from` or `to` is not valid | Use `pinned`, `hidden`, `position` and `schedule`; days are `sun` to `sat` and times look like `09:00` |
+| `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
+| A scheduled app is missing from the home screen | Its schedule is not active at the phone's clock | Read the home text, which says when it starts; call `set_phone_time`, or `switch_app` still opens it |
 | `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
 
 ## Next steps

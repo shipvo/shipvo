@@ -1,1 +1,0 @@
-- docs: the App spec page covers `refresh` on data sources and the example spec gallery, with troubleshooting. Glossary and content ledger updated.
