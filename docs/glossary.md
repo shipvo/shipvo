@@ -59,7 +59,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Policy.** Rules you write in `shipvo.json` about releases, such as no publishing on Fridays (`blockedWeekdays`) or after 3pm (`blockedAfterHour`). `shipvo publish --dry-run` checks them, and the control plane enforces them on every real publish.
 
-**Rollback.** Sending people back to the last good release. If the newer release changed how the app saves data on the phone, Shipvo stops the rollback and tells you; see [Rollbacks and stored data](rollbacks-and-stored-data.md).
+**Rollback.** Sending people back to the last good release.
 
 **Parquet.** A file format for tables of data. Tools such as DuckDB read it, so you can ask questions about your releases with SQL.
 
