@@ -33,7 +33,7 @@
     if (!window.matchMedia("(max-width:800px)").matches) return;
     var r = phone.getBoundingClientRect();
     if (r.top >= 0 && r.bottom <= window.innerHeight) return;
-    try { phone.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) { phone.scrollIntoView(); }
+    try { phone.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" }); } catch (e) { phone.scrollIntoView(); }
   }
   function deviceControls(panel) {
     var result = document.createElement("p"); result.className = "pg-result"; result.id = "pg-result"; result.setAttribute("role", "status"); result.setAttribute("aria-live", "polite"); result.textContent = "Pick an option to change the phone.";
