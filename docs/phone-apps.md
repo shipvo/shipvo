@@ -70,6 +70,8 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 
 ## Describe an app and it appears
 
+For a step-by-step walkthrough, see [Describe an app](describe-an-app.md).
+
 `create_app { session, id, spec }` takes an app spec ([app spec](design/app-spec.md), `shipvo.app/v0`), checks it, and puts the app on the phone. A spec with problems is refused with `invalid_spec`: every problem comes back with its path in the spec and a fix, and nothing is installed. A valid spec gets an icon on the home screen and opens (pass `open: false` to stay where you are). Pass `style: "ios"` for the iPhone look; the default is Android.
 
 The app is real HTML with every control labelled, so `screen`, `tap`, `type` and `scroll` work on it like any app. Lists, forms, toggles, segmented controls and tabs react to taps and typing. `run_app_action { session, id, action, input }` runs one action of the spec by name, the way its form does, and the open screen shows the result. If the action refuses the input you get `action_failed` and the reason.
