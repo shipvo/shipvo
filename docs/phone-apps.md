@@ -118,6 +118,14 @@ Any spec app can turn a collection into CSV with the `csv()` function. Return it
 
 The first line holds the column names. Fields with commas, quotes or line breaks are quoted, and lists such as tags are joined with `; `. Leave the column list out to export every field. Spreadsheets treat a cell that starts with `=`, `+`, `-` or `@` as a formula. For text that other people typed, map the field first, for example `data.entries.map(r, {'note': has(r.note) && r.note.startsWith('=') ? "'" + r.note : (has(r.note) ? r.note : '')})`, then pass that list to `csv()`.
 
+## Save as a file
+
+A `saveFile` step keeps text as a named file on the phone. It needs the `files` device permission, on Android and iOS alike. Saving again with the same name replaces the file.
+
+```json
+{ "actions": { "save_diary": { "description": "Save the diary as diary.csv.", "input": {}, "do": [ { "saveFile": "diary.csv", "content": "{{ csv(data.entries, ['date', 'title']) }}", "mime": "text/csv" }, { "toast": "Saved diary.csv" } ] } } }
+```
+
 ## Import data from CSV
 
 `parseCsv(text)` is the other direction. It reads CSV text into a list of maps keyed by the header row, on Android and iOS alike. Quoted fields, CRLF or LF line ends and a leading byte order mark are read, and blank lines are skipped. Every value is text. A row with fewer cells than the header gets empty values.
