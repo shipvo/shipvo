@@ -80,14 +80,19 @@ export function watchAndRebuild(opts: { dir: string; build: () => Promise<void>;
   return stop;
 }
 
+/** Arguments for `npx`: the web export. The first build clears the Metro cache; warm rebuilds keep it. */
+export function expoExportArgs(outDir: string, warm = false): string[] {
+  return ["expo", "export", "--platform", "web", ...(warm ? [] : ["--clear"]), "--output-dir", outDir];
+}
+
 /**
  * Builds into `<root>/.shipvo/sim-next` and swaps it into `<root>/sim-dist` only if the build succeeds.
  * The old build is moved aside first and moved back if the swap fails.
- * `reuseCache` keeps the Metro cache between builds, so a small edit rebuilds fast. Without it the cache is cleared first.
  * `command` is the shell command; it gets the output dir as its last argument.
+ * With `warm` the default command keeps the Metro cache, so a small edit only re-transforms the changed file.
  * A failed build rejects with an Error whose `output` property holds the last 4000 characters of stdout and stderr.
  */
-export function rebuildInto(opts: { root?: string; command?: string; echo?: boolean; reuseCache?: boolean } = {}): Promise<void> {
+export function rebuildInto(opts: { root?: string; command?: string; echo?: boolean; warm?: boolean } = {}): Promise<void> {
   const root = opts.root ?? process.cwd();
   const next = join(root, ".shipvo", "sim-next"), live = join(root, "sim-dist"), prev = join(root, ".shipvo", "sim-prev");
   return new Promise((resolve, reject) => {
@@ -96,7 +101,7 @@ export function rebuildInto(opts: { root?: string; command?: string; echo?: bool
     // A custom command is a shell string. The default goes through spawnBin so Windows runs npx.cmd.
     const call = opts.command
       ? { command: `${opts.command} "${next}"`, args: [] as string[], shell: true }
-      : spawnBin("npx", ["expo", "export", "--platform", "web", ...(opts.reuseCache ? [] : ["--clear"]), "--output-dir", next]);
+      : spawnBin("npx", expoExportArgs(next, opts.warm));
     const p = spawn(call.command, call.args, { cwd: root, shell: call.shell, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "pipe", "pipe"] });
     let tail = "";
     // Metro and Expo print resolve errors to either stream, so keep both. `echo` also shows them.
@@ -180,7 +185,7 @@ async function simRun(argv: string[], json: boolean): Promise<Done | void> {
     console.error(`Watch the agent: ${watchUrl}`);
     if (shouldOpenWatch({ noOpen: a["no-open"] === "true", json })) openBrowser(watchUrl);
     if (a.watch === "true") {
-      watchAndRebuild({ dir: process.cwd(), build: () => rebuildInto({ reuseCache: true }), verbose: a.verbose === "true" });
+      watchAndRebuild({ dir: process.cwd(), build: () => rebuildInto({ warm: true }), verbose: a.verbose === "true" });
       console.error("Watching for changes (ignoring node_modules, sim-dist, .shipvo, .expo, dist, dist-ota, web-build, ios, android)");
     }
     if (json) return { code: "listening", summary: `Simulator on http://localhost:${port}/app/`, data: { url: `http://localhost:${port}/app/`, port: Number(port), app_id: cfg.appId, watch_url: watchUrl, watch: a.watch === "true" }, next: [{ command: `shipvo explore --json --sim http://localhost:${port}`, why: "Walk the app in the running simulator." }, { command: "shipvo test --json", why: "Run the app's tests." }] };

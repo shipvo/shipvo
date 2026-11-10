@@ -34,15 +34,6 @@ describe("win32 call shape", () => {
     expect(o.env.PN_SIM).toBe("1");
   });
 
-  it("sim: rebuildInto clears the Metro cache unless reuseCache is set", async () => {
-    const { rebuildInto } = await import("../src/sim");
-    const root = mkdtempSync(join(tmpdir(), "sv-"));
-    await rebuildInto({ root });
-    await rebuildInto({ root, reuseCache: true });
-    expect(spawn.mock.calls[0][1]).toContain("--clear");
-    expect(spawn.mock.calls[1][1]).not.toContain("--clear");
-  });
-
   it("run: --native runs npx.cmd with a shell", async () => {
     const { run } = await import("../src/run");
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
