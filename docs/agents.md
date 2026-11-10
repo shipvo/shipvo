@@ -278,6 +278,8 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 
 **A tool answers `{ "status": "running", "job": … }`.** Nothing failed. The work (a preview or a build upload) takes longer than the wait. Ask the assistant to call `job_status` with that `job`. Calling the same tool again returns the same job, so it never starts a second publish. Another key gets `job_not_found`, and a job is kept for 15 minutes after it finishes.
 
+**A tap or scroll fails with `stale_ref` after the phone restarted.** Refs from before a restart are gone. Read the screen again with `screen`. The new refs look like `f1e2` and work in `tap`, `type`, `scroll` and `wait_for`, on Android and iOS.
+
 **The assistant cannot find a button.** The tree only lists what a person could see and touch (see [What the tree shows](#what-the-tree-shows-and-hides-on-purpose)). Ask the assistant to read the screen again after the app finishes loading, and check that the button has a label.
 
 **The `watch_url` shows an error or does not load.** The link is valid for one hour, for one session. Call `open_app` again for a new one. If there is no `watch_url` in the reply, you are on a local simulator; open `/watch` there instead.

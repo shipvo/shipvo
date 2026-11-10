@@ -85,6 +85,10 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: Spec apps export a list as CSV with `csv(rows, columns?)` ([Export data as CSV](spec-blocks.md#export-data-as-csv), #1458)
+- 2026-11-10: After a phone restart, `tap`, `type`, `scroll` and `wait_for` accept the new refs such as `f1e2` ([Agents](agents.md#troubleshooting), #1459)
+- 2026-11-10: On Android, an update patch that would use too much memory falls back to the full download ([Runtime](../packages/runtime/README.md), #1454)
+- 2026-11-10: `shipvo rollback` refuses to send phones to an older stored-data format unless you allow it ([Rollbacks and stored data](rollbacks-and-stored-data.md), #1442)
 - 2026-11-10: A page for founders and developers on describing an app and watching it appear, with a checked example spec and troubleshooting ([Describe an app](describe-an-app.md))
 - 2026-11-10: Revoke a saved key from the Secrets screen, and the gallery grows to five example specs ([Revoke](phone-apps.md#see-saved-keys-in-settings), [Example specs](spec-blocks.md#example-specs), #1388, #1385)
 - 2026-11-10: `shipvo keys root` creates the offline root key for key rotation ([Key rotation](key-rotation.md), #1417)
