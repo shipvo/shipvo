@@ -99,6 +99,8 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Job handles for slow tools (`job_status`, `wait_ms` on `publish_preview` and `upload_build`) | [agents](agents.md#slow-tools-and-job_status), [cli](cli.md), [mcp](../packages/mcp/README.md) | | | |
 | W3C `traceparent` recorded from tool calls | [agents](agents.md#trace-context) | | | |
 | Saved-key routes: list, rotate, revoke and use log (`/vault/keys`, `/vault-ui/*` in the simulator) | [self-hosting](self-hosting.md#saved-key-routes-vault) | | | |
+| Key rotation: `shipvo keys root`, `keys rotate sign` and `upload` | [key-rotation](key-rotation.md) | | | |
+| Per-app device permissions on the install card (`set_app_permission`) | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
 | Key rotations in the pointer response (`rotations`) | [self-hosting](self-hosting.md#pointer-response-and-key-rotations) | | | |
 | Pin and hide apps on the home screen (`pin_app`, `hide_app`) | [phone-apps](phone-apps.md) | | | [test-an-app-on-a-phone-with-a-store-and-other-apps](../blog/test-an-app-on-a-phone-with-a-store-and-other-apps.md) |
 | Arrange the home screen (`arrange_apps`, schedules, `set_phone_time`) | [phone-apps](phone-apps.md) | | | [test-an-app-on-a-phone-with-a-store-and-other-apps](../blog/test-an-app-on-a-phone-with-a-store-and-other-apps.md) |

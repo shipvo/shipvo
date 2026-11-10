@@ -87,6 +87,8 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 
 - 2026-11-10: Playground Many phones (1 to 12 Android and iOS phones) with a shareable link and Copy link, and an Agent panel with a tool console and Watch Lumi ([Playground](playground.md), #1323, #1335, #1290)
 - 2026-11-10: Network profile tools, `setNetwork` in the test API and `network` in phone.json ([Phone network](phone-network.md), #1338)
+- 2026-11-10: `shipvo keys root` creates the offline root key for key rotation ([Key rotation](key-rotation.md), #1417)
+- 2026-11-10: The Store install card lists each device permission an app declares, with Allow and Deny ([Phone apps](phone-apps.md#device-permissions-per-app), #1356)
 - 2026-11-10: `room_log` and `room_note` let a lead agent see what the other agents in a room did and leave notes for them ([Agents](agents.md#room-log-and-notes), #1419)
 - 2026-11-10: Exported phone apps carry their home-screen layout, and `import_phone_apps` warns about each invalid layout field ([Phone apps](phone-apps.md), #1401)
 - 2026-11-10: `app_activity` shows what the agent built and changed in each spec app, `refresh_app` fetches a data source now, and `schedule_app` shows or hides an app on a time window ([Phone apps](phone-apps.md#see-what-was-built-and-changed), #1396, #1379, #1357)
