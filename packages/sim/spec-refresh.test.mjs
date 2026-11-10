@@ -1,7 +1,7 @@
 // A spec data source with `refresh` runs again on its interval while the app is installed, with no tap and no model call.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { SpecHost } from "./spec-host.mjs";
+import { SpecHost, guardedFetch, isPrivateAddress } from "./spec-host.mjs";
 import { validate } from "../spec/dist/index.js";
 
 const spec = (extra = {}) => ({
@@ -136,4 +136,39 @@ test("the page script leaves an unchanged page alone and swaps it when data chan
   assert.deepEqual(scrolled, [120], "scroll position is kept");
   poll(); await new Promise((r) => setImmediate(r));
   assert.equal(swaps, 1, "no second rebuild without new data");
+});
+
+test("the default fetch refuses loopback, private and link-local hosts", async () => {
+  let reached = 0;
+  const f = guardedFetch({ lookup: async (h) => [{ address: h === "sneaky.example.com" ? "10.0.0.5" : "93.184.216.34" }], fetchImpl: async () => { reached++; return { ok: true }; } });
+  for (const u of ["http://localhost/x", "http://127.0.0.1/x", "http://169.254.169.254/latest", "http://10.1.2.3/x", "http://[::1]/x", "http://[::ffff:127.0.0.1]/x", "https://sneaky.example.com/x", "file:///etc/passwd"]) {
+    await assert.rejects(() => f(u), undefined, u);
+  }
+  assert.equal(reached, 0);
+  assert.equal(isPrivateAddress("93.184.216.34"), false);
+  await f("https://api.example.com/p");
+  assert.equal(reached, 1);
+});
+
+test("the default fetch does not follow redirects and passes a timeout signal", async () => {
+  let seen;
+  const f = guardedFetch({ lookup: async () => [{ address: "93.184.216.34" }], fetchImpl: async (_u, init) => { seen = init; return {}; } });
+  await f("https://api.example.com/p");
+  assert.equal(seen.redirect, "manual");
+  assert.ok(seen.signal instanceof AbortSignal);
+});
+
+test("a hung request that times out does not stop later ticks refreshing", async () => {
+  const f = guardedFetch({ lookup: async () => [{ address: "93.184.216.34" }], timeoutMs: 20, fetchImpl: async (_u, init) => { if (hang) return new Promise((_, rej) => init.signal.addEventListener("abort", () => rej(new Error("timeout")))); return { ok: true, status: 200, text: async () => JSON.stringify({ price: 99 }) }; } });
+  const keep = setTimeout(() => {}, 1000); // AbortSignal.timeout does not hold the event loop open
+  let hang = true;
+  const timers = [];
+  const host = new SpecHost({ timers: { setInterval: (fn) => { const t = { fn }; timers.push(t); return t; }, clearInterval() {} }, context: () => ({ fetch: f, secrets: () => undefined }) });
+  host.create("s", "app", spec());
+  await timers[0].fn(); // hangs, then aborts after 20 ms
+  assert.doesNotMatch(JSON.stringify(host.tree("s", "app")), /Price 99/);
+  hang = false;
+  await timers[0].fn();
+  assert.match(JSON.stringify(host.tree("s", "app")), /Price 99/);
+  clearTimeout(keep);
 });

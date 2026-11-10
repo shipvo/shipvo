@@ -2,9 +2,41 @@
 // app per phone and app id, renders its screen as a page the phone shows, and applies the taps, typing and choices
 // that page sends back. The page is real HTML with labelled controls, so the screen and tap tools work on it as on any app.
 import { createHash } from "node:crypto";
+import { lookup as dnsLookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { createApp, runSource, memoryCache } from "@shipvo/spec";
 
 const REFRESH_POLL_MS = 5000;
+const FETCH_TIMEOUT_MS = 15000;
+
+/** True for loopback, private, link-local, unspecified and other non-public addresses (IPv4 and IPv6). */
+export function isPrivateAddress(ip) {
+  const v = ip.toLowerCase();
+  const m4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v);
+  if (m4) return isPrivateAddress(m4[1]);
+  if (isIP(v) === 4) {
+    const [a, b] = v.split(".").map(Number);
+    return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || a >= 224;
+  }
+  if (isIP(v) === 6) return v === "::" || v === "::1" || /^f[cd]/.test(v) || /^fe[89ab]/.test(v) || v.startsWith("ff");
+  return true;
+}
+
+/**
+ * The fetch a refresh uses by default: public http(s) hosts only (every resolved address is checked), no redirects
+ * followed, and a timeout so one hung request cannot stop later refreshes. `lookup` can be replaced in tests.
+ */
+export function guardedFetch({ lookup = (h) => dnsLookup(h, { all: true }), fetchImpl = fetch, timeoutMs = FETCH_TIMEOUT_MS } = {}) {
+  return async (url, init = {}) => {
+    const u = new URL(String(url));
+    if (u.protocol !== "https:" && u.protocol !== "http:") throw new Error("Only http and https URLs can be fetched");
+    const host = u.hostname.replace(/^\[|\]$/g, "");
+    if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal")) throw new Error(`Refused: ${host} is not a public host`);
+    const addrs = isIP(host) ? [{ address: host }] : await lookup(host);
+    if (!addrs.length || addrs.some((a) => isPrivateAddress(a.address))) throw new Error(`Refused: ${host} is not a public host`);
+    return fetchImpl(u, { ...init, redirect: "manual", signal: AbortSignal.timeout(timeoutMs) });
+  };
+}
 
 /** The script the page runs. Controls are found by their role and accessible name, as an agent finds them. */
 export const HOST_SCRIPT = `(function(){
@@ -61,7 +93,8 @@ export class SpecHost {
     this.running = new Map();
     this.timers = timers;
     this.cache = memoryCache();
-    this.context = context ?? (() => ({ fetch: (url, init) => fetch(url, init), secrets: () => ({ refused: "unavailable" }), cache: this.cache }));
+    this.guarded = guardedFetch();
+    this.context = context ?? (() => ({ fetch: this.guarded, secrets: () => ({ refused: "unavailable" }), cache: this.cache }));
     this.refreshing = new Map();
   }
 
