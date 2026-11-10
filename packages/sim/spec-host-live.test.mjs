@@ -254,3 +254,16 @@ test("import_apps with a bad spec installs nothing and lists every problem with 
   assert.match(r.error, /apps\[1\]\.spec/); assert.match(r.error, /apps\[2\]\.id/); assert.match(r.error, /apps\[3\]\.spec/);
   assert.deepEqual((await act("ex-bad", { action: "export_apps" })).apps, []);
 });
+
+test("refresh_app on a spec app answers with what changed and logs data_refresh; an unknown app says not_installed", async () => {
+  assert.ok((await call("/session", { session: "sp-ref" })).ok);
+  assert.equal((await act("sp-ref", { action: "create_app", id: "gifts", spec: GIFTS })).ok, true);
+  const r = await act("sp-ref", { action: "refresh_app", id: "gifts" });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.deepEqual(r.updated, []);
+  assert.deepEqual(r.errors, []);
+  assert.match(r.screen, /Scarf/);
+  const log = (await act("sp-ref", { action: "device_log" })).log.find((e) => e.name === "data_refresh");
+  assert.equal(log.app, "gifts");
+  assert.equal((await act("sp-ref", { action: "refresh_app", id: "ghost" })).code, "not_installed");
+});

@@ -110,3 +110,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Hosted `open_app` returns `watch_url` (read-only live link, Take over for the key's owner) | [agents](agents.md#watch-the-agents-phone) | | | |
 | Faster rebuild after a save in `shipvo run` and `shipvo sim --watch` | [run](run.md#edit-and-save-the-phone-updates) | | | |
 | Arrange the home screen (`arrange_apps`, `set_phone_time`) and the `/phone` frame page | [phone-apps](phone-apps.md) | | | |
+| Arrange the home screen and set the phone clock (`arrange_apps`, `set_phone_time`) | [phone-apps](phone-apps.md) | | | |
+| Phone frame page `/phone?session=` with Store and installed apps | [phone-apps](phone-apps.md) | | | |
+| Watch link on the hosted phone (`watch_url`, read-only, sign in to take over) | [agents](agents.md#watch-link-on-the-hosted-phone) | | | |
+| Hosted MCP sign-in with URL client ids (Client ID Metadata Documents) | [agents](agents.md) | | | |

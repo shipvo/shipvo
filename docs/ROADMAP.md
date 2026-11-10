@@ -83,7 +83,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
 - 2026-11-10: Data sources refresh on an interval while an app is installed (`refresh`), the `/phone` frame page, `arrange_apps` and `set_phone_time`, and faster rebuilds after a save in `shipvo run` ([App spec](spec-blocks.md#data-that-refreshes), [Phone apps](phone-apps.md), [Run](run.md), #1351, #1337, #1349, #1367)
-- 2026-11-09: Hosted `open_app` returns `watch_url` to watch the phone live ([Agents](agents.md#watch-the-agents-phone), #1277)
+- 2026-11-10: Watch link on the hosted phone: `open_app` returns a read-only `watch_url` ([Agents](agents.md#watch-link-on-the-hosted-phone), #1277)
 - 2026-11-10: Spec `calendar` and `map` blocks, the Secrets screen in phone Settings, and opening a build from a `build_url` ([App spec](spec-blocks.md#calendars-and-maps), [Phone apps](phone-apps.md#see-saved-keys-in-settings), [Test your build](test-your-build.md#open-a-build-from-a-link), #1353, #1350, #1287)
 - 2026-11-10: Playground Many phones: 1 to 12 Android and iOS phones with a shareable link ([Getting started](getting-started.md#try-it-in-your-browser-first), #1323, #1335)
 - 2026-11-10: Secrets screen in the phone's Settings lists saved keys, metadata only ([Phone apps](phone-apps.md#see-saved-keys-in-settings), #1350)
