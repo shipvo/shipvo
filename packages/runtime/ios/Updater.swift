@@ -31,6 +31,9 @@ enum Updater {
     return Int(ProcessInfo.processInfo.physicalMemory)
     #endif
   }
+  private static func fileSize(_ path: String) -> Int? {
+    (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int
+  }
   private static func require(_ cond: Bool, _ msg: @autoclosure () -> String) throws { if !cond { throw UpdateError(msg()) } }
 
   private static func request(_ url: String, etag: String?) throws -> URLRequest {
@@ -105,7 +108,7 @@ enum Updater {
     do {
       downloadedBytes = try await patched(s, core: core, wantSha: wantSha, wantSize: wantSize, to: tmp)
       ready = true; via = "patch"
-    } catch { patchError = (error as? UpdateError)?.message ?? "\(error)" }
+    } catch let e as UpdateError where e.message == overBudget { patchError = overBudget } catch {}
     var downloadMs = (Store.now() - d0) * 1000
     var resumedFrom = 0
     if !ready {
@@ -128,7 +131,7 @@ enum Updater {
     try FileManager.default.moveItem(at: tmp, to: dest)
     stage(s, dest: dest, release: release, sha: wantSha, issuedAt: body["issued_at"] as? String)
     return ["status": "staged", "release": release, "bytes": downloadedBytes, "via": via, "bundleBytes": size,
-            "patchError": patchError as Any,
+            "patchError": patchError ?? NSNull(),
             "downloadMs": Int(downloadMs), "verifyMs": Int(verifyMs), "issuedAt": body["issued_at"] as? String ?? ""]
   }
 
@@ -185,8 +188,8 @@ enum Updater {
           let purl = entry["url"] as? String, let psha = entry["sha256"] as? String, let psize = (entry["size"] as? NSNumber)?.intValue,
           psize > 0, psize < wantSize else { throw UpdateError("no usable patch") }
     // Memory guard: decide from file sizes alone, before the patch or the base is read, so nothing is allocated when over budget.
-    let baseSize: Int? = baseFile != nil ? (try? FileManager.default.attributesOfItem(atPath: baseFile!)[.size] as? Int) ?? nil
-      : s.appBundle.url(forResource: "main", withExtension: "jsbundle").flatMap { (try? FileManager.default.attributesOfItem(atPath: $0.path)[.size] as? Int) ?? nil }
+    let basePath = baseFile ?? s.appBundle.url(forResource: "main", withExtension: "jsbundle")?.path
+    guard let baseSize = basePath.flatMap({ fileSize($0) }) else { throw UpdateError("no base bundle") }
     if patchDecision(baseSize: baseSize, patchSize: psize, newSize: wantSize, availableBytes: availableMemory()) == .skip {
       s.addEvent("patch_failed"); throw UpdateError(overBudget)
     }

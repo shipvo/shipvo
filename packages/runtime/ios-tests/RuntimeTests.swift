@@ -133,6 +133,14 @@ final class RuntimeTests: XCTestCase {
     XCTAssertTrue(s.consumeEvents().contains("patch_failed"))
   }
 
+  func testFullOnlyUpdateHasNoPatchError() async throws {
+    let s = try storeRunningRelease5("bad-patch")
+    let r = try await Updater.check(s)
+    XCTAssertEqual(r["via"] as? String, "full")
+    XCTAssertNil(r["patchError"] as? String)
+    XCTAssertTrue(r["patchError"] is NSNull)
+  }
+
   // MARK: resumed downloads
 
   private func bundleBytes() throws -> Data { try Data(contentsOf: URL(string: "\(base)/b/good/ios-r5.hbc")!) }
