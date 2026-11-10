@@ -233,3 +233,17 @@ test("biometrics: every nextResult value set through __pnDevice reaches the app 
   }
   dev.reset();
 });
+
+test("the clipboard is kept in sessionStorage so it outlives a page load, and reset clears it", async () => {
+  const store = new Map();
+  globalThis.sessionStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)) };
+  try {
+    dev.reset();
+    await device.clipboard.set("Order the lamps");
+    assert.equal(store.get("pn.clipboard"), "Order the lamps");
+    dev.set({ clipboard: "from the agent" });
+    assert.equal(store.get("pn.clipboard"), "from the agent");
+    dev.reset();
+    assert.equal(store.get("pn.clipboard"), "");
+  } finally { delete globalThis.sessionStorage; }
+});

@@ -141,4 +141,37 @@ describe("wake-up tools", () => {
     expect(JSON.parse(k.content[0].text)).toEqual({ cleared: true });
     await c.close(); srv.close();
   }, 30000);
+
+  it("share, share_targets and the clipboard tools pass their input on", async () => {
+    const seen: any[] = [];
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      if (body.action === "share_targets") return res.end(JSON.stringify({ ok: true, targets: [{ app: "notes", action: "add_note", field: "body" }] }));
+      if (body.action === "share") return res.end(JSON.stringify(body.to === "shop" ? { ok: false, code: "not_a_share_target", error: "'shop' takes no shared text" } : { ok: true, shared: { app: body.to, action: "add_note" }, value: { id: "n1" } }));
+      res.end(JSON.stringify({ ok: true, text: body.text ?? "copied" }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const names = (await c.listTools()).tools.map((t) => t.name);
+    for (const n of ["share", "share_targets", "get_clipboard", "set_clipboard"]) expect(names).toContain(n);
+    const tg: any = await c.callTool({ name: "share_targets", arguments: { session: "s" } });
+    expect(JSON.parse(tg.content[0].text).targets[0].app).toBe("notes");
+    const sh: any = await c.callTool({ name: "share", arguments: { session: "s", to: "notes", text: "Buy rope", title: "Trip", from: "browser" } });
+    expect(seen.at(-1)).toMatchObject({ action: "share", session: "s", to: "notes", text: "Buy rope", title: "Trip", from: "browser" });
+    expect(JSON.parse(sh.content[0].text)).toEqual({ shared: { app: "notes", action: "add_note" }, value: { id: "n1" } });
+    const bad: any = await c.callTool({ name: "share", arguments: { session: "s", to: "shop", text: "x" } });
+    expect(bad.isError).toBe(true); expect(bad.content[0].text).toContain("not_a_share_target");
+    await c.callTool({ name: "set_clipboard", arguments: { session: "s", text: "paste me" } });
+    expect(seen.at(-1)).toMatchObject({ action: "set_clipboard", text: "paste me" });
+    const g: any = await c.callTool({ name: "get_clipboard", arguments: { session: "s" } });
+    expect(JSON.parse(g.content[0].text)).toEqual({ text: "copied" });
+    await c.close(); srv.close();
+  }, 30000);
 });
