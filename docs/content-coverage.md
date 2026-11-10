@@ -117,7 +117,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Watch link on the hosted phone (`watch_url`, read-only, sign in to take over) | [agents](agents.md#watch-link-on-the-hosted-phone) | | | |
 | Hosted MCP sign-in with URL client ids (Client ID Metadata Documents) | [agents](agents.md) | | | |
 | Data sources refresh on an interval (`refresh`, 30 seconds or more) | [spec-blocks](spec-blocks.md#keep-a-data-source-fresh) | | | |
-| Gallery of example specs (`packages/spec/gallery`: habit tracker, workout log, expense splitter, trip checklist, flashcards) | [spec-blocks](spec-blocks.md#example-specs) | | | |
+| Gallery of example specs (`packages/spec/gallery`: habit tracker, workout log, expense splitter, trip checklist, flashcards, reading board, meal planner, favourite places) | [spec-blocks](spec-blocks.md#example-specs) | | | |
 | Faster rebuild after a save in `shipvo run` (Metro cache kept) | [run](run.md) | | | |
 | Signing seed backup and restore on a new machine (`shipvo keys export`, `shipvo keys import`) | [new-machine](new-machine.md) | | | |
 | See what an agent built and changed in a spec app (`app_activity`) | [phone-apps](phone-apps.md#see-what-was-built-and-changed) | | | |
@@ -126,3 +126,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Network proxy refusal codes (`x-shipvo-net-error`) | [phone-network](phone-network.md#troubleshooting) | | | |
 | Room log and notes (`room_log`, `room_note`): a lead agent sees what the others did | [agents](agents.md#room-log-and-notes) | | | |
 | Shop template warns when a price is in the wrong unit (`[shop]` message, failing test) | [your-own-shop](tutorials/your-own-shop.md#troubleshooting), [getting-started](getting-started.md#the-shop-checkout) | [your-own-shop](tutorials/your-own-shop.md) | | |
+| Refs from a restarted phone (`f1e2`, `p1e5`) accepted by `tap`, `type`, `scroll`, `wait_for` | [agents](agents.md) | | | |
+| Android patch falls back to full download on out-of-memory (`out_of_memory`, `over_memory_budget`) | [adapters](adapters.md) | | | |
+| `state_version` and rollback guard (`--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
+| `csv()` spec function | [phone-apps](phone-apps.md#export-data-as-csv) | | | |
