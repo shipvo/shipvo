@@ -130,3 +130,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Refs after a phone restart (`f1e2`) work in `tap`, `type`, `scroll`, `wait_for` | [agents](agents.md#troubleshooting) | | | |
 | Android patch step falls back to the full download on out-of-memory or over budget (`patchError`) | [runtime](../packages/runtime/README.md) | | | |
 | Refuse a rollback to older stored-data formats (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
+| Roll back safely with a state version (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
