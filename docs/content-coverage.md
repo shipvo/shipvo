@@ -114,3 +114,5 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Data sources refresh on an interval (`refresh`, 30 seconds or more) | [spec-blocks](spec-blocks.md#keep-a-data-source-fresh) | | | |
 | Gallery of example specs (`packages/spec/gallery`) | [spec-blocks](spec-blocks.md#example-specs) | | | |
 | Faster rebuild after a save in `shipvo run` (Metro cache kept) | [run](run.md) | | | |
+| Revoke a saved key from the phone's Secrets screen | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
+| `app_activity` (versions, data sources and events of each spec app) | [phone-apps](phone-apps.md) | | | |

@@ -1,6 +1,6 @@
 # Moving to a new machine
 
-Switching laptops, or joining a teammate's repo, takes two small steps. One of them matters a lot: the **signing seed**.
+This page is for anyone who publishes updates with Shipvo and is about to switch laptops, or is joining a teammate's repo. You will back up the one file that cannot be recovered, then set up the new machine so `shipvo publish` works again. It takes about five minutes. The file is the **signing seed**: the private key that proves an update came from you.
 
 ## What lives where
 
@@ -36,6 +36,14 @@ npx -y @shipvo/cli app create                     # new publish token for this m
 npx -y @shipvo/cli publish
 ```
 
+Check it worked:
+
+```bash
+npx -y @shipvo/cli doctor
+```
+
+The line "signing key matches shipvo.json publicKey" should pass.
+
 `keys import` checks the seed against the public key in `shipvo.json` and refuses one that does not match, so you find out now, not when a release is rejected. It writes `.shipvo/seed.txt` with owner-only permissions.
 
 ## If the seed is truly lost
@@ -49,3 +57,16 @@ So back it up once, today, even if you are not moving.
 ## Teams
 
 Do not share the seed over chat. Put it in the CI secrets (`SHIPVO_SIGNING_SEED`) and let CI publish, or keep it in a shared vault your team already trusts. Each person runs their own `shipvo login` and `shipvo app create`; publish tokens are per machine.
+
+## Troubleshooting
+
+- **`keys import` says the seed "does not look like" a seed.** You copied extra text or cut part of it. Paste the whole value, or use `--file seed.txt`.
+- **`keys import` says the seed "belongs to a different key".** This is not the seed for the app in `shipvo.json`. Find the backup made for this app; each app has its own seed.
+- **`publish` says to set `SHIPVO_SIGNING_SEED`.** No seed is on this machine yet. Run `shipvo keys import`, or set the variable in CI.
+- **`doctor` says the signing key does not match.** Run `shipvo keys import` with the right seed, as the fix line suggests.
+
+## Next steps
+
+- [Command line guide](cli.md): publish, roll out and roll back.
+- [Move from CodePush](migrate-from-codepush.md)
+- [Glossary](glossary.md)
