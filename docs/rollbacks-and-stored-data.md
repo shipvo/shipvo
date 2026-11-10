@@ -51,7 +51,7 @@ Without `--allow-state-downgrade`, `shipvo rollback --json` fails with `code` `s
 | `has state_version none, but phones already run state_version 3` | The release you chose was published without `stateVersion`. | Publish a fix forward, or add `--allow-state-downgrade`. |
 | `shipvo.json: stateVersion must be a positive integer` | The value is `0`, negative, a decimal or text. | Use `1`, `2`, `3` and so on, without quotes. |
 | The rollback stops and you did not expect it | A newer release set a higher `stateVersion`. | Run `shipvo status` to see the releases. Decide whether the data format changed. |
-| You want to be sure before you run it | | Run `shipvo rollback --to <release> --dry-run` first. |
+| You want to be sure before you run it | Nothing is wrong. | Run `shipvo rollback --to <release> --dry-run` first. |
 
 ## Next steps
 

@@ -43,11 +43,11 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Signing.** Putting a secret stamp on a release so phones can check it really came from you. The stamp comes from a key file kept on your computer.
 
-**State version.** A whole number in `shipvo.json` (`stateVersion`) that says which layout of saved data a release uses. `shipvo rollback` stops if it would send phones to a lower one. See [Rollbacks and stored data](rollbacks-and-stored-data.md).
-
 **Signing seed.** The secret file (`.shipvo/seed.txt`) that makes the stamp. Back it up once: without it you cannot update phones that already have your app. See [Moving to a new machine](new-machine.md).
 
 **Simulator.** A copy of a phone that runs on your computer and opens in your web browser. It shows your app without a real phone.
+
+**State version.** A whole number in `shipvo.json` (`stateVersion`) that says which layout of saved data a release uses. `shipvo rollback` stops if it would send phones to a lower one. See [Rollbacks and stored data](rollbacks-and-stored-data.md).
 
 **Template.** A ready-made app you change into your own, such as the shop template.
 
