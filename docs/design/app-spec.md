@@ -128,6 +128,7 @@ Expressions inside `{{ }}` are [CEL, the Common Expression Language](https://cel
   - dates: `today()`, `startOf(unit, ts)`, `endOf(unit, ts)`, `addDays(ts, n)`, `diffDays(a, b)`, `formatDate(ts, pattern)`, `unix(ts)`;
   - formatting (uses the person's locale): `money(amount, currency)`, `number(x, decimals?)`, `percent(x)`, `compact(x)`;
   - text: `lower`, `upper`, `trim`, `split`, `join`, plus CEL's built-in `contains`, `startsWith`, `matches`;
+  - export: `csv(rows)` or `csv(rows, ['col', ...])` returns CSV text with a header row, quoted fields and CRLF line ends. Lists become `a; b`. Return it from an action to hand it to an agent, or put it in state to show it.
   - fallbacks: `orElse(value, fallback)`, or CEL's `has(x.field) ? x.field : fallback`.
 - Limits: 2,000 characters per expression and a cost limit per evaluation (CEL cost estimation); over-limit expressions are validation errors.
 
