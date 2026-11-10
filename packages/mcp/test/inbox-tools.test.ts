@@ -80,3 +80,65 @@ describe("pending banner", () => {
     await c.close(); srv.close();
   }, 30000);
 });
+
+describe("wait_for_event", () => {
+  it("passes the wait to the simulator and says plainly whether something is waiting", async () => {
+    const seen: any[] = [];
+    let event = true;
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      res.end(JSON.stringify(event ? { ok: true, event: true, banner: "Inbox: 1 unread for claude", pending: { messages: ["m1"], tasks: [] } } : { ok: true, event: false }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const hit: any = await c.callTool({ name: "wait_for_event", arguments: { session: "s", timeout_ms: 1000 } });
+    expect(hit.content[0].text).toBe("Something is waiting for you. Read it with check_inbox or my_tasks.");
+    expect(hit.structuredContent).toEqual({ event: true, pending: { messages: ["m1"], tasks: [] } });
+    expect(seen.at(-1)).toMatchObject({ action: "wait_for_event", session: "s", timeout_ms: 1000 });
+    event = false;
+    const none: any = await c.callTool({ name: "wait_for_event", arguments: { session: "s" } });
+    expect(none.content[0].text).toBe("nothing yet");
+    expect(none.structuredContent).toEqual({ event: false });
+    await c.close(); srv.close();
+  }, 30000);
+});
+
+describe("wake-up tools", () => {
+  it("pass the registration to the simulator and return the secret once", async () => {
+    const seen: any[] = [];
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      if (body.action === "register_wakeup") return res.end(JSON.stringify(body.url.includes("127.") ? { ok: false, code: "host_not_allowed", error: "127.0.0.1 is a private host" } : { ok: true, wakeup: { name: body.name, url: body.url, events: body.events ?? ["message", "task"], secret: "abc" } }));
+      if (body.action === "list_wakeups") return res.end(JSON.stringify({ ok: true, wakeups: [{ name: "claude", url: "https://example.com/h", events: ["task"] }] }));
+      res.end(JSON.stringify({ ok: true, cleared: true }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const names = (await c.listTools()).tools.map((t) => t.name);
+    for (const n of ["register_wakeup", "list_wakeups", "clear_wakeup"]) expect(names).toContain(n);
+    const ok: any = await c.callTool({ name: "register_wakeup", arguments: { session: "s", name: "chatgpt", url: "https://example.com/h", events: ["message"] } });
+    expect(JSON.parse(ok.content[0].text)).toEqual({ name: "chatgpt", url: "https://example.com/h", events: ["message"], secret: "abc" });
+    expect(seen.at(-1)).toMatchObject({ action: "register_wakeup", session: "s", name: "chatgpt", url: "https://example.com/h", events: ["message"] });
+    const bad: any = await c.callTool({ name: "register_wakeup", arguments: { session: "s", name: "x", url: "http://127.0.0.1:9/h" } });
+    expect(bad.isError).toBe(true); expect(bad.content[0].text).toContain("host_not_allowed");
+    const l: any = await c.callTool({ name: "list_wakeups", arguments: { session: "s" } });
+    expect(JSON.parse(l.content[0].text).wakeups[0].name).toBe("claude");
+    const k: any = await c.callTool({ name: "clear_wakeup", arguments: { session: "s", name: "claude" } });
+    expect(JSON.parse(k.content[0].text)).toEqual({ cleared: true });
+    await c.close(); srv.close();
+  }, 30000);
+});

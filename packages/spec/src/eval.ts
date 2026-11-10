@@ -133,28 +133,28 @@ function library(o: Required<Pick<EvalOptions, "locale" | "timeZone">> & { now: 
     const line = (cells: string[]) => cells.join(",");
     return [line(keys.map(cell)), ...rows.map((r) => line(keys.map((k) => cell(r !== null && typeof r === "object" ? (r as Record<string, unknown>)[k] : undefined))))].join("\r\n") + "\r\n";
   };
-  /** RFC 4180 reader: quoted fields, doubled quotes, CRLF or LF. The first row names the fields; every value is text. */
   const parseCsv = (t: unknown) => {
-    const text = String(t).replace(/^\uFEFF/, "");
-    const rows: string[][] = [];
+    if (typeof t !== "string") throw new Error("parseCsv() needs text");
+    const text = t.replace(/^\uFEFF/, "");
+    const table: string[][] = [];
     let row: string[] = [], cur = "", quoted = false, any = false;
     for (let i = 0; i < text.length; i++) {
       const c = text[i]!;
       if (quoted) {
         if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else quoted = false; } else cur += c;
-      } else if (c === '"') { quoted = true; any = true; }
+      } else if (c === '"' && cur === "") { quoted = true; any = true; }
       else if (c === ",") { row.push(cur); cur = ""; any = true; }
       else if (c === "\n" || c === "\r") {
         if (c === "\r" && text[i + 1] === "\n") i++;
-        if (any || cur !== "") { row.push(cur); rows.push(row); }
+        if (any || cur !== "") { row.push(cur); table.push(row); }
         row = []; cur = ""; any = false;
       } else { cur += c; any = true; }
     }
     if (quoted) throw new Error("parseCsv() found a quote that is never closed");
-    if (any || cur !== "") { row.push(cur); rows.push(row); }
-    const [head, ...body] = rows;
+    if (any || cur !== "") { row.push(cur); table.push(row); }
+    const [head, ...body] = table;
     if (!head) return [];
-    return body.map((r) => Object.fromEntries(head.map((k, i) => [k, r[i] ?? ""])));
+    return body.map((r) => Object.fromEntries(head.map((h, i) => [h, r[i] ?? ""])));
   };
   const empty = (l: unknown[], fn: string) => { if (!l.length) throw new Error(`${fn}() needs a non-empty list`); return l; };
   return [
