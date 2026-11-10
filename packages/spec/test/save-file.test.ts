@@ -24,7 +24,7 @@ describe("saveFile step", () => {
     if (!r.ok) throw new Error(JSON.stringify(r.errors));
     const out = r.app.call("export_diary", { name: "diary.csv" }) as any;
     expect(out.ok).toBe(true);
-    expect(out.value).toEqual([{ id: 1, name: "diary.csv", kind: "file", mime: "text/csv", size: 32, content: 'title,mood\r\n"Out, at sea",ok\r\n', added: NOW }]);
+    expect(out.value).toEqual([{ id: 1, name: "diary.csv", kind: "file", mime: "text/csv", size: 30, content: 'title,mood\r\n"Out, at sea",ok\r\n', added: NOW }]);
   });
   it("reads the saved file back with parseCsv", () => {
     const withImport = { ...spec, actions: { ...spec.actions, read_back: { description: "Read a file.", input: {}, do: [{ return: "{{ parseCsv(data.files[0].content) }}" }] } } };
