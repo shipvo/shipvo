@@ -9,7 +9,7 @@ Read the design in [Key rotation: model and wire format](design/key-rotation.md)
 ## Before you start
 
 - A Shipvo app with a `shipvo.json` (see [Getting started](getting-started.md)). Step 1 does not need it; step 3 does.
-- The root public key built into your app (step 2). Without it, an app ignores rotations.
+- A build that pins your root public key (step 2). Without it, an app ignores rotations.
 - For the upload step: `shipvo login` as the app owner. Tokens cannot upload.
 
 ## 1. Create the root key
@@ -45,7 +45,7 @@ Then register the same public key with the control plane once (`PUT /rotation/<a
 
 ## 3. Sign a rotation (offline)
 
-Run this in your app folder: it reads the app id from `shipvo.json`. Make a new release key first (`shipvo keygen`), then sign a statement that names its public key:
+Run this in your app folder: it reads the app id from `shipvo.json`. Make a new release key first (`shipvo keygen` prints the new release public key), then sign a statement that names its public key:
 
 ```bash
 npx -y @shipvo/cli keys rotate sign --root-seed-file root-seed.txt \
