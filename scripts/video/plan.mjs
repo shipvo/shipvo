@@ -31,3 +31,11 @@ export function vtt(plan) { return "WEBVTT\n\n" + plan.cues.map((c, i) => `${i +
 export function flashes(script, plan) {
   return plan.scenes.flatMap((sc, i) => (script.scenes[i].flashes || []).filter((x) => sc.start + x.at < sc.end).map((x) => ({ start: sc.start + x.at, end: Math.min(sc.end, sc.start + x.at + 1.5), text: x.text })));
 }
+
+// Resolve `{{IMG:name}}` or `{{IMG:dir/name}}` to a tutorial PNG path. The dir form avoids name clashes between tutorials.
+export const imgPath = (pub, n, exists) => {
+  if (n.includes("/")) { const [d, f] = n.split("/"); return `${pub}/${d}/${f}.png`; }
+  const d = ["first-app", "test-with-an-assistant", "test-your-app-with-lumi"].find((x) => exists(`${pub}/${x}/${n}.png`));
+  if (!d) throw new Error(`image not found in any folder: ${n}`);
+  return `${pub}/${d}/${n}.png`;
+};
