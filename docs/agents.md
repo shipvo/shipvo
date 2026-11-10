@@ -279,7 +279,7 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 
 **A tool answers `{ "status": "running", "job": … }`.** Nothing failed. The work (a preview or a build upload) takes longer than the wait. Ask the assistant to call `job_status` with that `job`. Calling the same tool again returns the same job, so it never starts a second publish. Another key gets `job_not_found`, and a job is kept for 15 minutes after it finishes.
 
-**A tool refuses a ref the phone gave back after a restart.** Read the screen again with `screen` and use the refs it shows. After a restart they look like `f1e2` or `p1e5`, and `tap`, `type`, `scroll` and `wait_for` accept them as returned.
+**A tool refuses a ref the phone gave back after a restart.** Read the screen again with `screen` and use the refs it shows. After a restart they look like `f1e2` or `p1e5`, and `tap`, `type`, `scroll` and `wait_for` accept them as returned. A ref from before the restart still fails with `stale_ref`: call `screen` again.
 
 **The assistant cannot find a button.** The tree only lists what a person could see and touch (see [What the tree shows](#what-the-tree-shows-and-hides-on-purpose)). Ask the assistant to read the screen again after the app finishes loading, and check that the button has a label.
 
