@@ -1,5 +1,7 @@
 # Test an email sign-in on Android and iOS
 
+This page is for developers and for assistants that test apps. You will finish a sign-in by email code or magic link, without a real mailbox.
+
 Many apps sign in with a code or a link sent by email. Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
 
 The inbox works the same on the Android and iOS phones.
@@ -60,3 +62,19 @@ Agents use three tools. Each takes the `session` from `open_app`.
 ## Android and iOS
 
 The inbox, the tools and `phone.inbox` are the same on the Android and iOS phones. With MCP, open the session with `platform: "android"` or `platform: "ios"` in `open_app` and follow the same steps.
+
+## Troubleshooting
+
+| You see | Cause | Fix |
+| --- | --- | --- |
+| `inbox_timeout` | No mail matched `subject` or `from` before `timeout` ends | Check the app really called the stubbed request. Use `list()` (or `inbox_read`) to see what arrived, and loosen `subject`. Raise `timeout` (at most 25000 ms). |
+| `inbox_no_code` | The mail has no 4 to 8 digit number | Read `text` from `waitFor`, and fix the stub's mail text. For a link, use `links[0]`. |
+| Status 550 from `/send` | The mail was addressed to someone other than the session's own address | Send to the address from `address()` or `inbox_read`. |
+| Mail from an earlier attempt is picked up | The inbox keeps mail until the session ends | Call `clear()` (or `inbox_clear`) before each attempt. |
+| The address changed | A new session has a new address | Read the address again after every `open_app`. |
+
+## Next steps
+
+- [Test with an assistant](test-with-an-assistant.md): give your assistant the phone and the inbox.
+- [Test your app in CI](testing.md): run the sign-in test on every pull request.
+- [Agents and MCP tools](agents.md): every tool, including the inbox tools.

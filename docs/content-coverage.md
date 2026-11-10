@@ -101,6 +101,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Saved-key routes: list, rotate, revoke and use log (`/vault/keys`, `/vault-ui/*` in the simulator) | [self-hosting](self-hosting.md#saved-key-routes-vault) | | | |
 | Key rotation: `shipvo keys root`, `keys rotate sign` and `upload` | [key-rotation](key-rotation.md) | | | |
 | Per-app device permissions on the install card (`set_app_permission`) | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
+| Key rotations in the audit log (`key-rotation` rows in `shipvo audit`) | [cli](cli.md#shipvo-audit) | | | |
 | Key rotations in the pointer response (`rotations`) | [self-hosting](self-hosting.md#pointer-response-and-key-rotations) | | | |
 | Playground Many phones (1 to 12 Android and iOS phones, shareable link) | [getting-started](getting-started.md#try-it-in-your-browser-first) | | | |
 | Pin and hide apps on the home screen (`pin_app`, `hide_app`) | [phone-apps](phone-apps.md) | | | [test-an-app-on-a-phone-with-a-store-and-other-apps](../blog/test-an-app-on-a-phone-with-a-store-and-other-apps.md) |
@@ -134,3 +135,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Assistant Inbox (`send_message`, `check_inbox`, `hand_off`, `{{ caller }}`) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | |
 | Patch falls back to full download on small heaps (Android, `patchError`) | [runtime](../packages/runtime/README.md#patches-on-small-heaps-android) | | | |
 | Permissions detected from camera, scanner and file blocks | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
+| Private email inbox per session (`inbox_read`, `inbox_wait`, `inbox_clear`, `phone.inbox`) for email-code and magic-link sign-in | [email-sign-in](email-sign-in.md) | | | |
