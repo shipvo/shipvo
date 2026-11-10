@@ -82,6 +82,9 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: Playground Many phones (1 to 12 Android and iOS phones) with a shareable link and Copy link, and an Agent panel with a tool console and Watch Lumi ([Playground](playground.md), #1323, #1335, #1290)
+- 2026-11-10: `job_status` and `wait_ms` for slow MCP tools such as `publish_preview` and `upload_build` ([Agents](agents.md#slow-tools-and-job_status), #1314)
+- 2026-11-10: Network profile tools, `setNetwork` in the test API and `network` in phone.json ([Phone network](phone-network.md), #1338)
 - 2026-11-08: Wallet, Calendar, Files and Photos, and Shop first-party spec apps ([Phone apps](phone-apps.md#first-party-apps), #1275, #1252, #1299, #1300)
 - 2026-11-08: App spec `vector` block, `motion`, translations, locale formatting and right-to-left ([App spec](spec-blocks.md#vector-drawings), #1271, #1274)
 - 2026-11-08: Playground Device API and over-the-air update panels, Android and iOS ([Getting started](getting-started.md#try-it-in-your-browser-first), #1276, #1278)

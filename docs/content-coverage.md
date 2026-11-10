@@ -90,6 +90,9 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Spec `vector` block and `motion` (fade, slide, scale, countUp, pulse) | [spec-blocks](spec-blocks.md#vector-drawings) | | | |
 | Spec translations, locale formatting and right-to-left | [spec-blocks](spec-blocks.md#translations-and-right-to-left) | | | |
 | First-party Calendar, Files and Photos, Wallet and Shop apps | [phone-apps](phone-apps.md#first-party-apps) | | | |
-| Playground: device API and over-the-air update panels in the browser | [getting-started](getting-started.md#try-it-in-your-browser-first) | | | |
+| Playground: device API and over-the-air update panels in the browser | [playground](playground.md) | | | |
 | `shipvo store policy` (privacy policy from what the app does) | [store](store.md) | | | |
 | `shipvo sim` and `shipvo preview` open a Capacitor project | [capacitor](capacitor.md#see-it-in-the-simulator) | | | |
+| Playground Many phones (1 to 12 phones, shareable `?phones=&mix=&dark=` link) and Agent panel (tool console, Watch Lumi) | [playground](playground.md) | | | |
+| Job handles for slow tools (`job_status`, `wait_ms`) | [agents](agents.md#slow-tools-and-job_status) | | | |
+| W3C `traceparent` recorded from tool calls | [agents](agents.md) | | | |

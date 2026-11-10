@@ -37,7 +37,7 @@ Open [shipvo.dev/playground](https://shipvo.dev/playground/). No install. The sa
 - **Device API:** set location, camera, biometrics, payment, notification and airplane mode, and see the sample app show each result.
 - **Over-the-air updates:** publish a signed update, stage it to 10% and then 100% of phones, crash it, and watch the rollback. The signature result, cohort counts and crash-loop threshold on that panel come from the real signer, verifier, cohort bands and runtime code, recorded when the site was built.
 
-If a panel does not load, reload the page; it needs JavaScript on.
+If a panel does not load, reload the page; it needs JavaScript on. [The playground](playground.md) page lists every panel and the shareable Many phones link.
 
 ## 1. Create the app
 

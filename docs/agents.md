@@ -79,6 +79,16 @@ The person can stop the agent at any time. Any touch or key press on the phone p
 
 The simulator serves a `/watch` page. Open it in a browser to see the agent's phone live, in its Android or iOS frame. It lists live sessions, follows the newest one unless you pick one, and starts view only; the viewer can turn on **Take over** to drive the phone. For a phone you can touch directly, see [Driving the live phone](#driving-the-live-phone). The video stream runs only while someone is watching. `/sessions` reports `skin` and `streaming` for each session. For a phone you can also touch, use [`shipvo run`](run.md).
 
+## Slow tools and `job_status`
+
+`publish_preview` and `upload_build` can take longer than some clients wait for one tool call. Both take an optional `wait_ms` (default 20000). If the work finishes within that time you get the usual result. If not, you get `{ "status": "running", "job": "<id>" }`.
+
+1. Call `job_status` with `{ "job": "<id>", "wait_ms": 20000 }`.
+2. It returns `running`, `done` with the result, or `failed` with a typed error `{ code, error }`. With `wait_ms` it waits for the job to finish.
+3. If your agent calls `publish_preview` again while the job runs, it gets the same job, so a retry never starts a second publish.
+
+Jobs belong to the key that started them and are kept for 15 minutes after they finish.
+
 ## What the tree shows (and hides), on purpose
 
 - **Rails show only what is on screen.** A horizontal list exposes its visible items; the agent swipes (`scroll right` with the rail's ref) to see more, as on a phone.

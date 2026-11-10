@@ -1,0 +1,1 @@
+- docs: new Playground page (panels, Many phones shareable link and its parameters, Agent tool console, troubleshooting) and a "Slow tools and `job_status`" section in Agents.
