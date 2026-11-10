@@ -1,0 +1,2 @@
+- Docs: Revoke on the phone's Secrets screen, and the five example specs in the gallery.
+- Migration: none.
