@@ -547,3 +547,28 @@ for (const style of ["android", "ios"]) {
     assert.equal(bad.ok, false); assert.equal(bad.code, "bad_time");
   });
 }
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: Contacts, Messages and Clock install and keep their data`, async () => {
+    const spec = (n) => JSON.parse(readFileSync(new URL(`../../templates/${n}/app.json`, import.meta.url), "utf8"));
+    const sid = `sp-sys-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    for (const id of ["contacts", "messages", "clock"]) assert.equal((await act(sid, { action: "create_app", id, spec: spec(id), style })).ok, true, id);
+    const run = (id, action_name, input = {}, agent) => act(sid, { action: "app_action", id, action_name, input, ...(agent ? { agent } : {}) });
+    await run("contacts", "add_contact", { name: "Ada Obi", phone: "+237 650 000 111" });
+    assert.deepEqual((await run("contacts", "find_contacts", { text: "ada" })).value.contacts.map((c) => c.name), ["Ada Obi"]);
+    await run("messages", "receive_text", { from: "Ada Obi", body: "Friday at nine?" });
+    await run("messages", "send_text", { to: "Ada Obi", body: "Yes" });
+    const conv = (await run("messages", "list_conversations")).value.threads;
+    assert.deepEqual(conv.map((t) => [t.with, t.last, t.unread]), [["Ada Obi", "Yes", 1]]);
+    assert.equal((await run("messages", "read_conversation", { with: "Ada Obi" })).value.texts.length, 2);
+    assert.equal((await run("messages", "list_conversations")).value.threads[0].unread, 0);
+    assert.equal((await run("clock", "add_alarm", { time: "06:45", label: "Boat" })).value.added, true);
+    assert.equal((await run("clock", "add_alarm", { time: "6:45" })).value.added, false);
+    assert.deepEqual((await run("clock", "list_alarms")).value.alarms.map((a) => [a.time, a.on]), [["06:45", true]]);
+    // the data is on the phone: a restart keeps it
+    await act(sid, { action: "restart" });
+    assert.deepEqual((await run("contacts", "find_contacts", {})).value.contacts.map((c) => c.name), ["Ada Obi"]);
+    assert.equal((await run("clock", "list_alarms")).value.alarms.length, 1);
+  });
+}
