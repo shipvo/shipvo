@@ -1,0 +1,1 @@
+- Site: links, the apps search field and category chips, brand download links and feature links are at least 44 px at phone width; the docs "#" heading anchor is hidden on touch screens.
