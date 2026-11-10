@@ -127,8 +127,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Network proxy refusal codes (`x-shipvo-net-error`) | [phone-network](phone-network.md#troubleshooting) | | | |
 | Room log and notes (`room_log`, `room_note`): a lead agent sees what the others did | [agents](agents.md#room-log-and-notes) | | | |
 | Shop template warns when a price is in the wrong unit (`[shop]` message, failing test) | [your-own-shop](tutorials/your-own-shop.md#troubleshooting), [getting-started](getting-started.md#the-shop-checkout) | [your-own-shop](tutorials/your-own-shop.md) | | |
-| Patch memory guard: Android falls back to the full download (`over_memory_budget`, `out_of_memory`) | [phone-updates](phone-updates.md#large-patches-on-android), [runtime](../packages/runtime/README.md#patches-and-memory-android) | | | |
-| Android patch falls back to the full download on out-of-memory or over the memory budget (`patchError`) | [getting-started](getting-started.md) | | | |
+| Patch memory guard: Android falls back to the full download (`over_memory_budget`, `out_of_memory`, `patchError`) | [getting-started](getting-started.md), [phone-updates](phone-updates.md#large-patches-on-android), [runtime](../packages/runtime/README.md#patches-and-memory-android) | | | |
 | Prefixed element refs after a restart (`f1e2`, `p1e5`; `stale_ref`) | [agents](agents.md) | | | |
 | Spec `csv()` function to export a collection | [phone-apps](phone-apps.md), [app-spec](design/app-spec.md) | | | |
 | Roll back safely with a state version (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
