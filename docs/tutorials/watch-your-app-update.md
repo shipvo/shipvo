@@ -103,11 +103,11 @@ to this (delete the comma and add a word):
 "price": 1800 oops
 ```
 
-Save the file. In a few seconds a red bar appears under the phone:
+Save the file. In a few seconds a red bar appears under the phone. If you don't see it, scroll down in the window or make the window taller:
 
 > Your file src/data/products.json has a mistake at line 6, column 18: check for a missing or extra comma. The page still shows your last good version.
 
-The terminal prints the same words. Two things to notice. The message names the file and the place. And the phone did not break: it keeps showing your last good version, so you never stare at a blank screen.
+The terminal prints the same words. The place is counted from the start of the file's built text, so it can sit one line after your edit: you changed line 5, and the message says line 6. Two things to notice. The message names the file and the place. And the phone did not break: it keeps showing your last good version, so you never stare at a blank screen.
 
 ![The same phone with the Merino beanie still shown, and a red bar under the phone with the message about line 6, column 18 of products.json.](/tutorials/watch-your-app-update/03-error.png)
 
