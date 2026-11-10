@@ -28,7 +28,7 @@ Runtime.markHealthy();                   // call once the first screen rendered
 
 `shipvo init` wires all of this for you.
 
-## Patches and memory (Android)
+## Patches on small heaps (Android)
 
 Applying a patch needs the base bundle, the patch and the new bundle in memory together. The runtime checks first. If they would use more than 40% of the app's heap limit, it skips the patch and downloads the full bundle. If the patch step runs out of memory anyway, it does the same. The update still lands and is verified the same way.
 

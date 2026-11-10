@@ -1,2 +1,0 @@
-- Docs: Android patch memory fallback in the runtime README and OTA updates page.
-- Migration: none.

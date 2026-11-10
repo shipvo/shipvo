@@ -1,0 +1,2 @@
+- Docs: Troubleshooting table added to the demo video worked example; the CodePush guide links to the stored-data rollback check.
+- Migration: none.

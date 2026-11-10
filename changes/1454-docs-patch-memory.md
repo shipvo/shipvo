@@ -1,0 +1,3 @@
+- `@shipvo/runtime`: README documents the Android patch memory fallback.
+- Docs: Android patch memory fallback on the OTA updates page.
+- Migration: none.
