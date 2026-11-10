@@ -1,0 +1,2 @@
+- `@shipvo/sim`: new page `/phone?session=<name>` draws the phone frame for a live session (Android and iOS). Its home screen and Store share the session's installed apps with the MCP tools: Install tapped in the page shows in `device_log`, and `install_app` from the tools draws its icon. New read action `phone_apps`.
+- Migration: none; new page and action.

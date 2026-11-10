@@ -1,0 +1,1 @@
+- sim: the Settings app has a Secrets screen. It lists each saved key with app, name, domain, access and last used, loaded through `/vault-ui/keys`. It shows metadata only, never a key value. Android and iOS skins. No exported API changes.

@@ -20,6 +20,7 @@ import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
 import { PhoneBrowser, BrowserError, checkUrl } from "./phone-browser.mjs";
 import { acceptWebSocket } from "./ws-lite.mjs";
+import { phonePage } from "./phone-page.mjs";
 import { createWatch, watchPage, watchList, closeWatchers, isWatched, describeStep, changeLine } from "./watch.mjs";
 import { browserAppPage } from "./browser-app.mjs";
 import { launchErrorMessage } from "./chromium-hint.mjs";
@@ -490,6 +491,8 @@ async function act(id, body) {
       const where = s.nav.where;
       return { where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
     }
+    // Read-only: what a frame page needs to draw this phone's home screen and Store. Not in device_log.
+    case "phone_apps": return { where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, store: s.apps.store, locked: s.life.locked, skin: s.skin, screen: null };
     // Search the Store by need. Read-only; logged in device_log as simulated.
     case "find_apps": {
       const catalog = Array.isArray(body.catalog) ? body.catalog : s.apps.store;
@@ -650,7 +653,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, pin_app, hide_app, export_apps, import_apps, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, share_to, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, pin_app, hide_app, export_apps, import_apps, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, share_to, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
@@ -716,6 +719,9 @@ const server = http.createServer(async (req, res) => {
     }
     // the Browser app, in a phone frame
     if (req.method === "GET" && url.pathname === "/browser") return send(200, browserAppPage(url.searchParams.get("skin") === "ios" ? "ios" : "android", url.searchParams.get("session") ?? ""), MIME[".html"]);
+    // The phone frame for one session: its home screen and Store show the apps the MCP tools install, and tapping Install here installs on the session.
+    if (req.method === "GET" && url.pathname === "/phone") { const id = url.searchParams.get("session") ?? ""; return send(200, phonePage(url.searchParams.get("skin") === "ios" ? "ios" : url.searchParams.get("skin") === "android" ? "android" : sessions.get(id)?.skin, id), MIME[".html"]); }
+    if (req.method === "GET" && url.pathname === "/phone/apps") { const id = url.searchParams.get("session") ?? ""; if (!sessions.has(id)) return send(404, { ok: false, code: "no_session", error: "no such session" }); try { const { screen: _s, ...r } = await act(id, { action: "phone_apps" }); return send(200, { ok: true, ...r }); } catch (e) { return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}) }); } }
     if (req.method === "GET" && url.pathname === "/watch") { const list = watchList(sessions); const want = url.searchParams.get("skin"); return send(200, watchPage(want ?? (url.searchParams.get("session") ? sessions.get(url.searchParams.get("session"))?.skin : null) ?? list[0]?.skin, url.searchParams.get("session") ?? "", { hosted: url.searchParams.get("hosted") === "1", takeOver: url.searchParams.get("takeover") === "1", signin: url.searchParams.get("signin") ?? "" }), MIME[".html"]); }
     // Spec apps: the page for an app's current screen, and the control events the page sends back.
     { const sp = url.pathname.match(/^\/spec\/([^/]+)\/([a-z0-9-]+)\/(op)?$/);

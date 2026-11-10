@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { settingPatch, readSettings, describeSettings, SettingsError, SETTING_KEYS, settingsHtml } from "./settings.mjs";
+import { settingPatch, readSettings, describeSettings, SettingsError, SETTING_KEYS, settingsHtml, secretRowsHtml, loadSecrets, settingsClientScript } from "./settings.mjs";
+import { renderFrame } from "./frame.mjs";
 import { settingsAction } from "./settings-actions.mjs";
 
 test("each setting maps to a device field", () => {
@@ -50,4 +51,30 @@ test("get_settings and set_setting read and write the page's device", async () =
   await assert.rejects(settingsAction(page, { action: "set_setting", key: "nope", value: true }), { code: "unknown_setting" });
   await assert.rejects(settingsAction(page, { action: "set_setting", key: "rtl", value: "x" }), { code: "bad_value" });
   assert.equal(dev.s.rtl, true); delete globalThis.__pnDevice;
+});
+
+const KEYS = [{ app: "shop", name: "stripe", domain: "api.stripe.com", access: "read", last_used_at: "2026-11-01T10:00:00Z", value: "rk_live_SECRET", wrapped: "WRAPPED" }];
+
+test("secret rows show metadata and never a key value", async () => {
+  const seen = [];
+  const rows = await loadSecrets(async (u) => { seen.push(u); return { ok: true, json: async () => ({ keys: KEYS }) }; }, ["shop"]);
+  assert.deepEqual(seen, ["/vault-ui/keys?app=shop"]);
+  const html = secretRowsHtml(rows);
+  for (const t of ["stripe", "App: shop", "api.stripe.com", "Access: read", "2026-11-01T10:00:00Z"]) assert.ok(html.includes(t), t);
+  assert.doesNotMatch(JSON.stringify(rows) + html, /SECRET|WRAPPED|rk_live/);
+  assert.match(secretRowsHtml([{ name: "<i>", app: "a", domain: "d", access: "x", last_used_at: null }]), /&lt;i&gt;.*Last used: never/s);
+});
+
+test("secrets empty state renders, and a failing app is skipped", async () => {
+  assert.match(secretRowsHtml([]), /data-part="secrets-empty">No saved keys yet/);
+  assert.deepEqual(await loadSecrets(async () => ({ ok: false }), ["shop"]), []);
+  assert.deepEqual(await loadSecrets(async () => { throw new Error("x"); }, ["shop"]), []);
+});
+
+test("the Secrets screen is in both skins and wired by the client script", () => {
+  for (const skin of ["android", "ios"]) {
+    const h = renderFrame({ skin }).html;
+    assert.match(h, /data-part="settings-secrets"/); assert.match(h, /data-part="secrets-screen"[^>]*aria-label="Secrets"/);
+  }
+  assert.match(settingsClientScript(), /\/vault-ui\/keys\?app=/);
 });
