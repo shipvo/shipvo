@@ -1,0 +1,1 @@
+- Docs: the "Test an email sign-in" page is now in the docs sidebar and `llms.txt`. The phone apps page explains that camera, scanner and file blocks respect per-app permissions. Glossary adds Session inbox and Assistant Inbox.
