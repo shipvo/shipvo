@@ -126,6 +126,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Show or hide an app on a time window (`schedule_app`, `clear_schedule`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
 | Network proxy refusal codes (`x-shipvo-net-error`) | [phone-network](phone-network.md#troubleshooting) | | | |
 | Room log and notes (`room_log`, `room_note`): a lead agent sees what the others did | [agents](agents.md#room-log-and-notes) | | | |
+| Held release when failures look fake (fresh installs or a burst; owner approves or denies) | [auto-halt](auto-halt.md#when-the-failures-look-like-an-attack) | | | |
 | Shop template warns when a price is in the wrong unit (`[shop]` message, failing test) | [your-own-shop](tutorials/your-own-shop.md#troubleshooting), [getting-started](getting-started.md#the-shop-checkout) | [your-own-shop](tutorials/your-own-shop.md) | | |
 | Assistant Inbox (`send_message`, `check_inbox`, `hand_off`, `{{ caller }}`; assistants on one phone message each other, hand off tasks, share reports) | [phone-apps](phone-apps.md#assistants-talking-to-each-other), [troubleshooting](phone-apps.md#assistant-inbox-troubleshooting) | | | |
 | Android patch falls back to the full download on out-of-memory or over the memory budget (`patchError`) | [getting-started](getting-started.md), [runtime](../packages/runtime/README.md#patches-and-memory-android) | | | |
