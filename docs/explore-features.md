@@ -1,14 +1,6 @@
 # Action feature log (`--record-features`)
 
-This page is for developers who want a record of how `shipvo explore` walks an app, to rank actions or study a walk. You get the exact line format and the flag.
-
-## Record a walk
-
-1. Start from your app folder with the simulator available (see [getting started](getting-started.md)).
-2. Run `shipvo explore --seed 1 --record-features features.jsonl`.
-3. Open `features.jsonl`. It has one line per step, numbered from `n` 1.
-
-The same `--seed` walks the same way. The flag needs a file name: `--record-features` alone stops with `--record-features needs a file`. The file is emptied at the start of each run.
+This page is for developers who want to rank or analyse the actions `shipvo explore` takes. It describes the file the flag writes and every field in it. For the walker itself, see [agents](agents.md#walk-an-app-with-shipvo-explore).
 
 `shipvo explore --record-features <file>` writes one JSON line per action the walker takes. The lines are training data for ranking actions. The flag is off by default. Without it the run and the JSON report are the same as before.
 
@@ -43,8 +35,26 @@ Each line holds roles, counts, types and hashes. It never holds app text, label 
 | `outcome.findings` | integer | How many new findings. |
 | `outcome.failed` | boolean | The action failed or the app crashed. |
 
+## Record a file
+
+```bash
+shipvo explore --seed 1 --max-steps 20 --record-features features.jsonl
+head -n 1 features.jsonl
+```
+
+The default for `--max-steps` is 100.
+
+The file is created empty at the start and gets one line per action. Each line is one JSON object in the format above.
+
+## Troubleshooting
+
+- **`--record-features needs a file`.** You gave the flag without a path. Add one, for example `--record-features features.jsonl`.
+- **The file is empty.** The file is created empty when the run starts and gets one line per action. It has no lines until the walk takes its first action.
+- **Two runs give different lines.** A different `--seed`, or a changed app, changes the walk. The same seed on the same app repeats it (default seed 1).
+
 ## Next steps
 
-- [CLI guide](cli.md#shipvo-explore---record-features-file): every `explore` flag and the `--json` envelope.
+- [Walk an app with `shipvo explore`](agents.md#walk-an-app-with-shipvo-explore)
+- [CLI guide](cli.md)
+- [Lumi ranker](lumi-ranker.md)
 - [Lumi](lumi.md): test your app while you watch on Shipvo Phone, and turn a finding into a test with Save as test.
-- [Testing](testing.md): turn a finding into a typed test.
