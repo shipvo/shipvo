@@ -83,7 +83,7 @@
         },
         {
           "type": "list",
-          "label": "Recent check-ins",
+          "label": "Check-ins",
           "from": "{{ sortBy(checkins, 'day') }}",
           "item": {
             "title": "{{ item.habit }}",
