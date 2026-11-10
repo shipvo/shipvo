@@ -218,5 +218,11 @@ try {
   assert.ok(count >= 15, "device panel has its buttons");
   for (let i = 0; i < count; i++) assert.ok((await small.nth(i).boundingBox()).height >= 44, `button ${i} tap target at 375 px`);
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "device panel: no sideways scroll at 375 px");
+  // Phone screen: a device choice shows a result line and brings the phone into view.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.locator('#pg-panel button[data-kind="location"][data-value="Lisbon"]').click();
+  assert.match(await page.locator("#pg-result").textContent(), /Location: Lisbon/);
+  await page.waitForFunction(() => { const r = document.getElementById("pg-phone").getBoundingClientRect(); return r.top < innerHeight && r.bottom > 0 && r.top + r.height / 2 <= innerHeight; }, null, { timeout: 5000 });
   console.log("playground: platform switch, dark, large text, RTL and deep links work");
 } finally { await browser.close(); server.close(); }
