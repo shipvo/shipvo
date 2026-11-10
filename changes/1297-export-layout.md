@@ -1,0 +1,3 @@
+- `@shipvo/sim`: `export_apps` includes each app's home-screen layout (`placement`); `import_apps` restores it and lists a warning when part of it is not valid.
+- `@shipvo/mcp`: `export_phone_apps` and `import_phone_apps` descriptions mention the layout.
+- Migration: none; exports without a layout import as before.
