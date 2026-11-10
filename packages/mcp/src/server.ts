@@ -3,7 +3,7 @@
 //   PN_SIM=http://localhost:4545  PN_CONTROL=https://api.shipvo.dev  PN_OWNER_TOKEN=...  shipvo-mcp
 // Remote (Streamable HTTP, what Claude, ChatGPT, Cursor connect to over the network):
 //   shipvo-mcp --http 8787  with PN_API_KEYS="key1,key2" (Authorization: Bearer <key>) → POST/GET/DELETE /mcp
-// Tools: get_update_state, check_for_update, apply_update (OTA updates on the phone), list_store_apps, install_app, create_app, uninstall_app, switch_app (apps on the phone), list_apps, open_app, screen, tap, type, scroll, back, screenshot, export_test, end_session (UI simulator);
+// Tools: get_update_state, check_for_update, apply_update (OTA updates on the phone), list_store_apps, install_app, create_app, export_phone_apps, import_phone_apps, uninstall_app, switch_app (apps on the phone), list_apps, open_app, screen, tap, type, scroll, back, screenshot, export_test, end_session (UI simulator);
 //        owner_describe, owner_command, audit_log (the app's live content, prices, orders: owner token required).
 import type { ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -424,6 +424,16 @@ use(server, tools.create_app,
   async ({ session, id, spec, name, style, open }) => { need(session); return result(session, await act({ session, action: "create_app", id, spec, ...(name ? { name } : {}), ...(style ? { style } : {}), ...(open === false ? { open: false } : {}) })); });
 use(server, tools.update_app, 
   async ({ session, id, spec, name }) => { need(session); return result(session, await act({ session, action: "update_app", id, spec, ...(name ? { name } : {}) })); });
+use(server, tools.export_phone_apps, 
+  async ({ session, ids }) => {
+    need(session);
+    const r = await act({ session, action: "export_apps", ...(ids ? { ids } : {}) }) as Act & { format?: string; apps?: unknown[] };
+    if (!r.ok) return result(session, r);
+    const s = sessions.get(session); if (s) s.steps++;
+    return text(JSON.stringify({ format: r.format, apps: r.apps }));
+  });
+use(server, tools.import_phone_apps, 
+  async ({ session, apps, replace }) => { need(session); return result(session, await act({ session, action: "import_apps", apps, ...(replace ? { replace: true } : {}) })); });
 use(server, tools.run_app_action, 
   async ({ session, id, action, input }) => { need(session); return result(session, await act({ session, action: "app_action", id, action_name: action, input: input ?? {} })); });
 use(server, tools.uninstall_app, 
