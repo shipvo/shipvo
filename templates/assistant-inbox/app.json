@@ -1,0 +1,608 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "inbox",
+    "name": "Assistant Inbox",
+    "icon": "mail",
+    "description": "Messages and tasks that ChatGPT, Claude and other assistants send to each other on this phone."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable",
+    "elevation": "soft"
+  },
+  "data": {
+    "messages": {
+      "source": "collection",
+      "fields": {
+        "id": "text",
+        "from": "text",
+        "to": "text",
+        "body": "text",
+        "sent_on": "text",
+        "read": "bool"
+      },
+      "seed": []
+    },
+    "handoffs": {
+      "source": "collection",
+      "fields": {
+        "id": "text",
+        "from": "text",
+        "to": "text",
+        "title": "text",
+        "detail": "text",
+        "status": "text",
+        "reply": "text",
+        "created_on": "text"
+      },
+      "seed": []
+    },
+    "unread": {
+      "source": "computed",
+      "value": "{{ count(messages.filter(m, !m.read)) }}"
+    },
+    "open_handoffs": {
+      "source": "computed",
+      "value": "{{ count(handoffs.filter(h, h.status != 'done')) }}"
+    },
+    "reports": {
+      "source": "collection",
+      "fields": {
+        "id": "text",
+        "author": "text",
+        "to": "text",
+        "title": "text",
+        "body": "text",
+        "kind": "text",
+        "shared_on": "text"
+      },
+      "seed": []
+    },
+    "report_count": {
+      "source": "computed",
+      "value": "{{ count(reports) }}"
+    }
+  },
+  "navigation": {
+    "type": "tabs",
+    "items": [
+      {
+        "screen": "messages",
+        "label": "Messages",
+        "icon": "mail"
+      },
+      {
+        "screen": "handoffs",
+        "label": "Tasks",
+        "icon": "check"
+      },
+      {
+        "screen": "reports",
+        "label": "Reports",
+        "icon": "note"
+      }
+    ]
+  },
+  "screens": [
+    {
+      "id": "messages",
+      "title": "Messages",
+      "body": [
+        {
+          "type": "badge",
+          "value": "{{ unread }} unread"
+        },
+        {
+          "type": "list",
+          "label": "Messages",
+          "from": "{{ messages }}",
+          "item": {
+            "title": "{{ item.from + ' to ' + item.to }}",
+            "subtitle": "{{ item.body }}",
+            "trailing": "{{ item.read ? 'read' : 'new' }}"
+          },
+          "empty": {
+            "message": "No messages yet"
+          }
+        },
+        {
+          "type": "form",
+          "label": "New message form",
+          "submit": {
+            "label": "Send",
+            "action": "send_message"
+          },
+          "fields": [
+            {
+              "name": "from",
+              "type": "text",
+              "label": "From",
+              "required": true,
+              "maxLength": 40
+            },
+            {
+              "name": "to",
+              "type": "text",
+              "label": "To",
+              "required": true,
+              "maxLength": 40
+            },
+            {
+              "name": "body",
+              "type": "text",
+              "label": "Message",
+              "required": true,
+              "maxLength": 5000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "handoffs",
+      "title": "Tasks",
+      "body": [
+        {
+          "type": "badge",
+          "value": "{{ open_handoffs }} open"
+        },
+        {
+          "type": "list",
+          "label": "Open tasks",
+          "from": "{{ handoffs.filter(h, h.status != 'done') }}",
+          "item": {
+            "title": "{{ item.title }}",
+            "subtitle": "{{ item.from + ' to ' + item.to + ' \u00b7 ' + item.status }}"
+          },
+          "empty": {
+            "message": "No open tasks"
+          }
+        },
+        {
+          "type": "list",
+          "label": "Done tasks",
+          "from": "{{ handoffs.filter(h, h.status == 'done') }}",
+          "item": {
+            "title": "{{ item.title }}",
+            "subtitle": "{{ item.reply }}"
+          },
+          "empty": {
+            "message": "Nothing done yet"
+          }
+        },
+        {
+          "type": "form",
+          "label": "New task form",
+          "submit": {
+            "label": "Hand off",
+            "action": "hand_off"
+          },
+          "fields": [
+            {
+              "name": "from",
+              "type": "text",
+              "label": "From",
+              "required": true,
+              "maxLength": 40
+            },
+            {
+              "name": "to",
+              "type": "text",
+              "label": "To",
+              "required": true,
+              "maxLength": 40
+            },
+            {
+              "name": "title",
+              "type": "text",
+              "label": "Task",
+              "required": true,
+              "maxLength": 200
+            },
+            {
+              "name": "detail",
+              "type": "text",
+              "label": "Details",
+              "maxLength": 5000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reports",
+      "title": "Reports",
+      "body": [
+        {
+          "type": "badge",
+          "value": "{{ report_count }} reports"
+        },
+        {
+          "type": "list",
+          "label": "Reports",
+          "from": "{{ reports }}",
+          "item": {
+            "title": "{{ item.title }}",
+            "subtitle": "{{ item.kind + ' from ' + item.author + ' to ' + item.to }}"
+          },
+          "empty": {
+            "message": "No reports yet"
+          }
+        }
+      ]
+    }
+  ],
+  "actions": {
+    "send_message": {
+      "description": "Send a message to another assistant (or to 'anyone'). Your name is added for you; the other assistant reads it with check_inbox.",
+      "input": {
+        "from": {
+          "type": "text",
+          "default": ""
+        },
+        "to": {
+          "type": "text"
+        },
+        "body": {
+          "type": "text"
+        }
+      },
+      "returns": {
+        "id": "text"
+      },
+      "do": [
+        {
+          "insert": "messages",
+          "value": {
+            "id": "{{ 'm' + string(count(messages) + 1) }}",
+            "from": "{{ lower(trim((input.from != '' ? input.from : (caller != '' ? caller : 'unknown')))) }}",
+            "to": "{{ lower(trim(input.to)) }}",
+            "body": "{{ input.body }}",
+            "sent_on": "{{ today() }}",
+            "read": false
+          }
+        },
+        {
+          "toast": "Message sent"
+        },
+        {
+          "return": {
+            "id": "{{ 'm' + string(count(messages)) }}"
+          }
+        }
+      ]
+    },
+    "check_inbox": {
+      "description": "List the messages waiting for you (sent to your name or to 'anyone') that you have not marked read. Your name is known, so no input is needed. Call mark_read for each one you have dealt with.",
+      "input": {
+        "to": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "returns": {
+        "messages": "list"
+      },
+      "do": [
+        {
+          "return": {
+            "messages": "{{ messages.filter(m, !m.read && (m.to == lower(trim((input.to != '' ? input.to : (caller != '' ? caller : 'unknown')))) || m.to == 'anyone')) }}"
+          }
+        }
+      ]
+    },
+    "mark_read": {
+      "description": "Mark a message sent to you (or to 'anyone') as read, by its id. Returns updated: true, or updated: false with the reason when nothing matched.",
+      "input": {
+        "id": {
+          "type": "text"
+        }
+      },
+      "do": [
+        {
+          "if": "messages.exists(m, m.id == input.id && (caller == '' || m.to == caller || m.to == 'anyone'))",
+          "then": [
+            {
+              "update": "messages",
+              "where": "item.id == input.id",
+              "value": {
+                "read": true
+              }
+            },
+            {
+              "toast": "Marked read"
+            },
+            {
+              "return": {
+                "updated": true,
+                "reason": ""
+              }
+            }
+          ],
+          "else": [
+            {
+              "return": {
+                "updated": false,
+                "reason": "No message with that id was sent to you."
+              }
+            }
+          ]
+        }
+      ],
+      "returns": {
+        "updated": "bool",
+        "reason": "text"
+      }
+    },
+    "read_thread": {
+      "description": "Show every message between two assistants, oldest first, read or not.",
+      "input": {
+        "a": {
+          "type": "text"
+        },
+        "b": {
+          "type": "text"
+        }
+      },
+      "returns": {
+        "messages": "list"
+      },
+      "do": [
+        {
+          "return": {
+            "messages": "{{ messages.filter(m, (m.from == lower(trim(input.a)) && m.to == lower(trim(input.b))) || (m.from == lower(trim(input.b)) && m.to == lower(trim(input.a)))) }}"
+          }
+        }
+      ]
+    },
+    "hand_off": {
+      "description": "Give a task to another assistant. Your name is added for you. They see it with my_tasks and report back with finish_task.",
+      "input": {
+        "from": {
+          "type": "text",
+          "default": ""
+        },
+        "to": {
+          "type": "text"
+        },
+        "title": {
+          "type": "text"
+        },
+        "detail": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "returns": {
+        "id": "text"
+      },
+      "do": [
+        {
+          "insert": "handoffs",
+          "value": {
+            "id": "{{ 'h' + string(count(handoffs) + 1) }}",
+            "from": "{{ lower(trim((input.from != '' ? input.from : (caller != '' ? caller : 'unknown')))) }}",
+            "to": "{{ lower(trim(input.to)) }}",
+            "title": "{{ input.title }}",
+            "detail": "{{ input.detail }}",
+            "status": "open",
+            "reply": "",
+            "created_on": "{{ today() }}"
+          }
+        },
+        {
+          "toast": "Task handed off"
+        },
+        {
+          "return": {
+            "id": "{{ 'h' + string(count(handoffs)) }}"
+          }
+        }
+      ]
+    },
+    "my_tasks": {
+      "description": "List the tasks handed to you (or to 'anyone') that are not done. No input is needed.",
+      "input": {
+        "to": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "returns": {
+        "tasks": "list"
+      },
+      "do": [
+        {
+          "return": {
+            "tasks": "{{ handoffs.filter(h, h.status != 'done' && (h.to == lower(trim((input.to != '' ? input.to : (caller != '' ? caller : 'unknown')))) || h.to == 'anyone')) }}"
+          }
+        }
+      ]
+    },
+    "start_task": {
+      "description": "Say you have started a task handed to you, by its id. The sender sees the status change. Returns updated: true, or updated: false with the reason (not yours, not found, or already started).",
+      "input": {
+        "id": {
+          "type": "text"
+        }
+      },
+      "do": [
+        {
+          "if": "handoffs.exists(h, h.id == input.id && h.status == 'open' && (caller == '' || h.to == caller || h.to == 'anyone'))",
+          "then": [
+            {
+              "update": "handoffs",
+              "where": "item.id == input.id",
+              "value": {
+                "status": "doing"
+              }
+            },
+            {
+              "toast": "Task started"
+            },
+            {
+              "return": {
+                "updated": true,
+                "reason": ""
+              }
+            }
+          ],
+          "else": [
+            {
+              "return": {
+                "updated": false,
+                "reason": "No open task with that id was handed to you."
+              }
+            }
+          ]
+        }
+      ],
+      "returns": {
+        "updated": "bool",
+        "reason": "text"
+      }
+    },
+    "finish_task": {
+      "description": "Finish a task handed to you and leave the result for the sender, by its id. Returns updated: true, or updated: false with the reason (not yours, not found, or already done). A finished task keeps its first reply.",
+      "input": {
+        "id": {
+          "type": "text"
+        },
+        "reply": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "do": [
+        {
+          "if": "handoffs.exists(h, h.id == input.id && h.status != 'done' && (caller == '' || h.to == caller || h.to == 'anyone'))",
+          "then": [
+            {
+              "update": "handoffs",
+              "where": "item.id == input.id",
+              "value": {
+                "status": "done",
+                "reply": "{{ input.reply }}"
+              }
+            },
+            {
+              "toast": "Task done"
+            },
+            {
+              "return": {
+                "updated": true,
+                "reason": ""
+              }
+            }
+          ],
+          "else": [
+            {
+              "return": {
+                "updated": false,
+                "reason": "No unfinished task with that id was handed to you."
+              }
+            }
+          ]
+        }
+      ],
+      "returns": {
+        "updated": "bool",
+        "reason": "text"
+      }
+    },
+    "sent_tasks": {
+      "description": "List the tasks you handed to others, with their status and reply. No input is needed.",
+      "input": {
+        "from": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "returns": {
+        "tasks": "list"
+      },
+      "do": [
+        {
+          "return": {
+            "tasks": "{{ handoffs.filter(h, h.from == lower(trim((input.from != '' ? input.from : (caller != '' ? caller : 'unknown'))))) }}"
+          }
+        }
+      ]
+    },
+    "share_report": {
+      "description": "Share a report with another assistant (or 'anyone'): research findings, a review, a synthesis. Your name is added for you. kind is research, review or synthesis. The other assistant reads it with get_reports.",
+      "input": {
+        "to": {
+          "type": "text"
+        },
+        "title": {
+          "type": "text"
+        },
+        "body": {
+          "type": "text"
+        },
+        "kind": {
+          "type": "text",
+          "default": "research"
+        }
+      },
+      "returns": {
+        "id": "text"
+      },
+      "do": [
+        {
+          "insert": "reports",
+          "value": {
+            "id": "{{ 'r' + string(count(reports) + 1) }}",
+            "author": "{{ caller != '' ? caller : 'unknown' }}",
+            "to": "{{ lower(trim(input.to)) }}",
+            "title": "{{ input.title }}",
+            "body": "{{ input.body }}",
+            "kind": "{{ lower(trim(input.kind)) }}",
+            "shared_on": "{{ today() }}"
+          }
+        },
+        {
+          "toast": "Report shared"
+        },
+        {
+          "return": {
+            "id": "{{ 'r' + string(count(reports)) }}"
+          }
+        }
+      ]
+    },
+    "get_reports": {
+      "description": "List the reports shared with you (or with 'anyone'). Pass kind to see only research, review or synthesis. Pass author to see one assistant's reports. Nothing is needed otherwise.",
+      "input": {
+        "kind": {
+          "type": "text",
+          "default": ""
+        },
+        "author": {
+          "type": "text",
+          "default": ""
+        }
+      },
+      "returns": {
+        "reports": "list"
+      },
+      "do": [
+        {
+          "return": {
+            "reports": "{{ reports.filter(r, (r.to == caller || r.to == 'anyone') && (input.kind == '' || r.kind == lower(trim(input.kind))) && (input.author == '' || r.author == lower(trim(input.author)))) }}"
+          }
+        }
+      ]
+    }
+  }
+}

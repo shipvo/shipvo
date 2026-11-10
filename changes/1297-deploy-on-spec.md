@@ -1,0 +1,2 @@
+- CI: the hosted phone redeploys when `packages/spec` changes, because the image bundles it. Before, a spec-only change such as `csv()` did not reach the hosted phone until the next sim or MCP change.
+- Migration: none.

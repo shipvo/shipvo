@@ -1,0 +1,1 @@
+- spec: `actionDeviceNeeds` also finds the device permission for camera, scanner and file blocks on a screen an action opens with `navigate`, so a denied permission gives `permission_denied` for those actions too.
