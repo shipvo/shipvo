@@ -135,11 +135,14 @@ This signs the code of release 3 as the next release number and publishes it to 
 
 ## Troubleshooting
 
+
 - **`Git tree is not clean (N changed path(s)). Commit or stash first, or pass --force.`** `shipvo migrate --apply` will not edit a repo with uncommitted changes. Commit or stash, then run it again. Review its edits with `git diff`.
 - **The native build fails after `--apply`.** Files such as `MainApplication.kt`, `AppDelegate.mm`, `settings.gradle` and the `Podfile` still call CodePush. `--apply` lists each one with its line under the manual steps. Remove those calls by hand.
 - **`shipvo migrate needs --plan ... or --apply ...`** (exit code 2). Pass one of the two flags. Passing both prints `Use --plan or --apply, not both.`
 - **A `shipvo doctor` line says FAIL.** The line ends with the fix. Make it, then run `npx shipvo doctor` again.
 - **Users on the old build get no update.** Ship the new store build from Step 5. Every build that includes it receives Shipvo updates.
+- **`publish` fails before building.** The project is not an Expo project, or `expo export` fails. Run `npx expo export` alone and fix its error first.
+- **Phones do not get the release.** The installed app does not include `@shipvo/runtime` from Step 2. Install an app build made after Step 2; later releases go over the air.
 
 ## Next steps
 

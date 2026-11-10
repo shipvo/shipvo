@@ -30,7 +30,7 @@ beforeAll(async () => {
 }, 120_000);
 afterAll(async () => { await browser?.close(); });
 
-async function session(platform: Platform) {
+async function session(platform: Platform, viewport = { width: 500, height: 950 }) {
   const root = mkdtempSync(join(tmpdir(), "shipvo-live-"));
   mkdirSync(join(root, "src"));
   writeFileSync(join(root, "src", "title.txt"), "Hello tide");
@@ -47,7 +47,7 @@ async function session(platform: Platform) {
     onResult: (r) => { if (r.ok) reloadAt = Date.now(); server.notify(r.ok ? { type: "reload" } : { type: "error", message: r.message }); },
   });
   await wait(100);
-  const page = await browser.newPage({ viewport: { width: 500, height: 950 } });
+  const page = await browser.newPage({ viewport });
   await page.goto(`http://127.0.0.1:${server.port}/`);
   await page.waitForSelector("#app");
   const app = () => page.frames().find((f: any) => f !== page.mainFrame());
@@ -95,4 +95,34 @@ describe.each(["android", "ios"] as const)("live reload on %s", (platform) => {
       expect(await s.page.isHidden("#banner")).toBe(true);
     } finally { await s.close(); }
   }, 60_000);
+
+  describe.each([
+    { name: "1000x600 with the device panel open", viewport: { width: 1000, height: 600 }, open: true },
+    { name: "1000x600 with the device panel closed", viewport: { width: 1000, height: 600 }, open: false },
+    { name: "390x844", viewport: { width: 390, height: 844 }, open: false },
+  ])("error bar at $name", ({ name, viewport, open }) => {
+    it("sits inside the window, below the title bar, above the phone and clear of the device panel", async () => {
+      const s = await session(platform, viewport);
+      try {
+        await s.page.evaluate((o: boolean) => { (document.getElementById("dpanel") as HTMLDetailsElement).open = o; }, open);
+        await wait(100);
+        s.edit("<<syntax error>>");
+        await s.page.waitForSelector("#banner:not([hidden])", { timeout: 15000 });
+        const r = await s.page.evaluate(() => {
+          const q = (id: string) => document.getElementById(id)!.getBoundingClientRect();
+          const b = q("banner"), t = q("top"), p = q("phone"), d = q("dpanel");
+          const hit = b.left < d.right && b.right > d.left && b.top < d.bottom && b.bottom > d.top;
+          return { bTop: b.top, bBottom: b.bottom, bLeft: b.left, bRight: b.right, tBottom: t.bottom, pTop: p.top, h: innerHeight, w: innerWidth, hit };
+        });
+        expect(r.bTop).toBeGreaterThanOrEqual(0);
+        expect(r.bBottom).toBeLessThanOrEqual(r.h);
+        expect(r.bLeft).toBeGreaterThanOrEqual(0);
+        expect(r.bRight).toBeLessThanOrEqual(r.w);
+        expect(r.bTop).toBeGreaterThanOrEqual(r.tBottom - 1);
+        expect(r.bBottom).toBeLessThanOrEqual(r.pTop + 1);
+        expect(r.hit).toBe(false);
+        if (SHOTS) await s.page.screenshot({ path: join(SHOTS, `${platform}-error-${name.replace(/[^a-z0-9]+/gi, "-")}.png`) });
+      } finally { await s.close(); }
+    }, 60_000);
+  });
 });
