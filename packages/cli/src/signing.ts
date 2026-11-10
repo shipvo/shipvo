@@ -5,13 +5,17 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "n
 import { join } from "node:path";
 import { b64, keyFromSeed } from "./index.js";
 import { args, loadConfig, seed } from "./config.js";
-import { rotate, RotateError } from "./rotation.js";
+import { rotate, createRoot, RotateError } from "./rotation.js";
 
 const pub = (s: string) => b64(keyFromSeed(s).publicKey);
 const valid = (s: string) => { try { return /^[A-Za-z0-9+/=_-]{43,44}$/.test(s) && !!pub(s); } catch { return false; } };
 
 export async function signingKey(argv: string[]) {
   const [sub, ...rest] = argv, a = args(rest);
+  if (sub === "root") {
+    try { createRoot(rest); } catch (e) { if (!(e instanceof RotateError)) throw e; console.error(e.message); process.exit(1); }
+    return;
+  }
   const cfg = loadConfig();
   if (sub === "rotate") {
     try { await rotate(rest, cfg); } catch (e) { if (!(e instanceof RotateError)) throw e; console.error(e.message); process.exit(1); }
