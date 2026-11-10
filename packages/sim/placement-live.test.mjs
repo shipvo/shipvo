@@ -51,6 +51,68 @@ test("a weekly planner shows on weekdays and weekend plans on Saturday, by the p
   assert.equal((await act("pl1", { action: "switch_app", id: "plan" })).ok, true);   // not showing on Saturday, still opens by tool
 });
 
+const SPEC = (id, name) => ({ spec: "shipvo.app/v0", app: { id, name, icon: "gift" }, screens: [{ id: "home", title: name, body: [{ type: "text", text: `${name} home` }] }] });
+
+for (const skin of ["android", "ios"]) {
+  test(`${skin}: schedule_app shows an app in a window on the phone's clock (also across midnight) and clear_schedule returns to pin and hide`, async () => {
+    const sid = `pl4-${skin}`;
+    assert.ok((await call("/session", { session: sid, phone: PHONE, skin })).ok);
+    assert.equal((await act(sid, { action: "phone_apps" })).skin, skin);
+    const r = await act(sid, { action: "schedule_app", id: "mail", days: ["mon"], from: "08:00", to: "10:00" });
+    assert.equal(r.ok, true, JSON.stringify(r));
+    const at = async (iso) => (await act(sid, { action: "set_time", at: iso })).home;
+    assert.match(await at("2026-11-09T09:00:00"), /button "Mail"/);
+    const out = await at("2026-11-09T11:00:00");
+    assert.doesNotMatch(out, /button "Mail"/); assert.match(out, /"Mail" \(mail\): not showing now/);
+    assert.doesNotMatch(await at("2026-11-10T09:00:00"), /button "Mail"/);   // Tuesday
+    // A window across midnight belongs to the day it starts: Friday 22:00 to Saturday 06:00.
+    assert.equal((await act(sid, { action: "schedule_app", id: "mail", days: ["fri"], from: "22:00", to: "06:00" })).ok, true);
+    assert.match(await at("2026-11-13T23:00:00"), /button "Mail"/);
+    assert.match(await at("2026-11-14T05:00:00"), /button "Mail"/);
+    assert.doesNotMatch(await at("2026-11-14T07:00:00"), /button "Mail"/);
+    assert.doesNotMatch(await at("2026-11-13T12:00:00"), /button "Mail"/);
+    assert.equal((await act(sid, { action: "clear_schedule", id: "mail" })).ok, true);
+    assert.match(await at("2026-11-09T11:00:00"), /button "Mail"/);
+    await act(sid, { action: "hide_app", id: "mail" });
+    assert.doesNotMatch(await at("2026-11-09T09:00:00"), /button "Mail"/);   // hide is the fallback again
+    const bad = await act(sid, { action: "schedule_app", id: "mail", from: "8am", to: "09:00" });
+    assert.equal(bad.ok, false); assert.equal(bad.code, "bad_placement");
+    assert.equal((await act(sid, { action: "schedule_app", id: "nope", from: "08:00", to: "09:00" })).code, "not_installed");
+    assert.equal((await act(sid, { action: "clear_schedule", id: "nope" })).code, "not_installed");
+  });
+}
+
+test("device_log records schedule_app and clear_schedule under their own names", async () => {
+  assert.ok((await call("/session", { session: "pl5", phone: PHONE })).ok);
+  await act("pl5", { action: "schedule_app", id: "mail", days: ["sat"], from: "09:00", to: "10:00" });
+  await act("pl5", { action: "clear_schedule", id: "mail" });
+  await act("pl5", { action: "arrange_apps", id: "mail", pinned: true });
+  const names = (await act("pl5", { action: "device_log" })).log.filter((e) => e.app === "mail").map((e) => e.name);
+  assert.deepEqual(names, ["schedule_app", "clear_schedule", "arrange_apps"]);
+});
+
+for (const skin of ["android", "ios"]) {
+  test(`${skin}: export then import keeps the schedule`, async () => {
+    const from = `pl6-${skin}`, to = `pl7-${skin}`;
+    assert.ok((await call("/session", { session: from, skin })).ok);
+    assert.equal((await act(from, { action: "create_app", id: "plan", spec: SPEC("plan", "Planner"), style: skin, open: false })).ok, true);
+    assert.equal((await act(from, { action: "schedule_app", id: "plan", days: ["mon"], from: "08:00", to: "10:00" })).ok, true);
+    const ex = await act(from, { action: "export_apps" });
+    assert.deepEqual(ex.apps[0].placement, { schedule: { days: ["mon"], from: "08:00", to: "10:00" } });
+    assert.ok((await call("/session", { session: to, skin })).ok);
+    const im = await act(to, { action: "import_apps", apps: ex.apps });
+    assert.equal(im.ok, true, JSON.stringify(im));
+    const at = async (iso) => (await act(to, { action: "set_time", at: iso })).home;
+    assert.match(await at("2026-11-09T09:00:00"), /button "Planner"/);
+    const out = await at("2026-11-09T11:00:00");
+    assert.doesNotMatch(out, /button "Planner"/); assert.match(out, /"Planner" \(plan\): not showing now/);
+    // An export from an app with no placement carries none, and a bad placement in an import is dropped.
+    const bad = await act(to, { action: "import_apps", replace: true, apps: [{ ...ex.apps[0], placement: { schedule: { from: "8am" } } }] });
+    assert.equal(bad.ok, true, JSON.stringify(bad));
+    assert.match(await at("2026-11-09T11:00:00"), /button "Planner"/);
+  });
+}
+
 test("pin, hide and position change the order; errors are typed; changes are in device_log", async () => {
   assert.ok((await call("/session", { session: "pl2", phone: PHONE })).ok);
   const order = (screen) => [...screen.matchAll(/button "([^"]+)"/g)].map((m) => m[1]).filter((n) => n !== "Store").join(",");
