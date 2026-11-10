@@ -1,1 +1,1 @@
-- docs: new page "Test an email sign-in" with expected output, a troubleshooting table and next steps; it is in the docs sidebar and `llms.txt`, and the glossary has "Session inbox".
+- docs: [Test an email sign-in](../docs/email-sign-in.md) has a new "What you will see" section with example inbox output, and the `inbox_no_code` troubleshooting row says a code inside a longer number is not picked up. The glossary has "Session inbox".

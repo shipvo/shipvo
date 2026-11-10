@@ -4,7 +4,7 @@ This page is for developers and for anyone who drives an app with an assistant. 
 
 Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
 
-Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved. The inbox works the same on the Android and iOS phones.
+The inbox works the same on the Android and iOS phones.
 
 ## How it works
 
