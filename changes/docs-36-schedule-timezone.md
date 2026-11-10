@@ -1,0 +1,1 @@
+- Docs: Phone apps page covers the `timezone` option of `schedule_app` and `arrange_apps`, with an example and the `bad_timezone` error.
