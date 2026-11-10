@@ -1,6 +1,6 @@
 # Create a root key and rotate your update key
 
-This page is for the person who owns an app's signing keys. You will create an offline root key, then use it to replace your release key if the release key is lost or leaked. Phones switch to the new key when they next fetch the signed statement.
+This page is for the person who owns an app's signing keys. You will create an offline root key, then use it to replace your release key if the release key is lost or leaked. Phones check the signed statement against the root public key pinned in the app build, and switch to the new key only if it verifies.
 
 ## The two keys
 
@@ -32,7 +32,18 @@ Root seed written to /path/root-seed.txt (mode 0600). Store it offline, in a pas
 
 For scripts, add `--json`. Stdout is one line: `{ "ok": true, "code": "root_created", "data": { "public_key", "file" }, "next": [...] }`.
 
-## 2. Sign a rotation
+## 2. Register the root public key
+
+The control plane accepts a rotation only after it knows your root public key. Register it once, signed in as the app owner in the admin (an admin session; a token cannot do this):
+
+```text
+PUT /rotation/<app>/root
+{ "root_key": "<root public key>" }
+```
+
+`<root public key>` is the value `keys root` printed. A good reply is `{ "ok": true, "app": "<app>", "root_key": "…" }`. Put the same value in your shell build as `dev.shipvo.ROOT_KEY` (Android and iOS), so phones can verify a statement. The registered key cannot be changed over the air.
+
+## 3. Sign a rotation
 
 Inside your app folder, with the new release public key:
 
@@ -42,7 +53,7 @@ npx -y @shipvo/cli keys rotate sign --root-seed-file root-seed.txt --new-key <ne
 
 This works offline and prints the signed envelope. Pick a `--sequence` above every statement you signed before. `--valid-from <ISO time>` plans the switch for later (at most 90 days ahead); without it the rotation is for now.
 
-## 3. Upload it
+## 4. Upload it
 
 Sign in as the app owner, then upload the saved envelope:
 
@@ -61,7 +72,9 @@ The control plane serves the statement in the signed pointer response; see [Poin
 | `Cannot write the root key file …: the folder does not exist.` | The folder in `--out` is missing | Create the folder, or use a path that exists |
 | The usage text appears | `--out` was missing | Add `--out <file>` |
 | `No shipvo.json in this folder` from `keys rotate sign` | You are outside the app folder | `cd` into the app, then run it again |
-| `keys rotate upload` is refused | You used a token | Run `shipvo login` as the owner |
+| `409 no_root_key` from `keys rotate upload` | The root public key is not registered | Do step 2, then upload again |
+| `401 unauthorized` from `keys rotate upload` | No credential was sent | Run `shipvo login` as the owner |
+| `403 forbidden` from `keys rotate upload` | You used a token. Publish tokens and agent tokens, the owner token included, are refused | Run `shipvo login` as the owner |
 
 ## Next steps
 
