@@ -131,3 +131,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Export a collection as CSV (`csv()` in a spec action) | [phone-apps](phone-apps.md#export-data-as-csv) | | | |
 | Android update falls back to the full bundle when a patch is too big for memory (`patchError`) | [getting-started](getting-started.md#5-publish-over-the-air) | | | |
 | Rollback guard for stored-data format (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
+| Roll back safely with a state version (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
