@@ -184,6 +184,26 @@ try {
   await page.locator("#pg-many-count").fill("6");
   await page.locator("#pg-many-mix").selectOption("both");
   await page.locator('#pg-many-grid iframe[data-platform="ios"]').first().contentFrame().locator('[data-platform="ios"]').waitFor({ timeout: 30_000 });
+  // Shareable link: query applies to the controls, Copy link round-trips, bad values clamp.
+  await page.goto(`${base}/playground/?phones=4&mix=ios&dark=1#many`);
+  assert.equal(await frames("ios"), 4); assert.equal(await frames("android"), 0);
+  assert.equal(await page.locator("#pg-many-count").inputValue(), "4");
+  await page.locator('#pg-many-grid iframe').first().contentFrame().locator('.sf-body[data-theme="dark"]').waitFor({ timeout: 30_000 });
+  await page.goto(`${base}/playground/?phones=99&mix=zzz#many`);
+  assert.equal(await page.locator("#pg-many-count").inputValue(), "12"); assert.equal(await page.locator("#pg-many-mix").inputValue(), "both");
+  await page.goto(`${base}/playground/?phones=-3&mix=android#many`);
+  assert.equal(await page.locator("#pg-many-count").inputValue(), "1"); assert.equal(await frames("android"), 1);
+  await page.goto(`${base}/playground/#many`);
+  await page.locator("#pg-dark").click();
+  await page.locator("#pg-many-count").fill("3"); await page.locator("#pg-many-mix").selectOption("android");
+  await page.locator("#pg-many-copy").click();
+  const link = await page.evaluate(() => location.href);
+  const u = new URL(link);
+  assert.equal(u.searchParams.get("phones"), "3"); assert.equal(u.searchParams.get("mix"), "android"); assert.equal(u.searchParams.get("dark"), "1"); assert.equal(u.hash, "#many");
+  await page.goto(link);
+  assert.equal(await page.locator("#pg-many-count").inputValue(), "3"); assert.equal(await page.locator("#pg-many-mix").inputValue(), "android");
+  assert.equal(await page.locator("#pg-dark").getAttribute("aria-pressed"), "true");
+  assert.equal(await frames("android"), 3);
   await page.setViewportSize({ width: 375, height: 800 });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "many phones: no sideways scroll at 375 px");
   await page.setViewportSize({ width: 1280, height: 900 });
