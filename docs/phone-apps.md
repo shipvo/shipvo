@@ -97,6 +97,8 @@ A frame page without a session (`shipvo run`) lists the marketplace apps and ins
 | `list_store_apps` | Lists the marketplace apps (id, name, bundle URL, version) from the control plane | `store_unreachable` |
 | `install_app { id }` | Fetches the app's bundle and installs it; its icon appears on the home screen | `unknown_app`, `already_installed`, `store_app_unreachable`, `too_large`, `host_not_allowed` |
 | `switch_app { id }` | Opens an installed app; it becomes `current_app` | `not_installed` |
+| `pin_app { id, pinned }` | Puts the app at the top of the home screen, after apps pinned before it, or unpins it. Android and iOS style | `not_installed` |
+| `hide_app { id, hidden }` | Takes the app off the home screen and the app list, or brings it back. Its data stays, and `switch_app` and `run_app_action` still work | `not_installed` |
 | `uninstall_app { id }` | Removes it. If it was open, the phone goes home | `not_installed` |
 
 `/phone?session=<name>` on the simulator shows the phone frame for a live session, in its Android or iOS skin (`&skin=ios` or `&skin=android` overrides it). The home screen and the Store show the session's installed apps. Tap Install in the page and the app is installed on the session, so `device_log` records `install_app`. An `install_app` from the tools draws its icon on the page within a second. Tapping an icon runs `switch_app`. The read action `phone_apps` returns `where`, `current_app`, `installed_apps` and `store` for a session and writes nothing to `device_log`.

@@ -22,6 +22,7 @@
   },
   "files": [
     "server.mjs",
+    "secrets-forward.mjs",
     "net-gate.mjs",
     "chromium-hint.mjs",
     "browser-resolver.mjs",
