@@ -51,7 +51,7 @@ Use this to check which keys your apps have saved, without anyone seeing the key
 6. To remove a key, tap **Revoke** on its row and confirm. The prompt says this cannot be undone. The key is deleted and its row disappears. Tap **Cancel** and nothing is sent. Apps that used the key can no longer call the service until you save a key again.
 7. Tap **Back** to return to Settings.
 
-If a revoke does not go through, the screen shows "Could not revoke this key. Try again." and the row stays; tap **Revoke** again. With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate or revoke a key from a script.
+If a revoke does not go through, the screen shows "Could not revoke this key. Try again." and the row stays; tap **Revoke** again. With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` routes; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate or revoke a key from a script.
 
 ## Open a web page in the phone's Browser
 
@@ -98,6 +98,16 @@ A spec app with an `http` data source can refresh on an interval (`refresh`, in 
 - **events**: create, update, action and data refresh, newest last.
 
 Pass `id` for one app and `limit` for the number of recent events. Data and settings a person entered stay across versions, so the history is the record of what the agent changed.
+
+## Export data as CSV
+
+Any spec app can turn a collection into CSV with the `csv()` function. Return it from an action and the agent gets the text, on Android and iOS alike:
+
+```json
+{ "actions": { "export_diary": { "description": "Export the diary as CSV.", "input": {}, "returns": { "csv": "text" }, "do": [ { "return": "{{ csv(data.entries, ['date', 'title', 'mood', 'tags']) }}" } ] } } }
+```
+
+The first line holds the column names. Fields with commas, quotes or line breaks are quoted, and lists such as tags are joined with `; `. Leave the column list out to export every field. Spreadsheets treat a cell that starts with `=`, `+`, `-` or `@` as a formula. For text that other people typed, map the field first, for example `data.entries.map(r, {'note': has(r.note) && r.note.startsWith('=') ? "'" + r.note : (has(r.note) ? r.note : '')})`, then pass that list to `csv()`.
 
 ## Arrange the home screen
 
@@ -179,8 +189,31 @@ device_log { session }                 -> install_app (source "real" for marketp
 | Files and Photos | Keeps files and photos in one place, sorted by album. | `save_file`, `find_files`, `move_to_album`, `show_matches`, `delete_file` | [`templates/files-photos/app.json`](../templates/files-photos/app.json) |
 | Wallet | Keeps tickets, receipts and passes, grouped by kind, with an expiring-soon list. | `save_pass`, `find_pass`, `show_matches`, `delete_pass` | [`templates/wallet/app.json`](../templates/wallet/app.json) |
 | Shop | Lists products, takes orders and shows them in one place; the currency is a setting. | `add_product`, `find_products`, `place_order`, `list_orders`, `set_currency`, `show_matches`, `pick_product` | [`templates/shop/app.json`](../templates/shop/app.json) |
+| Assistant Inbox | Lets ChatGPT, Claude and other assistants on the same phone message each other and hand over tasks. Android and iOS. | `send_message`, `check_inbox`, `mark_read`, `read_thread`, `hand_off`, `my_tasks`, `start_task`, `finish_task`, `sent_tasks`, `share_report`, `get_reports` | [`templates/assistant-inbox/app.json`](../templates/assistant-inbox/app.json) |
 
 The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action into a tool. Two assistants on the same phone read and write the same tasks and notes. Copy the folder to start your own app. The screen tree names every control: tabs `Tasks` and `Notes`, lists `Open tasks`, `Done tasks` and `Notes`, forms `Complete task form`, `New task form` and `New note form`. Test: `pnpm --filter @shipvo/spec test`.
+
+### Assistants talking to each other
+
+Connect ChatGPT and Claude to the same phone and install the Assistant Inbox. The phone knows which assistant is calling from the name it connects with, so nobody types a name. Actions can read it as `{{ caller }}` (`claude`, `chatgpt`, `cursor`, `gemini`, or the client's own name in lower case). A person tapping the screen has no caller.
+
+1. ChatGPT calls `send_message` with `to: "claude"`. The sender is filled in as `chatgpt`.
+2. Claude calls `check_inbox` with no input, answers with `send_message`, and calls `mark_read`.
+3. To pass work, `hand_off` creates a task for the other assistant. They list theirs with `my_tasks`, call `start_task`, then `finish_task` with the result. The sender reads the status and reply with `sent_tasks`.
+
+A message to `anyone` reaches whichever assistant checks first. The Messages and Tasks tabs show the same data, so you can follow the exchange on the phone. An explicit `from` still works when you want to send as someone else.
+
+`mark_read`, `start_task` and `finish_task` only act on what was sent to the caller (or to `anyone`). When nothing matched they return `updated: false` with the reason, so an assistant is never told it worked when it did not. A finished task keeps its first reply. Two clients of the same assistant, such as claude.ai and Claude Code, share the name `claude` and so share one inbox. A client that connects with no name has no caller, and these actions then match any row, as they do when a person taps the screen.
+
+### Things to do with two assistants on one phone
+
+- **Research, review, synthesize.** Tell ChatGPT: "Research this topic, then `share_report` your findings to Claude." Tell Claude: "Read your reports with `get_reports`, share a review of any gaps, then share a final synthesis." Reports carry a kind (`research`, `review`, `synthesis`) and an author, and the Reports tab lists them.
+- **Architect and builder.** Tell Claude: "Write the spec for a habit tracker as notes in Notes and Tasks, then hand the build to ChatGPT." Tell ChatGPT: "Check your tasks, read the notes, build the app with `create_app` and report back with `finish_task`."
+- **Customer and support.** Tell ChatGPT: "Act as a customer of the Shop app. Message support when something breaks." Tell Claude: "Watch your inbox. When a customer reports a bug, reproduce it on the phone, fix the app with `update_app` and reply."
+- **Builder and breaker.** Tell one assistant to build an app such as Daybook and `hand_off` "try to break it" with the edge cases to try. The other opens the app, tries them and returns what it found with `finish_task`.
+- **Memory relay.** The phone keeps its data between chats and between assistants. One assistant saves notes, files or tasks today. Another picks them up next week, from a different product, with no copy and paste. `export_phone_apps` takes the whole lot out as JSON.
+- **Debate with a record.** Two assistants argue a decision by message. Each reads the thread with `read_thread`, and you read the same thread on the Messages tab.
+- **Night shift.** Hand a long task to an assistant before you leave. Read the status and result when you are back.
 
 ## Open a link in the owning app
 

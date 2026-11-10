@@ -1,63 +1,60 @@
 # Rollbacks and stored data
 
-This page is for developers whose app keeps data on the phone (AsyncStorage, SQLite or MMKV). You will learn how to tell Shipvo which data format a release uses, so a rollback on Android and iOS never sends phones back to code that cannot read their saved data.
-
-A rollback sends phones back to older code. If the newer release already changed how stored data is laid out, the older code may crash or damage that data. A release can declare the format it uses, and Shipvo checks it before it sends phones back.
+For app owners who roll back a bad release. A rollback sends phones back to older code. If the newer release already changed how your app saves data on the phone (AsyncStorage, SQLite or MMKV), the older code may crash or damage that data. You will learn how to tell Shipvo which data format each release uses, so `shipvo rollback` stops before it sends phones to code that cannot read their data. This works the same for Android and iOS.
 
 ## Declare a state version
 
-1. Open `shipvo.json` and add `stateVersion`. It is a positive integer. Raise it whenever a release changes how stored data is laid out.
+The state version is a whole number you choose. Raise it whenever a release changes the layout of stored data. Releases that keep the same layout keep the same number.
+
+1. Open `shipvo.json` in your project.
+2. Add `stateVersion` as a positive integer:
 
    ```json
    { "appId": "tide", "stateVersion": 3 }
    ```
 
-2. Publish as usual:
+3. Run `shipvo publish` as usual. The number is signed into the release with the rest of it.
 
-   ```bash
-   npx shipvo publish
-   ```
-
-   `shipvo publish` signs the number into the release. Releases without it work as before.
+Releases without `stateVersion` work as before. A value that is not a whole number of 1 or more stops `shipvo publish` with `shipvo.json: stateVersion must be a positive integer`.
 
 ## Roll back
 
-```bash
-npx shipvo rollback --to 5 --dry-run   # preview
-npx shipvo rollback --to 5
-```
-
-If the target release has a lower `state_version` than the one phones run, `shipvo rollback` stops and says so:
+`shipvo rollback --to <release>` compares the target release with the highest `state_version` among the bands it changes (`b0,b1,b2` unless you pass `--bands`). If the target is lower, or has none, the command stops and prints what to do:
 
 ```
 Release 5 (android) has state_version 2, but phones already run state_version 3. Older code may not read data the newer release stored. Publish a fix forward, or pass --allow-state-downgrade to roll back anyway. The choice is recorded in the audit log.
 ```
 
-Publish a fix forward, or choose the rollback on purpose:
+Nothing is written. You have two choices:
 
-```bash
-shipvo rollback --to 5 --allow-state-downgrade
-```
+- **Publish a fix forward.** Ship a new release that has the old behaviour and still reads the new data format. This is the safe choice.
+- **Roll back on purpose.** You accept that phones may lose or fail to read the newer data:
 
-The control plane records a rollback that lowers `state_version` in the audit log (`shipvo audit <app>`) with the `from` and `to` versions.
+  ```bash
+  shipvo rollback --to 5 --allow-state-downgrade
+  ```
 
-## Options
+Rollbacks to the same or a higher state version need no flag. `shipvo rollback --dry-run` shows what would happen, and with `--allow-state-downgrade` it lists the downgrade under `state_downgrade` in the result.
 
-| Option | Where | What it does |
-| --- | --- | --- |
-| `stateVersion` | `shipvo.json` | Positive integer signed into each release. Leave it out if your app stores nothing on the phone. |
-| `--allow-state-downgrade` | `shipvo rollback` | Roll back to a release with a lower `state_version`. The audit log records it. |
-| `--json` | `shipvo rollback` | A blocked rollback returns the error code `state_downgrade` and the command to run with `--allow-state-downgrade`. |
+## What gets recorded
+
+The rolled-back release keeps the target's `state_version`. The control plane records a rollback that lowers it in the audit log with the `from` and `to` versions. Read it with `shipvo audit <app>`.
+
+## With `--json`
+
+Without `--allow-state-downgrade`, `shipvo rollback --json` fails with `code` `state_downgrade`. The `next` field holds the same command with the flag added. A rollback that goes ahead adds `data.state_downgrade`, a list of `{ platform, from, to }`.
 
 ## Troubleshooting
 
-| What you see | Why | What to do |
+| You see | What it means | What to do |
 | --- | --- | --- |
-| `shipvo.json: stateVersion must be a positive integer` (code `bad_config`) | The value is `0`, negative, a decimal or a string such as `"3"` | Write a whole number of 1 or more, without quotes |
-| `shipvo rollback` stops with `state_version` in the message | Phones run a newer data format than the release you chose | Publish a fix forward, or add `--allow-state-downgrade` if you know the older code can read the data |
-| The message says `state_version none` | The target release was published before you set `stateVersion` | Treat it as the oldest format; roll back only if that code can read the current data |
+| `has state_version none, but phones already run state_version 3` | The release you chose was published without `stateVersion`. | Publish a fix forward, or add `--allow-state-downgrade`. |
+| `shipvo.json: stateVersion must be a positive integer` | The value is `0`, negative, a decimal or text. | Use `1`, `2`, `3` and so on, without quotes. |
+| The rollback stops and you did not expect it | A newer release set a higher `stateVersion`. | Run `shipvo status` to see the releases. Decide whether the data format changed. |
+| You want to be sure before you run it | Nothing is wrong. | Run `shipvo rollback --to <release> --dry-run` first. |
 
 ## Next steps
 
-- [CLI guide](cli.md): every command, including `rollback` and `audit`
-- [Glossary](glossary.md)
+- [CLI guide](cli.md) for every command and its `--json` output.
+- [Moving to a new machine](new-machine.md) and [Key rotation](key-rotation.md) for the signing keys behind every release.
+- [Glossary](glossary.md) for state version and rollback.

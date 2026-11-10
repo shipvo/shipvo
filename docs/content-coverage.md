@@ -6,7 +6,7 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
-1. Describe an app and it appears (`create_app`, `update_app`, `app_activity`; launch kit written 10 Nov; docs: [describe-an-app](describe-an-app.md); tutorial, video and blog needed) and the browser playground (launch kit written 10 Nov; tutorial, video and blog needed)
+1. Describe an app and it appears (`create_app`, `update_app`, `app_activity`; launch kit written 10 Nov; docs: [describe-an-app](describe-an-app.md); tutorial and video needed; blog done 10 Nov) and the browser playground (launch kit written 10 Nov; tutorial, video and blog needed)
 1b. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog done (10 Nov), tutorial done; video now for the live page; the agent-vs-agent video and launch kit once #1166 merges. Docs: [demos/chess](demos/chess.md) (live page, `--agents`, `--record`, troubleshooting).
 2. ~~Shipvo Testers and `shipvo store testers`~~ (done)
 3. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog done) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial done 10 Nov; video needs the new section)
@@ -105,7 +105,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Playground Many phones (1 to 12 Android and iOS phones, shareable link) | [getting-started](getting-started.md#try-it-in-your-browser-first) | | | |
 | Pin and hide apps on the home screen (`pin_app`, `hide_app`) | [phone-apps](phone-apps.md) | | | [test-an-app-on-a-phone-with-a-store-and-other-apps](../blog/test-an-app-on-a-phone-with-a-store-and-other-apps.md) |
 | Arrange the home screen (`arrange_apps`, schedules, `set_phone_time`) | [phone-apps](phone-apps.md) | | | [test-an-app-on-a-phone-with-a-store-and-other-apps](../blog/test-an-app-on-a-phone-with-a-store-and-other-apps.md) |
-| Describe an app and it appears (`create_app`, `update_app`) | [describe-an-app](describe-an-app.md), [phone-apps](phone-apps.md) | | | |
+| Describe an app and it appears (`create_app`, `update_app`) | [describe-an-app](describe-an-app.md), [phone-apps](phone-apps.md) | | | [describe-an-app-and-it-appears-on-a-phone](../blog/describe-an-app-and-it-appears-on-a-phone.md) |
 | Export and import a phone's apps and home-screen layout (`export_phone_apps`, `import_phone_apps`, layout warnings) | [phone-apps](phone-apps.md) | | | |
 | Real app install from the Store (`install_app`, `find_apps`) | [phone-apps](phone-apps.md) | | | |
 | SAML sign-in for the control plane | [sso](sso.md) | | | |
@@ -127,3 +127,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Network proxy refusal codes (`x-shipvo-net-error`) | [phone-network](phone-network.md#troubleshooting) | | | |
 | Room log and notes (`room_log`, `room_note`): a lead agent sees what the others did | [agents](agents.md#room-log-and-notes) | | | |
 | Shop template warns when a price is in the wrong unit (`[shop]` message, failing test) | [your-own-shop](tutorials/your-own-shop.md#troubleshooting), [getting-started](getting-started.md#the-shop-checkout) | [your-own-shop](tutorials/your-own-shop.md) | | |
+| Roll back safely with a state version (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |

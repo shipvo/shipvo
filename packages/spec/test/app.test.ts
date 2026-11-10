@@ -155,3 +155,17 @@ describe("the form submit matches the action's tool", () => {
     expect(props).toEqual(form);
   });
 });
+
+describe("an action that returns CSV text", () => {
+  it("hands the string back unchanged", () => {
+    const spec = {
+      spec: "shipvo.app/v0", app: { id: "csvx", name: "Csv", icon: "note" },
+      data: { rows: { source: "collection", fields: { title: "text", tags: "text" }, seed: [{ title: "A, B", tags: ["x", "y"] }] } },
+      screens: [{ id: "home", title: "Home", body: [{ type: "text", value: "hi" }] }],
+      actions: { export_rows: { description: "Export.", input: {}, returns: { csv: "text" }, do: [{ return: "{{ csv(rows, ['title', 'tags']) }}" }] } }
+    };
+    const r = createApp(spec);
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    expect(r.app.call("export_rows")).toEqual({ ok: true, value: 'title,tags\r\n"A, B",x; y\r\n' });
+  });
+});

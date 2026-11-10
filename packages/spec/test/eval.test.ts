@@ -89,6 +89,21 @@ describe("evaluate: text and fallbacks", () => {
     expect(ev("'hello'.startsWith('he')")).toBe(true);
     expect(ev("'hello'.matches('h.*o')")).toBe(true);
   });
+  it("csv", () => {
+    const rows = [{ title: "A, B", note: 'say "hi"', tags: ["x", "y"], n: 2 }, { title: "line\nbreak", n: null }];
+    expect(evaluate("csv(rows, ['title','note','tags','n'])", { rows })).toBe(
+      'title,note,tags,n\r\n"A, B","say ""hi""",x; y,2\r\n"line\nbreak",,,\r\n'
+    );
+    expect(String(evaluate("csv(rows)", { rows })).split("\r\n")[0]).toBe("title,note,tags,n");
+    expect(ev("csv([], ['a'])")).toBe("a\r\n");
+  });
+
+  it("csv: a null in a list is empty, an object in a list is JSON, and 3 arguments are refused", () => {
+    expect(evaluate("csv(rows, ['t'])", { rows: [{ t: ["a", null, "b"] }] })).toBe("t\r\na; ; b\r\n");
+    expect(evaluate("csv(rows, ['t'])", { rows: [{ t: [{ k: 1 }] }] })).toBe('t\r\n"{""k"":1}"\r\n');
+    expect(() => evaluate("csv(rows, ['t'], 1)", { rows: [] })).toThrow();
+  });
+
   it("orElse", () => {
     expect(ev("orElse(null, 'x')")).toBe("x");
     expect(ev("orElse('a', 'x')")).toBe("a");
