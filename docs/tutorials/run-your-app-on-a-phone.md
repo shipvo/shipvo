@@ -80,7 +80,7 @@ Look at the terminal. You should see `Rebuilding...` and, a moment later, a line
 
 ![The same phone after the edit. The fourth product now says Merino beanie, still at $24.00.](/tutorials/run-your-app-on-a-phone/08-after-edit.png)
 
-Now make a mistake on purpose. In the same file, break one line on purpose. Before:
+Now make a mistake on purpose. In the same file, break one line. Before:
 
 ```json
 "name": "Merino beanie",
