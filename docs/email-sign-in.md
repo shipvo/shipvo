@@ -1,8 +1,8 @@
 # Test an email sign-in on Android and iOS
 
-This page is for developers and for anyone who drives an app with an assistant. You will learn how to finish a sign-in that sends a code or a link by email, in a test or through an agent, without a real mailbox.
+This page is for developers and for anyone testing an app that signs in by email. You will finish an emailed-code or magic-link sign-in in a test or with an agent, without a real mailbox.
 
-Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
+Many apps sign in with a code or a link sent by email. Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
 
 The inbox works the same on the Android and iOS phones.
 
@@ -80,7 +80,7 @@ The inbox, the tools and `phone.inbox` are the same on the Android and iOS phone
 | You see | Cause | Fix |
 | --- | --- | --- |
 | `inbox_timeout` | No mail matched `subject` or `from` before `timeout` (`timeout_ms` in the MCP tool) ran out | Call `inbox_read` (or `phone.inbox.list()`) to see what arrived. If it is empty, check that the app tapped the send button and that your `mockNetwork` rule has a `mail` field. If mail is there, loosen `subject`. |
-| `inbox_no_code` | `phone.inbox.code()` found mail with no 4 to 8 digit number | Read the mail with `waitFor` and look at `text`. A code inside a longer number or a word is not picked up. For a link, use `links[0]` instead. |
+| `inbox_no_code` | `phone.inbox.code()` found mail with no 4 to 8 digit number | Read `text` from `waitFor`, and put a 4 to 8 digit number in the stub's mail text. A code inside a longer number or a word is not picked up. For a link, use `links[0]`. |
 | `bad_timeout` | `timeout_ms` is above 25000 or not a whole number | Use a whole number from 0 to 25000. |
 | `session_ended` | The session closed while you waited | Open the app again. The inbox and its address are new for each session. |
 | Status 550 from `https://inbox.shipvo.test/send` | The `to` address is not this session's address | Send to the address from `inbox_read` or `phone.inbox.address()`. |

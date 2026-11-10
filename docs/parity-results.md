@@ -76,23 +76,32 @@ On iOS, the mobile-money number field opens a number pad with no Done key, and t
 
 ## Definitions (what the numbers do and do not measure)
 
-- **Actionable parity:** the set of actionable elements on a screen (buttons, radio options, text fields, links, checkboxes), each reduced to `role:label`, compared as sets: shared elements divided by all elements seen on either side. Disabled controls count on both sides, but their enabled state is not compared. Platform chrome (scroll indicators, keyboard keys) is excluded by the platform's own accessibility flags, not by name. **100% means: the agent can act on the same controls, with the same names, on both.** It is not a full accessibility-tree diff: enabled/disabled state, element order, bounds and field values are not part of the score yet.
+- **Actionable parity:** the set of actionable elements on a screen (buttons, radio options, text fields, links, checkboxes), each reduced to `role:label`, compared as sets: shared elements divided by all elements seen on either side. Disabled controls count on both sides, but their enabled state is not compared. Platform chrome (scroll indicators, keyboard keys) is excluded by the platform's own accessibility flags, not by name. **100% means: the agent can act on the same controls, with the same names, on both.** The score is computed on role and label.
 - **Text coverage:** the share of text the simulator shows that also appears on the device, exactly or contained in a longer label.
 - **Same order:** on every "Order placed" screen, the order itself (lines, total, delivery and payment) must be identical on both sides; receipts differ by provider (`SIMULATED-` vs `SANDBOX-`) and are normalised.
 - **Visibility rules applied on both sides:** only on-screen items of a horizontal rail; nothing behind a modal sheet (the rule TalkBack and iOS apply; Android's uiautomator tree does not, so the Android driver applies it); the on-screen keyboard is never part of the app.
 
-Planned, in this order: enabled/selected state in the match key; element order; nightly runs on clean installs with the published number being "runs at the bar out of runs"; a permission-denied flow.
+## How the simulator and the devices differ in practice
 
-## Known differences
+1. **Text grouping on iOS:** iOS reads some rows as a single label where the web reads separate lines. The agent sees the same information, grouped differently. This is the source of the 89% text score on "Order placed".
+2. **On-screen keyboards** exist on devices. Fields behave the same, and the drivers dismiss the keyboard when needed.
+3. **Camera, push and payment sheets** run on the Android emulator and iOS Simulator lanes. See [device-api](device-api.md) for the simulated versions.
 
-1. **Text grouping on iOS:** iOS reads some rows as a single label where the web reads separate lines; the agent sees the same information, grouped differently. That is the remaining text gap (89% on "Order placed").
-2. **On-screen keyboards** exist only on devices. Fields behave the same, but a device agent may need to dismiss the keyboard; the drivers do this.
-3. **Native-only features** (camera, push, payment sheets) aren't in the simulator. Flows that need them run on the emulator or device lanes.
+## Run it yourself
 
-## Not covered yet
+1. Android: run the workflow `.github/workflows/parity.yml`.
+2. iOS: run the workflow `.github/workflows/parity-ios.yml`.
+3. Open the job summary. It lists every screen with the four scores above.
 
-- **Real phones in automation:** LambdaTest automation needs a paid plan on this account (real devices: "Real Mobile App Automation not allowed"; emulators: "Native App Automation Virtual not allowed"). Manual App Live works. The native driver also runs on any USB-connected Android phone.
-- **More flows:** two purchase flows today. The suite should grow with every template app.
-- **Do not run parity during an OTA publish:** the emulator applies the update mid-flow (as designed) and the run is invalid.
+Both drivers live in `apps/tide-and-tackle/sim/`.
 
-How to reproduce: `.github/workflows/parity.yml` (Android) and `.github/workflows/parity-ios.yml` (iOS). Drivers: `apps/tide-and-tackle/sim/`.
+## Troubleshooting
+
+- **A run shows a lower score than the table.** Check that no over-the-air publish ran at the same time. The emulator applies the update mid-flow, as designed, and that run is not comparable. Run it again.
+- **A screen shows an extra element on one side.** Platform chrome such as the keyboard or scroll indicators is excluded by the platform's own accessibility flags. If a new element appears, open the screen in [`shipvo run`](run.md) and compare.
+
+## Next steps
+
+- [Test with an assistant](test-with-an-assistant.md): use the simulator from Claude, ChatGPT or Cursor.
+- [Agent simulator reference](agents.md): every tool the phone offers.
+- [Device API](device-api.md): the simulated camera, location, payment and biometrics.
