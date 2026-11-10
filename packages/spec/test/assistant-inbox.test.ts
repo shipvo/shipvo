@@ -75,18 +75,30 @@ describe("Assistant Inbox spec app", () => {
     expect(p.call("sent_tasks", {}, "chatgpt").out.value.tasks).toEqual([]);
   });
 
-  it("an assistant cannot read-mark, start or finish what was sent to someone else", () => {
+  it("an assistant cannot read-mark, start or finish what was sent to someone else, and is told so", () => {
     const p = phone();
     p.call("send_message", { to: "claude", body: "private" }, "chatgpt");
     p.call("hand_off", { to: "claude", title: "Claude's job" }, "chatgpt");
-    p.call("mark_read", { id: "m1" }, "cursor");
-    p.call("start_task", { id: "h1" }, "cursor");
-    p.call("finish_task", { id: "h1", reply: "stolen" }, "cursor");
+    const no = { updated: false };
+    expect(p.call("mark_read", { id: "m1" }, "cursor").out.value).toMatchObject({ ...no, reason: "No message with that id was sent to you." });
+    expect(p.call("start_task", { id: "h1" }, "cursor").out.value).toMatchObject({ ...no, reason: "No open task with that id was handed to you." });
+    expect(p.call("finish_task", { id: "h1", reply: "stolen" }, "cursor").out.value).toMatchObject({ ...no, reason: "No unfinished task with that id was handed to you." });
     expect(p.call("check_inbox", {}, "claude").out.value.messages).toHaveLength(1);
     const t = p.call("my_tasks", {}, "claude").out.value.tasks[0];
     expect([t.status, t.reply]).toEqual(["open", ""]);
-    p.call("finish_task", { id: "h1", reply: "done" }, "claude");
+    expect(p.call("finish_task", { id: "h1", reply: "done" }, "claude").out.value).toEqual({ updated: true, reason: "" });
     expect(p.call("my_tasks", {}, "claude").out.value.tasks).toEqual([]);
+  });
+
+  it("says so when an id does not exist, and a finished task keeps its first reply", () => {
+    const p = phone();
+    expect(p.call("mark_read", { id: "m99" }, "claude").out.value).toMatchObject({ updated: false });
+    p.call("hand_off", { to: "claude", title: "Once" }, "chatgpt");
+    expect(p.call("start_task", { id: "h1" }, "claude").out.value.updated).toBe(true);
+    expect(p.call("start_task", { id: "h1" }, "claude").out.value).toMatchObject({ updated: false });
+    p.call("finish_task", { id: "h1", reply: "first" }, "claude");
+    expect(p.call("finish_task", { id: "h1", reply: "second" }, "claude").out.value).toMatchObject({ updated: false, reason: "No unfinished task with that id was handed to you." });
+    expect(p.call("sent_tasks", {}, "chatgpt").out.value.tasks[0].reply).toBe("first");
   });
 
   it("an explicit name wins, and a caller with no name is 'unknown'", () => {
