@@ -108,13 +108,13 @@ Content agents take their next item from this list first (top to bottom, skippin
 | W3C `traceparent` recorded from MCP tool calls | [mcp](../packages/mcp/README.md) | | | |
 | Spec `calendar` and `map` blocks (month, week, agenda; pins with no tile calls) | [spec-blocks](spec-blocks.md#calendars-and-maps) | | | |
 | Open a hosted build from a link (`POST /session` with `build_url`) | [test-your-build](test-your-build.md#open-a-build-from-a-link) | | | |
-| Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
+| Secrets screen in the phone's Settings (saved keys, metadata only, Revoke button) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
 | Arrange the home screen and set the phone's clock (`arrange_apps`, `set_phone_time`, `placement` in `phone.json`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
 | Phone frame page `/phone?session=` with Store and installed apps | [phone-apps](phone-apps.md) | | | |
 | Watch link on the hosted phone (`watch_url`, read-only, sign in to take over) | [agents](agents.md#watch-link-on-the-hosted-phone) | | | |
 | Hosted MCP sign-in with URL client ids (Client ID Metadata Documents) | [agents](agents.md) | | | |
 | Data sources refresh on an interval (`refresh`, 30 seconds or more) | [spec-blocks](spec-blocks.md#keep-a-data-source-fresh) | | | |
-| Gallery of example specs (`packages/spec/gallery`) | [spec-blocks](spec-blocks.md#example-specs) | | | |
+| Gallery of example specs (`packages/spec/gallery`: habit tracker, workout log, expense splitter, trip checklist, flashcards) | [spec-blocks](spec-blocks.md#example-specs) | | | |
 | Faster rebuild after a save in `shipvo run` (Metro cache kept) | [run](run.md) | | | |
 | See what an agent built and changed in a spec app (`app_activity`) | [phone-apps](phone-apps.md#see-what-was-built-and-changed) | | | |
 | Fetch an app's live data now (`refresh_app`) | [phone-apps](phone-apps.md#fetch-live-data-now) | | | |
