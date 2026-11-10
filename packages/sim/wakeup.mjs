@@ -8,6 +8,9 @@ import { checkUrl } from "./phone-browser.mjs";
 export class WakeupError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
 const EVENTS = ["message", "task"];
+const FORMATS = ["json", "text", "slack"];
+const NAMES = { chatgpt: "ChatGPT", claude: "Claude", gemini: "Gemini", cursor: "Cursor", copilot: "Copilot", mistral: "Mistral" };
+const shown = (n) => NAMES[n] ?? n.charAt(0).toUpperCase() + n.slice(1);
 const MAX_WAKEUPS = 20;
 const RETRY_DELAYS_MS = [1000, 3000];
 const TIMEOUT_MS = 5000;
@@ -20,6 +23,14 @@ function summary(name, m, t) {
   if (m) parts.push(`${m} new ${m === 1 ? "message" : "messages"}`);
   if (t) parts.push(`${t} new ${t === 1 ? "task" : "tasks"}`);
   return `${parts.join(" and ")} for ${name} on the phone`;
+}
+
+/** The line a person reads when the URL is a notification service: what arrived and where to go. */
+export function nudgeText(name, m, t) {
+  const parts = [];
+  if (m) parts.push(`${m} new ${m === 1 ? "message" : "messages"}`);
+  if (t) parts.push(`${t} new ${t === 1 ? "task" : "tasks"}`);
+  return `${shown(name)} has ${parts.join(" and ")} on the phone. Open your chat with ${shown(name)} to pick it up.`;
 }
 
 /**
@@ -35,7 +46,10 @@ export function createWakeups(read, log, opts = {}) {
   const inflight = new Set();
 
   async function deliver(name, e, payload) {
-    const body = JSON.stringify(payload);
+    // json: the note described in the docs. text: one plain line for a push service such as ntfy. slack: {"text": line} for a Slack-style webhook.
+    const line = nudgeText(name, payload.messages.length, payload.tasks.length);
+    const body = e.format === "text" ? line : e.format === "slack" ? JSON.stringify({ text: line }) : JSON.stringify(payload);
+    const type = e.format === "text" ? "text/plain; charset=utf-8" : "application/json";
     let attempts = 0, status = 0, error = "";
     for (const wait of [0, ...delays]) {
       if (wait) await new Promise((r) => setTimeout(r, wait));
@@ -45,7 +59,7 @@ export function createWakeups(read, log, opts = {}) {
         // Re-check on every attempt: a name can start pointing at a private address after it was registered.
         await checkUrl(e.url, { allowPrivate: e.allowPrivate }, opts.resolve);
         const r = await doFetch(e.url, { method: "POST", redirect: "manual", signal: AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS),
-          headers: { "content-type": "application/json", "user-agent": "shipvo-phone/wakeup", "x-shipvo-signature": sign(e.secret, ts, body), "x-shipvo-event": payload.event }, body });
+          headers: { "content-type": type, ...(e.format === "text" ? { title: "Shipvo phone" } : {}), "user-agent": "shipvo-phone/wakeup", "x-shipvo-signature": sign(e.secret, ts, body), "x-shipvo-event": payload.event }, body });
         status = r.status; error = "";
         if (r.status >= 200 && r.status < 300) break;
         error = `the URL answered ${r.status}`;
@@ -75,11 +89,12 @@ export function createWakeups(read, log, opts = {}) {
   return {
     tick,
     /** Registers (or replaces) the URL for an assistant name. Anything already waiting is the starting point: only later arrivals wake. Returns the secret when it was generated. */
-    async register({ name, url, events, secret, allowPrivate = false }) {
+    async register({ name, url, events, secret, format = "json", allowPrivate = false }) {
       const n = String(name ?? "").trim().toLowerCase();
       if (!n) throw new WakeupError("bad_name", "name is the assistant to wake, such as chatgpt or claude");
       const ev = events == null ? [...EVENTS] : events;
       if (!Array.isArray(ev) || !ev.length || ev.some((x) => !EVENTS.includes(x))) throw new WakeupError("bad_events", `events can be ${EVENTS.map((x) => `"${x}"`).join(" and ")}`);
+      if (!FORMATS.includes(format)) throw new WakeupError("bad_format", `format can be ${FORMATS.map((x) => `"${x}"`).join(", ")}`);
       if (typeof secret === "string" && secret.length > 0 && secret.length < 16) throw new WakeupError("bad_secret", "a secret must be at least 16 characters, or leave it out and one is generated");
       try { await checkUrl(url, { allowPrivate }, opts.resolve); } catch (e) { throw new WakeupError(e.code === "host_not_allowed" ? "host_not_allowed" : "bad_url", e.message); }
       if (!/^https?:/i.test(String(url))) throw new WakeupError("bad_url", "only http and https URLs can be called");
@@ -88,11 +103,11 @@ export function createWakeups(read, log, opts = {}) {
       const s = generated ? randomBytes(24).toString("hex") : secret;
       const now = pendingIds(read(), n);
       const sent = new Set([...now.messages.map((id) => `m:${id}`), ...now.tasks.map((id) => `t:${id}`)]);
-      entries.set(n, { url: String(url), secret: s, events: [...ev], sent, allowPrivate });
+      entries.set(n, { url: String(url), secret: s, events: [...ev], format, sent, allowPrivate });
       start();
-      return { name: n, url: String(url), events: [...ev], ...(generated ? { secret: s } : {}) };
+      return { name: n, url: String(url), events: [...ev], format, ...(generated ? { secret: s } : {}) };
     },
-    list() { return [...entries].map(([name, e]) => ({ name, url: e.url, events: e.events })); },
+    list() { return [...entries].map(([name, e]) => ({ name, url: e.url, events: e.events, format: e.format })); },
     clear(name) { const had = entries.delete(String(name ?? "").trim().toLowerCase()); if (!entries.size) stop(); return had; },
     close() { entries.clear(); stop(); },
     /** Resolves when every delivery started so far has finished. For tests. */
