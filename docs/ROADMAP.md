@@ -85,12 +85,13 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: Key rotations appear in `shipvo audit` next to publishes and rollbacks ([Key rotation](key-rotation.md#see-rotations-in-the-audit-log), #1505)
 - 2026-11-10: Every session has a private inbox, so tests and agents can finish email-code and magic-link sign-in on Android and iOS ([Test an email sign-in](email-sign-in.md), #1496)
 - 2026-11-10: Assistant Inbox: assistants on one phone message each other and hand over tasks, with `{{ caller }}` filled in automatically ([Phone apps](phone-apps.md#assistants-talking-to-each-other), #1472)
 - 2026-11-10: A denied camera or files permission now stops a `navigate` to a screen with a camera, scanner or file block ([Phone apps](phone-apps.md#device-permissions-per-app), #1491)
-- 2026-11-10: An Android patch that runs out of memory or is over the memory budget falls back to the full download ([Getting started](getting-started.md), #1454)
-- 2026-11-10: Agents can use the prefixed refs the phone returns after a restart ([Agents](agents.md), #1459)
-- 2026-11-10: `csv()` exports a spec app's collection as CSV ([Phone apps](phone-apps.md), #1458)
+- 2026-11-10: Spec apps export a list as CSV with `csv(rows, columns?)` ([Export data as CSV](spec-blocks.md#export-data-as-csv), #1458)
+- 2026-11-10: `tap`, `type`, `scroll` and `wait_for` accept the refs the phone returns after a restart, such as `f1e2` ([Agents](agents.md#troubleshooting), #1459)
+- 2026-11-10: On Android, an update patch that would use too much memory falls back to the full download ([Runtime](../packages/runtime/README.md#patches-on-small-heaps-android), #1454)
 - 2026-11-10: Declare a `stateVersion` with each release; `shipvo rollback` stops before sending phones to older code that cannot read newer saved data ([Rollbacks and stored data](rollbacks-and-stored-data.md), #1442)
 - 2026-11-10: **Use log** on the Secrets screen shows when, where and with what outcome each saved key was used ([Phone apps](phone-apps.md#see-saved-keys-in-settings), #1431)
 - 2026-11-10: A page for founders and developers on describing an app and watching it appear, with a checked example spec and troubleshooting ([Describe an app](describe-an-app.md))

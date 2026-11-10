@@ -1,0 +1,2 @@
+- Docs: new "Export data as CSV" section in the app spec guide, a restart-refs entry in the Agents troubleshooting, and the Android patch memory fallback in the `@shipvo/runtime` README.
+- Migration: none.

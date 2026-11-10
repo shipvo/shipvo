@@ -84,8 +84,19 @@ Agents use three tools. Each takes the `session` from `open_app`.
 
 The inbox, the tools and `phone.inbox` are the same on the Android and iOS phones. With MCP, open the session with `platform: "android"` or `platform: "ios"` in `open_app` and follow the same steps.
 
+## Troubleshooting
+
+| You see | Cause | Fix |
+| --- | --- | --- |
+| `inbox_timeout` | No mail matched `subject` or `from` before `timeout` ran out | Call `inbox_read` (or `phone.inbox.list()`) to see what arrived. If it is empty, check that the app tapped the send button and that your `mockNetwork` rule has a `mail` field. If mail is there, loosen `subject`. |
+| `inbox_no_code` | The matching mail has no 4 to 8 digit number | Read the mail with `waitFor` and look at `text`. For a link, use `links[0]` instead. |
+| `bad_timeout` | `timeout_ms` is above 25000 or not a whole number | Use a whole number from 0 to 25000. |
+| `session_ended` | The session closed while you waited | Open the app again. The inbox and its address are new for each session. |
+| Status 550 from `https://inbox.shipvo.test/send` | The `to` address is not this session's address | Send to the address from `inbox_read` or `phone.inbox.address()`. |
+| An old code is picked up | The inbox still holds mail from an earlier attempt | Call `inbox_clear` (or `phone.inbox.clear()`) before each attempt. |
+
 ## Next steps
 
-- [Test with an assistant](test-with-an-assistant.md): connect Claude, ChatGPT or Cursor to the phone.
-- [Test your app in CI](testing.md): run this test on every pull request.
-- [Agents and tools](agents.md): every MCP tool, including the three inbox tools.
+- [Testing](testing.md) for `mockNetwork` and the rest of the typed test API.
+- [Agents](agents.md) for the other tools an assistant can call on the phone.
+- [Phone apps](phone-apps.md) for the apps on the phone that send and read mail.
