@@ -24,7 +24,7 @@ The public key is written into the app at build time as native manifest meta-dat
 Assets:
 
 - **Publisher seed.** The Ed25519 private key. Only the seed can create a release that phones accept. It lives in your CI secrets or `.shipvo/seed.txt` (`packages/cli/src/config.ts`, `packages/cli/src/signing.ts`).
-- **Pinned public key.** In every installed app. It cannot be rotated for apps already installed. Losing the seed means shipping a new store build.
+- **Pinned public key.** In every installed app. Apps built with `rootKey` pin an offline root key. A root-signed statement replaces a lost or leaked release key without a new store build (see "Lost or leaked release key").
 - **Users' phones.** They run whatever JavaScript bundle passes the checks above, with the native permissions of the installed shell.
 
 Actors and what each holds:
@@ -63,9 +63,33 @@ Trust boundaries, from least to most trusted:
 | **A signed release that crashes the app** | Not an attack, but the same blast radius. The device counts trial boots, drops a release that never reports healthy, and reverts one that dies shortly after. | `BootRules.kt`, `Store.swift` | `StabilityTest.kt` `releaseThatDiesAfterMarkHealthyIsReverted`; `RuntimeTests.swift` `testUnhealthyReleaseIsDroppedAfterThreeLoads`, `testReleaseThatDiesAfterMarkHealthyIsReverted`. |
 | **Agent with a scoped token** | An agent that holds only the owner token or a publish token cannot sign. It cannot create a release phones accept. The control plane gates its destructive calls behind a server-issued, one-time owner approval (the agent cannot approve its own; `confirm: true` alone does nothing), applies the owner's `agentMaxBand` limit, and the owner can set approval so that a second person must approve a wide release. | `services/control-plane/src/index.ts`, `apps.ts` | `agent-confirm.test.ts` "one-time challenges" (replay, tampered arguments, expiry, denial), `approval-route.test.ts` "the owner token (an agent) cannot approve or deny", "the deny list blocks any command, confirm or not", "agents cannot change the policy; the admin can"; `release-policy.test.ts` "refuses an agent beyond agentMaxBand; a human at the same band succeeds"; `approval.test.ts` "the proposer cannot approve". An agent given the seed has the same power as a stolen seed. |
 
+## Lost or leaked release key
+
+The release key is the seed that `shipvo publish` signs with. Apps built with `rootKey` on Android and iOS also pin a second key, the root key. The root key stays offline and only signs rotation statements. It never signs releases. The design is in [design/key-rotation.md](design/key-rotation.md); the steps are in [key-rotation.md](key-rotation.md).
+
+To replace a lost or leaked release key:
+
+1. Run `shipvo keygen --out new-seed.txt`. It writes the new seed and prints its public key.
+2. Sign a statement with the root key. `--sequence` must be above every statement you signed before (1 for the first). `--valid-from` defaults to now, which is what an emergency needs. `sign` prints to stdout, so save the output:
+
+   ```bash
+   npx -y @shipvo/cli keys rotate sign \
+     --root-seed-file root-seed.txt \
+     --new-key <the public key> \
+     --sequence 1 > rotation.json
+   ```
+
+   The statement is signed by the root key and names the new release key, the `sequence` and a `validFrom` time.
+3. Upload the file as a signed-in owner (`upload` refuses tokens): `npx -y @shipvo/cli keys rotate upload rotation.json`. The control plane checks the root signature and hands the statement out with the pointer. It only passes the statement on. Each phone checks it again.
+4. The Android and iOS runtimes check the root signature, the app id, and that the `sequence` is higher than the one they hold. When the phone's clock reaches `validFrom`, they switch to the new release key. From then on the leaked release key signs nothing the phone accepts.
+
+What a thief with only the release key can do: sign releases until each phone has the statement and has reached `validFrom`. A publish token or an agent token cannot make a statement, because phones check the root signature.
+
+CLI commands: `keys root`, `keys rotate sign` and `keys rotate upload` ([cli.md](cli.md)).
+
 ## What we do not defend against
 
-- **A stolen or leaked seed.** There is no second factor on signing and no key rotation for installed apps. Release policy and approval slow a release down. They do not make a signed release invalid.
+- **A stolen or leaked seed.** There is no second factor on signing. A leaked release key stops working once a root-signed rotation statement reaches a phone and its `validFrom` has passed (see "Lost or leaked release key"). Release policy and approval slow a release down. They do not make a signed release invalid.
 - **A malicious publisher or a compromised CI.** Whatever your CI signs is accepted.
 - **A downgrade by an attacker who controls the network path or control plane**, for a device that has not yet reached the replayed release number. The device checks the release number only against its own state, not against a signed expiry or a signed "latest".
 - **Withholding.** A compromised control plane, CDN or network can serve nothing, or serve a stale pointer. Devices then keep running what they have. There is no signed freshness proof, so a device cannot tell "no update" from "update hidden".

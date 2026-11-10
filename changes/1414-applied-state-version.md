@@ -1,0 +1,1 @@
+- `@shipvo/runtime`: new export `getAppliedStateVersion(): Promise<number | null>` (Android and iOS). It returns the `state_version` the running bundle was published with, or `null` if the release declared none or the embedded bundle runs. The runtime now keeps `state_version` from the signed pointer next to the release id. Additive: no migration needed.

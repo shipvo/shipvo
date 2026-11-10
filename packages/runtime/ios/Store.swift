@@ -42,6 +42,21 @@ final class Store {
   var pendingPath: String? { get { d.string(forKey: "pending_path") } set { d.set(newValue, forKey: "pending_path") } }
   var pendingSha: String? { get { d.string(forKey: "pending_sha") } set { d.set(newValue, forKey: "pending_sha") } }
   var pendingIssuedAt: String? { get { d.string(forKey: "pending_issued_at") } set { d.set(newValue, forKey: "pending_issued_at") } }
+  /// `state_version` of the pending, current and previous release; 0 when the release declared none.
+  var pendingStateVersion: Int { get { d.integer(forKey: "pending_state_version") } set { d.set(newValue, forKey: "pending_state_version") } }
+  var currentStateVersion: Int { get { d.integer(forKey: "current_state_version") } set { d.set(newValue, forKey: "current_state_version") } }
+  var previousStateVersion: Int { get { d.integer(forKey: "previous_state_version") } set { d.set(newValue, forKey: "previous_state_version") } }
+  /// Keep the signed pointer's `state_version` with the release being staged. Absent or not a positive integer stays absent.
+  func stageStateVersion(_ v: Any?) { pendingStateVersion = (v as? Int).flatMap { $0 > 0 ? $0 : nil } ?? 0 }
+  /// The pending release became current. Call before the release ids move.
+  func promoteStateVersion() { previousStateVersion = currentStateVersion; currentStateVersion = pendingStateVersion; pendingStateVersion = 0 }
+  /// The current release was replaced by the previous one (or by the embedded bundle, when there is none).
+  func revertStateVersion() { currentStateVersion = previousStateVersion; previousStateVersion = 0 }
+  /// The version of the bundle running now, or nil for the embedded bundle or a release that declared none.
+  func appliedStateVersion(running: Int) -> Int? {
+    let v = running == 0 ? 0 : running == pendingRelease ? pendingStateVersion : running == currentRelease ? currentStateVersion : 0
+    return v > 0 ? v : nil
+  }
   /// Highest release this device refused (crash-looped or rolled back). Only newer releases are fetched.
   var blockedRelease: Int { get { d.integer(forKey: "blocked_release") } set { d.set(newValue, forKey: "blocked_release") } }
   /// Shell binary the stored OTA bundles were downloaded under.
@@ -80,7 +95,7 @@ final class Store {
       for f in files { try? FileManager.default.removeItem(at: f) }
     }
     for k in ["current_release", "current_path", "current_sha", "previous_release", "previous_path", "pending_release", "pending_path",
-              "pending_sha", "pending_issued_at", "trial_boots", "unhealthy_boots", "first_unhealthy_at", "blocked_release"] { d.removeObject(forKey: k) }
+              "pending_sha", "pending_issued_at", "pending_state_version", "current_state_version", "previous_state_version", "trial_boots", "unhealthy_boots", "first_unhealthy_at", "blocked_release"] { d.removeObject(forKey: k) }
     binaryVersion = installedBinaryVersion
   }
 

@@ -55,6 +55,6 @@ The file is created empty at the start and gets one line per action. Each line i
 ## Next steps
 
 - [Walk an app with `shipvo explore`](agents.md#walk-an-app-with-shipvo-explore)
-- [CLI guide](cli.md)
+- [CLI guide](cli.md#shipvo-explore---record-features-file)
 - [Lumi ranker](lumi-ranker.md)
 - [Lumi](lumi.md): test your app while you watch on Shipvo Phone, and turn a finding into a test with Save as test.
