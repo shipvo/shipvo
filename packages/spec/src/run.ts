@@ -3,7 +3,7 @@
  * No `eval`, no dynamic import, no user code. Network, secrets, cache and the clock are injected.
  */
 import { extractExpressions } from "./cel.js";
-import { estimateCost, evaluateTemplate, ExpressionError, MAX_COST } from "./eval.js";
+import { estimateCost, evaluate, evaluateTemplate, ExpressionError, MAX_COST } from "./eval.js";
 import type { EvalOptions } from "./eval.js";
 
 export type RunErrorCode =
@@ -269,4 +269,45 @@ async function steps(spec: unknown, list: unknown[], ctx: RunContext): Promise<{
     }
   }
   return { done: false };
+}
+
+/**
+ * Brings stored rows of a collection up to the spec's `version`.
+ * Rows saved under a lower version (`savedVersion`, default 1) get the collection's `migrate` steps in order.
+ * Rows already at the spec's version are returned as they are. Input rows are not changed.
+ */
+export function migrateRows(spec: unknown, name: string, rows: unknown[], savedVersion = 1, ctx: Pick<RunContext, "eval"> = {}): unknown[] {
+  const c = isObj(spec) && isObj(spec.data) ? spec.data[name] : undefined;
+  if (!isObj(c) || c.source !== "collection") throw new RunError("bad_spec", `"${name}" is not a collection in this spec.`);
+  const version = typeof c.version === "number" ? c.version : 1;
+  const steps = Array.isArray(c.migrate) ? c.migrate : [];
+  if (savedVersion >= version || steps.length === 0) return rows;
+  return rows.map((row) => {
+    if (!isObj(row)) return row;
+    let out: Json = { ...row };
+    for (const st of steps) {
+      if (!isObj(st)) continue;
+      if (isObj(st.rename)) {
+        const { from, to } = st.rename as { from: string; to: string };
+        if (from in out) {
+          const { [from]: v, ...rest } = out;
+          out = { ...rest, [to]: v };
+        }
+      } else if (isObj(st.drop)) {
+        const { [String(st.drop.field)]: _gone, ...rest } = out;
+        out = rest;
+      } else if (isObj(st.retype)) {
+        const { field, using } = st.retype as { field: string; using: string };
+        if (field in out) {
+          try {
+            out = { ...out, [field]: evaluate(using, { value: out[field] }, ctx.eval) };
+          } catch (e) {
+            if (e instanceof ExpressionError) throw new RunError("expression_error", `Migrating "${name}.${field}": ${e.message}`);
+            throw e;
+          }
+        }
+      }
+    }
+    return out;
+  });
 }

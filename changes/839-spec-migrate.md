@@ -1,0 +1,1 @@
+- spec: collections take an optional `version` and a `migrate` list (`rename`, `drop`, `retype` with a CEL `using` over `value`). `migrateRows()` applies the steps to rows saved under a lower version, and `validate(spec, previous)` refuses removed or retyped fields that have no step. Existing specs need no change.

@@ -173,6 +173,7 @@ class Run {
     const stateNames = keys(this.spec.state);
     const names: NameScope["names"] = { data: dataNames, state: stateNames, route: ["params"] };
     for (const d of dataNames) names[d] = undefined;
+    if (/\.migrate\[\d+\]\.retype\.using$/.test(path)) return { names: { value: undefined } };
     if (/^\$\.data\.[^.[]+\.paginate/.test(path) || /^\$\.data\["[^"]+"\]\.paginate/.test(path)) return { names, loose: true };
     if (path.startsWith("$.screens")) names.item = undefined;
     if (path.includes(".onMove.")) names.column = undefined;
@@ -231,6 +232,64 @@ class Run {
       if (isObject(src.paginate)) {
         this.checkBare(src.paginate.next, childPath(childPath(base, "paginate"), "next"));
         this.checkBare(src.paginate.until, childPath(childPath(base, "paginate"), "until"));
+      }
+    }
+  }
+
+  /** Checks each collection's `migrate` steps, and, given the previous spec, that every removed or retyped field has one. */
+  checkMigrations(previous?: unknown) {
+    const data = this.spec.data;
+    if (!isObject(data)) return;
+    const prev = isObject(previous) && isObject(previous.data) ? previous.data : {};
+    for (const [name, src] of Object.entries(data)) {
+      if (!isObject(src) || src.source !== "collection" || !isObject(src.fields)) continue;
+      const base = childPath("$.data", name);
+      const fields = src.fields;
+      const steps = Array.isArray(src.migrate) ? src.migrate : [];
+      const removed = new Set<string>();
+      const retyped = new Set<string>();
+      steps.forEach((step, i) => {
+        if (!isObject(step)) return;
+        const p = childPath(childPath(base, "migrate"), i);
+        const kinds = ["rename", "drop", "retype"].filter((k) => k in step);
+        if (kinds.length !== 1) {
+          this.error(p, "A migrate step has exactly one of rename, drop or retype.", "Use one step per change, for example { \"drop\": { \"field\": \"old\" } }.");
+          return;
+        }
+        const body = step[kinds[0]!];
+        if (!isObject(body)) return;
+        const gone = (f: unknown, key: string, what: string) => {
+          if (typeof f !== "string") return;
+          removed.add(f);
+          if (f in fields) this.error(childPath(childPath(p, kinds[0]!), key), `"${f}" is still declared in "${name}.fields", so it cannot be ${what}.`, `Remove "${f}" from fields, or remove this step.`);
+        };
+        const kept = (f: unknown, key: string) => {
+          if (typeof f === "string" && !(f in fields)) {
+            this.error(childPath(childPath(p, kinds[0]!), key), `"${f}" is not a field of "${name}".`, `Declare "${f}" in "${name}.fields", or use one of: ${Object.keys(fields).join(", ")}.`);
+          }
+        };
+        if (kinds[0] === "rename") { gone(body.from, "from", "renamed"); kept(body.to, "to"); }
+        else if (kinds[0] === "drop") gone(body.field, "field", "dropped");
+        else {
+          kept(body.field, "field");
+          if (typeof body.field === "string") {
+            retyped.add(body.field);
+            if (body.to !== fields[body.field]) this.error(childPath(childPath(p, "retype"), "to"), `"${body.field}" is declared as ${JSON.stringify(fields[body.field])}, not ${JSON.stringify(body.to)}.`, `Set "to" to "${String(fields[body.field])}", or change the field's type.`);
+          }
+          if (typeof body.using === "string") this.checkExpression(body.using, childPath(childPath(p, "retype"), "using"));
+        }
+      });
+      const old = prev[name];
+      if (!isObject(old) || !isObject(old.fields)) continue;
+      for (const [f, t] of Object.entries(old.fields)) {
+        const at = childPath(childPath(base, "fields"), f);
+        if (!(f in fields) && !removed.has(f)) {
+          this.error(base, `Field "${f}" was removed from "${name}" and no migrate step says what happens to saved rows.`,
+            `Add { "drop": { "field": "${f}" } } or { "rename": { "from": "${f}", "to": "<new name>" } } to "${name}.migrate", and raise "version".`);
+        } else if (f in fields && fields[f] !== t && !retyped.has(f)) {
+          this.error(at, `Field "${f}" changed from ${JSON.stringify(t)} to ${JSON.stringify(fields[f])} and no migrate step converts saved rows.`,
+            `Add { "retype": { "field": "${f}", "to": "${String(fields[f])}", "using": "<expression over value>" } } to "${name}.migrate", and raise "version".`);
+        }
       }
     }
   }
@@ -562,9 +621,10 @@ export const appSpecSchema = schema;
 
 /**
  * Checks an app spec. Never throws: any input gives a result.
+ * Pass the installed spec as `previous` to also check that removed or retyped collection fields have a `migrate` step.
  * CEL expressions are checked for syntax, cost, and unknown names, fields and functions.
  */
-export function validate(spec: unknown): ValidationResult {
+export function validate(spec: unknown, previous?: unknown): ValidationResult {
   try {
     if (!isObject(spec)) {
       return {
@@ -576,6 +636,7 @@ export function validate(spec: unknown): ValidationResult {
     checkSchema(schema, schema, spec, "$", run.errors);
     run.scanStrings(spec, "$");
     run.checkData();
+    run.checkMigrations(previous);
     run.checkActions();
     run.checkTheme();
     run.checkScreens();

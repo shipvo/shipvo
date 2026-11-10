@@ -233,7 +233,7 @@ Warnings (shown, not refused): touch targets under 44 px, more than three type s
 
 - `spec` names the schema version. The engine supports the current and previous version; newer fields are refused by older engines.
 - Every change to an installed app's spec is a new signed release, delivered over the air, with the same staged rollout and rollback as any Shipvo update.
-- Collections migrate automatically when fields are added; removing or retyping a field needs an explicit `migrate` step.
+- Collections migrate automatically when fields are added; removing or retyping a field needs an explicit `migrate` step (`rename`, `drop` or `retype` with a CEL `using` over `value`), and the collection's `version` goes up.
 
 ## 15. Where apps are made, and the escape hatches
 
