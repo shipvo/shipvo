@@ -43,6 +43,10 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Release.** One numbered version of your app that phones can download.
 
+**Secrets screen.** The screen in the Settings app on Shipvo Phone that lists the keys you saved for an app, such as a payment key. You can rotate or remove a key there. See [Phone apps](phone-apps.md#see-saved-keys-in-settings).
+
+**Use log.** The list under a saved key that shows when the key was used, where, and what happened. Use it to check that only your app used the key. See [Phone apps](phone-apps.md#see-saved-keys-in-settings).
+
 **Signing.** Putting a secret stamp on a release so phones can check it really came from you. The stamp comes from a key file kept on your computer.
 
 **Signing seed.** The secret file (`.shipvo/seed.txt`) that makes the stamp. Back it up once: without it you cannot update phones that already have your app. See [Moving to a new machine](new-machine.md).
