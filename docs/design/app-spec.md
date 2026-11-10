@@ -209,6 +209,7 @@ Steps (v0): `refresh`, `insert`, `update`, `delete` (collections), `http` (calls
 Rules:
 - Every interactive block either calls a named action or a single built-in step. UI-only steps (navigate, set) are not published to agents.
 - Actions that change data outside the app (`http` writes) are marked `"effect": "external"` automatically and always go through the one-time approval flow unless the person granted standing permission.
+- An action with `"share": "<text input>"` is a share target: text shared from another app on the phone goes into that input. The validator checks that the input exists and is text.
 - Agents see the same action list in `describe_app`, plus the screen's labelled tree, so they can use the UI or call actions directly.
 
 ## 11. Schedules and notifications

@@ -209,6 +209,40 @@ uninstall_app { session, id: "notes" } -> back on the home screen
 device_log { session }                 -> install_app (source "real" for marketplace apps, with the bundle sha256), switch_app, uninstall_app
 ```
 
+## Share sheet and clipboard
+
+Share text from one app into another, and copy and paste, on Android and iOS.
+
+- `share_targets` lists the apps that take shared text: app id, action and the input that receives it. Notes and Tasks takes text as a new note (`add_note`) or a new task (`add_task`).
+- `share` sends text into one of them, as picking it in the share sheet does. A title input that is not the share input gets `title`, or the first line of the text. Each share is in `app_activity` as `share`, with `from` when you give it.
+- `get_clipboard` and `set_clipboard` read and write the phone's clipboard, the same one apps copy to and paste from. It stays when you switch apps.
+
+```json
+{ "session": "demo", "to": "notes", "action": "add_note", "text": "Harbour list\nrope, hooks", "from": "browser" }
+```
+
+To make an action of your own app a share target, add `"share"` with the name of one of its text inputs:
+
+```json
+"save_link": { "description": "Save a link", "input": { "url": { "type": "text" } }, "share": "url", "do": [ ... ] }
+```
+## Back up and restore the whole phone
+
+`backup_phone` returns the whole phone as one JSON object, on Android and iOS:
+
+- every app you built, with its spec, data, settings, home-screen place and permission answers;
+- every Store app, with its listing and permission answers;
+- the system settings (dark mode, font size, bold text, reduce motion, language, right-to-left);
+- the clipboard.
+
+Saved keys in the vault are never in a backup.
+
+`restore_phone` puts a backup on this phone or another one. Every part is checked first, and a bad backup changes nothing. Apps you built that are already on the phone need `"replace": true`; a Store app that is already installed is skipped and listed in `skipped`.
+
+```json
+{ "session": "new-phone", "backup": { "format": "shipvo.phone-backup/v0", "...": "..." } }
+```
+
 ## Search across the phone
 
 `search_phone` finds text anywhere on the phone in one call: rows in every app's data (Notes and Tasks, Calendar, Files and Photos, Wallet, Shop, Assistant Inbox and any app you built) and notifications. It works the same on Android and iOS.
@@ -247,6 +281,9 @@ Each result has the app, the collection, the row id, the field that matched, a s
 | Wallet | Keeps tickets, receipts and passes, grouped by kind, with an expiring-soon list. | `save_pass`, `find_pass`, `show_matches`, `delete_pass` | [`templates/wallet/app.json`](../templates/wallet/app.json) |
 | Shop | Lists products, takes orders and shows them in one place; the currency is a setting. | `add_product`, `find_products`, `place_order`, `list_orders`, `set_currency`, `show_matches`, `pick_product` | [`templates/shop/app.json`](../templates/shop/app.json) |
 | Assistant Inbox | Lets ChatGPT, Claude and other assistants on the same phone message each other and hand over tasks. Android and iOS. | `send_message`, `check_inbox`, `mark_read`, `read_thread`, `hand_off`, `my_tasks`, `start_task`, `finish_task`, `sent_tasks`, `share_report`, `get_reports` | [`templates/assistant-inbox/app.json`](../templates/assistant-inbox/app.json) |
+| Contacts | Keeps people with phone numbers, emails and notes, with favourites and search. | `add_contact`, `find_contacts`, `update_contact`, `set_favorite`, `delete_contact`, `show_matches` | [`templates/contacts/app.json`](../templates/contacts/app.json) |
+| Messages | Text conversations, one thread for each person, with unread counts. | `send_text`, `receive_text`, `list_conversations`, `read_conversation`, `delete_conversation` | [`templates/messages/app.json`](../templates/messages/app.json) |
+| Clock | Alarms, timers and a world clock. | `add_alarm`, `list_alarms`, `set_alarm`, `delete_alarm`, `start_timer`, `stop_timer`, `list_timers`, `add_place`, `delete_place` | [`templates/clock/app.json`](../templates/clock/app.json) |
 
 The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action into a tool. Two assistants on the same phone read and write the same tasks and notes. Copy the folder to start your own app. The screen tree names every control: tabs `Tasks` and `Notes`, lists `Open tasks`, `Done tasks` and `Notes`, forms `Complete task form`, `New task form` and `New note form`. Test: `pnpm --filter @shipvo/spec test`.
 
@@ -265,6 +302,12 @@ A message to `anyone` reaches whichever assistant checks first. The Messages and
 ### Seeing what is waiting
 
 When the Assistant Inbox is installed, every phone tool result for a session starts with one line about the calling assistant, for example `Inbox: 2 unread for chatgpt, 1 task open`. An assistant sees it on its next call of any phone tool, so nobody has to say "check your inbox". When nothing is waiting, no line is added. This works the same on the Android and iOS phone.
+
+### Reminders
+
+Call `set_reminder` with a `title` and either `at` (a time on the phone's clock, such as `2026-11-14T09:00`) or `in_minutes`. At that time a notification arrives on the phone, whether or not an app is open. `repeat` can be `daily` or `weekly`. `list_reminders` shows what is waiting and what has fired, and `cancel_reminder` removes one.
+
+The phone's clock is the one `set_phone_time` sets, so a test can jump to the time and read the notification with `notifications`. With Do Not Disturb (Android) or Focus (iPhone) on, the reminder goes to the notification shade without a banner. A reminder is the phone's own notification, so it does not need an app's notification permission. If the clock jumps past a repeating reminder several times, it fires once and moves to the next time after the clock. It works the same on the Android and iPhone phone.
 
 ### Waiting for the other assistant
 

@@ -1,0 +1,2 @@
+- New first-party spec apps: Contacts (`templates/contacts`), Messages (`templates/messages`) and Clock (`templates/clock`). Contacts: `add_contact`, `find_contacts`, `update_contact`, `set_favorite`, `delete_contact`, `show_matches`. Messages: `send_text`, `receive_text`, `list_conversations`, `read_conversation`, `delete_conversation`. Clock: `add_alarm`, `list_alarms`, `set_alarm`, `delete_alarm`, `start_timer`, `stop_timer`, `list_timers`, `add_place`, `delete_place`. Files and Camera roll are the existing Files and Photos app.
+- Migration: none; new apps.
