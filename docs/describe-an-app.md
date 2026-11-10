@@ -20,7 +20,7 @@ You need a phone session your assistant can reach: the hosted phone, `shipvo run
 
 1. Ask your assistant: "Make a weekly planner on the phone." It calls `create_app` with an id and a spec.
 2. Look at the phone. The Weekly planner icon is on the home screen and the app is open. If you want to stay where you are, ask for `open: false`.
-3. Ask it to add a task: "Add 'call the printer' on Monday." It types into the form and taps the button, or calls `run_app_action` with the action name and input.
+3. Ask it to add a task: "Add 'call the printer' on Monday." It usually types into the form and taps the button. It can also call `run_app_action` with the action name and input. You do not need to do anything.
 4. Ask for a change: "Add an About screen." The assistant calls `update_app` with the whole new spec. The open screen shows the new look at once and the task is still there.
 5. Ask: "What did you change?" The assistant calls `app_activity`. You see lines such as `added screen 'about'`.
 
@@ -142,6 +142,7 @@ More starting points are in the [spec gallery](spec-blocks.md#example-specs): ha
 | `run_app_action { session, id, action, input }` | Runs one action of the spec by name, like its form does. |
 | `refresh_app { session, id }` | Fetches the app's `http` data sources now. |
 | `app_activity { session, id?, limit? }` | Returns `history`, `sources` and `events`. |
+| `arrange_apps`, `schedule_app` | Place apps on the home screen and run actions on a schedule. See [Phone apps](phone-apps.md). |
 | `export_phone_apps`, `import_phone_apps` | Move your apps to another phone. |
 
 Every option and error is in [Phone apps](phone-apps.md#describe-an-app-and-it-appears). The spec format is in [App spec](spec-blocks.md).
