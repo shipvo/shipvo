@@ -40,7 +40,7 @@ If the target has the same or a higher `state_version`, the rollback goes ahead 
 
 Two ways forward:
 
-- **Publish a fix forward.** Ship a new release that reads both formats. This is the safest choice.
+- **Publish a fix forward.** Ship a new release that reads both formats.
 - **Roll back anyway.** You accept that older code will meet newer data:
 
 ```bash
@@ -59,10 +59,10 @@ shipvo audit tide
 
 **I use `--bands` or `--platform`.** The check uses the highest `state_version` across the bands you name, for each platform, so a rollback of one band is still checked against what phones in it run.
 
-**Nothing is reported for old releases.** Releases published before you set `stateVersion` carry no number. They are treated as 0.
+**Nothing is reported for old releases.** Releases published before you set `stateVersion` carry no number. A rollback stops only when phones run a higher `state_version` than the target, so you can roll back freely to a release with no number when phones run none either.
 
 ## Next steps
 
-- [CLI guide](cli.md): every `shipvo rollback` option and `--json` output.
+- [CLI guide](cli.md#shipvo-rollback): every `shipvo rollback` option.
 - [Auto-halt](auto-halt.md): stop a bad release before it reaches every phone.
 - [Glossary](glossary.md): state version.
