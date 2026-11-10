@@ -8,7 +8,7 @@ import java.io.File
 import kotlin.random.Random
 
 /** Persistent runtime state. All bundle decisions go through here so the host handler and module agree. */
-internal class Store(private val ctx: Context) : TrialCounts, RotationState {
+internal class Store(private val ctx: Context) : TrialCounts, RotationState, StateVersions {
   private val p: SharedPreferences = ctx.getSharedPreferences("shipvo.runtime", Context.MODE_PRIVATE)
   val dir: File get() = File(ctx.filesDir, "shipvo").apply { mkdirs() }
 
@@ -26,6 +26,10 @@ internal class Store(private val ctx: Context) : TrialCounts, RotationState {
   override var pendingRelease: Int get() = p.getInt("pending_release", 0); set(v) { p.edit().putInt("pending_release", v).commit() }
   var pendingPath: String? get() = p.getString("pending_path", null); set(v) { p.edit().putString("pending_path", v).commit() }
   var pendingIssuedAt: String? get() = p.getString("pending_issued_at", null); set(v) { p.edit().putString("pending_issued_at", v).commit() }
+  /** `state_version` of the pending, current and previous release; 0 when the release declared none. */
+  override var pendingStateVersion: Int get() = p.getInt("pending_state_version", 0); set(v) { p.edit().putInt("pending_state_version", v).commit() }
+  override var currentStateVersion: Int get() = p.getInt("current_state_version", 0); set(v) { p.edit().putInt("current_state_version", v).commit() }
+  override var previousStateVersion: Int get() = p.getInt("previous_state_version", 0); set(v) { p.edit().putInt("previous_state_version", v).commit() }
   /** Highest release this device refused (crash-looped or rolled back). Only newer releases are fetched. */
   var blockedRelease: Int get() = p.getInt("blocked_release", 0); set(v) { p.edit().putInt("blocked_release", v).commit() }
   /** Shell binary the stored OTA bundles were downloaded under. */
@@ -46,6 +50,7 @@ internal class Store(private val ctx: Context) : TrialCounts, RotationState {
       .remove("pending_release").remove("pending_path").remove("pending_issued_at").remove("trial_boots")
       .remove("unhealthy_boots").remove("first_unhealthy_at").remove("blocked_release")
       .remove("current_sha").remove("pending_sha")
+      .remove("pending_state_version").remove("current_state_version").remove("previous_state_version")
       .putString("binary_version", installedBinaryVersion).commit()
   }
 
