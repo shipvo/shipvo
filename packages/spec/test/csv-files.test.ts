@@ -16,6 +16,11 @@ const spec = {
       { set: "state.rows", value: "{{ parseCsv(input.text) }}" },
       { return: "{{ parseCsv(input.text) }}" }
     ] },
+    save_default: { description: "Save with defaults.", do: [{ saveFile: "note.txt", content: "hi" }] },
+    no_content: { description: "No content.", do: [{ saveFile: "a.txt" }] },
+    nested: { description: "Save inside an if.", input: { go: { type: "bool" } }, do: [
+      { if: "{{ input.go }}", then: [{ saveFile: "a.txt", content: "x" }], else: [{ saveFile: "b.txt", content: "y" }] }
+    ] },
     bad_name: { description: "Bad name.", do: [{ saveFile: "../x.csv", content: "a" }] }
   },
   state: { rows: { type: "text", default: "" } }
@@ -46,6 +51,30 @@ describe("CSV import and save as file", () => {
     const r = app.call("save_csv");
     expect(r.ok).toBe(false);
     expect(app.files).toEqual([]);
+  });
+
+  it("mime defaults to text/plain", () => {
+    const app = start();
+    app.call("save_default");
+    expect(app.files[0]!.mime).toBe("text/plain");
+  });
+
+  it("a missing content fails", () => {
+    const app = start();
+    const r = app.call("no_content");
+    expect(r.ok).toBe(false);
+    expect("error" in r && r.error).toMatch(/content/);
+    expect(app.files).toEqual([]);
+  });
+
+  it("a saveFile inside then or else still needs the files permission", () => {
+    const denied = start({ devicePermissions: { files: false } });
+    expect(denied.call("nested", { go: true }).ok).toBe(false);
+    expect(denied.call("nested", { go: false }).ok).toBe(false);
+    expect(denied.files).toEqual([]);
+    const ok = start();
+    expect(ok.call("nested", { go: false }).ok).toBe(true);
+    expect(ok.files[0]!.name).toBe("b.txt");
   });
 
   it("a name with a slash fails", () => {

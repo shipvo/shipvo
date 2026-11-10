@@ -132,6 +132,7 @@ Expressions inside `{{ }}` are [CEL, the Common Expression Language](https://cel
   - export: `csv(rows)` or `csv(rows, ['col', ...])` returns CSV text with a header row, quoted fields and CRLF line ends. Lists become `a; b`. Return it from an action to hand it to an agent, or put it in state to show it.
   - fallbacks: `orElse(value, fallback)`, or CEL's `has(x.field) ? x.field : fallback`.
 - Limits: 2,000 characters per expression and a cost limit per evaluation (CEL cost estimation); over-limit expressions are validation errors.
+- `saveFile` step: `{ "saveFile": "diary.csv", "content": "{{ csv(data.entries) }}", "mime": "text/csv" }` saves text as a named file. `content` is required. `mime` is optional and defaults to `text/plain`. The name may not contain a slash. Saving again with the same name replaces the file. The step needs the `files` device permission, also when it sits inside `then` or `else`. Saved files are on `app.files`.
 
 ## 8. Screens and navigation
 

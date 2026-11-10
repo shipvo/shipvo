@@ -194,8 +194,9 @@ export function createApp(spec: unknown, options: CreateAppOptions = {}): { ok: 
       else if (typeof st.saveFile === "string") {
         const name = String(ev(st.saveFile, scope)).trim();
         if (!name || /[\\/\0]/.test(name)) throw new Error("saveFile needs a file name with no slash");
-        const content = String(ev(st.content ?? "", scope));
-        const file = { name, mime: String(ev(st.mime ?? "text/csv", scope)), size: new TextEncoder().encode(content).length, content };
+        if (st.content === undefined) throw new Error("saveFile needs content");
+        const content = String(ev(st.content, scope));
+        const file = { name, mime: String(ev(st.mime ?? "text/plain", scope)), size: new TextEncoder().encode(content).length, content };
         const at = files.findIndex((f) => f.name === name);
         if (at >= 0) files[at] = file; else files.push(file);
       }
