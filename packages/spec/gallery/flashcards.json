@@ -1,0 +1,119 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "flashcards",
+    "name": "Flashcards",
+    "description": "Make cards and mark each one known or not yet."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable"
+  },
+  "data": {
+    "cards": {
+      "source": "collection",
+      "fields": {
+        "front": "text",
+        "back": "text",
+        "known": "bool"
+      },
+      "seed": []
+    },
+    "todo": {
+      "source": "computed",
+      "value": "{{ cards.filter(c, !c.known) }}"
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Cards",
+      "body": [
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "{{ count(todo) }} cards to learn"
+        },
+        {
+          "type": "chart",
+          "kind": "donut",
+          "from": "cards",
+          "x": "{{ item.known ? 'Known' : 'Learning' }}",
+          "y": "{{ 1 }}",
+          "aggregate": "count",
+          "label": "Known and not known"
+        },
+        {
+          "type": "form",
+          "label": "New card form",
+          "submit": {
+            "label": "Add card",
+            "action": "add_card"
+          },
+          "fields": [
+            {
+              "name": "front",
+              "type": "text",
+              "label": "Front",
+              "required": true,
+              "maxLength": 200
+            },
+            {
+              "name": "back",
+              "type": "text",
+              "label": "Back",
+              "required": true,
+              "maxLength": 200
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "label": "Cards to learn",
+          "from": "{{ todo }}",
+          "item": {
+            "title": "{{ item.front }}",
+            "subtitle": "{{ item.back }}"
+          },
+          "empty": {
+            "message": "No cards to learn"
+          }
+        }
+      ]
+    }
+  ],
+  "actions": {
+    "add_card": {
+      "description": "Add a card with a front and a back.",
+      "input": {
+        "front": {
+          "type": "text"
+        },
+        "back": {
+          "type": "text"
+        }
+      },
+      "do": [
+        {
+          "insert": "cards",
+          "value": {
+            "front": "{{ input.front }}",
+            "back": "{{ input.back }}",
+            "known": false
+          }
+        },
+        {
+          "toast": "Card added"
+        }
+      ]
+    }
+  }
+}

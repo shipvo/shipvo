@@ -1,0 +1,129 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "habit-tracker",
+    "name": "Habit tracker",
+    "description": "Log habits each day and see how many times you did each one."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable"
+  },
+  "data": {
+    "checkins": {
+      "source": "collection",
+      "fields": {
+        "habit": "text",
+        "day": "text",
+        "count": "number"
+      },
+      "seed": []
+    },
+    "total": {
+      "source": "computed",
+      "value": "{{ sum(checkins.map(c, c.count)) }}"
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Habits",
+      "body": [
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "{{ total }} check-ins"
+        },
+        {
+          "type": "chart",
+          "kind": "bar",
+          "from": "checkins",
+          "x": "{{ item.habit }}",
+          "y": "{{ item.count }}",
+          "aggregate": "sum",
+          "label": "Check-ins by habit"
+        },
+        {
+          "type": "form",
+          "label": "Check in form",
+          "submit": {
+            "label": "Check in",
+            "action": "check_in"
+          },
+          "fields": [
+            {
+              "name": "habit",
+              "type": "text",
+              "label": "Habit",
+              "required": true,
+              "maxLength": 60
+            },
+            {
+              "name": "day",
+              "type": "date",
+              "label": "Day",
+              "required": true
+            },
+            {
+              "name": "count",
+              "type": "number",
+              "label": "Times",
+              "min": 1,
+              "max": 100
+            }
+          ]
+        },
+        {
+          "type": "list",
+          "label": "Recent check-ins",
+          "from": "{{ sortBy(checkins, 'day') }}",
+          "item": {
+            "title": "{{ item.habit }}",
+            "subtitle": "{{ item.day }}, {{ item.count }} times"
+          },
+          "empty": {
+            "message": "No check-ins yet"
+          }
+        }
+      ]
+    }
+  ],
+  "actions": {
+    "check_in": {
+      "description": "Log a habit for one day.",
+      "input": {
+        "habit": {
+          "type": "text"
+        },
+        "day": {
+          "type": "date"
+        },
+        "count": {
+          "type": "number",
+          "default": 1
+        }
+      },
+      "do": [
+        {
+          "insert": "checkins",
+          "value": {
+            "habit": "{{ input.habit }}",
+            "day": "{{ input.day }}",
+            "count": "{{ input.count }}"
+          }
+        },
+        {
+          "toast": "Checked in"
+        }
+      ]
+    }
+  }
+}
