@@ -50,7 +50,7 @@ export const tools = {
   platform: z.enum(["android", "ios"]).optional().describe("Which phone to show: 'android' or 'ios' (default: the live run's, else android). Ignored when no phone is started (show false, attach never, or a live run is attached as it is)"),
   show: z.boolean().optional().describe("true: open the phone in the user's browser so they can watch (default on a computer with a desktop, when the project has `shipvo` installed; a server over HTTP never starts a run). false: headless, nobody sees it (default in CI)."),
   attach: z.enum(["auto", "never", "always"]).optional().describe("'auto' (default): drive the phone of a live `shipvo run` in this project if there is one, else a headless session. 'never': always headless. 'always': error if there is no live `shipvo run`."),
-}, WR, ["attach_failed","no_live_run","unknown_app","build_not_found","build_expired"]),
+}, WR, ["attach_failed","no_live_run","unknown_app","build_not_found","build_expired","bad_room"]),
   upload_build: def("upload_build", "Build the app in this project with the simulated device (the same build `shipvo sim` makes), upload it to the hosted phone for this key, and return a build id. Then call open_app(\"<app>@build:<id>\") on the hosted server. The build is private to your account and is deleted when it expires. Runs only on the local (stdio) server, because it reads your project.", {
   dir: z.string().optional().describe("Project folder (default: the server's working directory)"),
   app: z.string().optional().describe("App id (default: read from the project's shipvo config)"),

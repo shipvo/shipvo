@@ -235,6 +235,7 @@ use(server, tools.list_apps, async ({ query }) => {
 });
 
 const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, room }: { app: string; room?: string; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always"; platform?: "android" | "ios"; show?: boolean }) => {
+  if (room) { const bad = badRoom(room); if (bad) return bad; }
   let id = app.split("@")[0];
   const buildId = /^[^@]+@build:([A-Za-z0-9_-]+)$/.exec(app)?.[1];
   const headlessOnly = attach === "never" || show === false;

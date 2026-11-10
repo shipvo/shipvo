@@ -100,6 +100,10 @@ describe("room log, notes and report", () => {
     const lastEntry = (await call("room_log", { room: "t1", since: 6 })).structuredContent.entries[0];
     expect(lastEntry).toMatchObject({ session: null, tool: "room_note", text: "Lead: all done" });
     expect((await call("room_report", { room: "t1" })).structuredContent.sessions.map((s: any) => s.session).sort()).toEqual(["buyer", "owner"]);
+    // Logs and the report stay readable after a session ends.
+    await call("end_session", { session: "buyer" });
+    expect((await call("room_log", { room: "t1" })).structuredContent.entries.length).toBeGreaterThan(5);
+    expect((await call("room_report", { room: "t1" })).structuredContent.room).toBe("t1");
     await c.close(); srv.close();
   }, 30000);
 });
@@ -136,4 +140,28 @@ describe("room log ownership and failures", () => {
     expect((await call("room_report", { room: "boom" })).structuredContent.sessions[0].errors).toBe(1);
     await c.close(); srv.close();
   }, 30000);
+});
+
+describe("room limits and findings", () => {
+  it("keeps at most ROOMS_PER_OWNER rooms per owner, dropping the least recently used", async () => {
+    const { RoomLogs, ROOMS_PER_OWNER } = await import("../src/room.js");
+    const r = new RoomLogs();
+    const e = { session: "a", agent: null, tool: "tap", target: null, change: null };
+    for (let i = 0; i < ROOMS_PER_OWNER; i++) r.add(`r${i}`, { ...e }, "k1");
+    r.add("other", { ...e }, "k2");
+    r.add("r0", { ...e }, "k1"); // r0 is used again, so r1 is the oldest
+    r.add("extra", { ...e }, "k1");
+    expect(r.all("r1")).toEqual([]);
+    expect(r.all("r0").length).toBe(2);
+    expect(r.all("extra").length).toBe(1);
+    expect(r.all("other").length).toBe(1);
+  });
+
+  it("counts only a note that starts with Finding", async () => {
+    const { isFinding } = await import("../src/room.js");
+    expect(isFinding("Finding: total is wrong")).toBe(true);
+    expect(isFinding("  finding total")).toBe(true);
+    expect(isFinding("Issue tracker is open on screen 2")).toBe(false);
+    expect(isFinding("Bug report sent")).toBe(false);
+  });
 });
