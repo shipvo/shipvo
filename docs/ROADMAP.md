@@ -88,6 +88,7 @@ Newest first. One line per user-visible feature. Dates are each PR's merge date.
 - 2026-11-10: An Android patch that runs out of memory or is over the memory budget falls back to the full download ([Getting started](getting-started.md), #1454)
 - 2026-11-10: Agents can use the prefixed refs the phone returns after a restart ([Agents](agents.md), #1459)
 - 2026-11-10: `csv()` exports a spec app's collection as CSV ([Phone apps](phone-apps.md), #1458)
+- 2026-11-10: Declare a `stateVersion` with each release; `shipvo rollback` stops before sending phones to older code that cannot read newer saved data ([Rollbacks and stored data](rollbacks-and-stored-data.md), #1442)
 - 2026-11-10: **Use log** on the Secrets screen shows when, where and with what outcome each saved key was used ([Phone apps](phone-apps.md#see-saved-keys-in-settings), #1431)
 - 2026-11-10: A page for founders and developers on describing an app and watching it appear, with a checked example spec and troubleshooting ([Describe an app](describe-an-app.md))
 - 2026-11-10: Revoke a saved key from the Secrets screen, and the gallery grows to five example specs ([Revoke](phone-apps.md#see-saved-keys-in-settings), [Example specs](spec-blocks.md#example-specs), #1388, #1385)

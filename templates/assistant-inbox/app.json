@@ -301,7 +301,7 @@
       ]
     },
     "mark_read": {
-      "description": "Mark a message sent to you (or to 'anyone') as read, by its id.",
+      "description": "Mark a message sent to you (or to 'anyone') as read, by its id. Returns updated: true, or updated: false with the reason when nothing matched.",
       "input": {
         "id": {
           "type": "text"
@@ -309,16 +309,39 @@
       },
       "do": [
         {
-          "update": "messages",
-          "where": "item.id == input.id && (caller == '' || item.to == caller || item.to == 'anyone')",
-          "value": {
-            "read": true
-          }
-        },
-        {
-          "toast": "Marked read"
+          "if": "messages.exists(m, m.id == input.id && (caller == '' || m.to == caller || m.to == 'anyone'))",
+          "then": [
+            {
+              "update": "messages",
+              "where": "item.id == input.id",
+              "value": {
+                "read": true
+              }
+            },
+            {
+              "toast": "Marked read"
+            },
+            {
+              "return": {
+                "updated": true,
+                "reason": ""
+              }
+            }
+          ],
+          "else": [
+            {
+              "return": {
+                "updated": false,
+                "reason": "No message with that id was sent to you."
+              }
+            }
+          ]
         }
-      ]
+      ],
+      "returns": {
+        "updated": "bool",
+        "reason": "text"
+      }
     },
     "read_thread": {
       "description": "Show every message between two assistants, oldest first, read or not.",
@@ -406,7 +429,7 @@
       ]
     },
     "start_task": {
-      "description": "Say you have started a task handed to you, by its id. The sender sees the status change.",
+      "description": "Say you have started a task handed to you, by its id. The sender sees the status change. Returns updated: true, or updated: false with the reason (not yours, not found, or already started).",
       "input": {
         "id": {
           "type": "text"
@@ -414,19 +437,42 @@
       },
       "do": [
         {
-          "update": "handoffs",
-          "where": "item.id == input.id && item.status == 'open' && (caller == '' || item.to == caller || item.to == 'anyone')",
-          "value": {
-            "status": "doing"
-          }
-        },
-        {
-          "toast": "Task started"
+          "if": "handoffs.exists(h, h.id == input.id && h.status == 'open' && (caller == '' || h.to == caller || h.to == 'anyone'))",
+          "then": [
+            {
+              "update": "handoffs",
+              "where": "item.id == input.id",
+              "value": {
+                "status": "doing"
+              }
+            },
+            {
+              "toast": "Task started"
+            },
+            {
+              "return": {
+                "updated": true,
+                "reason": ""
+              }
+            }
+          ],
+          "else": [
+            {
+              "return": {
+                "updated": false,
+                "reason": "No open task with that id was handed to you."
+              }
+            }
+          ]
         }
-      ]
+      ],
+      "returns": {
+        "updated": "bool",
+        "reason": "text"
+      }
     },
     "finish_task": {
-      "description": "Finish a task handed to you and leave the result for the sender, by its id.",
+      "description": "Finish a task handed to you and leave the result for the sender, by its id. Returns updated: true, or updated: false with the reason (not yours, not found, or already done). A finished task keeps its first reply.",
       "input": {
         "id": {
           "type": "text"
@@ -438,17 +484,40 @@
       },
       "do": [
         {
-          "update": "handoffs",
-          "where": "item.id == input.id && (caller == '' || item.to == caller || item.to == 'anyone')",
-          "value": {
-            "status": "done",
-            "reply": "{{ input.reply }}"
-          }
-        },
-        {
-          "toast": "Task done"
+          "if": "handoffs.exists(h, h.id == input.id && h.status != 'done' && (caller == '' || h.to == caller || h.to == 'anyone'))",
+          "then": [
+            {
+              "update": "handoffs",
+              "where": "item.id == input.id",
+              "value": {
+                "status": "done",
+                "reply": "{{ input.reply }}"
+              }
+            },
+            {
+              "toast": "Task done"
+            },
+            {
+              "return": {
+                "updated": true,
+                "reason": ""
+              }
+            }
+          ],
+          "else": [
+            {
+              "return": {
+                "updated": false,
+                "reason": "No unfinished task with that id was handed to you."
+              }
+            }
+          ]
         }
-      ]
+      ],
+      "returns": {
+        "updated": "bool",
+        "reason": "text"
+      }
     },
     "sent_tasks": {
       "description": "List the tasks you handed to others, with their status and reply. No input is needed.",

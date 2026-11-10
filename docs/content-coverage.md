@@ -129,3 +129,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Android patch falls back to the full download on out-of-memory or over the memory budget (`patchError`) | [getting-started](getting-started.md) | | | |
 | Prefixed element refs after a restart (`f1e2`, `p1e5`; `stale_ref`) | [agents](agents.md) | | | |
 | Spec `csv()` function to export a collection | [phone-apps](phone-apps.md), [app-spec](design/app-spec.md) | | | |
+| Roll back safely with a state version (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
