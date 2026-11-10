@@ -1,2 +1,2 @@
-- Docs: the Secrets screen steps cover the Use log button; the record page lists the `lumi` and `lumi_voice` options in its table.
+- Docs: the record page lists the `lumi` and `lumi_voice` options in its table, has a "Lumi in recordings" section before Next steps, and says how to find the recorded file.
 - Migration: none.

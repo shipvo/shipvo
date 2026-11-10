@@ -29,7 +29,7 @@ Waits longer than 0.6 s between actions are cut, including `wait_for` and `settl
 | | `title` | Used in the file name |
 | | `show_taps` | `true` (default) draws a finger dot and ripple on taps and a trail on scrolls; `false` hides them |
 | | `lumi` | `true` (default) keeps Lumi and its step captions in the video; `false` records a plain phone |
-| | `lumi_voice` | `true` makes Lumi speak its short step lines (see "Lumi in recordings") |
+| | `lumi_voice` | `true` makes Lumi speak its short step lines (see "Lumi in recordings"). Only applies when `lumi` is not `false` |
 | | `background` | `brand`, `plain` or a CSS colour behind the phone |
 | `record_marker` | `caption` | Required, a chapter title at the current time. It also shows on screen as a lower third until the next marker |
 | `record_stop` | `music` | `true` mixes a ducked music bed under the video and writes a `.credits.json` next to it. Needs `python3` and `scripts/video/bgmusic.py` (a repo checkout, or set `SHIPVO_BGMUSIC`). Set `SHIPVO_MUSIC_FILE` to use a local track instead of Jamendo |
