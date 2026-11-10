@@ -91,3 +91,4 @@ Want the native build too? `--native` runs your app on an emulator or simulator 
 - Let an assistant test the shop: [your assistant can test your app](https://shipvo.dev/blog/your-assistant-can-test-your-app/), or the [testing guide](https://shipvo.dev/docs/testing/).
 - Record a demo of the phone: [record a demo video](https://shipvo.dev/docs/record/).
 - New here? Start with [build your first app](https://shipvo.dev/docs/getting-started/).
+- Make an app by describing it: [describe an app and it appears](https://shipvo.dev/blog/describe-an-app-and-it-appears-on-a-phone/).

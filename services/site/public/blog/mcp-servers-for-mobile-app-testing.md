@@ -31,6 +31,8 @@ Run `npx -y @shipvo/cli login`, then `npx -y @shipvo/cli mcp`, and ask your assi
 
 To watch the simulated phone your assistant drives, see [seeing your app on a phone in your browser](https://shipvo.dev/blog/see-your-react-native-app-on-a-phone-in-your-browser/).
 
+Related: [two AI agents play chess on two phones](https://shipvo.dev/blog/two-ai-agents-play-chess-on-two-phones/) is a live example of two MCP sessions on an Android phone and an iOS phone.
+
 ## Sources
 
 - [ios-simulator-mcp](https://docsearch.algolia.com/mcp/docs/repo/joshuayoes/ios-simulator-mcp), project documentation
