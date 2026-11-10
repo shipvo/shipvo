@@ -296,6 +296,7 @@
         "presentation": { "enum": ["push", "sheet"] },
         "params": { "type": "object" },
         "notify": { "type": "object" },
+        "saveFile": { "type": "object" },
         "toast": { "type": "string" },
         "confirm": { "type": ["string", "object"] },
         "if": { "type": "string" },
