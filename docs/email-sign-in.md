@@ -70,8 +70,8 @@ The inbox, the tools and `phone.inbox` are the same on the Android and iOS phone
 | `inbox_timeout` | No mail matched your `subject` or `from` before the timeout. | Check the app really asked for a code. Loosen `subject` (it matches part of the text, any case). Check the `mockNetwork` rule has a `mail` field and its `url` and `method` match the request the app sends. Raise `timeout` (at most 25000 ms). |
 | `inbox_no_code` | The mail arrived but holds no 4 to 8 digit number. | Use `waitFor` and read `text`, or check the mail text in your stub. |
 | Status 550 from `https://inbox.shipvo.test/send` | The `to` address is not this session's address. | Use the address from `inbox.address()` or `inbox_read`. Each session has its own. |
-| The address is different after a restart of the session | The inbox belongs to the session and is removed when it ends. | Ask for the address again in the new session. |
-| `session_ended` while waiting | The session closed during the wait. | Open a new session and start the sign-in again. |
+| The address changed | Each session has its own address, and it is removed when the session ends. | Ask for the address again in the new session. |
+| `session_ended` while waiting (MCP) | The session closed during the wait. | Open a new session and start the sign-in again. |
 
 ## Next steps
 
