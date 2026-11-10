@@ -402,6 +402,14 @@ use(server, tools.wait_for_event,
   async ({ session, timeout_ms }) => { need(session); const r = await act({ session, action: "wait_for_event", timeout_ms }) as Act & { event?: boolean; banner?: string; pending?: unknown };
     if (!r.ok) return result(session, r);
     return { ...text(r.event ? "Something is waiting for you. Read it with check_inbox or my_tasks." : "nothing yet"), structuredContent: { event: r.event === true, ...(r.pending ? { pending: r.pending } : {}) } }; });
+use(server, tools.register_wakeup,
+  async ({ session, name, url, events, secret, allow_private }) => { need(session); const r = await act({ session, action: "register_wakeup", name, url, events, secret, allow_private }) as Act & { wakeup?: unknown };
+    if (!r.ok) return result(session, r);
+    return text(JSON.stringify(r.wakeup, null, 2)); });
+use(server, tools.list_wakeups,
+  async ({ session }) => { need(session); const r = await act({ session, action: "list_wakeups" }) as Act & { wakeups?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ wakeups: r.wakeups }, null, 2)); });
+use(server, tools.clear_wakeup,
+  async ({ session, name }) => { need(session); const r = await act({ session, action: "clear_wakeup", name }) as Act & { cleared?: boolean }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cleared: r.cleared === true })); });
 use(server, tools.inbox_wait,
   async ({ session, subject, from, timeout_ms }) => { need(session); const r = await act({ session, action: "inbox_wait", subject, from, timeout_ms }) as Act & { address?: string; message?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ address: r.address, message: r.message }, null, 2)); });
 use(server, tools.inbox_read,

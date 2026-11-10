@@ -36,6 +36,7 @@ import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
 import { assistantName } from "./identity.mjs";
 import { pendingBanner, waitForNew } from "./banner.mjs";
+import { createWakeups, WakeupError } from "./wakeup.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
@@ -152,12 +153,12 @@ async function endSession(id) {
   specHost.dropSession(id);
   for (const p of s.peers ?? []) p.close(); closeWatchers(s);
   await (await s.browserP?.catch(() => undefined))?.close(); await s.ctx.close().catch(() => {});
-  s.inbox?.close(); sessions.delete(id); leaveRoom(s, id); return true;
+  s.inbox?.close(); s.wakeups?.close(); sessions.delete(id); leaveRoom(s, id); return true;
 }
 async function newSession(id, opts = {}) {
   const room = opts.room == null ? undefined : String(opts.room);
   if (room !== undefined && !/^[\w-]{1,64}$/.test(room)) throw new SimError("bad_room", "room must be 1 to 64 letters, digits, _ or -");
-  if (sessions.has(id)) { specHost.dropSession(id); const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); old.inbox?.close(); sessions.delete(id); leaveRoom(old, id); }
+  if (sessions.has(id)) { specHost.dropSession(id); const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); old.inbox?.close(); old.wakeups?.close(); sessions.delete(id); leaveRoom(old, id); }
   let target, buildId;
   if (opts.build_url != null) {
     // Fetch the build before anything else is created, so a bad URL leaves no session behind.
@@ -697,6 +698,14 @@ async function act(id, body) {
       const fresh = await waitForNew(() => specHost.dataOf(sidOf(s), "inbox"), me, seen, ms);
       return fresh ? { event: true, pending: fresh } : { event: false };
     }
+    // Webhook wake-ups: POST a signed note to a URL when something new arrives for an assistant name. Every delivery is in device_log.
+    case "register_wakeup": {
+      s.wakeups ??= createWakeups(() => specHost.dataOf(sidOf(s), "inbox"), (e) => { (s.wakeLog ??= []).push({ at: Date.now(), ...e }); if (s.wakeLog.length > 200) s.wakeLog.splice(0, s.wakeLog.length - 200); });
+      try { return { wakeup: await s.wakeups.register({ name: body.name, url: body.url, events: body.events, secret: body.secret, allowPrivate: body.allow_private === true }) }; }
+      catch (e) { if (e instanceof WakeupError) throw new SimError(e.code, e.message); throw e; }
+    }
+    case "list_wakeups": return { wakeups: s.wakeups?.list() ?? [] };
+    case "clear_wakeup": return { cleared: s.wakeups?.clear(body.name) ?? false };
     // The session's private inbox. Reads change nothing.
     case "inbox_read": return { address: s.inbox.address, messages: s.inbox.read({ subject: body.subject, from: body.from }) };
     case "inbox_wait": {
@@ -728,7 +737,7 @@ async function act(id, body) {
         }
       } catch (e) { throw e.code ? new SimError(e.code, e.message) : e; }
     }
-    case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...s.life.log, ...s.apps.log, ...s.update.log, ...(s.netLog ?? []), ...(s.browser?.navigations ?? [])], capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
+    case "device_log": return { log: [...(await page.evaluate(() => globalThis.__pnDevice?.log() ?? [])), ...s.life.log, ...s.apps.log, ...s.update.log, ...(s.netLog ?? []), ...(s.wakeLog ?? []), ...(s.browser?.navigations ?? [])], capabilities: await page.evaluate(() => globalThis.__pnDevice?.capabilities() ?? null), screen: await screen(page) };
     case "diag": {
       const r = await page.evaluate(async () => {
         const cfg = globalThis.__PN_SIM__ ?? {}; const out = { baseUrl: cfg.baseUrl, origin: location.origin };
@@ -761,7 +770,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, read_share, receive_share, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, read_share, receive_share, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

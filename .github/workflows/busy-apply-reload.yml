@@ -1,0 +1,87 @@
+name: busy-apply-reload
+# Escalation #1555 (issue #1523). Applies a staged update 50 times under a busy JS loop on the Android emulator
+# and the iOS Simulator, and uploads the counts (crashes, reload time, module-state counts) for each platform.
+# The harness is scripts/busy-apply/run.mjs (engineers own it). Contract:
+#   node scripts/busy-apply/run.mjs --platform android|ios --applies 50 --out <file.json>
+# It builds the runtime test app with a small native module (state set in init, cleared in invalidate), runs the
+# applies, writes {"platform","applies","crashes","reloadMs":[...],"emptyModuleState":<n>} and exits non-zero if
+# the module state was empty after any reload.
+# On demand only until the harness has landed on main; the weekly schedule is added after the first green run.
+on:
+  workflow_dispatch:
+    inputs:
+      applies: { description: "Applies per platform", default: "50" }
+permissions:
+  contents: read
+concurrency: { group: busy-apply-reload, cancel-in-progress: false }
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install and build the CLI
+        run: |
+          pip install bsdiff4
+          pnpm install --frozen-lockfile
+          pnpm --filter "@shipvo/cli..." build
+      - name: Busy-apply on the emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          profile: pixel_5
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: node scripts/busy-apply/run.mjs --platform android --applies ${{ inputs.applies || '50' }} --out "$RUNNER_TEMP/busy-apply-android.json"
+      - name: Summary
+        if: always()
+        run: |
+          F="$RUNNER_TEMP/busy-apply-android.json"
+          { echo "### Busy-apply reload on the Android emulator (API 30, x86_64, pixel_5)"; echo '```json'; cat "$F" 2>/dev/null || echo "No counts were written."; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: busy-apply-android
+          path: ${{ runner.temp }}/busy-apply-android.json
+          if-no-files-found: ignore
+          retention-days: 30
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10.28.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - name: Install and build the CLI
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter "@shipvo/cli..." build
+      - name: Busy-apply on the iOS Simulator
+        run: node scripts/busy-apply/run.mjs --platform ios --applies ${{ inputs.applies || '50' }} --out "$RUNNER_TEMP/busy-apply-ios.json"
+      - name: Summary
+        if: always()
+        run: |
+          F="$RUNNER_TEMP/busy-apply-ios.json"
+          { echo "### Busy-apply reload on the iOS Simulator"; echo '```json'; cat "$F" 2>/dev/null || echo "No counts were written."; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: busy-apply-ios
+          path: ${{ runner.temp }}/busy-apply-ios.json
+          if-no-files-found: ignore
+          retention-days: 30
