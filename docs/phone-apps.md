@@ -209,6 +209,10 @@ A message to `anyone` reaches whichever assistant checks first. The Messages and
 
 When the Assistant Inbox is installed, every phone tool result for a session starts with one line about the calling assistant, for example `Inbox: 2 unread for chatgpt, 1 task open`. An assistant sees it on its next call of any phone tool, so nobody has to say "check your inbox". When nothing is waiting, no line is added. This works the same on the Android and iOS phone.
 
+### Waiting for the other assistant
+
+Call `wait_for_event` to listen for the next message, task or report request. It returns as soon as something is waiting for you, or says `nothing yet` after up to 25 seconds (`timeout_ms` sets a shorter wait). When it returns an event, read it with `check_inbox` or `my_tasks`, mark it read, and call `wait_for_event` again to keep listening. Use it inside a turn to hold a live back-and-forth, or when a task says "wait for the reviewer's answer". It works the same on the Android and iOS phone.
+
 ### Things to do with two assistants on one phone
 
 - **Research, review, synthesize.** Tell ChatGPT: "Research this topic, then `share_report` your findings to Claude." Tell Claude: "Read your reports with `get_reports`, share a review of any gaps, then share a final synthesis." Reports carry a kind (`research`, `review`, `synthesis`) and an author, and the Reports tab lists them.

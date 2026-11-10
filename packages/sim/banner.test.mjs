@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { pendingBanner } from "./banner.mjs";
+import { pendingBanner, pendingIds, waitForPending } from "./banner.mjs";
 
 const data = {
   messages: [{ to: "chatgpt", read: false }, { to: "chatgpt", read: false }, { to: "chatgpt", read: true }, { to: "claude", read: false }],
@@ -19,4 +19,17 @@ test("nothing waiting, no caller or no app gives an empty line", () => {
   assert.equal(pendingBanner(data, "gemini"), "");
   assert.equal(pendingBanner(data, ""), "");
   assert.equal(pendingBanner(undefined, "claude"), "");
+});
+
+test("pendingIds lists the ids that wait for the caller", () => {
+  const d = { messages: [{ id: "m1", to: "x", read: false }, { id: "m2", to: "x", read: true }], handoffs: [{ id: "h1", to: "anyone", status: "open" }, { id: "h2", to: "x", status: "done" }] };
+  assert.deepEqual(pendingIds(d, "X"), { messages: ["m1"], tasks: ["h1"] });
+  assert.deepEqual(pendingIds(d, ""), { messages: [], tasks: [] });
+});
+test("waitForPending returns at once when something waits, when it arrives, and empty on timeout", async () => {
+  const d = { messages: [], handoffs: [] };
+  assert.equal(await waitForPending(() => d, "x", 60, 10), "");
+  setTimeout(() => d.messages.push({ id: "m1", to: "x", read: false }), 40);
+  assert.equal(await waitForPending(() => d, "x", 2000, 10), "Inbox: 1 unread for x");
+  const t0 = Date.now(); assert.equal(await waitForPending(() => d, "x", 5000, 10), "Inbox: 1 unread for x"); assert.ok(Date.now() - t0 < 500);
 });
