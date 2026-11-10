@@ -85,6 +85,7 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: A private inbox per session lets tests and agents finish email-code and magic-link sign-ins on Android and iOS (`inbox_wait`, `inbox_read`, `phone.inbox`; [Test an email sign-in](email-sign-in.md), #1496)
 - 2026-11-10: Assistant Inbox: assistants on one phone message each other and hand over tasks, with `{{ caller }}` filled in automatically ([Phone apps](phone-apps.md#assistants-talking-to-each-other), #1472)
 - 2026-11-10: An Android patch that runs out of memory or is over the memory budget falls back to the full download ([Getting started](getting-started.md), #1454)
 - 2026-11-10: Agents can use the prefixed refs the phone returns after a restart ([Agents](agents.md), #1459)

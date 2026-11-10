@@ -57,6 +57,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Assistant attaches to the live `shipvo run` phone (`open_app`, with `platform` and `show` to start the phone and watch) | [run](run.md), [agents](agents.md) | | | |
 | Record demo videos (`record_start`, `record_marker`, `record_stop`) | [record](record.md), [worked example](record-a-demo-video.md) | | | |
 | Shipvo Testers and `shipvo store testers` | [store](store.md), [get-your-12-testers](tutorials/get-your-12-testers.md) | [get-your-12-testers](tutorials/get-your-12-testers.md) | [Get your 12 Google Play testers](videos.md) | [google-play-12-testers-14-days](../blog/google-play-12-testers-14-days.md) |
+| Private inbox per session for email-code and magic-link sign-in (`inbox_wait`, `inbox_read`, `phone.inbox`) | [email-sign-in](email-sign-in.md) | | | |
 | Real camera, microphone and location in the browser | [device-api](device-api.md) | | | |
 | Gate a rollout on test results (`shipvo promote --report`, `--report-md`) | [testing](testing.md), [cli](cli.md) | | | |
 | Test secrets (`secret(name)`, `{secret:NAME}`) | [testing](testing.md) | | | |

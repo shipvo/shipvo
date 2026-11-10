@@ -1,6 +1,8 @@
 # Test an email sign-in on Android and iOS
 
-Many apps sign in with a code or a link sent by email. Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
+This page is for developers and for anyone who drives an app with an assistant. You will learn how to finish a sign-in that sends a code or a link by email, in a test or through an agent, without a real mailbox.
+
+Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
 
 The inbox works the same on the Android and iOS phones.
 
@@ -60,3 +62,20 @@ Agents use three tools. Each takes the `session` from `open_app`.
 ## Android and iOS
 
 The inbox, the tools and `phone.inbox` are the same on the Android and iOS phones. With MCP, open the session with `platform: "android"` or `platform: "ios"` in `open_app` and follow the same steps.
+
+## Troubleshooting
+
+| What you see | Why | What to do |
+| --- | --- | --- |
+| `inbox_timeout` ("no mail ... arrived at s-...@inbox.shipvo.test within 10000 ms") | No mail matched `subject` and `from` in time. The app may have sent it to a different address, or the filter is too strict | Type the address from `inbox.address()` (or `inbox_read`) into the app, not your own. Call `list()` or `inbox_read` with no filter to see what arrived. Raise `timeout` (at most 25000 ms) |
+| `bad_timeout` | `timeout_ms` is below 0 or above 25000 | Use a number from 0 to 25000 |
+| `inbox_no_code` | The matching mail has no 4 to 8 digit number | Read `text` from `waitFor` and check the mail. Codes with letters are not picked up, so take them from `text` yourself |
+| `session_ended` | The session closed while you waited. Its inbox is gone | Open a new session and use its new address |
+| `POST` to `https://inbox.shipvo.test/send` answers 550 `no such mailbox` | The `to` field is not this session's address | Set `to` to the exact address of the running session. Each session has its own |
+| The old code is returned on a second attempt | The first mail is still in the inbox and matches | Call `clear()` (or `inbox_clear`) before each attempt |
+
+## Next steps
+
+- [Test with an assistant](test-with-an-assistant.md)
+- [Typed tests](testing.md)
+- [Agent tools](agents.md)

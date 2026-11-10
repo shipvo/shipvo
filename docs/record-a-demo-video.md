@@ -1,14 +1,14 @@
 # Record a demo video
 
-For founders working through an AI assistant. You get a short MP4 of your app with chapter markers, background music and a voice track. This page is a worked example. Options and error codes are in [Record a demo video of the phone](record.md), including the music and narration errors.
+For founders working through an AI assistant. By the end you have a short MP4 of your app with chapter markers, background music and a voice track, and a credit line to publish with it. This page is a worked example. Options and error codes are in [Record a demo video of the phone](record.md), including the music and narration errors.
 
 ## Before you start
 
 - The simulator is running (`shipvo sim`) and your assistant is connected to `@shipvo/mcp`.
 - `ffmpeg` and `ffprobe` on your PATH, and `python3` for music.
-- Music works today only from a repo checkout, because the mixer script `scripts/video/bgmusic.py` is not in the npm package. With an npm install, set `SHIPVO_BGMUSIC` to the path of a copy of that script, or `record_stop` fails with `music_unavailable`. Narration alone needs neither.
+- Music needs the mixer script `scripts/video/bgmusic.py`, which a repo checkout has. With an npm install, set `SHIPVO_BGMUSIC` to the path of a copy of that script. Narration alone needs neither.
 - `npm i -D playwright && npx playwright install chromium`.
-- For narration, a `.wav` file with your voice, for example `narration.wav`. Without a music service, set `SHIPVO_MUSIC_FILE` to a local track (an mp3). Otherwise a track is picked from Jamendo, which needs network access. The Jamendo path was not run for this page; the example used a local track.
+- For narration, a `.wav` file with your voice, for example `narration.wav`. Without a music service, set `SHIPVO_MUSIC_FILE` to a local track (an mp3). Otherwise a track is picked from Jamendo, which needs network access. The example on this page used a local track.
 
 ## Ask your assistant
 
@@ -71,6 +71,16 @@ codec_name=aac
 codec_type=audio
 duration=0.733
 ```
+
+## Troubleshooting
+
+| What you see | What to do |
+| --- | --- |
+| `recorder_unavailable` | Run `npm i -D playwright && npx playwright install chromium`, then ask again |
+| `frame_unreachable` | Start the simulator (`shipvo sim`) or `shipvo run`, then record again |
+| `recording_active` | A recording is already running. Ask the assistant to stop it first |
+| The video is under a second long | Waits longer than 0.6 s are cut, and steps with no wait are fast. Ask the assistant to tap and scroll through the real screens |
+| The file has no sound | Read `notes` in the `record_stop` result. `music_unavailable`, `music_failed` and `narration_unreadable` each keep the silent video; the fix for each is in the table in [record](record.md#troubleshooting) |
 
 ## Next steps
 
