@@ -128,7 +128,7 @@ Agents use `set_device(calendar: [...], permissions: { calendar })` over MCP.
 
 ## Files
 
-Support level: **simulated** in the simulator, **real** on a phone when `expo-document-picker` is installed (`unavailable` otherwise). One file at a time; camera, photo library, saving and sharing files are not covered.
+Support level: **simulated** in the simulator, **real** on a phone when `expo-document-picker` is installed (`unavailable` otherwise). One file at a time.
 
 ```ts
 const f = await device.files.pick({ type: "image/*" });   // { name, mimeType, size, uri } | null (cancelled)
