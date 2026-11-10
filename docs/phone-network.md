@@ -80,6 +80,8 @@ The phone starts with that profile. An unknown name fails the session with `bad_
 
 ## Troubleshooting
 
+Common problems:
+
 | You see | Why | Fix |
 | --- | --- | --- |
 | `bad_param` when storing the allow-list | An entry has a scheme, port, path or IP address | Use host names only, such as `api.example.com` or `*.cdn.example.com` |

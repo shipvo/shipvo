@@ -1,2 +1,2 @@
-- Docs: the network page has a Troubleshooting table and Next steps; the phone apps page covers the errors for `create_app`, `update_app`, `import_phone_apps` and schedules; three new glossary terms.
+- Docs: the network page has a Troubleshooting table and a Next steps link; three new glossary terms (App activity, Schedule, Phone clock).
 - Migration: none.
