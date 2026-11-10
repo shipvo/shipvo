@@ -1,7 +1,9 @@
 // Root-signed key rotation statements (docs/design/key-rotation.md, sections 3, 6 and 8).
 // `signStatement` and `verifyStatement` follow the wire format that the Android and iOS runtimes will check.
 import * as ed from "@noble/ed25519";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { resolve } from "node:path";
 import { b64, keyFromSeed, unb64 } from "./index.js";
 import { args } from "./config.js";
 import { savedCreds } from "./login.js";
@@ -58,9 +60,11 @@ export function verifyStatement(env: unknown, rootPublicKeyB64: string, ctx: { a
 export class RotateError extends Error {}
 type Cfg = { appId: string; controlPlane: string };
 export const ROTATE_HELP = `Usage:
+  shipvo keys root --out <file> [--json]
   shipvo keys rotate sign --root-seed-file <file> --new-key <public key> --sequence <n> [--valid-from <ISO time>] [--json]
   shipvo keys rotate upload <envelope.json> [--json]
 
+root creates the offline ROOT key: it writes a new seed to <file> (mode 0600, never overwritten) and prints the public key to pin. The seed is never printed.
 sign works offline. It reads the ROOT seed from a file (never the release seed) and prints the signed envelope.
 --valid-from defaults to now (an emergency rotation). It may be at most ${MAX_PENDING_DAYS} days ahead.
 Pick a sequence above every statement you signed before. To override a planned statement, use a higher one.
@@ -71,6 +75,20 @@ upload needs a signed-in owner session (shipvo login). Tokens are refused by the
 export async function rotate(argv: string[], cfg: Cfg, deps: { fetchFn?: typeof fetch; now?: () => Date } = {}): Promise<void> {
   const [sub, ...rest] = argv, a = args(rest), json = a.json === "true";
   const now = (deps.now ?? (() => new Date()))();
+  if (sub === "root") {
+    const out = a.out;
+    if (!out || out === "true") throw new RotateError(ROTATE_HELP);
+    const seedB64 = b64(new Uint8Array(randomBytes(32)));
+    try { writeFileSync(out, seedB64 + "\n", { mode: 0o600, flag: "wx" }); }
+    catch (e) { throw new RotateError((e as NodeJS.ErrnoException).code === "EEXIST" ? `${out} already exists. Not overwriting a root key. Pick a new file name.` : `Cannot write the root key file ${out}.`); }
+    const publicKey = b64(keyFromSeed(seedB64).publicKey), file = resolve(out);
+    if (json) console.log(JSON.stringify({ public_key: publicKey, file }));
+    else {
+      console.log(`Root public key (pin this value): ${publicKey}`);
+      console.error(`Root seed written to ${file} (mode 0600). Store it offline, in a password manager or vault, then delete this file from this machine. Anyone with it can rotate your release key.`);
+    }
+    return;
+  }
   if (sub === "sign") {
     const file = a["root-seed-file"], newKey = a["new-key"], seq = a.sequence;
     if (!file || file === "true" || !newKey || newKey === "true" || !seq || seq === "true") throw new RotateError(ROTATE_HELP);

@@ -13,8 +13,8 @@ const valid = (s: string) => { try { return /^[A-Za-z0-9+/=_-]{43,44}$/.test(s) 
 export async function signingKey(argv: string[]) {
   const [sub, ...rest] = argv, a = args(rest);
   const cfg = loadConfig();
-  if (sub === "rotate") {
-    try { await rotate(rest, cfg); } catch (e) { if (!(e instanceof RotateError)) throw e; console.error(e.message); process.exit(1); }
+  if (sub === "rotate" || sub === "root") {
+    try { await rotate(sub === "root" ? ["root", ...rest] : rest, cfg); } catch (e) { if (!(e instanceof RotateError)) throw e; console.error(e.message); process.exit(1); }
     return;
   }
   if (sub === "export") {

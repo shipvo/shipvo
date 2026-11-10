@@ -29,7 +29,7 @@ export async function keysJson(argv: string[]) {
       const d = JSON.parse(lines.join("\n"));
       return { code: "ok", summary: `Signed in as ${d.login}. Key ${d.prefix}… has used ${d.used_minutes} of ${d.quota_minutes} sandbox minutes.`, data: d, next: [{ command: "shipvo app create", why: "Register the app and save a publish token." }, { command: "shipvo doctor --json", why: "Check the setup." }] };
     }
-    if (sub !== "export" && sub !== "import" && sub !== "rotate") throw new UsageError(`Unknown keys command "${sub}". Use keys, keys export, keys import or keys rotate.`);
+    if (sub !== "export" && sub !== "import" && sub !== "rotate" && sub !== "root") throw new UsageError(`Unknown keys command "${sub}". Use keys, keys export, keys import, keys root or keys rotate.`);
     const cfg = project();
     if (sub === "export") {
       const out = args(rawRest).out;
@@ -53,6 +53,14 @@ export async function keysJson(argv: string[]) {
         data: { app_id: cfg.appId, public_key: cfg.publicKey, seed_file: ".shipvo/seed.txt", gitignore_warning: /\.gitignore does not ignore/.test(text) },
         next: [{ command: "shipvo login", why: "Sign in on this machine." }, { command: "shipvo app create", why: "Get a publish token on this machine." }],
       };
+    }
+    if (sub === "root") {
+      const lines = await captureLog(() => trapExit(() => signingKey(["root", ...rawRest, "--json"]), failIn([
+        [/^Usage:/, "usage", [{ command: "shipvo keys root --out root-seed.txt", why: "Create the root key." }]],
+        [/already exists/, "exists", [{ command: "shipvo keys root --out root-seed-2.txt", why: "Use a new file name." }]],
+      ], "root_failed")));
+      const out = JSON.parse(lines.join("\n"));
+      return { code: "root_created", summary: `Root key written to ${out.file}. Pin the public key. The seed is not printed.`, data: out, next: [{ command: "shipvo keys rotate sign --root-seed-file <file> --new-key <public key> --sequence 1", why: "Sign a rotation with it." }] };
     }
     // rotate sign | upload. The signed envelope is public, so it is safe in data.
     const lines = await captureLog(() => trapExit(() => signingKey(["rotate", ...rawRest, "--json"]), failIn([

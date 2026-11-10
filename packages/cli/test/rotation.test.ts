@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from "vitest";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -191,5 +191,36 @@ describe("shipvo keys rotate sign (process)", () => {
     const ok = go(JSON.stringify({ body: "{}", signature: "x" }));
     expect(ok.status).toBe(1);
     expect(ok.stderr).toMatch(/Not signed in/);
+  });
+});
+
+describe("keys root", () => {
+  const cfg = { appId: V.appId, controlPlane: "https://cp.example" };
+  const tmp = mkdtempSync(join(tmpdir(), "root-"));
+  afterAll(() => rmSync(tmp, { recursive: true, force: true }));
+
+  it("writes a 0600 file, prints the public key, never the seed", async () => {
+    const out = join(tmp, "root.txt"), log = vi.spyOn(console, "log").mockImplementation(() => {}), err = vi.spyOn(console, "error").mockImplementation(() => {});
+    await rotate(["root", "--out", out], cfg);
+    const seed = readFileSync(out, "utf8").trim(), printed = [...log.mock.calls, ...err.mock.calls].flat().join("\n");
+    log.mockRestore(); err.mockRestore();
+    expect(statSync(out).mode & 0o777).toBe(0o600);
+    expect(printed).toContain(b64(keyFromSeed(seed).publicKey));
+    expect(printed).not.toContain(seed);
+  });
+
+  it("refuses to overwrite an existing file", async () => {
+    const out = join(tmp, "exists.txt");
+    writeFileSync(out, "keep");
+    await expect(rotate(["root", "--out", out], cfg)).rejects.toThrow(/already exists/);
+    expect(readFileSync(out, "utf8")).toBe("keep");
+  });
+
+  it("the public key verifies a signed statement", async () => {
+    const out = join(tmp, "r2.txt"), log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await rotate(["root", "--out", out, "--json"], cfg);
+    const { public_key } = JSON.parse(log.mock.calls[0][0]); log.mockRestore();
+    const env = signStatement({ appId: V.appId, sequence: 1, newKey: V.keys.K2.publicKey, validFrom: "2026-11-01T00:00:00Z" }, readFileSync(out, "utf8").trim());
+    expect(verifyStatement(env, public_key, { appId: V.appId, effectiveSequence: 0, now: new Date("2026-11-02T00:00:00Z") }).ok).toBe(true);
   });
 });
