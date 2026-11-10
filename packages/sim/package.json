@@ -33,6 +33,7 @@
     "share.mjs",
     "backup.mjs",
     "search.mjs",
+    "connectivity.mjs",
     "wakeup.mjs",
     "reminders.mjs",
     "frame.mjs",

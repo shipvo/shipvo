@@ -256,6 +256,31 @@ describe("reminder tools", () => {
     expect(JSON.parse(g.content[0].text)).toEqual({ text: "copied" });
     await c.close(); srv.close();
   }, 30000);
+  it("get_connectivity and set_connectivity pass the switches on and return the network", async () => {
+    const seen: any[] = [];
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      if (body.action === "set_connectivity" && body.mobile_data === true) return res.end(JSON.stringify({ ok: false, code: "airplane_on", error: "mobile data stays off in airplane mode" }));
+      res.end(JSON.stringify({ ok: true, connectivity: { wifi: false, mobile_data: false, airplane: true, online: false, type: "none" } }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const s: any = await c.callTool({ name: "set_connectivity", arguments: { session: "s", airplane: true } });
+    expect(seen.at(-1)).toMatchObject({ action: "set_connectivity", session: "s", airplane: true });
+    expect(JSON.parse(s.content[0].text)).toEqual({ wifi: false, mobile_data: false, airplane: true, online: false, type: "none" });
+    const g: any = await c.callTool({ name: "get_connectivity", arguments: { session: "s" } });
+    expect(JSON.parse(g.content[0].text).online).toBe(false);
+    const bad: any = await c.callTool({ name: "set_connectivity", arguments: { session: "s", mobile_data: true } });
+    expect(bad.isError).toBe(true); expect(bad.content[0].text).toContain("airplane_on");
+    await c.close(); srv.close();
+  }, 30000);
   it("permission_log passes its filters on and returns the entries", async () => {
     const seen: any[] = [];
     const srv = http.createServer(async (req, res) => {

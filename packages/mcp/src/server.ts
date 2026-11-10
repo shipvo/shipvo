@@ -418,6 +418,10 @@ use(server, tools.clear_wakeup,
   async ({ session, name }) => { need(session); const r = await act({ session, action: "clear_wakeup", name }) as Act & { cleared?: boolean }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cleared: r.cleared === true })); });
 use(server, tools.permission_log,
   async ({ session, app, permission, event, limit }) => { need(session); const r = await act({ session, action: "permission_log", app, permission, event, limit }) as Act & { entries?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ entries: r.entries }, null, 2)); });
+use(server, tools.get_connectivity,
+  async ({ session }) => { need(session); const r = await act({ session, action: "get_connectivity" }) as Act & { connectivity?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.connectivity)); });
+use(server, tools.set_connectivity,
+  async ({ session, wifi, mobile_data, airplane }) => { need(session); const r = await act({ session, action: "set_connectivity", wifi, mobile_data, airplane }) as Act & { connectivity?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.connectivity)); });
 use(server, tools.share_targets,
   async ({ session }) => { need(session); const r = await act({ session, action: "share_targets" }) as Act & { targets?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ targets: r.targets }, null, 2)); });
 use(server, tools.share,
