@@ -99,6 +99,15 @@ A spec app with an `http` data source can refresh on an interval (`refresh`, in 
 
 Pass `id` for one app and `limit` for the number of recent events. Data and settings a person entered stay across versions, so the history is the record of what the agent changed.
 
+## Check accessibility
+
+`a11y_audit { session }` reads the open screen and lists every control that TalkBack or VoiceOver users cannot use. It is read-only and works the same on the Android and iPhone styles.
+
+- `missing_label`: a button, link, field or other control with no accessible name.
+- `small_target`: a pressable under 48 dp wide or high on the Android style, or under 44 pt on the iPhone style.
+
+Each issue has `ref`, `role`, `code` and `message`. In tests, `await phone.a11yAudit()` returns `{ issues }`.
+
 ## Export data as CSV
 
 Any spec app can turn a collection into CSV with the `csv()` function. Return it from an action and the agent gets the text, on Android and iOS alike:
@@ -108,6 +117,16 @@ Any spec app can turn a collection into CSV with the `csv()` function. Return it
 ```
 
 The first line holds the column names. Fields with commas, quotes or line breaks are quoted, and lists such as tags are joined with `; `. Leave the column list out to export every field. Spreadsheets treat a cell that starts with `=`, `+`, `-` or `@` as a formula. For text that other people typed, map the field first, for example `data.entries.map(r, {'note': has(r.note) && r.note.startsWith('=') ? "'" + r.note : (has(r.note) ? r.note : '')})`, then pass that list to `csv()`.
+
+## Import data from CSV
+
+`parseCsv(text)` is the other direction. It reads CSV text into a list of maps keyed by the header row, on Android and iOS alike. Quoted fields, CRLF or LF line ends and a leading byte order mark are read, and blank lines are skipped. Every value is text. A row with fewer cells than the header gets empty values.
+
+```json
+{ "actions": { "preview_import": { "description": "Read CSV text and return its rows.", "input": { "text": "text" }, "do": [ { "return": "{{ parseCsv(input.text) }}" } ] } } }
+```
+
+`parseCsv(csv(rows))` returns the same rows, with every value as text.
 
 ## Arrange the home screen
 
@@ -210,6 +229,10 @@ A message to `anyone` reaches whichever assistant checks first. The Messages and
 ### Seeing what is waiting
 
 When the Assistant Inbox is installed, every phone tool result for a session starts with one line about the calling assistant, for example `Inbox: 2 unread for chatgpt, 1 task open`. An assistant sees it on its next call of any phone tool, so nobody has to say "check your inbox". When nothing is waiting, no line is added. This works the same on the Android and iOS phone.
+
+### Waiting for the other assistant
+
+Call `wait_for_event` to listen for the next message or task. It returns as soon as a message or task you have not been told about yet is waiting for you, or says `nothing yet` after up to 25 seconds (`timeout_ms` sets a shorter wait). The result lists the new message and task ids. Read them with `check_inbox` or `my_tasks`, act on them, and call `wait_for_event` again: anything already returned does not wake you a second time, so a task you are still working on does not end the wait. Use it inside a turn to hold a live back-and-forth, or when a task says "wait for the reviewer's answer". It works the same on the Android and iOS phone.
 
 ### Things to do with two assistants on one phone
 
