@@ -33,6 +33,7 @@
     "phone-browser.mjs",
     "browser-app.mjs",
     "watch.mjs",
+    "phone-page.mjs",
     "ws-lite.mjs",
     "spec-host.mjs",
     "lifecycle.mjs",
