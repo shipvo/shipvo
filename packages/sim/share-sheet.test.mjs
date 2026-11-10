@@ -70,6 +70,10 @@ for (const skin of ["android", "ios"]) {
     const log = (await act(s, { action: "device_log" }));
     const text = JSON.stringify(log);
     assert.match(text, /"share"/); assert.match(text, /share_received/);
+    const entries = [];
+    JSON.stringify(log, (_k, v) => { if (v && typeof v === "object" && (v.kind === "share" || v.kind === "share_received")) entries.push(v); return v; });
+    assert.deepEqual(entries.map((e) => e.kind).sort(), ["share", "share_received"]);
+    for (const e of entries) assert.equal(e.simulated, true, `${e.kind} is marked simulated`);
   });
 }
 

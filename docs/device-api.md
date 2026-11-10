@@ -82,7 +82,7 @@ await device.share.text("Order TT-1001: …", "My order");   // true if shared
 await device.clipboard.set(text); await device.clipboard.get();
 ```
 
-Simulator: a share sheet with WhatsApp / Messages / Copy; Copy writes the simulated clipboard.
+Simulator: the share sheet lists the other installed apps plus Copy. `share_to` picks one, and Copy writes the simulated clipboard. See [phone apps](phone-apps.md).
 
 ## Contacts
 
