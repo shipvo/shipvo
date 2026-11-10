@@ -126,6 +126,10 @@ The object form of `saveFile` stores text as a file in one of the app's collecti
 { "do": [ { "saveFile": { "to": "files", "name": "diary.csv", "mime": "text/csv", "content": "{{ csv(data.entries) }}" } } ] }
 ```
 
+This form adds a new record each time, even with the same name. The string form in "Save as a file" below replaces the file with the same name. Use the collection form to keep a history or list files in the app; use the string form for one named file.
+
+Declare the `to` collection under `data` with the fields `id`, `name`, `kind`, `mime`, `size`, `content` and `added`.
+
 Each file gets the next `id` and the fields `name`, `kind` (`file`), `mime` (default `text/plain`), `size` in bytes, `content` and `added`. Read the content back with `parseCsv()` to import it.
 
 ## Save as a file

@@ -195,6 +195,7 @@ export function createApp(spec: unknown, options: CreateAppOptions = {}): { ok: 
         const f = ev(st.saveFile, scope) as Obj;
         if (typeof f.to !== "string" || !f.to) throw new Error("saveFile needs \"to\", the collection that holds files.");
         if (typeof f.name !== "string" || !f.name.trim()) throw new Error("saveFile needs a file name.");
+        if (/[\\/\0]/.test(f.name.trim())) throw new Error("saveFile needs a file name with no slash");
         if (typeof f.content !== "string") throw new Error("saveFile needs text content.");
         const mime = typeof f.mime === "string" && f.mime ? f.mime : "text/plain";
         const list = coll(f.to);

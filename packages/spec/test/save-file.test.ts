@@ -45,6 +45,12 @@ describe("saveFile step", () => {
     if (!r.ok) throw new Error("x");
     expect((r.app.call("bad", {}) as any).error).toMatch(/file name/);
   });
+  it("refuses a name with a slash", () => {
+    const r = createApp(spec, { now: NOW });
+    if (!r.ok) throw new Error("x");
+    expect((r.app.call("export_diary", { name: "a/b.csv" }) as any).error).toMatch(/slash/);
+    expect((r.app.call("export_diary", { name: "..\\x" }) as any).error).toMatch(/slash/);
+  });
   it("needs the files permission", () => {
     expect(actionDeviceNeeds(spec, "export_diary")).toEqual(["files"]);
     const r = createApp(spec, { now: NOW, devicePermissions: { files: false } });
