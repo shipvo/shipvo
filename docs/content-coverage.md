@@ -24,11 +24,11 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Chess on Shipvo Phone: live demo and two agents playing through MCP (`--agents`, `--record`) | [demos/chess](demos/chess.md) | [chess-on-two-phones](tutorials/chess-on-two-phones.md) | | [two-ai-agents-play-chess-on-two-phones](../blog/two-ai-agents-play-chess-on-two-phones.md) |
 | Create an app and run it in the simulator | [getting-started](getting-started.md) | [first-app](tutorials/first-app.md) | [Create your first app](videos.md) | [build-a-mobile-app-without-coding](../blog/build-a-mobile-app-without-coding.md) |
 | Shop template with your own products and prices | [getting-started](getting-started.md) | [your-own-shop](tutorials/your-own-shop.md) | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
-| Signed over-the-air updates | [getting-started](getting-started.md) | [ship-a-fix](tutorials/ship-a-fix.md) | [Ship an update to phones](videos.md) | [who-signs-your-updates](../blog/who-signs-your-updates.md) |
+| Signed over-the-air updates | [getting-started](getting-started.md), [new-machine](new-machine.md) | [ship-a-fix](tutorials/ship-a-fix.md) | [Ship an update to phones](videos.md) | [who-signs-your-updates](../blog/who-signs-your-updates.md) |
 | Small patches (bsdiff) | [spike-results](spike-results.md) | | | [react-native-ota-update-size-bsdiff-patches](../blog/react-native-ota-update-size-bsdiff-patches.md) |
 | Staged rollout by cohort | [cli](cli.md) | [ship-a-fix](tutorials/ship-a-fix.md) | | [staged-rollouts](../blog/staged-rollouts.md) |
 | Rollback and crash-loop protection | [cli](cli.md) | [ship-a-fix](tutorials/ship-a-fix.md) | | [roll-back-a-bad-react-native-update](../blog/roll-back-a-bad-react-native-update.md) |
-| Agent simulator over MCP | [agents](agents.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | [Have an AI assistant test your shop](videos.md) | [mcp-servers-for-mobile-app-testing](../blog/mcp-servers-for-mobile-app-testing.md) |
+| Agent simulator over MCP | [agents](agents.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | [Have an AI assistant test your shop](videos.md), [S1 · E1 · From a chat to an app](videos.md#s1--e1--from-a-chat-to-an-app) | [mcp-servers-for-mobile-app-testing](../blog/mcp-servers-for-mobile-app-testing.md) |
 | Test your app with Claude, ChatGPT or Cursor | [test-with-an-assistant](test-with-an-assistant.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | [Have an AI assistant test your shop](videos.md) | [your-assistant-can-test-your-app](../blog/your-assistant-can-test-your-app.md) |
 | Typed tests (`@shipvo/test`) and `export_test` | [testing](testing.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | | [the-bug-our-first-typed-test-found](../blog/the-bug-our-first-typed-test-found.md) |
 | `shipvo explore` (walk every button) | [agents](agents.md) | [test-with-an-assistant](tutorials/test-with-an-assistant.md) | | |
@@ -102,19 +102,20 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Pin and hide apps on the home screen (`pin_app`, `hide_app`) | [phone-apps](phone-apps.md) | | | [test-an-app-on-a-phone-with-a-store-and-other-apps](../blog/test-an-app-on-a-phone-with-a-store-and-other-apps.md) |
 | Arrange the home screen (`arrange_apps`, schedules, `set_phone_time`) | [phone-apps](phone-apps.md) | | | [test-an-app-on-a-phone-with-a-store-and-other-apps](../blog/test-an-app-on-a-phone-with-a-store-and-other-apps.md) |
 | Describe an app and it appears (`create_app`, `update_app`) | [phone-apps](phone-apps.md) | | | |
-| Export and import a phone's apps (`export_phone_apps`, `import_phone_apps`) | [phone-apps](phone-apps.md) | | | |
+| Export and import a phone's apps and home-screen layout (`export_phone_apps`, `import_phone_apps`, layout warnings) | [phone-apps](phone-apps.md) | | | |
 | Real app install from the Store (`install_app`, `find_apps`) | [phone-apps](phone-apps.md) | | | |
 | SAML sign-in for the control plane | [sso](sso.md) | | | |
 | W3C `traceparent` recorded from MCP tool calls | [mcp](../packages/mcp/README.md) | | | |
 | Spec `calendar` and `map` blocks (month, week, agenda; pins with no tile calls) | [spec-blocks](spec-blocks.md#calendars-and-maps) | | | |
 | Open a hosted build from a link (`POST /session` with `build_url`) | [test-your-build](test-your-build.md#open-a-build-from-a-link) | | | |
 | Secrets screen in the phone's Settings (saved keys, metadata only, Revoke) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
+| Secrets screen in the phone's Settings (saved keys, metadata only, Revoke button) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
 | Arrange the home screen and set the phone's clock (`arrange_apps`, `set_phone_time`, `placement` in `phone.json`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
 | Phone frame page `/phone?session=` with Store and installed apps | [phone-apps](phone-apps.md) | | | |
 | Watch link on the hosted phone (`watch_url`, read-only, sign in to take over) | [agents](agents.md#watch-link-on-the-hosted-phone) | | | |
 | Hosted MCP sign-in with URL client ids (Client ID Metadata Documents) | [agents](agents.md) | | | |
 | Data sources refresh on an interval (`refresh`, 30 seconds or more) | [spec-blocks](spec-blocks.md#keep-a-data-source-fresh) | | | |
-| Gallery of example specs (`packages/spec/gallery`) | [spec-blocks](spec-blocks.md#example-specs) | | | |
+| Gallery of example specs (`packages/spec/gallery`: habit tracker, workout log, expense splitter, trip checklist, flashcards) | [spec-blocks](spec-blocks.md#example-specs) | | | |
 | Faster rebuild after a save in `shipvo run` (Metro cache kept) | [run](run.md) | | | |
 | See what an agent built and changed in a spec app (`app_activity`) | [phone-apps](phone-apps.md#see-what-was-built-and-changed) | | | |
 | Fetch an app's live data now (`refresh_app`) | [phone-apps](phone-apps.md#fetch-live-data-now) | | | |

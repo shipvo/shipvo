@@ -2,6 +2,7 @@
 // Renders the story ad frames built so far (scenes 1 to 10, 0 to 100 s) to an mp4 or to PNG stills.
 //   node scripts/video/render-story.mjs --out /tmp/agent/story-a.mp4 [--from 0] [--to 22]
 //   --rec-order <mp4>, --rec-rush <mp4>  real recordings from story/record-screens.mjs order|rush (phone area is cropped and cut into frames)
+//   --dialogue <dir>  output of dialogue.py (mouth.js, lines.json): mouths follow the recorded voices and lines show as subtitles
 //   node scripts/video/render-story.mjs --still 2,8,16 --out /tmp/agent/stills
 // Needs Chromium (CHROME_PATH or /usr/bin/chromium), playwright-core resolvable from the repo, and ffmpeg.
 import { createRequire } from "node:module";
@@ -9,7 +10,7 @@ import { mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { spawn, execFileSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { frameAt, FPS, SHOTS, setScreen } from "./story/scenes.mjs";
+import { frameAt, FPS, SHOTS, setScreen, setDialogue } from "./story/scenes.mjs";
 
 const arg = (k, d) => { const i = process.argv.indexOf("--" + k); return i < 0 ? d : process.argv[i + 1]; };
 const end = SHOTS[SHOTS.length - 1].t1;
@@ -28,6 +29,12 @@ for (const name of ["order", "rush"]) {
     if (!cache.has(k)) cache.set(k, "data:image/jpeg;base64," + readFileSync(join(dir, String(k).padStart(4, "0") + ".jpg")).toString("base64"));
     return cache.get(k);
   });
+}
+
+const dlg = arg("dialogue");
+if (dlg) {
+  const js = readFileSync(join(dlg, "mouth.js"), "utf8");
+  setDialogue({ mouth: JSON.parse(js.replace(/^window\.MOUTH = /, "").replace(/;\s*$/, "")), lines: JSON.parse(readFileSync(join(dlg, "lines.json"), "utf8")) });
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
