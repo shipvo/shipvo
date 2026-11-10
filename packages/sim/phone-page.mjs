@@ -1,7 +1,7 @@
 // /phone: the phone frame for one live session. Its home screen and Store show the session's installed apps, the same ones the MCP tools
 // install and remove. Tapping Install or an app icon here runs install_app or switch_app on that session, so device_log records it.
 import { renderFrame } from "./frame.mjs";
-import { installedIconsHtml, storeRowsHtml } from "./apps.mjs";
+import { homeApps, installedIconsHtml, storeRowsHtml } from "./apps.mjs";
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
@@ -11,7 +11,7 @@ body{display:flex;flex-direction:column;align-items:center;gap:12px;padding:12px
 @media (prefers-color-scheme:dark){html,body{background:#15171a;color:#eee}.p-msg{color:#bbb}.p-msg.err{color:#f2b8b5}}`;
 
 const SCRIPT = (session) => `(function(){
-var SESSION=${JSON.stringify(session)},esc=${esc.toString()},installedIconsHtml=${installedIconsHtml.toString()},storeRowsHtml=${storeRowsHtml.toString()};
+var SESSION=${JSON.stringify(session)},esc=${esc.toString()},homeApps=${homeApps.toString()},installedIconsHtml=${installedIconsHtml.toString()},storeRowsHtml=${storeRowsHtml.toString()};
 var r=document.querySelector('[data-part="phone-body"]'),q=function(p){return r.querySelector('[data-part="'+p+'"]')},
 home=q("home-screen"),sc=q("store-screen"),rows=q("store-rows"),opened=q("opened-app"),msg=document.querySelector('[data-part="message"]');
 home.hidden=false;var box=document.createElement("div");box.className="sf-apps";box.setAttribute("data-part","installed-apps");home.appendChild(box);
