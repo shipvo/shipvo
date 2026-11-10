@@ -98,6 +98,12 @@ describe("evaluate: text and fallbacks", () => {
     expect(ev("csv([], ['a'])")).toBe("a\r\n");
   });
 
+  it("csv: a null in a list is empty, an object in a list is JSON, and 3 arguments are refused", () => {
+    expect(evaluate("csv(rows, ['t'])", { rows: [{ t: ["a", null, "b"] }] })).toBe("t\r\na;; b\r\n".replace(";; b", "; ; b"));
+    expect(evaluate("csv(rows, ['t'])", { rows: [{ t: [{ k: 1 }] }] })).toBe('t\r\n"{""k"":1}"\r\n');
+    expect(() => evaluate("csv(rows, ['t'], 1)", { rows: [] })).toThrow();
+  });
+
   it("orElse", () => {
     expect(ev("orElse(null, 'x')")).toBe("x");
     expect(ev("orElse('a', 'x')")).toBe("a");

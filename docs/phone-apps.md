@@ -106,7 +106,7 @@ Any spec app can turn a collection into CSV with the `csv()` function. Return it
 { "actions": { "export_diary": { "do": [ { "return": "{{ csv(data.entries, ['date', 'title', 'mood', 'tags']) }}" } ] } } }
 ```
 
-The first line holds the column names. Fields with commas, quotes or line breaks are quoted, and lists such as tags are joined with `; `. Leave the column list out to export every field.
+The first line holds the column names. Fields with commas, quotes or line breaks are quoted, and lists such as tags are joined with `; `. Leave the column list out to export every field. Spreadsheets treat a cell that starts with `=`, `+`, `-` or `@` as a formula. For text that other people typed, map the field first, for example `rows.map(r, {'note': r.note.startsWith('=') ? "'" + r.note : r.note})`, then pass that list to `csv()`.
 
 ## Arrange the home screen
 

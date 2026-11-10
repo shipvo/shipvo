@@ -120,7 +120,7 @@ function library(o: Required<Pick<EvalOptions, "locale" | "timeZone">> & { now: 
     return list(l, "unique").map((x) => (k === undefined ? x : field(x, k))).filter((x) => !seen.has(x) && seen.add(x));
   };
   const cell = (v: unknown): string => {
-    const t = v === null || v === undefined ? "" : Array.isArray(v) ? v.map((x) => (x !== null && typeof x === "object" ? JSON.stringify(x) : String(x))).join("; ") : typeof v === "object" ? JSON.stringify(v) : String(v);
+    const t = v === null || v === undefined ? "" : Array.isArray(v) ? v.map((x) => (x === null || x === undefined ? "" : typeof x === "object" ? JSON.stringify(x) : String(x))).join("; ") : typeof v === "object" ? JSON.stringify(v) : String(v);
     return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
   };
   const csv = (l: unknown, cols?: unknown) => {
