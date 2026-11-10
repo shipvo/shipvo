@@ -10,13 +10,13 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **App spec.** A JSON file that describes an app's screens, buttons and data in plain terms. Shipvo checks it, shows it the same on Android and iOS, and lets an assistant use it. See [App spec](spec-blocks.md).
 
-**CSV.** A plain text table: the first line names the columns and each line after it is a row, with commas between values. Spreadsheets open it. A spec app makes one with `csv()`. See [Export data as CSV](spec-blocks.md#export-data-as-csv).
-
 **App id.** A short name for your app with no spaces, such as `tideshop`. Shipvo uses it to find your app.
 
 **App activity.** The record of what an assistant built and changed in an app on the phone: each version with plain lines for what changed, the data sources, and recent events. Ask for it with `app_activity`. See [Phone apps](phone-apps.md#see-what-was-built-and-changed).
 
 **Assistant.** An AI helper such as Claude or ChatGPT. With Shipvo it can open your app and use it like a customer.
+
+**CSV.** A plain text table: the first line names the columns and each line after it is a row, with commas between values. Spreadsheets open it. A spec app makes one with `csv()`. See [Export data as CSV](spec-blocks.md#export-data-as-csv).
 
 **Command.** One line of text you type in the terminal and run by pressing Enter.
 
