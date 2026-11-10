@@ -14,6 +14,7 @@ import { parseMockRules } from "./mock-rules.mjs";
 import { applyProfile, getProfile } from "./network-profiles.mjs";
 import { installNetGate } from "./net-gate.mjs";
 import { pushNotification } from "./push-notification.mjs";
+import { createSecretsForward, isVaultUiPath } from "./secrets-forward.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
@@ -592,6 +593,7 @@ async function act(id, body) {
 const DELIVERY = new Set(["tap", "type", "scroll", "back"]);
 const REASONS = new Set(["stale_ref", "not_visible", "disabled", "covered"]);
 const WCACHE = new Map();
+const secretsForward = createSecretsForward({ control: CONTROL, token: (process.env.SHIPVO_OWNER_TOKEN || "").trim() });
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
   // CORS plus Chromium's private-network preflight: the app page comes from the public control plane (https) and
@@ -599,6 +601,7 @@ const server = http.createServer(async (req, res) => {
   const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-private-network": "true" };
   const send = (code, obj, type = "application/json") => { res.writeHead(code, { "content-type": type, ...CORS }); res.end(type === "application/json" ? JSON.stringify(obj) : obj); };
   try {
+    if (isVaultUiPath(url.pathname)) return await secretsForward(req, res, url);   // no CORS headers: same-origin loopback only
     if (req.method === "OPTIONS") return send(204, "", "text/plain");
     // the app's static web build
     if (url.pathname.startsWith("/_expo/") || url.pathname.startsWith("/assets/") || url.pathname === "/favicon.ico") {
