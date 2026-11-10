@@ -267,3 +267,23 @@ test("refresh_app on a spec app answers with what changed and logs data_refresh;
   assert.equal(log.app, "gifts");
   assert.equal((await act("sp-ref", { action: "refresh_app", id: "ghost" })).code, "not_installed");
 });
+
+test("app_activity lists versions with what changed, sources and events; limit and not_installed work", async () => {
+  assert.ok((await call("/session", { session: "sp-act2" })).ok);
+  assert.equal((await act("sp-act2", { action: "create_app", id: "gifts", spec: GIFTS })).ok, true);
+  const next = structuredClone(GIFTS);
+  next.screens.push({ id: "about", title: "About", body: [{ type: "text", value: "Hi" }] });
+  assert.equal((await act("sp-act2", { action: "update_app", id: "gifts", spec: next })).ok, true);
+  const r = await act("sp-act2", { action: "app_activity" });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const app = r.apps.find((a) => a.id === "gifts");
+  assert.equal(app.version, 2);
+  assert.deepEqual(app.history.map((h) => h.version), [1, 2]);
+  assert.deepEqual(app.history[1].changes, ["added screen 'about'"]);
+  assert.deepEqual(app.sources, []);
+  assert.deepEqual(app.events.map((e) => e.name), ["create_app", "update_app"]);
+  assert.deepEqual(app.events[1].changes, ["added screen 'about'"]);
+  const one = await act("sp-act2", { action: "app_activity", id: "gifts", limit: 1 });
+  assert.equal(one.apps[0].events.length, 1);
+  assert.equal((await act("sp-act2", { action: "app_activity", id: "ghost" })).code, "not_installed");
+});
