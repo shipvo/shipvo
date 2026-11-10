@@ -279,7 +279,7 @@ Builds the app the way `shipvo sim` does, uploads it for your `SHIPVO_API_KEY` a
 
 ## `shipvo audit`
 
-Exports an app's audit log, newest first, to stdout. Hand the file to an auditor.
+For owners and teams who need a record of what happened to an app's releases. It exports the audit log, newest first, to stdout, so you can hand the file to an auditor. The log shows publishes, rollbacks, halts and key rotations.
 
 ```bash
 shipvo audit shop > audit.json                 # JSON (default)
@@ -291,6 +291,15 @@ shipvo audit shop --limit 100                  # only the newest 100 entries
 - CSV has a header row, every field in double quotes, and columns in this order: `id`, `app_id`, `at`, `actor`, `actor_kind`, `action`, `release`, `release_id`, `before`, `after`. Objects are written as JSON text.
 - A value that starts with `=`, `+`, `-` or `@` gets a leading `'` so a spreadsheet does not run it as a formula.
 - It needs `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create`. A non-2xx answer prints the status and exits 1. The token is never printed.
+
+What a row looks like when you rotate the release key (see [Key rotation](key-rotation.md)):
+
+```json
+{ "action": "key-rotation", "release": null, "release_id": null, "before": null, "after": "{\"sequence\":2,\"valid_from\":\"2026-11-10T09:00:00.000Z\"}" }
+```
+
+- `action` is one of `publish`, `rollback`, `halt` or `key-rotation`. A `key-rotation` row has the key sequence number and the time it takes effect in `after`; `release`, `release_id` and `before` are empty.
+- Rotation rows are merged with the other rows by time. They come with the first page only (the page without `before`), so `shipvo audit` always includes them, and a hand-made call to `GET /audit/<app>?before=<id>` does not.
 
 ## shipvo run
 

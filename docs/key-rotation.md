@@ -56,6 +56,10 @@ npx -y @shipvo/cli keys rotate upload rotation.json
 
 `sign` works offline. `upload` needs `shipvo login` as the app owner; tokens are refused.
 
+## See rotations in the audit log
+
+Each rotation is recorded next to your publishes and rollbacks. Run `shipvo audit <app>` and look for `"action": "key-rotation"`. Its `after` field holds the sequence number and the time the new key takes effect. See [`shipvo audit`](cli.md#shipvo-audit).
+
 ## Troubleshooting
 
 | You see | Cause | Fix |
@@ -70,5 +74,5 @@ npx -y @shipvo/cli keys rotate upload rotation.json
 ## Next steps
 
 - [New machine and key backup](new-machine.md) for the release seed.
-- [CLI guide](cli.md) for the `--json` envelopes.
+- [CLI guide](cli.md) for the `--json` envelopes and [`shipvo audit`](cli.md#shipvo-audit).
 - [Pointer response and rotations](self-hosting.md#pointer-response-and-key-rotations) for the wire format.

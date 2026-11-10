@@ -49,7 +49,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Take mobile money payments | [device-api](device-api.md) | | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
 | `shipvo test --repair`, `--report`, plain steps | [testing](testing.md) | | | |
 | Release policy and `--dry-run-policy` | [CLI guide](cli.md) | | | |
-| Audit log and `shipvo audit` | [CLI guide](cli.md) | | | |
+| Audit log and `shipvo audit` (publishes, rollbacks, halts, key rotations) | [CLI guide](cli.md#shipvo-audit), [key-rotation](key-rotation.md#see-rotations-in-the-audit-log) | | | |
 | `shipvo auto-halt` | [CLI guide](cli.md), [self-hosting](self-hosting.md) | [ship-a-fix](tutorials/ship-a-fix.md) | | |
 | MCP delivery results, `wait_for`, `settle` | [agents](agents.md), [mcp](../packages/mcp/README.md) | | | |
 | `shipvo run android\|ios` (phone frame in your browser) | [run](run.md) | [run-your-app-on-a-phone](tutorials/run-your-app-on-a-phone.md) | [See your app on a phone in your browser](videos.md#see-your-app-on-a-phone-in-your-browser-with-shipvo-run) | [see-your-react-native-app-on-a-phone-in-your-browser](../blog/see-your-react-native-app-on-a-phone-in-your-browser.md) |
