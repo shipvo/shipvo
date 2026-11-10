@@ -119,7 +119,7 @@ fix: Add "label": a short name that people and agents see, for example "Add goal
 
 ## Try it without installing anything
 
-The [playground](getting-started.md#try-it-in-your-browser-first) shows phones in your browser. Type a short description of an app, such as "a gift ideas list", to see it appear.
+The [playground](getting-started.md#try-it-in-your-browser-first) shows phones in your browser. Open it to see the sample app on an Android phone and an iPhone side by side before you install anything.
 
 ## Next steps
 
