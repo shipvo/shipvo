@@ -97,7 +97,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Watch link.** A web address, valid for one hour, that shows one hosted phone session live and read-only. `open_app` returns it as `watch_url`. See [Agents](agents.md#watch-link-on-the-hosted-phone).
 
-**Room.** A name you give `open_app` so two phones share one backend, for example a buyer and a shop owner. See [Agents](agents.md#rooms-several-phones-one-backend). Agents in a room can read a shared log of what each phone did and leave notes for each other ([room log](agents.md#read-the-room-log-and-leave-notes)).
+**Room.** A name you give `open_app` so two phones share one backend, for example a buyer and a shop owner. Agents in a room can read what the others did with `room_log` and leave notes with `room_note`. See [Agents](agents.md#rooms-several-phones-one-backend) and [Room log and notes](agents.md#room-log-and-notes).
 
 **Vector block.** A small drawing in an app spec, made of shapes (rectangles, circles, lines, text) whose size and colour follow your data. A battery bar is one. See [App spec](spec-blocks.md#vector-drawings).
 

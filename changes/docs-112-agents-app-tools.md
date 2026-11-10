@@ -1,0 +1,1 @@
+- Docs: the agents page lists the app-building and home-screen tools (`create_app`, `update_app`, `arrange_apps` and more) and explains `invalid_spec`.
