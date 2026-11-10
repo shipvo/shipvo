@@ -126,6 +126,25 @@ In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `co
 
 `GET /p/:app/:major/:band` pointer · `GET /b/:app/:file` bundle · `GET /w/:app/releases.json`, `GET /w/:app/:rel/*` web artifact · `GET /c/:app/content.json` live content · `POST /o/:app` orders · `POST /t` telemetry, `GET /t/:app` summary · `GET /app/:id/admin` admin · `GET /app/:id/api/describe`, `POST /app/:id/api/command` owner API (bearer `OWNER_TOKEN` or admin session).
 
+### Pointer response and key rotations
+
+`GET /p/:app/:major/:band` returns the signed pointer. When the app has stored key rotations, the response also has a `rotations` array: up to 8 entries, oldest first, each `{ body, signature }`. The rotations are not part of the signed pointer body. The `ETag` changes when a rotation is added (`"<release>-r<sequence>"`), so phones that cached the pointer fetch the new one. A response without rotations is unchanged. Clients that ignore unknown fields keep working. To create a rotation, see `shipvo keys rotate` in the [CLI guide](cli.md).
+
+### Saved-key routes (vault)
+
+The secret vault keeps keys that you or your assistant saved for an app. These routes list and manage them. They need the owner token (`Authorization: Bearer <OWNER_TOKEN>`) or an admin session, and only return the calling owner's keys. No route returns a key's value.
+
+| Route | What it does | Answer |
+| --- | --- | --- |
+| `GET /vault/keys?app=<app>` | Lists saved keys, not revoked ones. | `{ keys: [{ app, name, domain, access, last_used_at }] }` |
+| `POST /vault/keys/:app/:name/rotate` | Starts a replacement: returns a one-time link where the new value is pasted. | `201 { ticket, url, expires_in, app, name, domain, access }` |
+| `DELETE /vault/keys/:app/:name` | Revokes a key. | `{ revoked: true, app, name }` |
+| `GET /vault/keys/:app/:name/uses` | Use log: when the key was used, for which host, and the outcome. | `{ uses: [{ at, app, host, outcome }] }` |
+
+After a revoke, `GET /vault/status/:app/:name` returns `saved: false`. Errors: `bad_request` (400), `unauthorized` (401), `not_found` (404, no saved key with that name).
+
+The simulator (`shipvo sim`, `shipvo run`) forwards these four routes to the Settings app on the phone as `/vault-ui/keys`, `/vault-ui/keys/:app/:name/rotate`, `/vault-ui/keys/:app/:name` and `/vault-ui/keys/:app/:name/uses`. It adds the owner token itself, so the token never reaches the page. It answers only on loopback addresses (`localhost`, `127.0.0.1`, `[::1]`) and to same-origin pages: other hosts get `forbidden_host` (403) and other origins `cross_origin` (403). Without credentials it answers `no_credentials` (503).
+
 ## Roles
 
 The control plane defines four roles, and **publish tokens are checked against them**. A token with no role acts as `admin`, so tokens made before roles existed work as before. The owner token and the admin session are not role-limited. A token with an unknown role is denied everything. A denied call returns `403` with `{"error":"forbidden","action":"<action>","role":"<role>"}`.
