@@ -1,5 +1,7 @@
 # Migrate from EAS Update to Shipvo
 
+This guide is for developers of an Expo app that ships updates with EAS Update. You will end with the same app receiving signed Shipvo updates, with a plan you can read before anything changes.
+
 This guide moves an Expo app that uses `expo-updates` (EAS Update) to Shipvo over-the-air updates. `shipvo migrate --plan` (`packages/cli/src/migrate.ts`) prints the plan for your app. It only reads; it changes no files. `shipvo migrate --apply` makes the safe edits for you (see below). You do the other steps by hand.
 
 Facts about `expo-updates` are from the [Expo EAS Update docs](https://docs.expo.dev/eas-update/introduction/).
@@ -92,4 +94,19 @@ After `shipvo migrate --apply` and `shipvo init --yes` on that copy, `init` prin
 - Release status: `shipvo status`, and the control plane admin at `/app/<id>/admin` for content, orders and the owner API (see [getting-started.md](getting-started.md)).
 - Channels and branches: group devices with bands.
 
-See also [Migrate from CodePush](migrate-from-codepush.md) and [cli.md](cli.md).
+## Troubleshooting
+
+Each message below is printed by the CLI on this branch.
+
+- **`shipvo: this app uses expo-updates ... I stopped and changed nothing.`** `shipvo init` found `expo-updates`. Run `npx shipvo migrate --apply`, install with your package manager, then run `shipvo init` again.
+- **`Git tree is not clean (N changed path(s)). Commit or stash first, or pass --force.`** `--apply` will not edit a repo with uncommitted changes, so you can review its edits with `git diff`. Commit or stash, then run it again. Backups are also in `.shipvo/migrate-backup/`.
+- **`shipvo migrate needs --plan ... or --apply ...`** (exit code 2). Pass one of the two flags. Passing both prints `Use --plan or --apply, not both.`
+- **The plan tells you to check entries by hand.** Your config is `app.config.js` or `app.config.ts`, which the CLI does not edit. Remove the `expo-updates` plugin and the `updates` and `runtimeVersion` keys yourself.
+- **The app still calls `Updates.checkForUpdateAsync`.** `--apply` does not edit your code. Search for `expo-updates` imports and remove them before you build.
+
+## Next steps
+
+- [Back up your signing key](new-machine.md) before your first store build.
+- [Publish your first release and widen it by cohort](cli.md).
+- [Roll back a bad release](cli.md).
+- [Migrate from CodePush](migrate-from-codepush.md) if you have other apps on CodePush.

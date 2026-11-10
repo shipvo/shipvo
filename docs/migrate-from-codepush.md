@@ -1,5 +1,7 @@
 # Migrate from CodePush to Shipvo
 
+This guide is for developers of an Expo-based React Native app that ships updates with CodePush. You will end with the same app receiving signed Shipvo updates, with staged rollout and rollback.
+
 This guide moves a React Native app that used `react-native-code-push` to Shipvo over-the-air (OTA) updates. Every command and flag below comes from `packages/cli` (`src/help.ts`, `src/init.ts`, `src/publish.ts`). The dry-run output was captured by running the CLI on the sample app in this repo.
 
 Run `shipvo migrate --plan` in your app first. It is read-only. It lists what it finds with file and line (the `react-native-code-push` dependency, `codePush()` and `CodePush.sync` calls, `CodePushDeploymentKey` and `CodePushPublicKey` in `Info.plist` and `strings.xml`, and `appcenter codepush` commands in `package.json` and CI files) and prints the steps in order. `--json` returns the same data.
@@ -131,7 +133,15 @@ This signs the code of release 3 as the next release number and publishes it to 
 - `publish` calls `expo export` to build the bundle, so the project is an Expo project.
 - You start with release 1 on Shipvo. Your CodePush history stays in App Center.
 
-## Next
+## Troubleshooting
+
+- **`Git tree is not clean (N changed path(s)). Commit or stash first, or pass --force.`** `shipvo migrate --apply` will not edit a repo with uncommitted changes. Commit or stash, then run it again. Review its edits with `git diff`.
+- **The native build fails after `--apply`.** Files such as `MainApplication.kt`, `AppDelegate.mm`, `settings.gradle` and the `Podfile` still call CodePush. `--apply` lists each one with its line under the manual steps. Remove those calls by hand.
+- **`shipvo migrate needs --plan ... or --apply ...`** (exit code 2). Pass one of the two flags. Passing both prints `Use --plan or --apply, not both.`
+- **A `shipvo doctor` line says FAIL.** The line ends with the fix. Make it, then run `npx shipvo doctor` again.
+- **Users on the old build get no update.** They need the new store build from Step 5. Shipvo cannot update a build that has no Shipvo runtime.
+
+## Next steps
 
 - [Build your first app](getting-started.md)
 - [Self-hosting the control plane](self-hosting.md)

@@ -41,7 +41,8 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Self-hosting on Cloudflare | [self-hosting](self-hosting.md) | | | |
 | Share a preview link (`shipvo preview`) | [getting-started](getting-started.md) | | | |
 | Telemetry export to R2 | [telemetry-export](telemetry-export.md) | | | |
-| Move from CodePush | [migrate-from-codepush](migrate-from-codepush.md) | | | [a-codepush-alternative-after-app-center](../blog/a-codepush-alternative-after-app-center.md) |
+| Move from EAS Update (`shipvo migrate --plan`, `--apply`) | [migrate-from-eas-update](migrate-from-eas-update.md) | | | |
+| Move from CodePush | [migrate-from-codepush](migrate-from-codepush.md#troubleshooting) | | | [a-codepush-alternative-after-app-center](../blog/a-codepush-alternative-after-app-center.md) |
 | New machine and key backup | [new-machine](new-machine.md) | | | |
 | Release health dashboard and alerts | [self-hosting](self-hosting.md#revert-alerts-webhook), [telemetry-export](telemetry-export.md) | | | |
 | Take mobile money payments | [device-api](device-api.md) | | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
@@ -110,7 +111,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | W3C `traceparent` recorded from MCP tool calls | [mcp](../packages/mcp/README.md) | | | |
 | Spec `calendar` and `map` blocks (month, week, agenda; pins with no tile calls) | [spec-blocks](spec-blocks.md#calendars-and-maps) | | | |
 | Open a hosted build from a link (`POST /session` with `build_url`) | [test-your-build](test-your-build.md#open-a-build-from-a-link) | | | |
-| Secrets screen in the phone's Settings (saved keys, metadata only, Revoke button) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
+| Secrets screen in the phone's Settings (saved keys, metadata only, Rotate, Revoke and Use log buttons) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
 | Arrange the home screen and set the phone's clock (`arrange_apps`, `set_phone_time`, `placement` in `phone.json`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
 | Phone frame page `/phone?session=` with Store and installed apps | [phone-apps](phone-apps.md) | | | |
 | Watch link on the hosted phone (`watch_url`, read-only, sign in to take over) | [agents](agents.md#watch-link-on-the-hosted-phone) | | | |
