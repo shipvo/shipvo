@@ -24,7 +24,7 @@ The public key is written into the app at build time as native manifest meta-dat
 Assets:
 
 - **Publisher seed.** The Ed25519 private key. Only the seed can create a release that phones accept. It lives in your CI secrets or `.shipvo/seed.txt` (`packages/cli/src/config.ts`, `packages/cli/src/signing.ts`).
-- **Pinned public key.** In every installed app. Apps also pin an offline root key. A root-signed statement replaces a lost or leaked release key without a new store build (see "Lost or leaked release key").
+- **Pinned public key.** In every installed app. Apps built with `rootKey` pin an offline root key. A root-signed statement replaces a lost or leaked release key without a new store build (see "Lost or leaked release key").
 - **Users' phones.** They run whatever JavaScript bundle passes the checks above, with the native permissions of the installed shell.
 
 Actors and what each holds:
@@ -65,12 +65,12 @@ Trust boundaries, from least to most trusted:
 
 ## Lost or leaked release key
 
-The release key is the seed that `shipvo publish` signs with. Each installed app on Android and iOS also pins a second key, the root key. The root key stays offline and only signs rotation statements. It never signs releases. The design is in [design/key-rotation.md](design/key-rotation.md); the steps are in [key-rotation.md](key-rotation.md).
+The release key is the seed that `shipvo publish` signs with. Apps built with `rootKey` on Android and iOS also pin a second key, the root key. The root key stays offline and only signs rotation statements. It never signs releases. The design is in [design/key-rotation.md](design/key-rotation.md); the steps are in [key-rotation.md](key-rotation.md).
 
 To replace a lost or leaked release key:
 
-1. Create a new release key (see [key-rotation.md](key-rotation.md)).
-2. Run `shipvo keys rotate sign` with the root seed. It prints a statement signed by the root key that names the new release key, a `sequence` and a `validFrom` time. For an emergency, set `validFrom` to the signing time or earlier.
+1. Run `shipvo keygen --out new-seed.txt`. It writes the new seed and prints its public key. Move the seed to `.shipvo/seed.txt` or your CI secret once the rotation is live.
+2. Run `shipvo keys rotate sign` with the root seed and `--new-key <the public key>`. It prints a statement signed by the root key that names the new release key, a `sequence` and a `validFrom` time. `--valid-from` defaults to now, which is what an emergency needs.
 3. Run `shipvo keys rotate upload` as a signed-in owner. The control plane checks the root signature and hands the statement out with the pointer. It only passes the statement on. Each phone checks it again.
 4. The Android and iOS runtimes check the root signature, the app id, and that the `sequence` is higher than the one they hold. When the phone's clock reaches `validFrom`, they switch to the new release key. From then on the leaked release key signs nothing the phone accepts.
 
