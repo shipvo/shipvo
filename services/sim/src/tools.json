@@ -35,6 +35,31 @@
     }
   },
   {
+    "name": "a11y_audit",
+    "description": "Check the current screen for controls TalkBack and VoiceOver users cannot use. Lists every button, link, field or other control with no accessible name (missing_label) and every tap target under the platform minimum (small_target: 48 dp wide or high on the Android style, 44 pt on the iPhone style). Each issue has ref, role, code and message. Fails with sizes_unavailable when the simulator cannot report sizes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "apply_update",
     "description": "Apply the ready release: the app restarts on the new bundle, like restart. After 3 boots that throw, the phone goes back to the old release and the state is reverted with reason crash_loop. Fails with not_ready unless the state is ready. Simulated; logged in device_log.",
     "inputSchema": {
