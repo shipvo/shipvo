@@ -147,9 +147,36 @@ export function hideApp(st, id, hidden) {
   note(st, "hide_app", id, { hidden: !!hidden }); return st;
 }
 
-/** The apps shown on the home screen: pinned first (in pin order), then the rest in install order. Hidden apps are left out. */
+/** Check a daily window. Returns a clean schedule or throws bad_schedule. Times are HH:MM (24 hour); a window may cross midnight. */
+export function checkSchedule(w) {
+  const t = (v) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(v));
+  if (!w || typeof w !== "object" || !t(w.from) || !t(w.to) || w.from === w.to) throw new AppsError("bad_schedule", "schedule needs from and to as HH:MM (24 hour), and they must differ");
+  const tz = String(w.timezone ?? "");
+  try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); } catch { throw new AppsError("bad_schedule", `'${tz.slice(0, 60)}' is not a timezone name, for example Europe/Berlin or UTC`); }
+  return { from: String(w.from), to: String(w.to), timezone: tz };
+}
+
+/** Show the app only inside a daily window (sim clock), or remove the window so pin/hide decide again. Throws not_installed or bad_schedule. */
+export function scheduleApp(st, id, window) {
+  const a = st.installed_apps.find((x) => x.id === id);
+  if (!a) throw new AppsError("not_installed", `'${id}' is not installed`);
+  if (window == null) { delete a.schedule; note(st, "clear_schedule", id); return st; }
+  a.schedule = checkSchedule(window);
+  note(st, "schedule_app", id, { ...a.schedule }); return st;
+}
+
+/** True when the sim clock is inside the app's window. Apps without a schedule are never asked. */
+export function inWindow(w, now) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: w.timezone, hourCycle: "h23", hour: "2-digit", minute: "2-digit" }).formatToParts(new Date(now)).map((x) => [x.type, x.value]));
+  const m = Number(p.hour) * 60 + Number(p.minute), mins = (v) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3));
+  const f = mins(w.from), t = mins(w.to);
+  return f < t ? m >= f && m < t : m >= f || m < t;
+}
+
+/** The apps shown on the home screen: pinned first (in pin order), then the rest in install order. A schedule decides first (shown inside its window, hidden outside); otherwise hidden apps are left out. */
 export function homeApps(st) {
-  const shown = st.installed_apps.filter((a) => !a.hidden);
+  const now = st.clock ?? Date.now();
+  const shown = st.installed_apps.filter((a) => (a.schedule ? inWindow(a.schedule, now) : !a.hidden));
   return [...shown.filter((a) => a.pinned != null).sort((a, b) => a.pinned - b.pinned), ...shown.filter((a) => a.pinned == null)];
 }
 

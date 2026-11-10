@@ -1,0 +1,3 @@
+- `@shipvo/sim`: new `schedule_app` and `clear_schedule` actions. An app is shown on the home screen inside a daily time window (HH:MM, with a timezone) and hidden outside it, on the sim clock, on Android and iOS skins. Without a schedule, `pin_app` and `hide_app` decide. Schedules are included in `export_apps` and `import_apps`. New `set_clock` action sets the sim clock.
+- `@shipvo/mcp`: new tools `schedule_app` and `clear_schedule`.
+- Migration: none; new tools.

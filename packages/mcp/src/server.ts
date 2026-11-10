@@ -428,6 +428,10 @@ use(server, tools.pin_app,
   async ({ session, id, pinned }) => { need(session); return result(session, await act({ session, action: "pin_app", id, pinned })); });
 use(server, tools.hide_app, 
   async ({ session, id, hidden }) => { need(session); return result(session, await act({ session, action: "hide_app", id, hidden })); });
+use(server, tools.schedule_app, 
+  async ({ session, id, from, to, timezone }) => { need(session); return result(session, await act({ session, action: "schedule_app", id, from, to, timezone })); });
+use(server, tools.clear_schedule, 
+  async ({ session, id }) => { need(session); return result(session, await act({ session, action: "clear_schedule", id })); });
 use(server, tools.export_phone_apps, 
   async ({ session, ids }) => {
     need(session);

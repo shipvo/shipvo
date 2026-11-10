@@ -543,6 +543,36 @@
     }
   },
   {
+    "name": "clear_schedule",
+    "description": "Remove an app's time window so pin_app and hide_app decide again. Fails with not_installed. Logged in device_log.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "Installed app id"
+        }
+      },
+      "required": [
+        "session",
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "close_panels",
     "description": "Close the notification shade, Notification Center or Control Center (swipe up).",
     "inputSchema": {
@@ -1833,6 +1863,51 @@
         "session",
         "id",
         "action"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "schedule_app",
+    "description": "Show an installed app only inside a daily time window: it appears on the home screen and app list from `from` to `to` (HH:MM, 24 hour, in the given timezone) and is hidden outside it. A window may cross midnight. The schedule is checked on the phone's clock, comes first over pin_app and hide_app, is kept by update_app, and is included in export_phone_apps and import_phone_apps. Android and iOS skins behave the same. Fails with not_installed or bad_schedule. Logged in device_log.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "Installed app id"
+        },
+        "from": {
+          "type": "string",
+          "description": "Start of the window, HH:MM"
+        },
+        "to": {
+          "type": "string",
+          "description": "End of the window, HH:MM (not included)"
+        },
+        "timezone": {
+          "type": "string",
+          "description": "IANA timezone name, for example Europe/Berlin or UTC"
+        }
+      },
+      "required": [
+        "session",
+        "id",
+        "from",
+        "to",
+        "timezone"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"

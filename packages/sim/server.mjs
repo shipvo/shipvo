@@ -28,7 +28,7 @@ import { settingsAction, syncMedia, SETTINGS_ACTIONS } from "./settings-actions.
 import { SettingsError } from "./settings.mjs";
 import { SpecHost } from "./spec-host.mjs";
 import { fetchBuild, BuildCacheError } from "./build-cache.mjs";
-import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, pinApp, hideApp, describeApps, installedIconsHtml, storeCss } from "./apps.mjs";
+import { AppsError, loadProfile, resolveUrl, profilePatch, installApp, findApps, uninstallApp, switchApp, pinApp, hideApp, scheduleApp, checkSchedule, describeApps, installedIconsHtml, storeCss } from "./apps.mjs";
 import { UpdateError, createUpdate, checkForUpdate, applyUpdate, bootDone, updateView, bannerText } from "./update.mjs";
 import { ShadeError } from "./shade.mjs";
 import { createNav, pressHome, openRecents, resume, killApp, assertForeground, setVisibilityInPage, awayScreenHtml, NavError } from "./nav.mjs";
@@ -395,7 +395,7 @@ async function act(id, body) {
       const want = Array.isArray(body.ids) ? body.ids.map(String) : null;
       const specs = s.apps.installed_apps.filter((a) => a.kind === "spec");
       if (want) for (const w of want) if (!specs.some((a) => a.id === w)) throw new SimError("not_installed", `'${w}' is not a spec app on this phone`);
-      const apps = specs.filter((a) => !want || want.includes(a.id)).map((a) => ({ id: a.id, name: a.name, ...specHost.snapshot(sidOf(s), a.id) }));
+      const apps = specs.filter((a) => !want || want.includes(a.id)).map((a) => ({ id: a.id, name: a.name, ...(a.schedule ? { schedule: a.schedule } : {}), ...specHost.snapshot(sidOf(s), a.id) }));
       return { format: "shipvo.phone-apps/v0", apps };
     }
     // Put exported apps on the phone. Every spec is checked first and nothing is installed if any is wrong.
@@ -413,6 +413,7 @@ async function act(id, body) {
         if (!c.ok) for (const e of c.errors.slice(0, 20)) problems.push(`${at}.spec${(e.path || "").replace(/^\$/, "")}: ${e.message}${e.fix ? ` (${e.fix})` : ""}`);
         else if (a.data != null && typeof a.data !== "object") problems.push(`${at}.data: expected an object`);
         else if (a.settings != null && typeof a.settings !== "object") problems.push(`${at}.settings: expected an object`);
+        if (a.schedule != null) { try { checkSchedule(a.schedule); } catch (e) { problems.push(`${at}.schedule: ${e.message}`); } }
       });
       if (problems.length) throw new SimError("invalid_spec", problems.join("\n"));
       if (body.replace !== true) for (const a of list) if (s.apps.installed_apps.some((x) => x.id === a.id)) throw new SimError("already_installed", `'${a.id}' is already installed. Pass replace: true to overwrite it.`);
@@ -422,7 +423,7 @@ async function act(id, body) {
         if (ex) { uninstallApp(s.apps, a.id, s.nav); specHost.drop(sidOf(s), a.id); }
         const made = specHost.create(sidOf(s), a.id, a.spec, { style: a.style === "ios" ? "ios" : "android", data: a.data ?? undefined, state: a.settings ?? undefined });
         const nm = String(a.name ?? a.spec?.app?.name ?? a.id).replace(/[<>"'\\]/g, "").slice(0, 40);
-        s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec" });
+        s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec", ...(a.schedule ? { schedule: checkSchedule(a.schedule) } : {}) });
         s.apps.log.push({ at: Date.now(), name: "import_apps", app: a.id, source: "real", version: "1", replaced: !!ex });
       }
       return { imported: list.map((a) => a.id), installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
@@ -445,6 +446,17 @@ async function act(id, body) {
       const id = String(body.id ?? "");
       try { (body.action === "pin_app" ? pinApp : hideApp)(s.apps, id, body.action === "pin_app" ? body.pinned !== false : body.hidden !== false); }
       catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
+      return { current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
+    }
+    // Show an app only inside a daily window on the sim clock; clear_schedule goes back to pin/hide. set_clock moves the sim clock (at: ISO time, or null for real time).
+    case "schedule_app": case "clear_schedule": case "set_clock": {
+      try {
+        if (body.action === "set_clock") {
+          const t = body.at == null ? null : Date.parse(String(body.at));
+          if (t !== null && Number.isNaN(t)) throw new SimError("bad_schedule", "at: expected an ISO time such as 2026-11-10T08:00:00Z, or null");
+          if (t === null) delete s.apps.clock; else s.apps.clock = t;
+        } else scheduleApp(s.apps, String(body.id ?? ""), body.action === "clear_schedule" ? null : { from: body.from, to: body.to, timezone: body.timezone });
+      } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       return { current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
     }
     // Run one action of a spec app by name, the way a generated tool does. The open screen shows the result.
@@ -629,7 +641,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, pin_app, hide_app, export_apps, import_apps, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, pin_app, hide_app, schedule_app, clear_schedule, set_clock, export_apps, import_apps, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

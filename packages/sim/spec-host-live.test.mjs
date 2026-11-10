@@ -166,6 +166,53 @@ for (const style of ["android", "ios"]) {
   });
 }
 
+for (const style of ["android", "ios"]) {
+  test(`schedule_app shows an app inside its window and hides it outside, on the sim clock (${style} style)`, async () => {
+    const sid = `sp-sch-${style}`;
+    assert.ok((await call("/session", { session: sid })).ok);
+    const mk = (id) => ({ ...structuredClone(GIFTS), app: { id, name: `App ${id}`, icon: "gift" } });
+    for (const id of ["aa", "bb"]) assert.equal((await act(sid, { action: "create_app", id, spec: mk(id), style, open: false })).ok, true);
+    const ids = (t) => [...t.matchAll(/\((\w+) \d/g)].map((m) => m[1]).join(",");
+    const home = async () => (await act(sid, { action: "press_home" })).screen;
+    const at = (iso) => act(sid, { action: "set_clock", at: iso });
+    // 08:00 to 12:00 in Berlin (UTC+1 in November)
+    const w = { action: "schedule_app", id: "aa", from: "08:00", to: "12:00", timezone: "Europe/Berlin" };
+    await at("2026-11-10T06:00:00Z");   // 07:00 Berlin
+    assert.equal((await act(sid, w)).ok, true);
+    assert.equal(ids(await home()), "bb");
+    await at("2026-11-10T07:00:00Z");   // 08:00
+    assert.equal(ids(await home()), "aa,bb");
+    await at("2026-11-10T10:59:00Z");   // 11:59
+    assert.equal(ids(await home()), "aa,bb");
+    await at("2026-11-10T11:00:00Z");   // 12:00
+    assert.equal(ids(await home()), "bb");
+    // schedule wins over a hide; clear_schedule goes back to pin/hide
+    await act(sid, { action: "hide_app", id: "aa", hidden: true });
+    await at("2026-11-10T08:00:00Z");
+    assert.equal(ids(await home()), "aa,bb");
+    assert.equal((await act(sid, { action: "clear_schedule", id: "aa" })).ok, true);
+    assert.equal(ids(await home()), "bb");
+    await act(sid, { action: "hide_app", id: "aa", hidden: false });
+    assert.equal(ids(await home()), "aa,bb");
+    // export then import keeps the schedule
+    await act(sid, w);
+    const exp = await act(sid, { action: "export_apps" });
+    assert.deepEqual(exp.apps.find((a) => a.id === "aa").schedule, { from: "08:00", to: "12:00", timezone: "Europe/Berlin" });
+    const sid2 = `${sid}-b`;
+    assert.ok((await call("/session", { session: sid2 })).ok);
+    await act(sid2, { action: "set_clock", at: "2026-11-10T06:00:00Z" });
+    assert.equal((await act(sid2, { action: "import_apps", apps: exp.apps })).ok, true);
+    assert.equal(ids((await act(sid2, { action: "press_home" })).screen), "bb");
+    await act(sid2, { action: "set_clock", at: "2026-11-10T08:00:00Z" });
+    assert.equal(ids((await act(sid2, { action: "press_home" })).screen), "aa,bb");
+    // errors
+    assert.equal((await act(sid, { ...w, id: "ghost" })).code, "not_installed");
+    assert.equal((await act(sid, { ...w, timezone: "Nowhere/City" })).code, "bad_schedule");
+    assert.equal((await act(sid, { ...w, from: "8am" })).code, "bad_schedule");
+    assert.equal((await act(sid, { action: "clear_schedule", id: "ghost" })).code, "not_installed");
+  });
+}
+
 test("uninstall stops the app: actions say not_installed and a new create starts with fresh data", async () => {
   assert.ok((await call("/session", { session: "sp-un" })).ok);
   assert.equal((await act("sp-un", { action: "create_app", id: "gifts", spec: GIFTS })).ok, true);
