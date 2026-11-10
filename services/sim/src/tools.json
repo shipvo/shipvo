@@ -736,6 +736,38 @@
     }
   },
   {
+    "name": "export_phone_apps",
+    "description": "Copy the spec apps (made with create_app) out of the phone. Returns JSON with, per app, id, name, style (android or ios), spec, data (what was entered into its collections) and settings. Pass ids to export only some. Vault secrets and keys are never included. Give the result to import_phone_apps on another phone to recreate the apps. Fails with not_installed (an id is not a spec app).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "App ids to export. Default: every spec app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "export_test",
     "description": "Turn the steps taken in this session (tap, type, scroll, back, set_device) into a @shipvo/test script and return its source. Read-only. Targets are named by their visible text; ambiguous ones become TODO comments and password fields use an environment variable instead of the typed value.",
     "inputSchema": {
@@ -804,6 +836,44 @@
     },
     "annotations": {
       "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "import_phone_apps",
+    "description": "Put apps from export_phone_apps on this phone, with their data and settings. Every spec is checked first: all problems come back with their path (for example apps[1].spec.screens) and nothing is installed unless all are valid. An id that is already installed fails with already_installed unless replace is true. Android and iOS styles are kept. Fails with invalid_spec or already_installed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "apps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "description": "The apps array from export_phone_apps"
+        },
+        "replace": {
+          "type": "boolean",
+          "description": "Overwrite apps with the same id (default false)"
+        }
+      },
+      "required": [
+        "session",
+        "apps"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
       "destructiveHint": false
     },
     "execution": {

@@ -389,6 +389,43 @@ async function act(id, body) {
       }
       return { where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, warnings: made.warnings, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
     }
+    // Copy every spec app out of the phone: spec, style, collection data and settings. Vault values are never held by the phone, so none can appear.
+    case "export_apps": {
+      const want = Array.isArray(body.ids) ? body.ids.map(String) : null;
+      const specs = s.apps.installed_apps.filter((a) => a.kind === "spec");
+      if (want) for (const w of want) if (!specs.some((a) => a.id === w)) throw new SimError("not_installed", `'${w}' is not a spec app on this phone`);
+      const apps = specs.filter((a) => !want || want.includes(a.id)).map((a) => ({ id: a.id, name: a.name, ...specHost.snapshot(sidOf(s), a.id) }));
+      return { format: "shipvo.phone-apps/v0", apps };
+    }
+    // Put exported apps on the phone. Every spec is checked first and nothing is installed if any is wrong.
+    case "import_apps": {
+      const list = Array.isArray(body.apps) ? body.apps : Array.isArray(body.export?.apps) ? body.export.apps : null;
+      if (!list) throw new SimError("invalid_spec", "apps: expected the JSON from export_phone_apps (an array of apps)");
+      const problems = []; const seen = new Set();
+      list.forEach((a, i) => {
+        const at = `apps[${i}]`;
+        if (!a || typeof a !== "object") return problems.push(`${at}: expected an object`);
+        if (typeof a.id !== "string" || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(a.id)) problems.push(`${at}.id: lowercase letters, digits and dashes, up to 40`);
+        else if (seen.has(a.id)) problems.push(`${at}.id: '${a.id}' appears twice`); else seen.add(a.id);
+        const style = a.style === "ios" ? "ios" : "android";
+        const c = specHost.check(a.spec, style);
+        if (!c.ok) for (const e of c.errors.slice(0, 20)) problems.push(`${at}.spec${(e.path || "").replace(/^\$/, "")}: ${e.message}${e.fix ? ` (${e.fix})` : ""}`);
+        else if (a.data != null && typeof a.data !== "object") problems.push(`${at}.data: expected an object`);
+        else if (a.settings != null && typeof a.settings !== "object") problems.push(`${at}.settings: expected an object`);
+      });
+      if (problems.length) throw new SimError("invalid_spec", problems.join("\n"));
+      if (body.replace !== true) for (const a of list) if (s.apps.installed_apps.some((x) => x.id === a.id)) throw new SimError("already_installed", `'${a.id}' is already installed. Pass replace: true to overwrite it.`);
+      for (const a of list) { const ex = s.apps.installed_apps.find((x) => x.id === a.id); if (ex && ex.kind !== "spec") throw new SimError("already_installed", `'${a.id}' is an installed store app and cannot be replaced.`); }
+      for (const a of list) {
+        const ex = s.apps.installed_apps.find((x) => x.id === a.id);
+        if (ex) { uninstallApp(s.apps, a.id, s.nav); specHost.drop(sidOf(s), a.id); }
+        const made = specHost.create(sidOf(s), a.id, a.spec, { style: a.style === "ios" ? "ios" : "android", data: a.data ?? undefined, state: a.settings ?? undefined });
+        const nm = String(a.name ?? a.spec?.app?.name ?? a.id).replace(/[<>"'\\]/g, "").slice(0, 40);
+        s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec" });
+        s.apps.log.push({ at: Date.now(), name: "import_apps", app: a.id, source: "real", version: "1", replaced: !!ex });
+      }
+      return { imported: list.map((a) => a.id), installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
+    }
     // Edit in place: a new spec is a new version. Data and state the person entered carry over; a bad spec changes nothing.
     case "update_app": {
       const appId = String(body.id ?? "");
@@ -577,7 +614,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: screen, create_app, update_app, export_apps, import_apps, app_action, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
@@ -660,7 +697,7 @@ const server = http.createServer(async (req, res) => {
       try { const s0 = sessions.get(body.session); const prevScreen = s0?.lastScreen; const r = await act(body.session, body);
         if (s0 && typeof r.screen === "string") { s0.lastScreen = r.screen; watch.step(body.session, describeStep(body, prevScreen), changeLine(prevScreen, r.screen)); }
         log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
-      catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }
+      catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: e.code === "invalid_spec" ? String(e.message) : String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }
     }
     send(404, { error: "not found" });
   } catch (e) { send(500, { error: String(e) }); }
