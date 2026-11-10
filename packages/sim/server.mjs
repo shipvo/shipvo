@@ -328,6 +328,19 @@ async function screen(page) {
 
 function log(id, action, ok, extra = {}) { appendFileSync(join(DIR, `${id}.json.log`), JSON.stringify({ at: Date.now(), name: action, ok, ...extra }) + "\n"); }
 
+/** Which parts of an imported layout were rejected, as path suffixes with the reason. Valid input that is only normalised (true to 1, default times, "Sat" to "sat") is not reported. */
+function droppedPlacement(raw, cleaned) {
+  if (raw == null) return [];
+  if (typeof raw !== "object" || Array.isArray(raw)) return [": not valid, ignored (expected an object)"];
+  const out = [];
+  for (const k of Object.keys(raw)) {
+    if (!["pinned", "hidden", "position", "schedule"].includes(k)) out.push(`.${k}: not recognised, ignored`);
+    else if (raw[k] == null || ((k === "pinned" || k === "hidden") && raw[k] === false)) continue;
+    else if (!cleaned || !(k in cleaned)) out.push(`.${k}: not valid, dropped`);
+  }
+  return out;
+}
+
 async function act(id, body) {
   const s = sessions.get(id); if (!s) throw new SimError("no_session", `no session '${id}': call /session first`);
   const { page } = s;
@@ -436,15 +449,18 @@ async function act(id, body) {
       if (problems.length) throw new SimError("invalid_spec", problems.join("\n"));
       if (body.replace !== true) for (const a of list) if (s.apps.installed_apps.some((x) => x.id === a.id)) throw new SimError("already_installed", `'${a.id}' is already installed. Pass replace: true to overwrite it.`);
       for (const a of list) { const ex = s.apps.installed_apps.find((x) => x.id === a.id); if (ex && ex.kind !== "spec") throw new SimError("already_installed", `'${a.id}' is an installed store app and cannot be replaced.`); }
+      const warnings = [];
       for (const a of list) {
         const ex = s.apps.installed_apps.find((x) => x.id === a.id);
         if (ex) { uninstallApp(s.apps, a.id, s.nav); specHost.drop(sidOf(s), a.id); }
         const made = specHost.create(sidOf(s), a.id, a.spec, { style: a.style === "ios" ? "ios" : "android", data: a.data ?? undefined, state: a.settings ?? undefined });
         const nm = String(a.name ?? a.spec?.app?.name ?? a.id).replace(/[<>"'\\]/g, "").slice(0, 40);
-        s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec", ...(cleanPlacement(a.placement) ? { placement: cleanPlacement(a.placement) } : {}) });
+        const placement = a.placement == null ? null : cleanPlacement(a.placement);
+        for (const w of droppedPlacement(a.placement, placement)) warnings.push(`apps[${list.indexOf(a)}].placement${w}`);
+        s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec", ...(placement ? { placement } : {}) });
         s.apps.log.push({ at: Date.now(), name: "import_apps", app: a.id, source: "real", version: "1", replaced: !!ex });
       }
-      return { imported: list.map((a) => a.id), installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
+      return { imported: list.map((a) => a.id), installed_apps: s.apps.installed_apps, ...(warnings.length ? { warnings } : {}), screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Edit in place: a new spec is a new version. Data and state the person entered carry over; a bad spec changes nothing.
     // Fetch a spec app's http data sources now. Reloads the open screen only when the data changed.
