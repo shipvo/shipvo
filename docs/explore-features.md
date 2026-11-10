@@ -1,14 +1,6 @@
 # Action feature log (`--record-features`)
 
-This page is for developers who want a record of what `shipvo explore` did, one line per action, without any app text in it. You get a JSON-lines file you can read, count or use to train an action ranker. For how the walker works, see [Walk an app with `shipvo explore`](agents.md#walk-an-app-with-shipvo-explore).
-
-1. Run the walker with a file name:
-
-   ```bash
-   shipvo explore --max-steps 100 --seed 1 --record-features features.jsonl
-   ```
-
-2. Open `features.jsonl`. Each line is one action, as in the example below.
+This page is for developers who want to rank or analyse the actions `shipvo explore` takes. It describes the file the flag writes and every field in it. For the walker itself, see [agents](agents.md#walk-an-app-with-shipvo-explore).
 
 `shipvo explore --record-features <file>` writes one JSON line per action the walker takes. The lines are training data for ranking actions. The flag is off by default. Without it the run and the JSON report are the same as before.
 
@@ -43,14 +35,26 @@ Each line holds roles, counts, types and hashes. It never holds app text, label 
 | `outcome.findings` | integer | How many new findings. |
 | `outcome.failed` | boolean | The action failed or the app crashed. |
 
+## Record a file
+
+```bash
+shipvo explore --seed 1 --max-steps 20 --record-features features.jsonl
+head -n 1 features.jsonl
+```
+
+The default for `--max-steps` is 100.
+
+The file is created empty at the start and gets one line per action. Each line is one JSON object in the format above.
+
 ## Troubleshooting
 
-- **No file appears.** The flag needs a file name after it, and the folder must exist. The file is created when the run starts, so an empty file means the walker took no actions.
-- **Two runs differ.** Use the same `--seed` and the same app to repeat a walk.
-- **You expected label text.** Lines hold hashes only, so app text never leaves your machine.
+- **`--record-features needs a file`.** You gave the flag without a path. Add one, for example `--record-features features.jsonl`.
+- **The file is empty.** The file is created empty when the run starts and gets one line per action. It has no lines until the walk takes its first action.
+- **Two runs give different lines.** A different `--seed`, or a changed app, changes the walk. The same seed on the same app repeats it (default seed 1).
 
 ## Next steps
 
 - [Walk an app with `shipvo explore`](agents.md#walk-an-app-with-shipvo-explore)
-- [Lumi](lumi.md): watch an app being tested and save findings as tests
 - [CLI guide](cli.md#shipvo-explore---record-features-file)
+- [Lumi](lumi.md): watch an app being tested and save findings as tests
+- [Lumi ranker](lumi-ranker.md)

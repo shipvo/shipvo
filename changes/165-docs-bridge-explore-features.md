@@ -1,0 +1,1 @@
+- Docs: the `shipvo run` tree bridge page lists its `tap`, `type`, `scroll` and `back` actions and has troubleshooting. The `--record-features` page has a first paragraph, a runnable example, troubleshooting and next steps.
