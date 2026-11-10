@@ -10,3 +10,5 @@ export { renderFrame, fitCaption, frameStyleFor, decodePng, encodePng } from "./
 export type { FrameOptions, FrameStyle, RawImage } from "./frames.js";
 export { renderPolicyText } from "./policy-text.js";
 export type { PolicyContact, PolicyDoc } from "./policy-text.js";
+export { engagementReport } from "./engagement.js";
+export type { TelemetryRow, EngagementOptions, TesterEngagement, EngagementReport } from "./engagement.js";
