@@ -46,10 +46,11 @@ Use this to check which keys your apps have saved, without anyone seeing the key
 1. Open the phone in your browser with `shipvo run` or `shipvo sim`.
 2. Tap Settings, then tap **Secrets**.
 3. Each saved key shows its name, the app, the domain it may call, its access, and when it was last used ("never" if it has not been used).
-4. To remove a key, tap **Revoke** next to it, then confirm. The key is deleted and its row disappears. Apps that used it can no longer call the service until you save a key again.
-5. Tap **Back** to return to Settings.
+4. To replace a key, tap **Rotate** next to it. The screen shows a one-time link. Open that link and paste the new value there. The old value keeps working until you do. Only web links (http or https) are shown, and the key value is never displayed.
+5. To remove a key, tap **Revoke** next to it, then confirm. The key is deleted and its row disappears. Apps that used it can no longer call the service until you save a key again.
+6. Tap **Back** to return to Settings.
 
-With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate a key or revoke it from a script.
+With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate or revoke a key from a script.
 
 ## Allow or deny what an app can use
 
