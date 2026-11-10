@@ -47,6 +47,40 @@ This page is for founders and developers who want to know whether an AI agent ca
 
 Raw results: `apps/tide-and-tackle/agent-eval/results/`.
 
+## Run it yourself
+
+1. From `apps/tide-and-tackle`, create one fresh session file for each of the five tasks:
+
+   ```bash
+   node agent-eval/seed.mjs /tmp/pn-eval
+   ```
+
+   Expected output: `seeded /tmp/pn-eval`.
+
+2. Give your agent one task from `agent-eval/tasks.json` and point it at its own session file. It calls the app only through these commands:
+
+   ```bash
+   PN_SESSION=/tmp/pn-eval/T1.json scripts/agent describe
+   PN_SESSION=/tmp/pn-eval/T1.json scripts/agent call list_promos '{}'
+   ```
+
+3. When all five agents are done, grade the sessions:
+
+   ```bash
+   node agent-eval/grade.mjs /tmp/pn-eval
+   ```
+
+   The grader prints a table and the line `Success: <n>/5 = <rate>%  (kill gate: >= 70%)`.
+
+## Troubleshooting
+
+- **The grader says `0 orders placed (want 1)` for every task.** Nothing has called `checkout` yet. A freshly seeded folder scores 0/5; this is expected until an agent has finished.
+- **The grader says `no session`.** The folder you passed has no `T1.json` to `T5.json`. Run the seed command first. With no folder argument the grader reads `/tmp/pn-eval`.
+- **Every call returns `unknown_command`.** The message lists the valid commands. Use one of those names.
+- **A call returns `bad_json`.** The arguments must be a JSON object in single quotes, for example `'{}'`. Use `'{}'` for commands that take no arguments.
+- **The agent's calls land in one shared session.** Set `PN_SESSION` to a different file for each task. Without it, every call uses `/tmp/pn-session.json`.
+- **A Node warning about `MODULE_TYPELESS_PACKAGE_JSON` appears when you run `seed.mjs`.** It is harmless. `scripts/agent` hides it for you.
+
 ## Next steps
 
 - [Score an agent on your own app task](eval.md): `shipvo eval run` records every step and scores it with checks you write.
