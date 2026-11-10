@@ -96,7 +96,6 @@ After `shipvo migrate --apply` and `shipvo init --yes` on that copy, `init` prin
 
 ## Troubleshooting
 
-
 - **`shipvo: this app uses expo-updates ... I stopped and changed nothing.`** `shipvo init` found `expo-updates`. Run `npx shipvo migrate --plan` to see the steps, then `npx shipvo migrate --apply`, install with your package manager, and run `shipvo init` again.
 - **`Git tree is not clean (N changed path(s)). Commit or stash first, or pass --force.`** `--apply` will not edit a repo with uncommitted changes, so you can review its edits with `git diff`. Commit or stash, then run it again. Backups are also in `.shipvo/migrate-backup/`.
 - **`shipvo migrate needs --plan ... or --apply ...`** (exit code 2). Pass one of the two flags. Passing both prints `Use --plan or --apply, not both.`
