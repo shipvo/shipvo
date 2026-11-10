@@ -68,7 +68,7 @@ The inbox, the tools and `phone.inbox` are the same on the Android and iOS phone
 | You see | Cause | Fix |
 | --- | --- | --- |
 | `inbox_timeout` | No mail matched `subject` or `from` before `timeout` (`timeout_ms` in the MCP tool) ran out | Call `inbox_read` (or `phone.inbox.list()`) to see what arrived. If it is empty, check that the app tapped the send button and that your `mockNetwork` rule has a `mail` field. If mail is there, loosen `subject`. |
-| `inbox_no_code` | The matching mail has no 4 to 8 digit number | Read the mail with `waitFor` and look at `text`. For a link, use `links[0]` instead. |
+| `inbox_no_code` | The matching mail has no 4 to 8 digit number | Read `text` from `waitFor`, and put a 4 to 8 digit number in the stub's mail text. For a link, use `links[0]`. |
 | `bad_timeout` | `timeout_ms` is above 25000 or not a whole number | Use a whole number from 0 to 25000. |
 | `session_ended` | The session closed while you waited | Open the app again. The inbox and its address are new for each session. |
 | Status 550 from `https://inbox.shipvo.test/send` | The `to` address is not this session's address | Send to the address from `inbox_read` or `phone.inbox.address()`. |
