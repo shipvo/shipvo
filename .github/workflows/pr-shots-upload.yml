@@ -1,0 +1,41 @@
+# Uploads PR screenshots that are pushed to pr-shots/<pr>/ to the R2 bucket shipvo-media,
+# so they are served at https://shipvo.dev/media/pr-shots/<pr>/<file>. It uses the same Cloudflare
+# secrets and the same wrangler command as the agent workflows (_agent-claude.yml, "Upload media to R2").
+# Put the images in a commit, push, and read the URLs from the run summary. Delete the images in a later
+# commit if you do not want them in the history; the uploaded copies stay.
+name: pr-shots-upload
+on:
+  push:
+    branches-ignore: [main, release]
+    paths: ["pr-shots/**"]
+permissions: { contents: read }
+concurrency: { group: "pr-shots-${{ github.ref }}", cancel-in-progress: false }
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Upload to R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          [ -d pr-shots ] || { echo "no pr-shots folder"; exit 0; }
+          # Only png and jpg, at most 2 MB each, in pr-shots/<number>/. Anything else is ignored.
+          find pr-shots -type f | sort | while read -r f; do
+            case "$f" in
+              pr-shots/[0-9]*/*.png) ct=image/png;;
+              pr-shots/[0-9]*/*.jpg) ct=image/jpeg;;
+              *) echo "skipped $f"; continue;;
+            esac
+            case "$f" in *..*) echo "skipped $f"; continue;; esac
+            sz=$(stat -c %s "$f"); [ "$sz" -le 2097152 ] || { echo "::error::$f is over 2 MB"; exit 1; }
+            for a in 1 2 3; do
+              npx -y wrangler@4 r2 object put "shipvo-media/$f" --file "$f" --content-type "$ct" --cache-control "public, max-age=31536000, immutable" --remote && break
+              [ "$a" = 3 ] && { echo "::error::could not upload $f"; exit 1; }
+              sleep $((a*10))
+            done
+            echo "uploaded $f ($sz bytes) -> https://shipvo.dev/media/$f" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
