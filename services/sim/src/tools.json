@@ -1663,7 +1663,7 @@
   },
   {
     "name": "share_to",
-    "description": "Deliver what the app last passed to Share.share ({ message, url }) to another installed app, as choosing it in the share sheet would; the pending share is then cleared. Use app_id \"copy\" to put the text on the phone clipboard. Fails with no_share_sheet if nothing is being shared, or no_such_app if app_id is not installed.",
+    "description": "Deliver what the app last passed to Share.share ({ message, url }) to another installed app, as choosing it in the share sheet would; the pending share is then cleared. Use app_id \"copy\" to put the text on the phone clipboard. Fails with no_share_sheet if nothing is being shared, or no_such_app if that app is not installed.",
     "inputSchema": {
       "type": "object",
       "properties": {
