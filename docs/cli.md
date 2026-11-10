@@ -404,6 +404,7 @@ These commands take `--json` and print the same `{ ok, code, summary, data, next
 | `keys` | `ok` | `{ login, prefix, scope, app, expires_at, used_minutes, quota_minutes, last_used_at, mcp_url }` |
 | `keys export --out <file>` | `exported` | `{ app_id, public_key, out }`. `--out` is required, so the seed is never printed. |
 | `keys import` | `imported`, `unchanged` | `{ app_id, public_key, seed_file, gitignore_warning }` |
+| `keys root --out <file>` | `root_created` | `{ public_key, file }`. The seed goes to the file only. See [Key rotation](key-rotation.md). |
 | `keys rotate sign` | `rotation_signed` | `{ app_id, envelope: { body, signature } }` |
 | `keys rotate upload` | `rotation_uploaded` | `{ app_id, response }` |
 
