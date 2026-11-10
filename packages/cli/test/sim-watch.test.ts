@@ -155,6 +155,25 @@ describe("rebuildInto", () => {
     await rebuildInto({ root, command: cmd });
     expect(readFileSync(join(root, "sim-dist", "index.html"), "utf8")).toBe("big");
   });
+
+  it("passes --clear to npx for a cold build and leaves it out for a warm rebuild", async () => {
+    const { rebuildInto } = await import("../src/sim");
+    const root = project();
+    const bin = mkdtempSync(join(tmpdir(), "fake-npx-"));
+    const log = join(bin, "args.log");
+    // A fake npx records its arguments and writes the output dir (the last argument).
+    writeFileSync(join(bin, "npx"), `#!/bin/sh\necho "$@" >> "${log}"\nfor last; do :; done\nmkdir -p "$last"\necho new > "$last/index.html"\n`, { mode: 0o755 });
+    const oldPath = process.env.PATH;
+    process.env.PATH = `${bin}:${oldPath}`;
+    try {
+      await rebuildInto({ root });
+      await rebuildInto({ root, warm: true });
+    } finally { process.env.PATH = oldPath; }
+    const [cold, warm] = readFileSync(log, "utf8").trim().split("\n");
+    expect(cold).toContain("--clear");
+    expect(warm).not.toContain("--clear");
+    expect(warm).toContain("expo export --platform web");
+  });
 });
 
 describe("expoExportArgs", () => {

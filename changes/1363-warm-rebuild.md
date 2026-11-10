@@ -1,1 +1,1 @@
-- cli: `shipvo run` and `shipvo sim --watch` keep the Metro cache between saves, so rebuilds after a small edit are faster. The first build still starts clean.
+- cli: `shipvo run` and `shipvo sim --watch` no longer clear the Metro cache on rebuilds after a save. The first build still clears it.
