@@ -57,8 +57,6 @@ While `shipvo run` is open it watches your project. When you save a file, it reb
 
 If a rebuild fails (a typo in your code, say), the phone keeps your last good version. The terminal prints the error, and a small red bar under the phone shows it too. Save a fix and the bar goes away and the phone reloads.
 
-The first build clears the Metro cache. Rebuilds after a save keep it, so a small edit only re-transforms the file you changed. The same holds for `shipvo sim --watch`.
-
 The tests in `packages/cli/test/run-live-reload.test.ts` edit a fixture app and check the Android and iOS frames in Chromium, and they print the save-to-visible time for each.
 
 ## The device panel
