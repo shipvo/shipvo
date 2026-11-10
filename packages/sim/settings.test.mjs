@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { settingPatch, readSettings, describeSettings, SettingsError, SETTING_KEYS, settingsHtml, secretRowsHtml, loadSecrets, settingsClientScript } from "./settings.mjs";
+import { settingPatch, readSettings, describeSettings, SettingsError, SETTING_KEYS, settingsHtml, secretRowsHtml, loadSecrets, revokeSecret, settingsClientScript } from "./settings.mjs";
 import { renderFrame } from "./frame.mjs";
 import { settingsAction } from "./settings-actions.mjs";
 
@@ -77,4 +77,21 @@ test("the Secrets screen is in both skins and wired by the client script", () =>
     assert.match(h, /data-part="settings-secrets"/); assert.match(h, /data-part="secrets-screen"[^>]*aria-label="Secrets"/);
   }
   assert.match(settingsClientScript(), /\/vault-ui\/keys\?app=/);
+});
+
+test("revoke asks to confirm, then sends DELETE", async () => {
+  const calls = [], asked = [];
+  const fetchFn = async (u, o) => { calls.push([u, o.method]); return { ok: true }; };
+  assert.match(secretRowsHtml([{ name: "stripe", app: "shop" }]), /data-part="secret-revoke" data-app="shop" data-name="stripe"/);
+  assert.equal(await revokeSecret(fetchFn, (m) => { asked.push(m); return true; }, { app: "shop", name: "stripe" }), true);
+  assert.equal(asked.length, 1);
+  assert.deepEqual(calls, [["/vault-ui/keys/shop/stripe", "DELETE"]]);
+  assert.equal(await revokeSecret(async () => ({ ok: false }), () => true, { app: "shop", name: "x" }), false);
+});
+
+test("cancel sends nothing and keeps the row", async () => {
+  const calls = [];
+  assert.equal(await revokeSecret(async (u) => { calls.push(u); return { ok: true }; }, () => false, { app: "shop", name: "stripe" }), false);
+  assert.deepEqual(calls, []);
+  assert.match(settingsClientScript(), /secret-revoke/);
 });
