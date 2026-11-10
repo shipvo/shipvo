@@ -3,7 +3,7 @@
   "app": {
     "id": "expense-splitter",
     "name": "Expense splitter",
-    "description": "Record who paid and see the total and each person's share."
+    "description": "Record who paid and see the total and what each person paid."
   },
   "theme": {
     "mode": "light",
