@@ -1,7 +1,9 @@
 package dev.shipvo.runtime
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PointerQueryTest {
@@ -22,6 +24,12 @@ class PointerQueryTest {
 
   @Test fun scopedNamesAreEncoded() {
     assertEquals("https://x.dev/p/app/1/b2.json?nm=%40s%2Fp%401.2.3,b%402.0.0", url(null, "@s/p@1.2.3,b@2.0.0"))
+  }
+
+  @Test fun refusesPointerForAnotherPlatform() {
+    assertTrue(PointerQuery.isForAndroid("android"))
+    assertFalse(PointerQuery.isForAndroid("ios"))
+    assertFalse(PointerQuery.isForAndroid(null))
   }
 
   @Test fun readsTypedReason() {
