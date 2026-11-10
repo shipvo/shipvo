@@ -244,6 +244,24 @@ Add `refresh` to an `http` data source to run it again on a timer while the app 
 | `$.data.<name>.refresh` is not a number | Seconds must be a number, not text. | Write `60`, not `"60"`. |
 | `$.data.<name>.refresh` on a non-`http` source | Only `http` sources refresh. | Remove `refresh`, or change the source to `http`. |
 
+## Export data as CSV
+
+Use `csv(rows, columns?)` in any expression to turn a list into CSV text: a header row, then one line per row. Fields with commas, quotes or line breaks are quoted, lines end with CRLF and a list value is joined with `; `. Without `columns`, the keys of the first row are used.
+
+```
+csv(rows, ["name", "qty"])
+```
+
+With `rows` of `{ name: "Tea, green", qty: 2 }` and `{ name: "Salt", qty: 5 }`, the result is:
+
+```
+name,qty
+"Tea, green",2
+Salt,5
+```
+
+The text works the same on Android and iOS, so you can pass it to a share or save action.
+
 ## Example specs
 
 `packages/spec/gallery/` holds example specs to copy and change: a habit tracker, a workout log, an expense splitter, a trip checklist and flashcards. Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.

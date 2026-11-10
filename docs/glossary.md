@@ -132,3 +132,5 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Rotation statement.** A note signed by the root key that tells phones to trust a new release key. `shipvo keys rotate sign` makes it.
 
 **App permission.** A device permission (such as notifications or location) an app declares and you allow or deny on its install card or in Settings. See [phone apps](phone-apps.md#device-permissions-per-app).
+
+**Session inbox.** A private mailbox that every test session gets, with its own address. A test or an assistant reads emailed sign-in codes and links there, and the mail is gone when the session ends. See [email sign-in](email-sign-in.md).

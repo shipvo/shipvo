@@ -1,5 +1,7 @@
 # Test an email sign-in on Android and iOS
 
+This page is for developers and for anyone whose assistant tests an app that signs in by email. You will finish an emailed-code or magic-link sign-in in a test or through an agent, with no real mailbox.
+
 Many apps sign in with a code or a link sent by email. Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
 
 The inbox works the same on the Android and iOS phones.
@@ -60,3 +62,19 @@ Agents use three tools. Each takes the `session` from `open_app`.
 ## Android and iOS
 
 The inbox, the tools and `phone.inbox` are the same on the Android and iOS phones. With MCP, open the session with `platform: "android"` or `platform: "ios"` in `open_app` and follow the same steps.
+
+## Troubleshooting
+
+| You see | Why | What to do |
+| --- | --- | --- |
+| `inbox_timeout` | No mail matched the `subject` or `from` before the timeout | Call `inbox_read` (or `phone.inbox.list()`) to see what arrived. Loosen the filter, or raise `timeout` (at most 25000 ms). Check that the app really sent the request |
+| `inbox_no_code` | The matching mail has no 4 to 8 digit code | Read `text` from `waitFor`. If the mail holds a link, use `links[0]` |
+| Status 550 from `https://inbox.shipvo.test/send` | The `to` address is not this session's address | Use the address from `inbox_read` or `phone.inbox.address()`. Each session has its own |
+| The address changed between runs | Each session gets a new address, and the inbox is removed when the session ends | Read the address again at the start of every session |
+| The inbox tools are missing in your agent | The session was not opened on Shipvo Phone | Open the app with `open_app` on `platform: "android"` or `"ios"` |
+
+## Next steps
+
+- [Agents and Shipvo apps](agents.md): every MCP tool, including the three inbox tools.
+- [Typed tests](testing.md): `@shipvo/test` and `mockNetwork`.
+- [Device API](device-api.md): simulated device features your sign-in flow may use.
