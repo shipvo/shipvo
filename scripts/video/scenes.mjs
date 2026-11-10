@@ -606,3 +606,68 @@ ${daShot("06-ios", 940, 160, 250, 5)}
 <div class="abs card in mono" style="left:470px;top:360px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="sky">npx</span> shipvo agents setup</div>
 <div class="abs in mute" style="left:470px;top:480px;font-size:28px;line-height:1.4;width:700px;--d:4s">The guide: <span class="sky">shipvo.dev</span>/learn<br>Next: <span class="sky">npx shipvo run android</span></div>`,
 });
+
+// --- try-shipvo-in-your-browser: real playground screenshots from the tutorial ---
+const tp = (n) => "try-shipvo-in-your-browser/" + n;
+const tpShot = (n, x, y, w, d = 0, extra = "", cls = "pop") => `<div class="abs ${cls}" style="left:${x}px;top:${y}px;width:${w}px;--d:${d}s;${extra}"><div style="border:6px solid #2b3a5c;border-radius:36px;overflow:hidden;background:#05080f;line-height:0"><img src="{{IMG:${tp(n)}}}" style="width:100%;display:block"></div></div>`;
+const tpLine = (label, text, x, y, w, d, color = "sky") => `<div class="abs card in" style="left:${x}px;top:${y}px;width:${w}px;padding:16px 24px;--d:${d}s"><div class="mono ${color}" style="font-size:16px">${label}</div><div style="font-size:28px;margin-top:4px;line-height:1.3">${text}</div></div>`;
+
+Object.assign(SCENES, {
+  tpHook: () => `
+<h1 class="abs in" style="left:72px;top:130px;width:640px;font-size:60px;--d:.2s">A phone in<br>your browser.<br><span class="or">Nothing to install.</span></h1>
+<div class="abs card in mono" style="left:72px;top:470px;padding:20px 28px;font-size:28px;--d:2s"><span class="sky">shipvo.dev</span>/playground</div>
+${tpShot("01-cart", 800, 24, 300, .3)}
+<div class="abs pop" style="left:1120px;top:80px;--d:3.4s"><span class="badge" style="background:#12382b;color:var(--green)">Android</span></div>`,
+
+  tpOpen: () => `
+${chip("Step 1")}
+<h2 class="abs in" style="left:72px;top:110px;--d:.3s">Open the page, tap Add</h2>
+${tpLine("OPEN", "shipvo.dev/playground", 72, 230, 640, .8)}
+${tpLine("TAP", "Add on two products", 72, 360, 640, 2.8)}
+${tpShot("01-cart", 800, 24, 300, .4)}
+<div class="abs pop" style="left:72px;top:520px;--d:6s"><span class="badge" style="background:#12382b;color:var(--green)">Cart: 2 items</span></div>`,
+
+  tpSwitch: () => `
+${chip("Android + iOS")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Switch phones <span class="or">in one tap</span></h2>
+${tpLine("BUTTON", "iOS", 72, 230, 300, .9)}
+${tpLine("BUTTON", "Android", 400, 230, 300, 2.6)}
+${tpLine("BUTTON", "Dark mode", 72, 360, 300, 4.4)}
+${tpLine("BUTTON", "Large text", 400, 360, 300, 5.8)}
+${tpShot("01-cart", 800, 24, 250, .4, "left:760px")}
+${tpShot("02-ios-dark-large", 800, 24, 250, 4.6, "left:1020px")}
+<div class="abs mono sky pop" style="left:830px;top:540px;font-size:22px;--d:1s">ANDROID</div>
+<div class="abs mono sky pop" style="left:1090px;top:540px;font-size:22px;--d:5s">iOS · DARK</div>`,
+
+  tpDevice: () => `
+${chip("Step 3")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Choose what the phone says</h2>
+${tpLine("LOCATION", "Lisbon", 72, 230, 640, .9)}
+${tpLine("PAYMENT", "Approve or decline", 72, 350, 640, 3)}
+${tpLine("AIRPLANE MODE", "On: no network", 72, 470, 640, 5.2)}
+${tpShot("03-device", 800, 24, 300, .4)}
+<div class="abs pop" style="left:830px;top:380px;--d:6.4s"><span class="badge" style="background:#12382b;color:var(--green)">Payment: approved</span></div>`,
+
+  tpUpdate: () => `
+${chip("Signed update")}
+<h2 class="abs in" style="left:72px;top:56px;--d:.3s">Update, crash, <span class="or">rollback</span></h2>
+${tpLine("SIGNATURE", "Valid. One field changed: rejected.", 72, 140, 760, .8, "green")}
+${tpLine("STAGED", "100 of 1000, then 1000 of 1000", 72, 255, 760, 3.2)}
+${tpLine("CRASH", "Three starts in a row: 1, 2, 3 of 3", 72, 370, 760, 6.2, "or")}
+${tpLine("ROLLBACK", "Fourth start: back to version 1", 72, 485, 760, 9.2, "green")}
+<div class="abs pop" style="left:900px;top:150px;--d:3.4s"><span class="badge" style="background:#1a2a4a;color:var(--sky);font-size:34px">Version 2</span></div>
+<div class="abs pop" style="left:900px;top:500px;--d:9.6s"><span class="badge" style="background:#12382b;color:var(--green);font-size:34px">Version 1</span></div>`,
+
+  tpMany: () => `
+${chip("Many phones")}
+<h2 class="abs in" style="left:72px;top:90px;--d:.3s">Six phones. <span class="or">One link.</span></h2>
+${tpLine("PHONES", "1 to 12, Android, iOS or both", 72, 230, 620, .9)}
+<div class="abs card in mono" style="left:72px;top:360px;width:620px;padding:20px 24px;font-size:20px;line-height:1.4;--d:3s;word-break:break-all"><span class="sky">shipvo.dev</span>/playground/?phones=6&amp;mix=both&amp;dark=1#many</div>
+${tpShot("05-many", 860, 14, 260, .5)}`,
+
+  tpCta: () => `
+<div class="abs pop" style="left:72px;top:140px;width:330px;--d:.3s">{{MARK}}</div>
+<h1 class="abs in" style="left:470px;top:120px;--d:.8s">Tap it.<br><span class="or">Test it.</span></h1>
+<div class="abs card in mono" style="left:470px;top:360px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="sky">shipvo.dev</span>/playground</div>
+<div class="abs in mute" style="left:470px;top:480px;font-size:28px;line-height:1.4;width:700px;--d:4s">The guide: <span class="sky">shipvo.dev</span>/learn<br>Next: <span class="sky">npx shipvo run android</span></div>`,
+});

@@ -6,7 +6,7 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
-1. Describe an app and it appears (`create_app`, `update_app`, `app_activity`; launch kit written 10 Nov; docs: [describe-an-app](describe-an-app.md); tutorial done 10 Nov; video done 10 Nov; blog done 10 Nov) and the browser playground (launch kit written 10 Nov; tutorial done 10 Nov; video and blog needed)
+1. Describe an app and it appears (`create_app`, `update_app`, `app_activity`; launch kit written 10 Nov; docs: [describe-an-app](describe-an-app.md); tutorial done 10 Nov; video done 10 Nov; blog done 10 Nov) and the browser playground (launch kit written 10 Nov; tutorial and video done 10 Nov; blog needed)
 1b. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog done (10 Nov), tutorial done; video now for the live page; the agent-vs-agent video and launch kit once #1166 merges. Docs: [demos/chess](demos/chess.md) (live page, `--agents`, `--record`, troubleshooting).
 2. ~~Shipvo Testers and `shipvo store testers`~~ (done)
 3. `shipvo lumi` (launch kit written 7 Nov; tutorial, video and blog done) and live reload in `shipvo run` (launch kit written 7 Nov; tutorial done 10 Nov; video needs the new section)
@@ -23,7 +23,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | --- | --- | --- | --- | --- |
 | Chess on Shipvo Phone: live demo and two agents playing through MCP (`--agents`, `--record`) | [demos/chess](demos/chess.md) | [chess-on-two-phones](tutorials/chess-on-two-phones.md) | | [two-ai-agents-play-chess-on-two-phones](../blog/two-ai-agents-play-chess-on-two-phones.md) |
 | Describe an app and it appears (`create_app`, `update_app`, `app_activity`) | [describe-an-app](describe-an-app.md) | [describe-an-app](tutorials/describe-an-app.md) | [Describe an app and watch it appear on a phone](videos.md#describe-an-app-and-watch-it-appear-on-a-phone) | [describe-an-app-and-it-appears-on-a-phone](../blog/describe-an-app-and-it-appears-on-a-phone.md) |
-| Browser playground (sample app on Android and iOS, device API, signed updates, many phones link) | [playground](playground.md) | [try-shipvo-in-your-browser](tutorials/try-shipvo-in-your-browser.md) | | |
+| Browser playground (sample app on Android and iOS, device API, signed updates, many phones link) | [playground](playground.md) | [try-shipvo-in-your-browser](tutorials/try-shipvo-in-your-browser.md) | [Try Shipvo in your browser](videos.md#try-shipvo-in-your-browser-a-phone-device-features-and-a-rollback) | |
 | Create an app and run it in the simulator | [getting-started](getting-started.md) | [first-app](tutorials/first-app.md) | [Create your first app](videos.md) | [build-a-mobile-app-without-coding](../blog/build-a-mobile-app-without-coding.md) |
 | Shop template with your own products and prices | [getting-started](getting-started.md) | [your-own-shop](tutorials/your-own-shop.md) | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
 | Signed over-the-air updates | [getting-started](getting-started.md), [new-machine](new-machine.md) | [ship-a-fix](tutorials/ship-a-fix.md) | [Ship an update to phones](videos.md) | [who-signs-your-updates](../blog/who-signs-your-updates.md) |
@@ -49,7 +49,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Take mobile money payments | [device-api](device-api.md) | | | [mobile-money-is-the-checkout](../blog/mobile-money-is-the-checkout.md) |
 | `shipvo test --repair`, `--report`, plain steps | [testing](testing.md) | | | |
 | Release policy and `--dry-run-policy` | [CLI guide](cli.md) | | | |
-| Audit log and `shipvo audit` | [CLI guide](cli.md) | | | |
+| Audit log and `shipvo audit` (publishes, rollbacks, halts, key rotations) | [CLI guide](cli.md#shipvo-audit), [key-rotation](key-rotation.md#see-rotations-in-the-audit-log) | | | |
 | `shipvo auto-halt` | [CLI guide](cli.md), [self-hosting](self-hosting.md) | [ship-a-fix](tutorials/ship-a-fix.md) | | |
 | MCP delivery results, `wait_for`, `settle` | [agents](agents.md), [mcp](../packages/mcp/README.md) | | | |
 | `shipvo run android\|ios` (phone frame in your browser) | [run](run.md) | [run-your-app-on-a-phone](tutorials/run-your-app-on-a-phone.md) | [See your app on a phone in your browser](videos.md#see-your-app-on-a-phone-in-your-browser-with-shipvo-run) | [see-your-react-native-app-on-a-phone-in-your-browser](../blog/see-your-react-native-app-on-a-phone-in-your-browser.md) |
@@ -101,6 +101,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Saved-key routes: list, rotate, revoke and use log (`/vault/keys`, `/vault-ui/*` in the simulator) | [self-hosting](self-hosting.md#saved-key-routes-vault) | | | |
 | Key rotation: `shipvo keys root`, `keys rotate sign` and `upload` | [key-rotation](key-rotation.md) | | | |
 | Per-app device permissions on the install card (`set_app_permission`) | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
+| Key rotations in the audit log (`key-rotation` rows in `shipvo audit`) | [cli](cli.md#shipvo-audit) | | | |
 | Key rotations in the pointer response (`rotations`) | [self-hosting](self-hosting.md#pointer-response-and-key-rotations) | | | |
 | Playground Many phones (1 to 12 Android and iOS phones, shareable link) | [getting-started](getting-started.md#try-it-in-your-browser-first) | | | |
 | Pin and hide apps on the home screen (`pin_app`, `hide_app`) | [phone-apps](phone-apps.md) | | | [test-an-app-on-a-phone-with-a-store-and-other-apps](../blog/test-an-app-on-a-phone-with-a-store-and-other-apps.md) |

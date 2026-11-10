@@ -43,6 +43,10 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Release.** One numbered version of your app that phones can download.
 
+**Secrets screen.** The screen in the Settings app on Shipvo Phone that lists the keys you saved for an app, such as a payment key. You can rotate or remove a key there. See [Phone apps](phone-apps.md#see-saved-keys-in-settings).
+
+**Use log.** The list under a saved key that shows when the key was used, where, and what happened. Use it to check that only your app used the key. See [Phone apps](phone-apps.md#see-saved-keys-in-settings).
+
 **Signing.** Putting a secret stamp on a release so phones can check it really came from you. The stamp comes from a key file kept on your computer.
 
 **Signing seed.** The secret file (`.shipvo/seed.txt`) that makes the stamp. Back it up once: without it you cannot update phones that already have your app. See [Moving to a new machine](new-machine.md).
@@ -55,7 +59,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Terminal.** A window where you type commands instead of clicking. On a Mac it is called Terminal. On Windows use "Windows Terminal" or "PowerShell". On Linux it is also called Terminal.
 
-**Audit log.** A list of what happened to your app's releases: who published, who rolled back, and when a release was stopped. You can export it with `shipvo audit`.
+**Audit log.** A list of what happened to your app's releases: who published, who rolled back, when a release was stopped, and when you rotated your release key. You can export it with `shipvo audit`.
 
 **Cohort.** A slice of your users that gets an update before everyone else. See also cohort band.
 
