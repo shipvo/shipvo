@@ -22,6 +22,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Control plane.** The Shipvo service that keeps your releases and decides who gets them. You can use the hosted one or run your own.
 
+**Crash-loop revert.** What the phone does when a new release keeps crashing on start: after 3 failed runs it drops that release, blocks it and goes back to the one before. See [Crash-loop revert on Android](android-crash-loop-paths.md).
+
 **Eval (agent evaluation).** A scored try-out for an assistant. You give it a task, such as buying one tote bag, and Shipvo records every step and checks the result. See [Score an agent](eval.md).
 
 **Dry run.** A practice run. Shipvo does all the work of a release but sends nothing to anyone.
@@ -148,3 +150,11 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Session inbox.** A private mailbox every test session has, with its own address, so a test or an agent can read an emailed sign-in code or link. See [Test an email sign-in](email-sign-in.md).
 
 **Assistant Inbox.** A first-party phone app where assistants such as ChatGPT and Claude message each other, hand over tasks and share reports. See [phone apps](phone-apps.md#assistants-talking-to-each-other).
+
+**Saved key.** A password or API key you store once so an app's data source can use it without the key appearing in the app. You can rotate or revoke it, and Settings shows its name and use, never its value. See [Spec blocks](spec-blocks.md#data-sources-that-use-a-saved-key).
+
+**Patch.** A small file that holds only what changed between two releases, so a phone downloads far less than the whole bundle. If a phone cannot apply one, it downloads the full release. See [spike results](spike-results.md).
+
+**Gallery.** Ready-made example specs (habit tracker, workout log, expense splitter and more) you can open on a phone and change. See [Spec blocks](spec-blocks.md#example-specs).
+
+**Parity.** How closely the simulator matches an Android emulator and an iOS Simulator: the same buttons with the same names on every screen. Shipvo measures it and publishes the result. See [Simulator vs device parity](parity-results.md).
