@@ -30,7 +30,7 @@ If step 2 fails, the agent gets a list of problems, each with where it is and ho
 
 The `id` you pass to `create_app` uses lowercase letters, digits and dashes, up to 40 characters, and it starts with a letter or digit. The `app.id` inside the spec follows the spec schema and is a separate rule.
 
-Every call is logged in `device_log`. Details for each tool are in [phone apps](phone-apps.md#describe-an-app-and-it-appears). The spec format is in [app spec](design/app-spec.md), and every block you can use is in [spec blocks](spec-blocks.md). Five complete examples are in `packages/spec/gallery`.
+Every call is logged in `device_log`. Details for each tool are in [phone apps](phone-apps.md#describe-an-app-and-it-appears). The spec format is in [app spec](design/app-spec.md), and every block you can use is in [spec blocks](spec-blocks.md). Eight complete examples are in `packages/spec/gallery`.
 
 ### A complete spec
 

@@ -305,6 +305,18 @@ shipvo audit shop --limit 100                  # only the newest 100 entries
 - If the app cannot build for web, the command exits with code 1 and names the module or file that failed.
 - Ctrl+C stops the server.
 
+## `shipvo rollback`
+
+Republishes an earlier release's code as a new release.
+
+```bash
+shipvo rollback --to 5 --dry-run       # preview
+shipvo rollback --to 5                 # roll back all bands and platforms
+shipvo rollback --to 5 --allow-state-downgrade
+```
+
+If the release you choose has a lower `state_version` than the one phones run, rollback stops until you pass `--allow-state-downgrade`. See [Rollbacks and stored data](rollbacks-and-stored-data.md).
+
 ## `shipvo promote`
 
 Widens a staged release to more bands. It reads a test report and refuses to widen a release whose flows failed.

@@ -46,6 +46,7 @@ const NAV = [
     { slug: "auto-halt", src: "docs/auto-halt.md", title: "Auto-halt a failing release", desc: "Stop a release automatically when it fails on many real installs: what counts as a vote, how to turn it on and how to read the result." },
     { slug: "sso", src: "docs/sso.md", title: "Single sign-on (OIDC)", desc: "Let people sign in to the dashboard with your identity provider and get the role their claims map to." },
     { slug: "taking-real-orders", src: "docs/taking-real-orders.md", title: "Taking real orders", desc: "How Shipvo stores the orders your app sends and how you, or your payment provider, tell Shipvo an order is paid." },
+    { slug: "rollbacks-and-stored-data", src: "docs/rollbacks-and-stored-data.md", title: "Rollbacks and stored data", desc: "Declare a state version in shipvo.json so a rollback never sends Android or iOS phones to code that cannot read their saved data." },
   ]},
   { group: "Test", pages: [
     { slug: "test-with-an-assistant", src: "docs/test-with-an-assistant.md", title: "Test with an assistant", desc: "Connect Claude, ChatGPT or Cursor to the hosted Shipvo simulator over MCP and have it test your React Native app, step by step." },

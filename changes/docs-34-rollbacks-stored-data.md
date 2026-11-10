@@ -1,0 +1,1 @@
+- Docs: "Rollbacks and stored data" is now in the sidebar with steps, the exact refusal message, `--json` behaviour and troubleshooting; `shipvo rollback` has its own section in the CLI guide; the gallery list names all eight example specs.

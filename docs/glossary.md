@@ -59,6 +59,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Rollback.** Sending people back to the last good release.
 
+**State version.** A whole number in `shipvo.json` (`stateVersion`) that says which layout of saved data a release uses. `shipvo rollback` stops before it sends phones to a lower number. See [Rollbacks and stored data](rollbacks-and-stored-data.md).
+
 **Parquet.** A file format for tables of data. Tools such as DuckDB read it, so you can ask questions about your releases with SQL.
 
 **Test.** A small file that repeats the steps a customer takes and fails if the result changes. It runs on your computer in seconds.
