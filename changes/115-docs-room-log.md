@@ -1,0 +1,1 @@
+- docs: the Agents page explains `room_log` and `room_note` (read what every phone in a room did, leave notes, error codes), with matching entries in the MCP README and glossary.

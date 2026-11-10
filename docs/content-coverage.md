@@ -120,3 +120,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Fetch an app's live data now (`refresh_app`) | [phone-apps](phone-apps.md#fetch-live-data-now) | | | |
 | Show or hide an app on a time window (`schedule_app`, `clear_schedule`) | [phone-apps](phone-apps.md#arrange-the-home-screen) | | | |
 | Network proxy refusal codes (`x-shipvo-net-error`) | [phone-network](phone-network.md#troubleshooting) | | | |
+| Room log and notes for agents in one room (`room_log`, `room_note`) | [agents](agents.md#read-the-room-log-and-leave-notes), [mcp](../packages/mcp/README.md) | | | |

@@ -53,6 +53,7 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `push_notification` · `notifications` · `open_notification` | Deliver, list and tap notifications |
 | `get_settings` · `set_setting` · `browser_open` · `browser_snapshot` · `browser_click` · `browser_type` · `browser_scroll` · `browser_back` · `browser_wait_for` · `browser_tabs` · `browser_close_tab` · `browser_screenshot` | Read and change the phone's system settings, and drive its separate web Browser. See [the phone's Browser and Settings](phone-apps.md) |
 | `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
+| `room_log(room, since?)` · `room_note(room, text)` | Read what every session in a room did, and post a short note for the other agents. See [Rooms](#rooms-several-phones-one-backend) |
 | `end_session(session)` | Ends the session. Reports steps taken, duration, the room, and the orders the app posted to its backend during the session. A room ends with its last session |
 | `owner_describe(app)` · `owner_command(app, command, args)` | The app's owner API (content, prices, offers, orders, publish), with an owner token |
 
@@ -66,6 +67,22 @@ open_app("tide-and-tackle@latest", room: "demo", platform: "ios")   // session s
 ```
 
 `list_sessions` shows the room of every session.
+
+### Read the room log and leave notes
+
+Agents in one room can see what the others did. This is for two agents, or an agent and you, testing the same app from two phones.
+
+- `room_log(room, since?)` returns the room's entries, oldest first. An action entry has the time, the session, the agent (the MCP client name), the tool, the target and a one-line change, such as `2026-11-10T06:50:00.000Z s2 (claude-code) tap e7: ...`. A note entry has the time, the agent and the text. The result ends with `cursor: <n>`. Pass that value as `since` on the next call to get only newer entries. Without `since` you get the whole log.
+- `room_note(room, text)` adds a plain-text note, up to 500 characters, and returns the new cursor. Use it to tell the other agent what you just did or what to check, for example `Placed order TT-1001, check the owner phone`.
+
+The room keeps its last 1000 entries and the log is deleted when the room ends. Calls that only read, such as `screen`, `errors`, `device_log` and `notifications`, are not logged.
+
+| Code | Meaning | What to do |
+| --- | --- | --- |
+| `no_room` | No open room has that name. | Check the name with `list_sessions`, or open a session with that `room`. |
+| `note_too_long` | The note is over 500 characters. | Shorten it. |
+| `bad_note` | The note is empty. | Send some text. |
+| `bad_cursor` | `since` is not a cursor from an earlier `room_log`. | Pass the `cursor` value from the last result, or leave `since` out. |
 
 ## Driving the live phone
 
