@@ -106,7 +106,7 @@ While the phone is on, Shipvo writes a small file called `.shipvo/run.json` in y
 
 You ran your app on a simulated phone in your browser with one command, tapped through the shop, saw the system sheet, switched to the iPhone style and stopped it. You used no real phone and no account.
 
-If you change a screen in your app, stop the phone with Ctrl+C and run `npx shipvo run android` again to see the change.
+When you save a change to your app while the phone is on, the phone reloads by itself. See [Change your app and watch the phone update as you save](watch-your-app-update.md).
 
 ## What we measured
 
@@ -114,6 +114,7 @@ On 2026-11-06, on a GitHub Actions Linux runner with Node 22.23, a first start o
 
 ## Next steps
 
+- [Change your app and watch the phone update as you save](watch-your-app-update.md)
 - [Have an AI assistant test your shop before every release](test-with-an-assistant.md)
 - [Run your app on a phone in your browser: all options](../run.md) (including `--port`, `--no-open` and `--native`)
 - [Record a demo video of the phone](../record.md)

@@ -131,10 +131,18 @@ async function openInBrowserApp(id, url) {
 // The mock backend a session uses: its own, or the shared one of its room. A room ends when its last session ends.
 const rooms = new Map();   // room -> Set of session ids
 const backendOf = (id, room) => (room ? `~${room}` : id);
+// The room log sits beside the shared store: what each session did and the notes agents post. Cursors are entry numbers.
+const roomLogs = new Map();   // room -> { n, entries }
+const NOTE_MAX = 500, LOG_MAX = 1000;
+function roomLog(room, e) {
+  const l = roomLogs.get(room) ?? roomLogs.set(room, { n: 0, entries: [] }).get(room);
+  l.entries.push({ n: ++l.n, at: new Date().toISOString(), ...e });
+  if (l.entries.length > LOG_MAX) l.entries.splice(0, l.entries.length - LOG_MAX);
+}
 function leaveRoom(s, id) {
   if (!s.room) return;
   const set = rooms.get(s.room); set?.delete(id);
-  if (!set?.size) { rooms.delete(s.room); try { rmSync(join(DIR, `${backendOf(id, s.room)}.json`), { force: true }); rmSync(join(DIR, `${backendOf(id, s.room)}.json.log`), { force: true }); } catch {} }
+  if (!set?.size) { rooms.delete(s.room); roomLogs.delete(s.room); try { rmSync(join(DIR, `${backendOf(id, s.room)}.json`), { force: true }); rmSync(join(DIR, `${backendOf(id, s.room)}.json.log`), { force: true }); } catch {} }
 }
 async function endSession(id) {
   const s = sessions.get(id); if (!s) return false;
@@ -328,6 +336,19 @@ async function screen(page) {
 
 function log(id, action, ok, extra = {}) { appendFileSync(join(DIR, `${id}.json.log`), JSON.stringify({ at: Date.now(), name: action, ok, ...extra }) + "\n"); }
 
+/** Which parts of an imported layout were rejected, as path suffixes with the reason. Valid input that is only normalised (true to 1, default times, "Sat" to "sat") is not reported. */
+function droppedPlacement(raw, cleaned) {
+  if (raw == null) return [];
+  if (typeof raw !== "object" || Array.isArray(raw)) return [": not valid, ignored (expected an object)"];
+  const out = [];
+  for (const k of Object.keys(raw)) {
+    if (!["pinned", "hidden", "position", "schedule"].includes(k)) out.push(`.${k}: not recognised, ignored`);
+    else if (raw[k] == null || ((k === "pinned" || k === "hidden") && raw[k] === false)) continue;
+    else if (!cleaned || !(k in cleaned)) out.push(`.${k}: not valid, dropped`);
+  }
+  return out;
+}
+
 async function act(id, body) {
   const s = sessions.get(id); if (!s) throw new SimError("no_session", `no session '${id}': call /session first`);
   const { page } = s;
@@ -436,15 +457,18 @@ async function act(id, body) {
       if (problems.length) throw new SimError("invalid_spec", problems.join("\n"));
       if (body.replace !== true) for (const a of list) if (s.apps.installed_apps.some((x) => x.id === a.id)) throw new SimError("already_installed", `'${a.id}' is already installed. Pass replace: true to overwrite it.`);
       for (const a of list) { const ex = s.apps.installed_apps.find((x) => x.id === a.id); if (ex && ex.kind !== "spec") throw new SimError("already_installed", `'${a.id}' is an installed store app and cannot be replaced.`); }
+      const warnings = [];
       for (const a of list) {
         const ex = s.apps.installed_apps.find((x) => x.id === a.id);
         if (ex) { uninstallApp(s.apps, a.id, s.nav); specHost.drop(sidOf(s), a.id); }
         const made = specHost.create(sidOf(s), a.id, a.spec, { style: a.style === "ios" ? "ios" : "android", data: a.data ?? undefined, state: a.settings ?? undefined });
         const nm = String(a.name ?? a.spec?.app?.name ?? a.id).replace(/[<>"'\\]/g, "").slice(0, 40);
-        s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec", ...(cleanPlacement(a.placement) ? { placement: cleanPlacement(a.placement) } : {}) });
+        const placement = a.placement == null ? null : cleanPlacement(a.placement);
+        for (const w of droppedPlacement(a.placement, placement)) warnings.push(`apps[${list.indexOf(a)}].placement${w}`);
+        s.apps.installed_apps.push({ id: a.id, name: nm, url: `spec://${a.id}`, version: "1", kind: "spec", ...(placement ? { placement } : {}) });
         s.apps.log.push({ at: Date.now(), name: "import_apps", app: a.id, source: "real", version: "1", replaced: !!ex });
       }
-      return { imported: list.map((a) => a.id), installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
+      return { imported: list.map((a) => a.id), installed_apps: s.apps.installed_apps, ...(warnings.length ? { warnings } : {}), screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Edit in place: a new spec is a new version. Data and state the person entered carry over; a bad spec changes nothing.
     // Fetch a spec app's http data sources now. Reloads the open screen only when the data changed.
@@ -756,11 +780,27 @@ const server = http.createServer(async (req, res) => {
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
     if (url.pathname === "/apps") return send(200, { ok: true, apps: [{ id: DEFAULT_APP, name: APP_NAME }] });
     if (url.pathname === "/sessions") return send(200, { ok: true, sessions: await Promise.all([...sessions.entries()].map(async ([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, skin: s.skin, streaming: isWatched(s) || !!s.browser?.screencast, url: s.page.url(), room: s.room ?? null, title: await s.page.title().catch(() => "") }))) });
+    if (url.pathname === "/room_log" || url.pathname === "/room_note") {
+      const room = String(body.room ?? "");
+      if (!rooms.has(room)) return send(200, { ok: false, code: "no_room", error: `no open room "${room}"` });
+      if (url.pathname === "/room_note") {
+        const text = typeof body.text === "string" ? body.text.trim() : "";
+        if (!text) return send(200, { ok: false, code: "bad_note", error: "note text is empty" });
+        if (text.length > NOTE_MAX) return send(200, { ok: false, code: "note_too_long", error: `note is ${text.length} characters; the limit is ${NOTE_MAX}` });
+        roomLog(room, { kind: "note", session: null, agent: typeof body.agent === "string" ? body.agent.slice(0, 64) : null, text });
+        return send(200, { ok: true, cursor: String(roomLogs.get(room).n) });
+      }
+      const l = roomLogs.get(room) ?? { n: 0, entries: [] };
+      const since = body.since == null ? 0 : Number(body.since);
+      if (!Number.isInteger(since) || since < 0) return send(200, { ok: false, code: "bad_cursor", error: "since must be a cursor from an earlier room_log" });
+      return send(200, { ok: true, entries: l.entries.filter((e) => e.n > since), cursor: String(l.n) });
+    }
     if (url.pathname === "/end") return send(200, { ok: true, ended: await endSession(String(body.session)) });
     if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof BuildCacheError || (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_room" || e.code === "bad_app"))) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, ...(s.build ? { build: s.build } : {}), screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const s0 = sessions.get(body.session); const prevScreen = s0?.lastScreen; const r = await act(body.session, body);
         if (s0 && typeof r.screen === "string") { s0.lastScreen = r.screen; watch.step(body.session, describeStep(body, prevScreen), changeLine(prevScreen, r.screen)); }
+        if (s0?.room && describeStep(body, prevScreen)) roomLog(s0.room, { kind: "action", session: body.session, agent: typeof body.agent === "string" ? body.agent.slice(0, 64) : null, tool: String(body.action), target: body.ref ? String(body.ref) : null, change: changeLine(prevScreen, r.screen) || null });
         log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
       catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: e.code === "invalid_spec" ? String(e.message) : String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }
     }
