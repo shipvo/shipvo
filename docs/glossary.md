@@ -115,5 +115,4 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Publish token.** A key that lets one machine upload releases for your app. Each machine has its own. `shipvo app create` makes a new one. See [Moving to a new machine](new-machine.md).
 
-
 **Refresh (data source).** A number of seconds on a web data source in an app spec. Shipvo asks the service again on that timer while the app is installed. See [App spec](spec-blocks.md#keep-a-data-source-fresh).
