@@ -78,32 +78,31 @@ On iOS, the mobile-money number field opens a number pad with no Done key, and t
 
 ## Definitions (what the numbers measure)
 
-- **Actionable parity:** the set of actionable elements on a screen (buttons, radio options, text fields, links, checkboxes), each reduced to `role:label`, compared as sets: shared elements divided by all elements seen on either side. Disabled controls count on both sides, but their enabled state is not compared. Platform chrome (scroll indicators, keyboard keys) is excluded by the platform's own accessibility flags, not by name. **100% means: the agent can act on the same controls, with the same names, on both.** The score is computed on role and label.
+- **Actionable parity:** the set of actionable elements on a screen (buttons, radio options, text fields, links, checkboxes), each reduced to `role:label`, compared as sets: shared elements divided by all elements seen on either side. Disabled controls count on both sides, but their enabled state is not compared. Platform chrome (scroll indicators, keyboard keys) is excluded by the platform's own accessibility flags, not by name. **100% means: the agent can act on the same controls, with the same names, on both.** The score compares the actionable controls and their names; enabled/disabled state, element order, bounds and field values are outside it.
 - **Text coverage:** the share of text the simulator shows that also appears on the device, exactly or contained in a longer label.
 - **Same order:** on every "Order placed" screen, the order itself (lines, total, delivery and payment) must be identical on both sides; receipts differ by provider (`SIMULATED-` vs `SANDBOX-`) and are normalised.
 - **Visibility rules applied on both sides:** only on-screen items of a horizontal rail; nothing behind a modal sheet (the rule TalkBack and iOS apply; Android's uiautomator tree does not, so the Android driver applies it); the on-screen keyboard is never part of the app.
 
-## How the simulator and the devices differ in practice
+## How the apps differ on a device
 
-1. **Text grouping on iOS:** iOS reads some rows as a single label where the web reads separate lines. The agent sees the same information, grouped differently. This is the source of the 89% text score on "Order placed".
-2. **On-screen keyboards** exist on devices. Fields behave the same, and the drivers dismiss the keyboard when needed.
-3. **Camera, push and payment sheets** run on the Android emulator and iOS Simulator lanes. See [device-api](device-api.md) for the simulated versions.
+1. **Text grouping on iOS:** iOS reads some rows as a single label where the web reads separate lines; the agent sees the same information, grouped differently. That is the text gap on iOS (89% on "Order placed").
+2. **On-screen keyboards** exist only on devices. Fields behave the same, and the device drivers dismiss the keyboard when a field needs it.
+3. **Native features** (camera, push, payment sheets) run in the simulator as simulated device features ([device API](device-api.md)); flows that use the real native sheets run on the Android emulator and iOS Simulator lanes.
+4. **Three flows** are measured on the sample shop (two purchase flows and a native-features flow), on Android and iOS.
 
 ## Run it yourself
 
-1. Android: run the workflow `.github/workflows/parity.yml`.
-2. iOS: run the workflow `.github/workflows/parity-ios.yml`.
-3. Open the job summary. It lists every screen with the four scores above.
-
-Both drivers live in `apps/tide-and-tackle/sim/`.
+The runs are `.github/workflows/parity.yml` (Android emulator) and `.github/workflows/parity-ios.yml` (iOS Simulator). The drivers are in `apps/tide-and-tackle/sim/`. Start a run when no over-the-air publish is in progress: the emulator applies a published update mid-flow, as designed, which changes the screens being compared.
 
 ## Troubleshooting
 
-- **A run shows a lower score than the table.** Check that no over-the-air publish ran at the same time. The emulator applies the update mid-flow, as designed, and that run is not comparable. Run it again.
-- **A screen shows an extra element on one side.** Platform chrome such as the keyboard or scroll indicators is excluded by the platform's own accessibility flags. If a new element appears, open the screen in [`shipvo run`](run.md) and compare.
+- **A run reports a lower number than the page.** Check whether an over-the-air publish landed during the run. If it did, run it again after the publish finishes.
+- **A screen shows an element on one side only.** Elements are matched by `role:label`, so a different name counts as a different element. Give the control the same accessible label on both sides.
+- **Text coverage is lower on iOS than on Android.** This is the row grouping described above. Actionable parity is the number an agent depends on.
 
 ## Next steps
 
 - [Test with an assistant](test-with-an-assistant.md): use the simulator from Claude, ChatGPT or Cursor.
-- [Agent simulator reference](agents.md): every tool the phone offers.
+- [Agents guide](agents.md): drive the simulator from your assistant over MCP.
 - [Device API](device-api.md): the simulated camera, location, payment and biometrics.
+- [Testing](testing.md): write typed tests and run them on an emulator or simulator.
