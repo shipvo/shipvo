@@ -115,6 +115,11 @@ describe("evaluate: text and fallbacks", () => {
     expect(ev("parseCsv('a,b\\n')")).toEqual([]);
   });
 
+  it("parseCsv drops cells beyond the header and the last duplicate header wins", () => {
+    expect(ev("parseCsv('a,b\\n1,2,3')")).toEqual([{ a: "1", b: "2" }]);
+    expect(ev("parseCsv('a,a\\n1,2')")).toEqual([{ a: "2" }]);
+  });
+
   it("parseCsv refuses an open quote and non-text", () => {
     expect(() => evaluate("parseCsv(t)", { t: 'a\n"x' })).toThrow(/never closed/);
     expect(() => ev("parseCsv(1)")).toThrow();
