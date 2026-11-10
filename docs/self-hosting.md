@@ -186,7 +186,7 @@ To stop a mismatched bundle at publish time, set `hermesBytecodeVersion` in `shi
 
 `shipvo publish` lists the dependencies in `package.json` that have native code (an `android/` or `ios/` folder, a podspec, or an Expo or React Native config file in `node_modules`) and writes them to the signed release as `required_native_modules`, a map of package name to semver range. `--dry-run` prints the list. A shell may declare `native_modules` (package name to version) and send them as `?nm=name@1.2.3,other@2.0.0` on the pointer request. When both sides are known, the control plane does not offer the release and answers 404 with `native_module_missing` (the shell lacks the module) or `native_module_version` (its version is outside the range), plus the `module` name. If either side is absent, the release is offered. The runtime does not send `?nm=` yet.
 
-Limits. The recorded range is the one in `package.json`, not the installed version. `react-native` and `expo` have native code too, so they are recorded: a shell that sends `?nm=` must list them in `native_modules`, or every release is refused. Ranges that are not plain numeric semver (tags, git, `workspace:`, pre-release such as `^1.0.0-beta.1`) are not recorded, and `shipvo publish` prints a note naming them. An empty `?nm=` means the shell has no native modules.
+The recorded range is the one in `package.json`, not the installed version. `react-native` and `expo` have native code too, so they are recorded: a shell that sends `?nm=` must list them in `native_modules`, or every release is refused. Ranges that are not plain numeric semver (tags, git, `workspace:`, pre-release such as `^1.0.0-beta.1`) are not recorded, and `shipvo publish` prints a note naming them. An empty `?nm=` means the shell has no native modules.
 
 ## Trust model, in one paragraph
 
@@ -196,18 +196,25 @@ The shell carries the Ed25519 public key and the control plane URL as native man
 
 ## Troubleshooting
 
-| What you see | Why | What to do |
+| You see | Why | Fix |
 | --- | --- | --- |
-| `curl .../health` returns nothing or is refused | The container is not running yet, or you used a different port | `docker compose ps`, then `docker compose logs`. The local server is on `http://localhost:8787`. |
-| The smoke script fails with an auth error | `SHIPVO_LOCAL_DEV_KEY` differs between the container and the script | Set the same value for both. It may only contain letters, digits, `_` and `-`. |
-| `restore` refuses to run | The volume already holds data | Run `docker compose down -v` first, then restore into the empty volume. |
-| `selfhost-upgrade-check.mjs verify` exits 1 | The earlier pointer is no longer served | Read the message it prints, then follow [Roll back](#roll-back). |
-| The pointer answers 404 `release_halted` | [Auto-halt](auto-halt.md) stopped the live release | Publish a fixed release. Publishing a new release clears the halt. |
-| `shipvo doctor` reports `telemetry_dropped_today` above zero | D1 refused telemetry writes for the day | See [D1 Free plan limits](#d1-free-plan-limits). Updates keep flowing. |
+| `wrangler d1 migrations apply` says the database is not found | `database_id` in `wrangler.toml` is not the id printed by `wrangler d1 create` | Copy the id again into `d1_databases[0].database_id`, then re-run the migration command with `--remote` |
+| `/health` does not answer `{ "ok": true }` after `wrangler deploy` | The Worker is not deployed under the name you opened | Open the URL `wrangler deploy` printed, or check `name` in `wrangler.toml` |
+| `docker compose up` works but the smoke script fails to sign in | The script and the container use different `SHIPVO_LOCAL_DEV_KEY` values | Pass the same value to both. It may only hold letters, digits, `_` and `-` |
+| Data is gone after restarting the container | `docker compose down -v` deletes the `control-plane-data` volume | Use `docker compose down` without `-v`, or restore a backup (see [Restore](#restore)) |
+| Phones keep the current release and the pointer answers 404 `release_halted` | [Auto-halt](auto-halt.md) stopped the live release | Publish a new release; it clears the effect |
+| `restore` refuses to run | The volume already holds data | Run `docker compose down -v` first, then restore into the empty volume |
+| `selfhost-upgrade-check.mjs verify` exits 1 | The earlier pointer is no longer served | Read the message it prints, then follow [Roll back](#roll-back) |
+| A call returns 403 `forbidden` with an `action` and a `role` | The publish token's role does not allow that action | Use a token with a role that does (see [Roles](#roles)), or the owner token |
+| Dashboards show fewer events than expected and `telemetry_dropped_today` in `/health` is above 0 | D1 refused some telemetry writes (see above) | Wait for the daily reset or move to a paid plan. Release pointers keep flowing |
+| `set_alert_webhook` answers `bad_webhook_url` | The URL is `http://` or contains a user name or password | Use an `https://` URL without credentials |
+
+Run `shipvo doctor` from your app folder for a check of the control plane URL and key.
 
 ## Next steps
 
+- [Back up and upgrade](#back-up-and-upgrade) before your first real release.
 - [Auto-halt](auto-halt.md): stop a bad release on its own.
-- [Telemetry export](telemetry-export.md): send events to R2 for SQL tools.
-- [Key rotation](key-rotation.md): change the signing key without a new app build.
-- [CLI guide](cli.md): publish, promote and roll back against your control plane.
+- [Telemetry export](telemetry-export.md): query events with SQL.
+- [Key rotation](key-rotation.md): replace the signing key without a new shell.
+- [CLI guide](cli.md): every command that talks to the control plane.
