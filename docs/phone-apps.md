@@ -213,7 +213,7 @@ device_log { session }                 -> install_app (source "real" for marketp
 
 `permission_log` lists every device permission decision on the phone, oldest first, on Android and iOS:
 
-- `granted` and `denied`: from install, import, an update, the Settings switch, or an app's own prompt (`by` says which).
+- `granted` and `denied`: from install, import, an update or the Settings switch (`by` says which).
 - `removed`: an update dropped the permission, or the app was uninstalled.
 - `used` and `blocked`: an app action needed the permission and ran, or stopped because the person denied it. `by` is the action and `caller` the assistant that called it.
 

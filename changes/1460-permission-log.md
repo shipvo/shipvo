@@ -1,2 +1,2 @@
-- New MCP tool `permission_log`: every grant, denial and removal of a device permission (by install, import, update, Settings or the app's prompt) and every use or block by an app action, with the calling assistant, on Android and iOS. Filters `app`, `permission`, `event`, `limit`. Error codes `bad_limit`, `bad_event`.
+- New MCP tool `permission_log`: every grant, denial and removal of a device permission (by install, import, update or Settings) and every use or block by an app action, with the calling assistant, on Android and iOS. Filters `app`, `permission`, `event`, `limit`. Error codes `bad_limit`, `bad_event`.
 - Migration: none; this is a new tool.

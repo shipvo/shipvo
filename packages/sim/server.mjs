@@ -569,15 +569,10 @@ async function act(id, body) {
       if (res.ok === false) throw new SimError("action_failed", res.error);
       return { value: res.value ?? null, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
     }
-    // The permission log: every grant, denial, removal, use and block, per app. Apps with a bundle add the answers to their own prompts. Changes nothing.
+    // The permission log: every grant, denial, removal, use and block, per app. Changes nothing.
     case "permission_log": {
-      const prompts = (await page.evaluate(() => globalThis.__pnDevice?.log() ?? []).catch(() => [])).filter((e) => e.kind === "permission" && e.detail?.name)
-        .map((e) => ({ at: e.at, app: s.apps.current_app ?? s.app ?? null, permission: e.detail.name, event: e.detail.result === "granted" ? "granted" : "denied", by: "prompt" }));
-      let mine; try { mine = permLog(s).list({ app: body.app, permission: body.permission, event: body.event, limit: 500 }); } catch (e) { if (e instanceof PermissionLogError) throw new SimError(e.code, e.message); throw e; }
-      const limit = body.limit == null ? 100 : Number(body.limit);
-      if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new SimError("bad_limit", "limit: a whole number from 1 to 500");
-      const all = [...mine, ...prompts.filter((e) => (body.app == null || e.app === body.app) && (body.permission == null || e.permission === body.permission) && (body.event == null || e.event === body.event))].sort((x, y) => x.at - y.at);
-      return { entries: all.slice(-limit) };
+      try { return { entries: permLog(s).list({ app: body.app, permission: body.permission, event: body.event, limit: body.limit }) }; }
+      catch (e) { if (e instanceof PermissionLogError) throw new SimError(e.code, e.message); throw e; }
     }
     // Installed apps. Errors are typed: unknown_app, already_installed, not_installed. Logged in device_log: source "real" (with the bundle sha256) for a fetched bundle, "simulated" for a fixture app.
     // One toggle per app and permission, the same as the Settings screen.

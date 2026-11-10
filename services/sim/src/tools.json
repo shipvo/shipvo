@@ -1805,7 +1805,7 @@
   },
   {
     "name": "permission_log",
-    "description": "Every device permission decision on the phone, oldest first, on Android and iOS: when an app was granted or denied a permission (by install, import, update, the Settings switch or the app's own prompt), when a permission was removed, and each time an app action used a permission or was blocked by a denial, with the assistant that called it. Filter by app, permission or event. Changes nothing.",
+    "description": "Every device permission decision on the phone, oldest first, on Android and iOS: when an app was granted or denied a permission (by install, import, update or the Settings switch), when a permission was removed, and each time an app action used a permission or was blocked by a denial, with the assistant that called it. Filter by app, permission or event. Changes nothing.",
     "inputSchema": {
       "type": "object",
       "properties": {
