@@ -75,6 +75,9 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 | `app_not_foreground` | The home screen or switcher is showing | Call `resume_app` |
 | `phone_locked` | The phone is locked | Call `unlock` |
 | The Secrets screen is empty | No key is saved for the apps on this phone, or the simulator cannot reach the saved-key routes | Save a key for an app first; check that the simulator is running |
+| `bad_placement` from `arrange_apps` | A field is unknown, `position` is not a whole number from 0 to 99, or `days`, `from` or `to` is not valid | Use `pinned`, `hidden`, `position` and `schedule`; days are `sun` to `sat` and times look like `09:00` |
+| `bad_time` from `set_phone_time` | The time is not like `2026-11-14T09:00:00` | Pass an ISO time, or `null` for the real time |
+| A scheduled app is missing from the home screen | Its schedule is not active at the phone's clock | Read the home text, which says when it starts; call `set_phone_time`, or `switch_app` still opens it |
 | `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
 
 ## Next steps
@@ -101,9 +104,21 @@ An app's data lives for the session: it starts from the spec's seed data when th
 
 A spec app with an `http` data source can refresh on an interval (`refresh`, in seconds). To fetch it right away, call `refresh_app` with the app id. The phone runs each `http` source, skips its cache, and redraws the open screen if the data changed. The result lists the sources that changed and any errors. A source that fails keeps its last good data. Each call is logged in `device_log` as `data_refresh`.
 
+## See what was built and changed
+
+`app_activity` shows what happened to each app made with `create_app`. For every app it returns:
+
+- **history**: each version with plain lines for what changed (`added screen 'about'`, `removed action 'add'`, `changed data 'prices'`);
+- **sources**: each `http` data source and its refresh interval in seconds (null when only `refresh_app` fetches it);
+- **events**: create, update, action and data refresh, newest last.
+
+Pass `id` for one app and `limit` for the number of recent events. Data and settings a person entered stay across versions, so the history is the record of what the agent changed.
+
 ## Arrange the home screen
 
 `arrange_apps { session, id, pinned?, hidden?, position?, schedule? }` places an installed app. Pinned apps come first, then apps by `position` (0 first), then in install order. A hidden app is off the home screen but still installed, and `switch_app` still opens it. A `schedule` (`days`, `from`, `to`, for example Monday to Friday 08:00 to 18:00) shows the app only then. A window that crosses midnight belongs to the day it starts: `days: ["fri"], from: "22:00", to: "06:00"` shows Friday 22:00 until Saturday 06:00. `schedule: null` shows it always. Put a weekly planner on weekdays and weekend plans on Saturday, and the home screen follows the phone's clock.
+
+`schedule_app { session, id, days?, from?, to? }` sets only the schedule: `days` defaults to every day, `from` to `00:00` and `to` to `23:59`. `clear_schedule { session, id }` removes it, so pin and hide decide again. They set the same schedule as `arrange_apps`, and a window that crosses midnight (`from: "22:00", to: "06:00"`) belongs to the day it starts. `device_log` records them as `schedule_app` and `clear_schedule`. `export_phone_apps` carries each app's placement, including its schedule, and `import_phone_apps` restores it on the other phone.
 
 `set_phone_time { session, at }` sets that clock (`2026-11-14T09:00:00`, or `null` for real time), so a test can check what shows on a Saturday morning. The clock stays at the time you set and a time without an offset is read in the simulator host's time zone. In `shipvo run`, the home screen follows the computer's clock and updates when a schedule starts or ends. The home screen text lists the apps that are showing as buttons and, for the others, says whether they are hidden or when their schedule starts. In a phone.json, an app can carry the same `placement` object. Errors are `not_installed`, `bad_placement` and `bad_time`. The result has `home` (the home screen text) and `screen` (the open app's screen when an app is in front, otherwise the home text). A placement in a phone.json that is not valid is left out. Every change is in `device_log`.
 

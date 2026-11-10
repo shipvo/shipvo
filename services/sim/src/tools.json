@@ -1,5 +1,40 @@
 [
   {
+    "name": "app_activity",
+    "description": "What was built and changed on the phone: for each app made with create_app, its versions with a plain line for what changed in each (added, removed or changed screens, actions and data), its http data sources and how often each refreshes, and its events (create, update, action, data refresh). Pass id for one app. Fails with not_installed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id; omit for every app"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "description": "Most recent events per app (default 50)"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "apply_update",
     "description": "Apply the ready release: the app restarts on the new bundle, like restart. After 3 boots that throw, the phone goes back to the old release and the state is reverted with reason crash_loop. Fails with not_ready unless the state is ready. Simulated; logged in device_log.",
     "inputSchema": {
@@ -614,6 +649,36 @@
       },
       "required": [
         "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "clear_schedule",
+    "description": "Remove an app's schedule so pin and hide decide again whether it shows. Fails with not_installed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id"
+        }
+      },
+      "required": [
+        "session",
+        "id"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
@@ -1972,6 +2037,59 @@
         "session",
         "id",
         "action"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "schedule_app",
+    "description": "Show an installed app only in a daily time window, by the phone's clock (see set_phone_time), for example your Tasks app from 08:00 to 10:00 on weekdays. from and to are HH:MM (default 00:00 and 23:59); a window that crosses midnight belongs to the day it starts. Leave days out for every day. Pin and hide still apply. Same schedule as arrange_apps. Fails with not_installed or bad_placement.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id"
+        },
+        "from": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "to": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "sun",
+              "mon",
+              "tue",
+              "wed",
+              "thu",
+              "fri",
+              "sat"
+            ]
+          }
+        }
+      },
+      "required": [
+        "session",
+        "id"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
