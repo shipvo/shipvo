@@ -1,2 +1,2 @@
-- docs: new guide "Prepare for a lost or leaked release key" for Android and iOS apps (`shipvo keys root`, `keys rotate sign`), published on the docs site. `docs/cli.md` lists the commands.
+- docs: `docs/key-rotation.md` has a section for a lost or leaked release key (new key, sign, upload, then switch the CI seed), the same for Android and iOS.
 - Migration: none; docs only.

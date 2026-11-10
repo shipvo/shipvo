@@ -56,6 +56,16 @@ npx -y @shipvo/cli keys rotate upload rotation.json
 
 `sign` works offline. `upload` needs `shipvo login` as the app owner; tokens are refused.
 
+## If your release key is lost or leaked
+
+Do steps 1 to 3 with a new release key. It works the same for Android and iOS.
+
+1. Make the new release key: `npx -y @shipvo/cli keygen --out new-seed.txt`. It prints the public key to use as `--new-key`.
+2. Run `keys rotate sign` and `keys rotate upload` as in step 3. Leave `--valid-from` out, so the statement applies now.
+3. Once `upload` succeeds, publish with `new-seed.txt` (set `SHIPVO_SIGNING_SEED_FILE`, or put it at `.shipvo/seed.txt`) and replace the `SHIPVO_SIGNING_SEED` secret in CI in the same step, so the old key cannot publish again.
+
+Publishing with the new seed before the statement is uploaded makes installed apps reject the update.
+
 ## Troubleshooting
 
 | You see | Cause | Fix |

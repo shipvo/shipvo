@@ -377,18 +377,6 @@ Without `--json`, `publish` and `rollback` print a single plain sentence.
 
 `next` suggests the follow-up. After `publish` it is `shipvo status --json` (and `shipvo promote --to ...` when some bands are left). After a dry run it is the real command. After a failure it is the likely fix, for example `shipvo doctor --json`.
 
-## `shipvo keys root` and `shipvo keys rotate`
-
-Create an offline root key and sign a rotation statement. Full steps: [Prepare for a lost or leaked release key](key-recovery.md).
-
-```bash
-shipvo keys root --out <file>
-shipvo keys rotate sign --root-seed-file <file> --new-key <public key> --sequence <n> [--valid-from <ISO time>] [--json]
-```
-
-- `keys root` writes a new root seed to `<file>` (mode 0600, never overwritten) and prints the root public key to pin. It needs no `shipvo.json`.
-- `keys rotate sign` works offline. It reads the root seed, never the release seed, and prints the signed envelope. `--valid-from` defaults to now and may be at most 90 days ahead. Pick a `--sequence` above every statement you signed before.
-
 ## `--json` for `init`, `login`, `audit` and `keys`
 
 These commands take `--json` and print the same `{ ok, code, summary, data, next }` envelope as the other `--json` commands. Stdout holds one JSON line. Progress and text go to stderr. Exit codes: 0 ok, 1 failed, 2 usage error. No envelope holds a key seed, a token or an API key.
