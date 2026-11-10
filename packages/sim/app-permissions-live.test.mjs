@@ -160,6 +160,7 @@ for (const style of ["android", "ios"]) {
       assert.deepEqual(posts[0], { session: "s1", action: "set_app_permission", id: "remind", permission: "notifications", allowed: true });
       await page.evaluate((s) => document.querySelector(s).click(), sw);   // turn it off again: server accepts
       await page.waitForFunction((s) => document.querySelector(s).getAttribute("aria-checked") === "false", sw);
+      for (let i = 0; i < 100 && posts.length < 2; i++) await new Promise((r) => setTimeout(r, 50));   // the post may land just after the switch flips
       assert.equal(posts.length, 2);
     } finally { await b.close(); }
   });
