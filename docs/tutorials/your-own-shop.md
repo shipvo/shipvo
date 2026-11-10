@@ -206,11 +206,13 @@ You:
 5. checked the cart and ran the tests,
 6. built and checked a release without sending it.
 
-## What this shop does not do yet
+## Change the currency
 
-- **It does not take payments.** The cart shows a total and nothing else.
-- **Prices show in dollars until you change `src/data/shop.json`.** Set `currency`, `position` (`before` or `after`), `decimals` and `locale`. For FCFA: `{ "currency": "FCFA", "position": "after", "decimals": 0, "locale": "fr-FR" }` shows `6 500 FCFA`. Prices in `products.json` stay whole minor units (6500 with `decimals` 0).
-- **It has no pictures.** Products show a name, a price and a description.
+Prices show in dollars until you change `src/data/shop.json`. Set `currency`, `position` (`before` or `after`), `decimals` and `locale`. For FCFA: `{ "currency": "FCFA", "position": "after", "decimals": 0, "locale": "fr-FR" }` shows `6 500 FCFA`. Prices in `products.json` stay whole minor units (6500 with `decimals` 0).
+
+## Troubleshooting
+
+- **The terminal prints `[shop] Fresh tilapia: price 6.5 is not a whole number...` or `...is less than one whole unit...`.** A price is written in dollars, not cents. Write `650` for $6.50 and `2400` for $24.00. The message tells you the number to use. `npm test` fails on the same check until you fix it.
 
 ## What we measured
 
