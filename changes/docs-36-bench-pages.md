@@ -1,0 +1,2 @@
+- Docs: "Simulator cost" and "Lumi benchmark" pages have numbered steps, options, expected output, troubleshooting and next steps, and appear in the sidebar under Measured results.
+- Migration: none.

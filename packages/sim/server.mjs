@@ -734,7 +734,7 @@ async function act(id, body) {
         const box = await page.locator(`aria-ref=${raw}`).first().boundingBox().catch(() => null);
         if (box) sizes[m[1]] = [Math.round(box.width * 10) / 10, Math.round(box.height * 10) / 10];
       }
-      return { sizes, screen: text };
+      return { sizes, skin: s.skin, screen: text };
     }
     case "back": { if (s.shade.open !== "none") { s.shade.open = "none"; break; } const b = page.getByRole("button", { name: "Back", exact: true }); if (await b.count()) { await ready(b.first()); await b.first().click(); } else throw new Error("no Back button on this screen"); break; }
     case "screenshot": {
