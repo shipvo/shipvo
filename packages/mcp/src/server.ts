@@ -102,7 +102,7 @@ async function act1(body: Record<string, unknown>): Promise<Act> {
   const d = attached.get(String(body.session));
   if (!d) return sim("/act", body);
   const { session: _s, action, ...args } = body;
-  if (!ATTACH_TYPES.has(String(action))) return { ok: false, code: "not_supported_attached", error: `"${action}" is not available on the live shipvo run phone yet. Use screen, tap, type, scroll or back, or open a headless session with attach: "never".` };
+  if (!ATTACH_TYPES.has(String(action))) return { ok: false, code: "not_supported_attached", error: `"${action}" is not available on the live shipvo run phone. This session is attached to it and answers screen, tap, type, scroll and back. To use "${action}", call open_app again with attach: "never" for a headless session, and open ${SIM}/watch in a browser to watch it.` };
   const m = await d.request(String(action), args);
   return { ok: m.ok !== false && !m.error, screen: m.screen ?? null, error: m.error, code: m.code, ...(typeof m.image === "string" ? { image: m.image } : {}), ...(typeof m.mime === "string" ? { mime: m.mime } : {}), ...(typeof m.source === "string" ? { source: m.source } : {}), ...(Array.isArray(m.unsupported) ? { unsupported: m.unsupported as string[] } : {}) };
 }
