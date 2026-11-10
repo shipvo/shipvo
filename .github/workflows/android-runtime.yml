@@ -110,11 +110,8 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           working-directory: apps/tide-and-tackle/android
           # Tests that measure the patch step print lines starting with SHIPVO_APPLY_MEMORY to logcat (Log.i); they land in the job summary.
-          script: |
-            adb logcat -c
-            ./gradlew "${{ steps.proj.outputs.p }}:connectedDebugAndroidTest" --no-daemon -PreactNativeArchitectures=x86_64; rc=$?
-            adb logcat -d | grep -o "SHIPVO_APPLY_MEMORY.*" | tee "$GITHUB_WORKSPACE/apply-memory.txt" || true
-            exit $rc
+          # The runner executes each script line in its own shell, so the whole sequence is one line.
+          script: bash -c 'adb logcat -c; ./gradlew "${{ steps.proj.outputs.p }}:connectedDebugAndroidTest" --no-daemon -PreactNativeArchitectures=x86_64; rc=$?; adb logcat -d | grep -o "SHIPVO_APPLY_MEMORY.*" > "$GITHUB_WORKSPACE/apply-memory.txt"; exit $rc'
       - name: Peak apply memory
         if: always() && steps.has.outputs.yes == 'true'
         run: |
