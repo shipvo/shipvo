@@ -1,5 +1,7 @@
 # Test an email sign-in on Android and iOS
 
+This page is for developers and for anyone testing an app that signs in by email. You will finish an emailed-code or magic-link sign-in in a test or with an agent, without a real mailbox.
+
 Many apps sign in with a code or a link sent by email. Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
 
 The inbox works the same on the Android and iOS phones.
@@ -60,3 +62,19 @@ Agents use three tools. Each takes the `session` from `open_app`.
 ## Android and iOS
 
 The inbox, the tools and `phone.inbox` are the same on the Android and iOS phones. With MCP, open the session with `platform: "android"` or `platform: "ios"` in `open_app` and follow the same steps.
+
+## Troubleshooting
+
+| What you see | Why | What to do |
+| --- | --- | --- |
+| `inbox_timeout` | No mail matched your `subject` or `from` before the timeout. | Check the app really asked for a code. Loosen `subject` (it matches part of the text, any case). Check the `mockNetwork` rule has a `mail` field and its `url` and `method` match the request the app sends. Raise `timeout` (at most 25000 ms). |
+| `inbox_no_code` | The mail arrived but holds no 4 to 8 digit number. | Use `waitFor` and read `text`, or check the mail text in your stub. |
+| Status 550 from `https://inbox.shipvo.test/send` | The `to` address is not this session's address. | Use the address from `inbox.address()` or `inbox_read`. Each session has its own. |
+| The address is different after a restart of the session | The inbox belongs to the session and is removed when it ends. | Ask for the address again in the new session. |
+| `session_ended` while waiting | The session closed during the wait. | Open a new session and start the sign-in again. |
+
+## Next steps
+
+- [Test your app in CI](testing.md): run this test on every pull request.
+- [Test with an assistant](test-with-an-assistant.md): set up the MCP tools the steps above use.
+- [Agents](agents.md): the full list of MCP tools.

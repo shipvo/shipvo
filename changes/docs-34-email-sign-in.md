@@ -1,0 +1,1 @@
+- Docs: "Test an email sign-in" is in the sidebar under Test, with a first paragraph for its audience, troubleshooting and next steps. The glossary has "Session inbox".
