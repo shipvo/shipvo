@@ -52,7 +52,7 @@ Only one recording runs at a time per server.
 
 ## Lumi in recordings
 
-`record_start` keeps Lumi and its step captions in the video by default. Pass `lumi: false` for a plain phone. Pass `lumi_voice: true` and Lumi speaks its short step lines with the `energetic` voice preset from `scripts/video/dialogue.py` The voice needs python3, ffmpeg and the voice service. If the voice cannot be made, you still get the finished video, with a note in `notes`. A narration file given to `record_stop` replaces Lumi's voice. The result reports `lumi` and `lumi_lines`.
+`record_start` keeps Lumi and its step captions in the video by default. Pass `lumi: false` for a plain phone. Pass `lumi_voice: true` and Lumi speaks its short step lines with the `energetic` voice preset from `scripts/video/dialogue.py`. The voice needs python3, ffmpeg and the voice service. If the voice cannot be made, you still get the finished video, with a note in `notes`. A narration file given to `record_stop` replaces Lumi's voice. The result reports `lumi` and `lumi_lines`.
 
 ## Next steps
 
