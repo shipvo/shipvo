@@ -30,6 +30,7 @@
     "identity.mjs",
     "banner.mjs",
     "wakeup.mjs",
+    "reminders.mjs",
     "frame.mjs",
     "lumi.mjs",
     "guide.mjs",

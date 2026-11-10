@@ -402,6 +402,12 @@ use(server, tools.wait_for_event,
   async ({ session, timeout_ms }) => { need(session); const r = await act({ session, action: "wait_for_event", timeout_ms }) as Act & { event?: boolean; banner?: string; pending?: unknown };
     if (!r.ok) return result(session, r);
     return { ...text(r.event ? "Something is waiting for you. Read it with check_inbox or my_tasks." : "nothing yet"), structuredContent: { event: r.event === true, ...(r.pending ? { pending: r.pending } : {}) } }; });
+use(server, tools.set_reminder,
+  async ({ session, title, body, at, in_minutes, repeat }) => { need(session); const r = await act({ session, action: "set_reminder", title, body, at, in_minutes, repeat }) as Act & { reminder?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.reminder, null, 2)); });
+use(server, tools.list_reminders,
+  async ({ session }) => { need(session); const r = await act({ session, action: "list_reminders" }) as Act & { reminders?: unknown; fired?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ reminders: r.reminders, fired: r.fired }, null, 2)); });
+use(server, tools.cancel_reminder,
+  async ({ session, id }) => { need(session); const r = await act({ session, action: "cancel_reminder", id }) as Act & { cancelled?: boolean }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cancelled: r.cancelled === true })); });
 use(server, tools.register_wakeup,
   async ({ session, name, url, events, secret, format, allow_private }) => { need(session); const r = await act({ session, action: "register_wakeup", name, url, events, secret, format, allow_private }) as Act & { wakeup?: unknown };
     if (!r.ok) return result(session, r);
