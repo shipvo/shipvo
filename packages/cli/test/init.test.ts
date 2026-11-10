@@ -183,6 +183,19 @@ it("--template shop shows prices in the currency set in src/data/shop.json", asy
     expect(readFileSync(join(dir, `src/screens/${f}.tsx`), "utf8")).toContain("formatPrice(");
 });
 
+it("--template shop explains prices written in the wrong unit", async () => {
+  const dir = join(tmp, "store-units");
+  await init([dir, "--template", "shop", "--public-key", "AAAA"]);
+  rmSync(join(dir, "tsconfig.json"));
+  const { priceProblems } = await import(join(dir, "src/money.ts"));
+  expect(priceProblems()).toEqual([]);
+  const bad = priceProblems([{ name: "Beanie", price: 24 }, { name: "Mug", price: 12.5 }, { name: "Free", price: 0 }]);
+  expect(bad).toHaveLength(2);
+  expect(bad[0]).toContain("write 2400 for 24");
+  expect(bad[1]).toContain("1250 for 12.5");
+  expect(priceProblems([{ name: "Rice", price: 5 }], 0)).toEqual([]);
+});
+
 it("--template shop sends the payment to the shop name given with --name", async () => {
   const dir = join(tmp, "named-shop");
   await init([dir, "--template", "shop", "--name", "Sandbar Shop", "--public-key", "AAAA"]);
