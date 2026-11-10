@@ -33,6 +33,7 @@ beforeAll(async () => {
     if (req.url === "/act" && body.action === "set_setting" && body.key !== "dark_mode") return res.end(JSON.stringify({ ok: false, code: "unknown_setting", error: `unknown setting '${body.key}'` }));
     if (req.url === "/act" && body.action === "set_setting" && typeof body.value !== "boolean") return res.end(JSON.stringify({ ok: false, code: "bad_value", error: "'dark_mode' takes true or false" }));
     if (req.url === "/act" && ["get_settings", "set_setting"].includes(body.action)) return res.end(JSON.stringify({ ok: true, settings: { dark_mode: body.value ?? false }, screen: `Settings (${body.action}:${body.key ?? ""}=${body.value ?? ""})` }));
+    if (req.url === "/act" && body.action === "set_network_profile" && body.profile !== "offline") return res.end(JSON.stringify({ ok: false, code: "unknown_profile", error: `Unknown network profile "${body.profile}"` }));
     if (req.url === "/act" && body.action === "toggle_tile" && body.tile === "wifi") return res.end(JSON.stringify({ ok: false, code: "tile_not_visible", error: "open_notifications first" }));
     if (req.url === "/act" && body.action === "open_control_center") return res.end(JSON.stringify({ ok: false, code: "no_control_center", error: "an Android phone has no Control Center" }));
     if (req.url === "/act" && ["open_notifications", "toggle_tile", "dismiss_notification", "close_panels"].includes(body.action)) return res.end(JSON.stringify({ ok: true, panel: "shade", screen: `Notification shade (${body.action}:${body.tile ?? body.id ?? ""})` }));
@@ -108,6 +109,9 @@ describe("settings tools", () => {
     expect((await call("set_setting", { key: "dark_mode", value: true })).content[0].text).toContain("set_setting:dark_mode=true");
     const a = await call("set_setting", { key: "volume", value: true }); expect(a.isError).toBe(true); expect(a.structuredContent.code).toBe("unknown_setting");
     const b = await call("set_setting", { key: "dark_mode", value: "yes" }); expect(b.isError).toBe(true); expect(b.structuredContent.code).toBe("bad_value");
+    const p = await call("set_network_profile", { profile: "5g" }); expect(p.isError).toBe(true); expect(p.structuredContent.code).toBe("unknown_profile");
+    expect((await call("set_network_profile", { profile: "offline" })).isError).toBeFalsy();
+    expect((await call("get_network_profile")).isError).toBeFalsy();
     await c.close();
   });
 });

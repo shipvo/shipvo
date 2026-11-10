@@ -14,6 +14,7 @@ import { parseMockRules } from "./mock-rules.mjs";
 import { applyProfile, getProfile } from "./network-profiles.mjs";
 import { installNetGate } from "./net-gate.mjs";
 import { pushNotification } from "./push-notification.mjs";
+import { createSecretsForward, isVaultUiPath } from "./secrets-forward.mjs";
 import { createRequire } from "node:module";
 import { execSync } from "node:child_process";
 import { resolveBrowser } from "./browser-resolver.mjs";
@@ -191,8 +192,10 @@ async function newSession(id, opts = {}) {
   await page.waitForTimeout(300);
   const patch = profilePatch(apps);
   if (Object.keys(patch).length) { await page.evaluate((p) => globalThis.__pnDevice?.set?.(p), patch); await syncMedia(page); }
+  if (apps.network) { try { getProfile(apps.network); } catch (e) { await ctx.close(); throw new SimError("bad_profile", `phone.json: ${e.message}`); } }
   sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, room, skin: opts.skin === "ios" ? "ios" : "android", startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav() });
   if (buildId) sessions.get(id).build = buildId;
+  if (apps.network && apps.network !== "online") await setNetworkProfile(sessions.get(id), page, apps.network);
   watch.refresh();   // /watch viewers move to the new session unless they picked one
   } catch (e) {
     // A failed open leaves nothing behind: no ghost room member, no backend file.
@@ -589,6 +592,7 @@ async function act(id, body) {
       break;
     }
     case "set_network_profile": { await setNetworkProfile(s, page, body.profile); break; }
+    case "get_network_profile": return { profile: s.netProfile ?? "online", screen: await screen(page) };
     // The phone's Chromium (isolated from the app page). Page text is untrusted: results carry source "web".
     case "browser_open": case "browser_snapshot": case "browser_click": case "browser_type": case "browser_back": case "browser_screenshot": case "browser_tabs": case "browser_close_tab": case "browser_scroll": case "browser_wait_for": {
       if (body.action === "browser_open" && body.url) { await phoneBrowser(s); if (body.allow_private !== undefined) s.browser.opts.allowPrivate = body.allow_private === true; if (Array.isArray(body.allow_hosts)) s.browser.opts.allowHosts = body.allow_hosts.map(String); }
@@ -650,6 +654,7 @@ async function act(id, body) {
 const DELIVERY = new Set(["tap", "type", "scroll", "back"]);
 const REASONS = new Set(["stale_ref", "not_visible", "disabled", "covered"]);
 const WCACHE = new Map();
+const secretsForward = createSecretsForward({ control: CONTROL, token: (process.env.SHIPVO_OWNER_TOKEN || "").trim() });
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, "http://x");
   // CORS plus Chromium's private-network preflight: the app page comes from the public control plane (https) and
@@ -657,6 +662,7 @@ const server = http.createServer(async (req, res) => {
   const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-private-network": "true" };
   const send = (code, obj, type = "application/json") => { res.writeHead(code, { "content-type": type, ...CORS }); res.end(type === "application/json" ? JSON.stringify(obj) : obj); };
   try {
+    if (isVaultUiPath(url.pathname)) return await secretsForward(req, res, url);   // no CORS headers: same-origin loopback only
     if (req.method === "OPTIONS") return send(204, "", "text/plain");
     // the app's static web build
     if (url.pathname.startsWith("/_expo/") || url.pathname.startsWith("/assets/") || url.pathname === "/favicon.ico") {
