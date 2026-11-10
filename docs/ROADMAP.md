@@ -65,6 +65,9 @@ The planner keeps this list current: the epics in flight, newest owner direction
 - Secret vault: keys go from the person straight into an encrypted vault, never through the model (#841)
 - Security hardening from the external review (#732)
 
+**Spaces on Shipvo Phone:**
+- Describe an app and it appears: create, update, pin, arrange and refresh spec apps on the phone (#1297)
+
 **Agents together (planner epic):**
 - Agents use apps together: shared rooms, sub-agent teams and agent evaluation (#1188)
 
@@ -82,6 +85,8 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: Spec data sources refresh on an interval, and a gallery of example specs ([App spec](spec-blocks.md#data-that-stays-fresh), #1351, #1358)
+- 2026-11-10: Arrange the home screen with `arrange_apps` and `set_phone_time` ([Phone apps](phone-apps.md), #1349)
 - 2026-11-10: Spec `calendar` and `map` blocks, the Secrets screen in phone Settings, and opening a build from a `build_url` ([App spec](spec-blocks.md#calendars-and-maps), [Phone apps](phone-apps.md#see-saved-keys-in-settings), [Test your build](test-your-build.md#open-a-build-from-a-link), #1353, #1350, #1287)
 - 2026-11-10: Playground Many phones: 1 to 12 Android and iOS phones with a shareable link ([Getting started](getting-started.md#try-it-in-your-browser-first), #1323, #1335)
 - 2026-11-10: Secrets screen in the phone's Settings lists saved keys, metadata only ([Phone apps](phone-apps.md#see-saved-keys-in-settings), #1350)

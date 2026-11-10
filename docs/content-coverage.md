@@ -106,3 +106,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Spec `calendar` and `map` blocks (month, week, agenda, pins, `onSelect`) | [spec-blocks](spec-blocks.md#calendars-and-maps) | | | |
 | Open a build from a link (`build_url` on `POST /session`) | [test-your-build](test-your-build.md#open-a-build-from-a-link) | | | |
 | Secrets screen in the phone's Settings (saved keys, metadata only) | [phone-apps](phone-apps.md#see-saved-keys-in-settings) | | | |
+| Live data: `refresh` on spec data sources | [spec-blocks](spec-blocks.md#data-that-stays-fresh) | | | |
+| Spec gallery (habit tracker, workout log) | [spec-blocks](spec-blocks.md#example-specs) | | | |
+| Home screen order and schedule (`arrange_apps`, `set_phone_time`) | [phone-apps](phone-apps.md) | | | |
+| Phone frame page for a live session (`/phone?session=`) | [phone-apps](phone-apps.md) | | | |

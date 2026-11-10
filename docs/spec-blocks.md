@@ -211,6 +211,35 @@ Add `strings` to the spec: a map from language to `{ "original text": "translate
 
 Add `"presentation": "sheet"` to a screen and to the `navigate` action that opens it. The screen appears as a bottom sheet (a `dialog` in the tree). `{ "back": true }` closes it.
 
+## Data that stays fresh
+
+Add `refresh` to an `http` data source and Shipvo fetches it again on that many seconds while the app is installed. A pinned or long-open app shows current prices or counts with no tap.
+
+```json
+"permissions": { "network": ["api.example.com"] },
+"data": {
+  "price": { "source": "http", "get": "https://api.example.com/price", "refresh": 60 }
+}
+```
+
+- `refresh` is in seconds, 30 or more. The next screen render and the labelled tree show the new value.
+- Each refresh uses the same domain checks, size limits and trimming as the first fetch. Refreshed values are not written to the `cache`.
+- A failed refresh keeps the last value. A source never overlaps itself.
+- Refreshing stops when the app is uninstalled or the session ends, and restarts when you update the spec.
+
+| Error | Fix |
+| --- | --- |
+| `10 is below the minimum 30.` (`$.data.price.refresh`) | Use 30 or more. |
+| `refresh is only for http data sources.` | Remove `refresh`, or change the source to `http`. |
+
+## Example specs
+
+`packages/spec/gallery/` holds complete specs to copy and change: a habit tracker and a workout log. Each has a collection, a computed total, an action, a form, a bar chart and a list. The workout log uses a dark theme. The gallery tests check that each spec passes `validate`, renders the same tree on the Android and iOS skins, and runs its action.
+
+```bash
+cp packages/spec/gallery/habit-tracker.json my-app.json
+```
+
 ## Data sources that use a saved key
 
 A data source can call a service with a key you saved once in the secret form. The spec holds only the key's name. The key never reaches the assistant, the spec or the screen.
@@ -263,6 +292,7 @@ A data source can call a service with a key you saved once in the secret form. T
 - **A week or month view shows no events.** The view only lists events inside the days it shows. Set `at` to a day in the period you want, or use `agenda`.
 - **A translation does not show.** The key must match the text exactly, including capitals and spaces, and `language` must be the same code you used in `strings` (`fr`, not `fr-FR`). Pass `locale` separately for money and dates.
 - **A vector shape is missing.** An unknown `shape` is an error; a colour that is not hex, a name or `url(#id)` draws as `none`; a path with other characters draws nothing.
+- **A refreshed value never changes.** Check that `refresh` is 30 or more and the source is `http`. A failed refresh keeps the last value, so check the domain is in `permissions.network`.
 - **State is empty before the first change.** Declare a `default` for each `state` value. Declared defaults are present from the start.
 
 ## Next steps

@@ -66,23 +66,6 @@ In the app, `openUrl` with an http(s) link opens this Browser. A link from a web
 
 **Private addresses are refused.** `localhost`, `127.x`, `10.x`, `192.168.x`, `169.254.x`, CGNAT addresses, `.local` and `.internal` fail with `host_not_allowed`. To allow them, pass `allow_private: true` (all of them) or `allow_hosts: ["my-dev-box.local"]` (only these). Each navigation is logged in `device_log`. In the app, `openUrl` logs `browser_open_refused` and returns `false` when the Browser refuses a page, so `await` it.
 
-## Troubleshooting
-
-| You see | Why | Fix |
-| --- | --- | --- |
-| `host_not_allowed` | The address is private | Use a public URL, or pass `allow_hosts` for that host |
-| `unknown_setting` / `bad_value` | Wrong key or value | Use the table above |
-| `app_not_foreground` | The home screen or switcher is showing | Call `resume_app` |
-| `phone_locked` | The phone is locked | Call `unlock` |
-| The Secrets screen is empty | No key is saved for the apps on this phone, or the simulator cannot reach the saved-key routes | Save a key for an app first; check that the simulator is running |
-| `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
-
-## Next steps
-
-- [Agents and Shipvo apps](agents.md): every tool.
-- [Simulated device features](device-api.md): camera, location, payment, notifications.
-- [Run on a phone in your browser](run.md): watch the phone while your assistant drives it.
-
 ## Describe an app and it appears
 
 `create_app { session, id, spec }` takes an app spec ([app spec](design/app-spec.md), `shipvo.app/v0`), checks it, and puts the app on the phone. A spec with problems is refused with `invalid_spec`: every problem comes back with its path in the spec and a fix, and nothing is installed. A valid spec gets an icon on the home screen and opens (pass `open: false` to stay where you are). Pass `style: "ios"` for the iPhone look; the default is Android.
@@ -175,3 +158,20 @@ The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action in
 ## Open a link in the owning app
 
 `open_url myapp://item/42` finds the installed app that declares the `myapp` scheme. If that app is not the current one, the simulator switches to it. The app's `getInitialURL()` returns the link once, and its `onUrl` listener gets the `url` event. Switching to another app or reloading afterwards does not deliver the link again. Android and iOS skins behave the same. `Linking.openURL` from inside an app does the same for another app's scheme.
+
+## Troubleshooting
+
+| You see | Why | Fix |
+| --- | --- | --- |
+| `host_not_allowed` | The address is private | Use a public URL, or pass `allow_hosts` for that host |
+| `unknown_setting` / `bad_value` | Wrong key or value | Use the table above |
+| `app_not_foreground` | The home screen or switcher is showing | Call `resume_app` |
+| `phone_locked` | The phone is locked | Call `unlock` |
+| The Secrets screen is empty | No key is saved for the apps on this phone, or the simulator cannot reach the saved-key routes | Save a key for an app first; check that the simulator is running |
+| `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
+
+## Next steps
+
+- [Agents and Shipvo apps](agents.md): every tool.
+- [Simulated device features](device-api.md): camera, location, payment, notifications.
+- [Run on a phone in your browser](run.md): watch the phone while your assistant drives it.
