@@ -138,7 +138,8 @@ const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 function cleanPlacement(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   var p = {};
-  if (raw.pinned === true || (Number.isInteger(raw.pinned) && raw.pinned > 0)) p.pinned = raw.pinned;
+  if (raw.pinned === true) p.pinned = 1;
+  else if (Number.isInteger(raw.pinned) && raw.pinned > 0) p.pinned = raw.pinned;
   if (raw.hidden === true) p.hidden = true;
   if (Number.isInteger(raw.position) && raw.position >= 0 && raw.position <= 99) p.position = raw.position;
   var sc = raw.schedule;
