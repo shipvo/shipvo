@@ -1,0 +1,3 @@
+- `@shipvo/sim`: new `arrange_apps` (pin, hide, position and schedule an app on the home screen) and `set_time` (the phone's clock; the MCP tool is `set_phone_time`). `shipvo run` draws each app's placement from `phone.json` on its Android and iOS home screen.
+- `@shipvo/mcp`: new tools `arrange_apps` and `set_phone_time`.
+- Migration: none; new tools. phone.json apps may carry a `placement` object.

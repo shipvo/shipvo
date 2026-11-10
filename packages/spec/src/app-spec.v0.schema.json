@@ -242,6 +242,7 @@
         "variant": { "type": "string" },
         "delta": { "type": "string" },
         "trend": { "enum": ["up", "down", "flat"] },
+        "view": { "enum": ["month", "week", "agenda"] },
         "motion": {
           "type": "object",
           "properties": {
