@@ -222,6 +222,31 @@ for (const style of ["android", "ios"]) {
   });
 }
 
+for (const style of ["android", "ios"]) {
+  test(`${style}: share puts text into another app, and the clipboard survives switching apps`, async () => {
+    const NOTES = JSON.parse(readFileSync(new URL("../../templates/notes-tasks/app.json", import.meta.url), "utf8"));
+    const sid = `sp-share-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "notes", spec: NOTES, style })).ok, true);
+    const tg = await act(sid, { action: "share_targets" });
+    assert.deepEqual(tg.targets.map((x) => `${x.app}.${x.action}:${x.field}`).sort(), ["notes.add_note:body", "notes.add_task:title"]);
+    assert.equal((await act(sid, { action: "share", to: "notes", text: "Buy rope" })).code, "pick_action");
+    const r = await act(sid, { action: "share", to: "notes", action_name: "add_note", text: "Harbour list\nrope, hooks", from: "browser" });
+    assert.equal(r.ok, true, JSON.stringify(r).slice(0, 300));
+    const notes = (await act(sid, { action: "export_apps", ids: ["notes"] })).apps[0].data.notes;
+    assert.deepEqual(notes.map((n) => [n.title, n.body]), [["Harbour list", "Harbour list\nrope, hooks"]]);
+    const ev = (await act(sid, { action: "app_activity", id: "notes" })).apps[0].events.filter((e) => e.name === "share");
+    assert.equal(ev.length, 1); assert.equal(ev[0].action, "add_note"); assert.equal(ev[0].from, "browser");
+    assert.equal((await act(sid, { action: "share", to: "nope", text: "x" })).code, "not_installed");
+    assert.equal((await act(sid, { action: "set_clipboard", text: "lamp order 42" })).ok, true);
+    assert.equal((await act(sid, { action: "get_clipboard" })).text, "lamp order 42");
+    assert.equal((await act(sid, { action: "switch_app", id: "notes" })).ok, true);
+    assert.equal((await act(sid, { action: "get_clipboard" })).text, "lamp order 42");
+    await act(sid, { action: "device_reset" });
+    assert.equal((await act(sid, { action: "get_clipboard" })).text, "");
+  });
+}
+
 test("update_app is a new version: entered data stays, the screen changes, a bad spec changes nothing", async () => {
   assert.ok((await call("/session", { session: "sp-up" })).ok);
   assert.equal((await act("sp-up", { action: "create_app", id: "gifts", spec: GIFTS })).ok, true);

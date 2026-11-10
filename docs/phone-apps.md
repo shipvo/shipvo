@@ -209,6 +209,23 @@ uninstall_app { session, id: "notes" } -> back on the home screen
 device_log { session }                 -> install_app (source "real" for marketplace apps, with the bundle sha256), switch_app, uninstall_app
 ```
 
+## Share sheet and clipboard
+
+Share text from one app into another, and copy and paste, on Android and iOS.
+
+- `share_targets` lists the apps that take shared text: app id, action and the input that receives it. Notes and Tasks takes text as a new note (`add_note`) or a new task (`add_task`).
+- `share` sends text into one of them, as picking it in the share sheet does. A title input that is not the share input gets `title`, or the first line of the text. Each share is in `app_activity` as `share`, with `from` when you give it.
+- `get_clipboard` and `set_clipboard` read and write the phone's clipboard, the same one apps copy to and paste from. It stays when you switch apps.
+
+```json
+{ "session": "demo", "to": "notes", "action": "add_note", "text": "Harbour list\nrope, hooks", "from": "browser" }
+```
+
+To make an action of your own app a share target, add `"share"` with the name of one of its text inputs:
+
+```json
+"save_link": { "description": "Save a link", "input": { "url": { "type": "text" } }, "share": "url", "do": [ ... ] }
+```
 ## Back up and restore the whole phone
 
 `backup_phone` returns the whole phone as one JSON object, on Android and iOS:

@@ -29,6 +29,7 @@
     "app-name.mjs",
     "identity.mjs",
     "banner.mjs",
+    "share.mjs",
     "backup.mjs",
     "search.mjs",
     "wakeup.mjs",

@@ -42,6 +42,9 @@ export type DeviceState = {
 const g = globalThis as any;
 const cfg = g.__PN_SIM__ ?? {};
 const platform: "android" | "ios" = cfg.device?.platform ?? "android"; const api: number = cfg.device?.api ?? 30;
+// The clipboard outlives a page load (switching apps), as on a phone: it is kept in sessionStorage for this tab.
+function keptClipboard(): string { try { return globalThis.sessionStorage?.getItem("pn.clipboard") ?? ""; } catch { return ""; } }
+function copy(text: string) { state.clipboard = text; try { globalThis.sessionStorage?.setItem("pn.clipboard", text); } catch { /* storage blocked: kept for this page only */ } }
 const state: DeviceState = {
   appName: cfg.appName ?? "This app", platform, api,
   // Before Android 13 (API 33) notifications need no runtime permission.
@@ -57,7 +60,7 @@ const state: DeviceState = {
   payment: { nextResult: "approve", pin: "1234" },
   online: true, networkProfile: "online", airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70,
   fontSize: "default", boldText: false, reduceMotion: false, language: "en", rtl: false,
-  battery: { level: 100, charging: false }, clipboard: "", log: [],
+  battery: { level: 100, charging: false }, clipboard: keptClipboard(), log: [],
   ...(cfg.device ?? {}),
 };
 // Every entry is marked simulated: a simulated fingerprint or payment is for testing and is never a real verification or money movement.
@@ -227,7 +230,7 @@ export const device: Device = {
       let ok = false;
       await sheet("Share", (card, close) => {
         card.append(p(title ?? text));
-        for (const t of ["WhatsApp", "Messages", "Copy"]) card.append(btn(t, () => { ok = true; if (t === "Copy") state.clipboard = text; log("share", { target: t, text }); close(); }));
+        for (const t of ["WhatsApp", "Messages", "Copy"]) card.append(btn(t, () => { ok = true; if (t === "Copy") copy(text); log("share", { target: t, text }); close(); }));
         card.append(btn("Cancel", () => close()));
       });
       return ok;
@@ -266,7 +269,7 @@ export const device: Device = {
       log("files", { picked: f.name }); return out;
     },
   },
-  clipboard: { async set(t) { state.clipboard = t; }, async get() { return state.clipboard; } },
+  clipboard: { async set(t) { copy(t); }, async get() { return state.clipboard; } },
   net: { online: isOnline, type: connectionType, onChange(cb) { netSubs.add(cb); return () => { netSubs.delete(cb); }; } },
 };
 
@@ -295,7 +298,7 @@ function showBanner(n: Notification, popup = true) {
 // Control surface for the simulator (page.evaluate): set state, push a notification, flip the network, read the log.
 g.__pnDevice = {
   state,
-  set(patch: Partial<DeviceState>) { const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasNet = netKey(); Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, microphone: { ...state.microphone, ...(patch.microphone ?? {}) }, battery: { ...state.battery, ...(patch.battery ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (netKey() !== wasNet) netSubs.forEach((f) => f(isOnline())); announceSystem(sk); announceStatus(before, true, bs); },
+  set(patch: Partial<DeviceState>) { if (typeof patch.clipboard === "string") copy(patch.clipboard); const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasNet = netKey(); Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, microphone: { ...state.microphone, ...(patch.microphone ?? {}) }, battery: { ...state.battery, ...(patch.battery ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (netKey() !== wasNet) netSubs.forEach((f) => f(isOnline())); announceSystem(sk); announceStatus(before, true, bs); },
   /** Push a notification to the app. Returns its id, or null when permission is not granted. */
   push(n: Omit<Notification, "id">, o?: { system?: boolean }) { return deliver(n, o?.system === true); },
   log: () => state.log,
@@ -323,7 +326,7 @@ g.__pnDevice = {
     const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasNet = netKey();
     Object.assign(state, { permissions: { camera: "undetermined", microphone: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: (profile?.platform ?? state.platform) === "android" && (profile?.api ?? state.api) < 33 ? "granted" : "undetermined" },
       source: "auto", microphone: { level: 0.2 }, location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, networkProfile: "online", airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70, fontSize: "default", boldText: false, reduceMotion: false, language: "en", rtl: false, battery: { level: 100, charging: false }, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
-    recent.length = 0; seq = 0; initialUrl = null;
+    recent.length = 0; seq = 0; initialUrl = null; copy(state.clipboard);
     announceSystem(sk, false); announceStatus(before, false, bs); if (netKey() !== wasNet) netSubs.forEach((f) => f(isOnline()));
     for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();
   },

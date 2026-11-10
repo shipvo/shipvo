@@ -416,6 +416,14 @@ use(server, tools.list_wakeups,
   async ({ session }) => { need(session); const r = await act({ session, action: "list_wakeups" }) as Act & { wakeups?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ wakeups: r.wakeups }, null, 2)); });
 use(server, tools.clear_wakeup,
   async ({ session, name }) => { need(session); const r = await act({ session, action: "clear_wakeup", name }) as Act & { cleared?: boolean }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cleared: r.cleared === true })); });
+use(server, tools.share_targets,
+  async ({ session }) => { need(session); const r = await act({ session, action: "share_targets" }) as Act & { targets?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ targets: r.targets }, null, 2)); });
+use(server, tools.share,
+  async ({ session, to, text: body, title, action, from }) => { need(session); const r = await act({ session, action: "share", to, text: body, title, action_name: action, from }) as Act & { shared?: unknown; value?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ shared: r.shared, value: r.value }, null, 2)); });
+use(server, tools.get_clipboard,
+  async ({ session }) => { need(session); const r = await act({ session, action: "get_clipboard" }) as Act & { text?: string }; if (!r.ok) return result(session, r); return text(JSON.stringify({ text: r.text ?? "" })); });
+use(server, tools.set_clipboard,
+  async ({ session, text: body }) => { need(session); const r = await act({ session, action: "set_clipboard", text: body }) as Act & { text?: string }; if (!r.ok) return result(session, r); return text(JSON.stringify({ text: r.text ?? "" })); });
 use(server, tools.backup_phone,
   async ({ session }) => { need(session); const r = await act({ session, action: "backup_phone" }) as Act & { backup?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.backup)); });
 use(server, tools.restore_phone,

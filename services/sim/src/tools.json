@@ -1101,6 +1101,31 @@
     }
   },
   {
+    "name": "get_clipboard",
+    "description": "The text on the phone's clipboard, the same one apps copy to and paste from on Android and iOS.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "get_network_profile",
     "description": "Read the phone's current network profile name (online until set_network_profile or phone.json changes it).",
     "inputSchema": {
@@ -2717,6 +2742,36 @@
     }
   },
   {
+    "name": "set_clipboard",
+    "description": "Put text on the phone's clipboard so the next paste in any app gets it. It stays when you switch apps.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "text": {
+          "type": "string",
+          "description": "Up to 20000 characters"
+        }
+      },
+      "required": [
+        "session",
+        "text"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "set_device",
     "description": "Change what the simulated phone has: location, the address book (contacts), calendar events, files for the file picker, a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.",
     "inputSchema": {
@@ -3171,6 +3226,78 @@
     },
     "annotations": {
       "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "share",
+    "description": "Share text into another app on the phone, like picking it in the share sheet: the text goes into that app's share action (for example a new note in Notes and Tasks). A title input that is not the share input gets `title`, or the first line of the text. Logged in app_activity as \"share\". Use share_targets to see which apps take shared text.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "to": {
+          "type": "string",
+          "description": "App id from share_targets"
+        },
+        "text": {
+          "type": "string",
+          "description": "The text to share, up to 5000 characters"
+        },
+        "title": {
+          "type": "string",
+          "description": "A title for the shared item (default: the first line of the text)"
+        },
+        "action": {
+          "type": "string",
+          "description": "The share action, when the app has more than one (from share_targets)"
+        },
+        "from": {
+          "type": "string",
+          "description": "The app the text is shared from, for the activity log"
+        }
+      },
+      "required": [
+        "session",
+        "to",
+        "text"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "share_targets",
+    "description": "The apps on this phone that take shared text, like the share sheet on Android and iOS: app id and name, the action and the input that receives the text.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
       "destructiveHint": false
     },
     "execution": {
