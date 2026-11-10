@@ -427,7 +427,9 @@ use(server, tools.open_url,
 use(server, tools.lock, 
   async ({ session }) => { need(session); return result(session, await act({ session, action: "lock" })); });
 use(server, tools.unlock, 
-  async ({ session }) => { need(session); return result(session, await act({ session, action: "unlock" })); });
+  async ({ session, pin }) => { need(session); return result(session, await act({ session, action: "unlock", pin })); });
+use(server, tools.set_lock_method,
+  async ({ session, method, pin, current }) => { need(session); return result(session, await act({ session, action: "set_lock_method", method, pin, current })); });
 use(server, tools.restart, 
   async ({ session }) => { need(session); return result(session, await act({ session, action: "restart" })); });
 use(server, tools.open_notifications, 

@@ -164,4 +164,26 @@ describe("wake-up tools", () => {
     expect(out2.count).toBe(1); expect(out2.results[0].snippet).toBe("Amina Diallo");
     await c.close(); srv.close();
   }, 30000);
+
+  it("set_lock_method and unlock pass the PIN on", async () => {
+    const seen: any[] = [];
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      res.end(JSON.stringify({ ok: true, screen: null }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    await c.callTool({ name: "set_lock_method", arguments: { session: "s", method: "pin", pin: "2468" } });
+    expect(seen.at(-1)).toMatchObject({ action: "set_lock_method", method: "pin", pin: "2468" });
+    await c.callTool({ name: "unlock", arguments: { session: "s", pin: "2468" } });
+    expect(seen.at(-1)).toMatchObject({ action: "unlock", pin: "2468" });
+    await c.close(); srv.close();
+  }, 30000);
 });

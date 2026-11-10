@@ -1,0 +1,2 @@
+- New MCP tool `set_lock_method`: the phone unlocks with a swipe or a 4 to 8 digit PIN, on Android and iOS. `unlock` takes `pin`; a restart leaves a PIN phone locked. Error codes `bad_method`, `bad_pin`, `pin_required`, `wrong_pin`. `phone_apps` returns `lock_method`.
+- Migration: none; `unlock` without a PIN works as before until a PIN is set.

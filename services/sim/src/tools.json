@@ -3255,17 +3255,62 @@
   },
   {
     "name": "unlock",
-    "description": "Swipe up on the lock screen. Returns to the same screen as before the lock. Fails with not_locked if the phone is not locked. Logged in device_log as simulated.",
+    "description": "Swipe up on the lock screen, and enter the PIN when the phone has one (set_lock_method). Returns to the same screen as before the lock. Fails with not_locked if the phone is not locked, pin_required if it has a PIN and none was given, wrong_pin on a wrong PIN. Logged in device_log as simulated.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "session": {
           "type": "string",
           "description": "Session from open_app"
+        },
+        "pin": {
+          "type": "string",
+          "description": "The PIN, when the phone has one"
         }
       },
       "required": [
         "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "set_lock_method",
+    "description": "Choose how the phone unlocks: none (swipe up) or pin (4 to 8 digits). With a PIN, unlock needs it, and a restart leaves the phone locked. Changing or removing a PIN needs the current one. Wrong PINs are counted in device_log; the PIN is never logged.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "none",
+            "pin"
+          ]
+        },
+        "pin": {
+          "type": "string",
+          "description": "The new PIN, 4 to 8 digits (method pin)"
+        },
+        "current": {
+          "type": "string",
+          "description": "The present PIN, when one is set"
+        }
+      },
+      "required": [
+        "session",
+        "method"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"

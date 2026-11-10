@@ -38,7 +38,7 @@ import { assistantName } from "./identity.mjs";
 import { pendingBanner, waitForNew } from "./banner.mjs";
 import { createWakeups, WakeupError } from "./wakeup.mjs";
 import { searchPhone, SearchError } from "./search.mjs";
-import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
+import { createLifecycle, lock, unlock, restart, setLockMethod, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
@@ -584,7 +584,7 @@ async function act(id, body) {
       return { where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, ...(installed ? { declared: installed.declared ?? [], permissions: installed.permissions ?? {} } : {}), screen: where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Read-only: what a frame page needs to draw this phone's home screen and Store. Not in device_log.
-    case "phone_apps": return { now: nowOf(s).getTime(), where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, store: s.apps.store, locked: s.life.locked, skin: s.skin, screen: null };
+    case "phone_apps": return { now: nowOf(s).getTime(), where: s.nav.where, current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, store: s.apps.store, locked: s.life.locked, lock_method: s.life.method, skin: s.skin, screen: null };
     // Search the Store by need. Read-only; logged in device_log as simulated.
     case "find_apps": {
       const catalog = Array.isArray(body.catalog) ? body.catalog : s.apps.store;
@@ -595,8 +595,12 @@ async function act(id, body) {
     // Simulated lock, unlock and restart. Restart reloads the page (a cold start of the app); the browser context keeps storage.
     case "lock": case "unlock": {
       if (body.action === "lock") s.shade.open = "none";
-      try { (body.action === "lock" ? lock : unlock)(s.life); } catch (e) { if (e instanceof LifecycleError) throw new SimError(e.code, e.message); throw e; }
+      try { (body.action === "lock" ? lock(s.life) : unlock(s.life, { pin: body.pin })); } catch (e) { if (e instanceof LifecycleError) throw new SimError(e.code, e.message); throw e; }
       return { locked: s.life.locked, screen: s.life.locked ? "Lock screen" : await screen(page) };
+    }
+    case "set_lock_method": {
+      try { setLockMethod(s.life, { method: body.method, pin: body.pin, current: body.current }); } catch (e) { if (e instanceof LifecycleError) throw new SimError(e.code, e.message); throw e; }
+      return { method: s.life.method, screen: null };
     }
     // Simulated OTA: check (signed pointer, hash), apply (restart on the new bundle), state. Errors: no_update, not_ready. Every change is in device_log.
     case "get_update_state": case "check_for_update": case "apply_update": {
@@ -604,7 +608,7 @@ async function act(id, body) {
         if (body.action === "check_for_update") { await checkForUpdate(s.update, { url: s.updateSrc.url, publicKey: s.updateSrc.key }); await showBanner(s); }
         else if (body.action === "apply_update") {
           applyUpdate(s.update, (n) => `http://localhost:${PORT}/u/${body.session}/r${n}/index.html`);
-          s.life.reloads++; s.shade.open = "none"; s.nav.where = "app"; s.life.locked = false;
+          s.life.reloads++; s.shade.open = "none"; s.nav.where = "app"; if (s.life.method !== "pin") s.life.locked = false;
           await boot(s, s.update.running.url);
         }
       } catch (e) { if (e instanceof UpdateError) throw new SimError(e.code, e.message); throw e; }
@@ -613,7 +617,7 @@ async function act(id, body) {
     case "restart": {
       restart(s.life); s.shade.open = "none"; s.nav.where = "app";
       await boot(s);
-      return { reloads: s.life.reloads, restarts: s.life.restarts, screen: await screen(page) };
+      return { reloads: s.life.reloads, restarts: s.life.restarts, locked: s.life.locked, screen: s.life.locked ? "Lock screen" : await screen(page) };
     }
     case "screen": break;
     // Coordinate input, for the "screenshots and coordinates only" side of scripts/agent-efficiency. Not an MCP tool: agents using
@@ -774,7 +778,7 @@ async function act(id, body) {
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: search_phone, screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: set_lock_method, search_phone, screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
