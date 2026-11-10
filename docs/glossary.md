@@ -55,6 +55,10 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Audit log.** A list of what happened to your app's releases: who published, who rolled back, and when a release was stopped. You can export it with `shipvo audit`.
 
+**Cohort.** A slice of your users that gets an update before everyone else. See also cohort band.
+
+**Over-the-air update.** A new version of your app that phones download directly, without a new store release. Shipvo signs each one and the phone checks the signature before it runs.
+
 **Cohort band.** A group of people who get a release first (`b0`), then more (`b1`, `b2`). Starting small limits the damage if something is wrong.
 
 **Policy.** Rules you write in `shipvo.json` about releases, such as no publishing on Fridays (`blockedWeekdays`) or after 3pm (`blockedAfterHour`). `shipvo publish --dry-run` checks them, and the control plane enforces them on every real publish.
