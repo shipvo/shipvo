@@ -218,6 +218,35 @@ Add `strings` to the spec: a map from language to `{ "original text": "translate
 
 Add `"presentation": "sheet"` to a screen and to the `navigate` action that opens it. The screen appears as a bottom sheet (a `dialog` in the tree). `{ "back": true }` closes it.
 
+## Keep a data source fresh
+
+Add `refresh` to an `http` data source to run it again on a timer while the app is installed. The value is a number of seconds, 30 or more. The open screen updates when new data arrives, so a price or a score stays current without a tap.
+
+```json
+"data": {
+  "price": {
+    "source": "http",
+    "get": "https://api.example.com/price",
+    "refresh": 60
+  }
+}
+```
+
+- Each refresh calls the service again. It does not read `cache`, and refreshed values are not written to it.
+- If a refresh fails, the screen keeps the last value and the next tick tries again.
+- Only public `http` and `https` hosts are called, and redirects are not followed.
+- The timer stops when the app is removed or replaced.
+
+| Error path | Meaning | Fix |
+| --- | --- | --- |
+| `$.data.<name>.refresh` below 30 | The interval is too short. | Use 30 or more. |
+| `$.data.<name>.refresh` is not a number | Seconds must be a number, not text. | Write `60`, not `"60"`. |
+| `$.data.<name>.refresh` on a non-`http` source | Only `http` sources refresh. | Remove `refresh`, or change the source to `http`. |
+
+## Example specs
+
+`packages/spec/gallery/` holds example specs to copy and change: a habit tracker and a workout log. Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.
+
 ## Data sources that use a saved key
 
 A data source can call a service with a key you saved once in the secret form. The spec holds only the key's name. The key never reaches the assistant, the spec or the screen.
