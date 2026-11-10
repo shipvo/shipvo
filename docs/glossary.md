@@ -109,5 +109,5 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Map block.** A part of an app spec that draws rows with a latitude and longitude as pins on a canvas. It loads no map tiles. See [App spec](spec-blocks.md#calendars-and-maps).
 
-**Refresh (data source).** A setting that makes an app spec fetch a web data source again every so many seconds while the app is installed. See [App spec](spec-blocks.md#data-that-stays-fresh).
+**Refresh (data source).** A setting that makes an app spec fetch a web data source again every so many seconds while the app is installed. See [App spec](spec-blocks.md#keep-a-data-source-fresh).
 **Refresh (data source).** A number of seconds on a web data source in an app spec. Shipvo asks the service again on that timer while the app is installed. See [App spec](spec-blocks.md#keep-a-data-source-fresh).
