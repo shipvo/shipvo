@@ -3,13 +3,19 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { openApp, PhoneError } from "../src/index";
 
 // A stand-in simulator that records what mockNetwork sends and answers like packages/sim does for a bad rule.
-let last: any = null;
+let last: any = null; let lastAction: any = null; let net = "online";
 const server = createServer((req, res) => {
   let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => {
     const body = b ? JSON.parse(b) : {};
     const send = (o: unknown) => { res.setHeader("content-type", "application/json"); res.end(JSON.stringify(o)); };
     if (req.url === "/session") return send({ ok: true, screen: '- heading "Home" [ref=e1]' });
     if (body.action === "set_network_mocks") last = body.rules;
+    if (body.action === "set_network_profile") {
+      lastAction = { action: body.action, profile: body.profile };
+      if (body.profile === "5g") return send({ ok: false, code: "unknown_profile", error: 'Unknown network profile "5g"' });
+      net = body.profile;
+    }
+    if (body.action === "get_network_profile") return send({ ok: true, profile: net, screen: "" });
     send({ ok: true, screen: '- heading "Home" [ref=e1]' });
   });
 });
@@ -37,4 +43,14 @@ it("a bad rule throws PhoneError mock_invalid and sends nothing", async () => {
     expect(err.code).toBe("mock_invalid");
   }
   expect(last).toBeNull();
+});
+
+it("setNetwork and getNetwork send the profile actions", async () => {
+  const phone = await openApp({ app: "demo", sim });
+  await phone.setNetwork("slow-4g");
+  expect(lastAction).toEqual({ action: "set_network_profile", profile: "slow-4g" });
+  expect(await phone.getNetwork()).toBe("slow-4g");
+  const err = await phone.setNetwork("5g").catch((e) => e);
+  expect(err).toBeInstanceOf(PhoneError);
+  expect(err.code).toBe("unknown_profile");
 });

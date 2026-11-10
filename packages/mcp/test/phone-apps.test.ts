@@ -54,6 +54,7 @@ beforeAll(async () => {
       installed.set(body.id, body.name ?? body.id); if (body.open !== false) current = body.id; return ok();
     }
     if (!installed.has(body.id)) return fail("not_installed", "not installed");
+    if (body.action === "pin_app" || body.action === "hide_app") return ok();
     if (body.action === "switch_app") { current = body.id; return ok(); }
     if (body.action === "uninstall_app") { installed.delete(body.id); if (current === body.id) current = null; return ok(); }
     fail("x", "x");
@@ -125,6 +126,18 @@ describe("phone app tools", () => {
     expect((await call(c, "import_phone_apps", { session: s, apps: [good] })).structuredContent.code).toBe("already_installed");
     expect((await call(c, "import_phone_apps", { session: s, apps: [good], replace: true })).isError).toBeFalsy();
     expect(seen.at(-1)).toMatchObject({ action: "import_apps", replace: true });
+    await c.close();
+  });
+  it("pin_app and hide_app reach the phone and report not_installed", async () => {
+    const c = await connect();
+    const s = "s-pin";
+    await call(c, "create_app", { session: s, id: "tide", spec: { spec: "shipvo.app/v0", screens: [{ id: "home", title: "T", body: [] }] } });
+    expect((await call(c, "pin_app", { session: s, id: "tide", pinned: true })).isError).toBeFalsy();
+    expect((await call(c, "hide_app", { session: s, id: "tide", hidden: true })).isError).toBeFalsy();
+    expect(seen.filter((b: any) => b.action === "pin_app").at(-1)).toMatchObject({ id: "tide", pinned: true });
+    expect(seen.filter((b: any) => b.action === "hide_app").at(-1)).toMatchObject({ id: "tide", hidden: true });
+    expect((await call(c, "pin_app", { session: s, id: "ghost", pinned: true })).structuredContent.code).toBe("not_installed");
+    expect((await call(c, "hide_app", { session: s, id: "ghost", hidden: true })).structuredContent.code).toBe("not_installed");
     await c.close();
   });
   it("marketplace apps get an app:// url that the sim resolves like open_app", async () => {

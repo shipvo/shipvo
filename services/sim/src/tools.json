@@ -841,6 +841,31 @@
     }
   },
   {
+    "name": "get_network_profile",
+    "description": "Read the phone's current network profile name (online until set_network_profile or phone.json changes it).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "get_settings",
     "description": "Read the phone's system settings from the Settings screen: dark_mode, font_size (small, default, large, largest), bold_text, reduce_motion, language (en, fr, ar) and rtl. Returns each setting and the screen as rows.",
     "inputSchema": {
@@ -884,6 +909,41 @@
     },
     "annotations": {
       "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "hide_app",
+    "description": "Hide an installed app from the home screen and the app list, or show it again with hidden: false. The app keeps its data and still opens with switch_app and run_app_action. Works for Store apps and apps made with create_app, and survives update_app. Fails with not_installed. Logged in device_log.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "Installed app id"
+        },
+        "hidden": {
+          "type": "boolean",
+          "description": "true to hide, false to show"
+        }
+      },
+      "required": [
+        "session",
+        "id",
+        "hidden"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
       "destructiveHint": false
     },
     "execution": {
@@ -1409,6 +1469,41 @@
     },
     "annotations": {
       "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "pin_app",
+    "description": "Pin an installed app to the top of the home screen (Android and iOS style), after any apps pinned before it, or unpin it with pinned: false. Works for Store apps and apps made with create_app, and survives update_app. Fails with not_installed. Logged in device_log.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "Installed app id"
+        },
+        "pinned": {
+          "type": "boolean",
+          "description": "true to pin, false to unpin"
+        }
+      },
+      "required": [
+        "session",
+        "id",
+        "pinned"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
       "destructiveHint": false
     },
     "execution": {
@@ -2228,6 +2323,36 @@
       },
       "required": [
         "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "set_network_profile",
+    "description": "Make the phone's network behave like a named profile: online, offline, 2g, 3g, slow-4g, spotty or low-end-4g. The app's fetch and XHR calls wait and fail as the profile says (offline rejects every call). The numbers are simulation settings, not measurements of a real network. Mock rules from set_network_mocks still win. Fails with unknown_profile for a name that does not exist. Logged in device_log as simulated.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "profile": {
+          "type": "string",
+          "description": "online, offline, 2g, 3g, slow-4g, spotty or low-end-4g"
+        }
+      },
+      "required": [
+        "session",
+        "profile"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"

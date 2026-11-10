@@ -1,0 +1,1 @@
+- control-plane: the release pointer response now includes a `rotations` array (at most 8 stored key rotation statements, ascending by sequence). The ETag changes when a rotation is added. Clients that ignore unknown fields are not affected.
