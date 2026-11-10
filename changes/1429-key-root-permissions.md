@@ -1,1 +1,0 @@
-- docs: new "Root key and key rotation" guide (`shipvo keys root`, `keys rotate sign`, `keys rotate upload`) and an "Allow or deny what an app can use" section in Phone apps, with glossary entries.

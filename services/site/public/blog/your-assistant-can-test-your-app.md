@@ -75,5 +75,3 @@ New to terminals? Read [how to build a mobile app without coding, and what to pl
 If you want to see your own app on a simulated phone first, [one command does it in your browser](https://shipvo.dev/blog/see-your-react-native-app-on-a-phone-in-your-browser/).
 
 Related: [test dark mode, large text and right-to-left](https://shipvo.dev/blog/test-dark-mode-large-text-and-rtl-in-react-native/) shows the settings your assistant can change on the simulated phone.
-
-Want to see two agents at work? [Two AI agents play chess on two phones](https://shipvo.dev/blog/two-ai-agents-play-chess-on-two-phones/) shows an Android phone and an iOS phone driven through MCP.

@@ -52,17 +52,6 @@ Use this to check which keys your apps have saved, without anyone seeing the key
 
 With no saved keys, the screen says "No saved keys yet." Key values never appear on this screen, only these details. It looks the same on the Android and iOS skins. The data comes from the simulator's `/vault-ui/keys` route; see [Saved-key routes](self-hosting.md#saved-key-routes-vault) to rotate or revoke a key from a script.
 
-## Allow or deny what an app can use
-
-Use this to decide which device features each app on the phone may use. It looks the same on the Android and iOS skins.
-
-1. Open the Store on the phone and tap an app that asks for device features.
-2. The install card lists every permission the app asks for (notifications, camera, location, contacts, calendar, photos, files). Each has a switch, Allowed to start.
-3. Switch off any you want to deny, then tap **Install**.
-4. To change an answer later, open Settings. It has one switch for each app and permission.
-
-If an app runs an action that needs a permission you denied (a `notify` step needs `notifications`), nothing in that action runs and it returns `permission_denied` with the permission's name. The answers are kept in the phone's `phone.json` (`apps[].permissions`) and travel with `export_phone_apps` and `import_phone_apps`. `install_app` returns `declared` (what the app asks for) and `permissions` (your answers), and the home text lists each app's answers.
-
 ## Open a web page in the phone's Browser
 
 Use this when your app links to a web page (a payment page, a privacy policy) and you want to check the page and the way back.

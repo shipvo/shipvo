@@ -125,9 +125,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Home-screen layout (`placement`).** How an app sits on the phone's home screen: pinned, hidden, its position and the days and hours it shows. `export_phone_apps` carries it and `import_phone_apps` restores it.
 
-**Root key.** A second signing key you keep offline. It does not sign updates. It signs a rotation statement that replaces your release key. Create it with `shipvo keys root`; see [Root key and key rotation](key-rotation.md).
-
-**Device permission.** A phone feature an app asks to use, such as notifications, camera or location. You allow or deny each one when you install the app and can change it in Settings. See [phone apps](phone-apps.md#allow-or-deny-what-an-app-can-use).
+**Root key.** An offline key that only signs rotation statements, never updates. `shipvo keys root` creates it. See [Key rotation](key-rotation.md).
 
 **Rotation statement.** A note signed by the root key that tells phones to trust a new release key. `shipvo keys rotate sign` makes it.
 
+**App permission.** A device permission (such as notifications or location) an app declares and you allow or deny on its install card or in Settings. See [phone apps](phone-apps.md#device-permissions-per-app).
