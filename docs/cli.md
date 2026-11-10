@@ -387,11 +387,11 @@ These four commands take `--json` and print the same `{ ok, code, summary, data,
 | `publish --dry-run-policy` | `policy_ok` | `{ policy: "none" or "allowed", bands }` |
 | `promote` | `promoted`, `nothing_to_promote` | `{ dry_run, promoted: [{ platform, release, from, bands, skipped_newer: [{ band, release }] }] }` |
 | `promote --dry-run` | `dry_run` | the same with `dry_run: true` |
-| `rollback` | `rolled_back` | `{ app, rolled_back_to_code_of, new_release, min_shell_version, issued_at, platforms, bands, dry_run: false }` |
+| `rollback` | `rolled_back` | `{ app, rolled_back_to_code_of, new_release, min_shell_version, issued_at, platforms, bands, dry_run: false, state_downgrade?: [{ platform, from, to }] }` (`state_downgrade` is present when `--allow-state-downgrade` overrode a check) |
 | `rollback --dry-run` | `dry_run` | the same with `dry_run: true` |
 | `auto-halt` | `auto_halt_show`, `auto_halt_on`, `auto_halt_off`, `dry_run` | `{ enabled, threshold, min_reports, dry_run, changed }` (`threshold` and `min_reports` are `null` when off) |
 
-Failure codes: `usage`, `failed`, `policy_refused`, `no_bundle`, `not_found`, `no_pointer`, `tests_failed`, `blocked`, `report_unreadable`, `no_credentials`, `auth_failed`, `remote_failed`. On failure `data` is `{}` and `summary` is the error message.
+Failure codes: `usage`, `failed`, `policy_refused`, `no_bundle`, `not_found`, `no_pointer`, `tests_failed`, `blocked`, `state_downgrade`, `bad_config`, `report_unreadable`, `no_credentials`, `auth_failed`, `remote_failed`. On failure `data` is `{}` and `summary` is the error message.
 
 Without `--json`, `publish` and `rollback` print a single plain sentence.
 
