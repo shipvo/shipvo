@@ -68,9 +68,9 @@ npx -y @shipvo/cli audit <app> --limit 20
 { "action": "key-rotation", "release": null, "after": { "sequence": 1, "valid_from": "2026-11-06T00:00:00Z" } }
 ```
 
-`shipvo audit` needs `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create`. Set one first; `shipvo login` alone is not enough.
+`shipvo audit` uses `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create`.
 
-Rotation rows are merged into the first page only, which holds the newest rows (up to 200). The export includes rotations that fall within the newest 200 rows. A new rotation is the newest row, so it is within `--limit 20` right after `upload`. See [`shipvo audit`](cli.md#shipvo-audit).
+A new rotation is the newest row, so it shows in `shipvo audit <app> --limit 20` right after `upload`. See [`shipvo audit`](cli.md#shipvo-audit).
 
 ## Troubleshooting
 
