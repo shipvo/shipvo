@@ -1902,7 +1902,7 @@
   },
   {
     "name": "schedule_app",
-    "description": "Show an installed app only inside a daily time window: it appears on the home screen and app list from `from` to `to` (HH:MM, 24 hour, in the given timezone) and is hidden outside it. A window may cross midnight. The schedule is checked on the phone's clock, comes first over pin_app and hide_app, is kept by update_app, and is included in export_phone_apps and import_phone_apps. Android and iOS skins behave the same. Fails with not_installed or bad_schedule. Logged in device_log.",
+    "description": "Show an installed app only inside a daily time window: it appears on the home screen and app list from `from` to `to` (HH:MM, 24 hour, in the given timezone) and is hidden outside it. A window may cross midnight. The schedule is checked on the phone's clock, comes first over pin_app and hide_app, is kept by update_app, and is included in export_phone_apps and import_phone_apps. Android and iOS skins behave the same. `from` and `to` must differ. Fails with not_installed or bad_schedule. Logged in device_log.",
     "inputSchema": {
       "type": "object",
       "properties": {

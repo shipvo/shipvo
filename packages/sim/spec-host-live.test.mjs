@@ -205,6 +205,20 @@ for (const style of ["android", "ios"]) {
     assert.equal(ids((await act(sid2, { action: "press_home" })).screen), "bb");
     await act(sid2, { action: "set_clock", at: "2026-11-10T08:00:00Z" });
     assert.equal(ids((await act(sid2, { action: "press_home" })).screen), "aa,bb");
+    // update_app keeps the schedule
+    const up = await act(sid, { action: "update_app", id: "aa", spec: { ...mk("aa"), app: { id: "aa", name: "App aa v2", icon: "gift" } } });
+    assert.ok(up.version, JSON.stringify(up));
+    assert.deepEqual((await act(sid, { action: "export_apps" })).apps.find((a) => a.id === "aa").schedule, { from: "08:00", to: "12:00", timezone: "Europe/Berlin" });
+    await at("2026-11-10T11:00:00Z");
+    assert.equal(ids(await home()), "bb");
+    await at("2026-11-10T08:00:00Z");
+    assert.equal(ids(await home()), "aa,bb");
+    // set_clock: a bad time is rejected and null goes back to real time
+    assert.equal((await at("yesterday")).code, "bad_clock");
+    assert.equal(ids(await home()), "aa,bb");
+    assert.equal((await at(null)).ok, true);
+    const real = await act(sid, { action: "press_home" });
+    assert.equal(real.ok, true);
     // errors
     assert.equal((await act(sid, { ...w, id: "ghost" })).code, "not_installed");
     assert.equal((await act(sid, { ...w, timezone: "Nowhere/City" })).code, "bad_schedule");

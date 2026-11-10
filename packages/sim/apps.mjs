@@ -38,8 +38,9 @@ export function loadProfile(json) {
   for (const a of apps) {
     if (!a || typeof a.id !== "string" || !/^[a-z0-9-]+$/.test(a.id)) throw new AppsError("bad_profile", "every app needs an id of lowercase letters, digits and dashes");
     if (seen.has(a.id)) throw new AppsError("bad_profile", `app '${a.id}' is listed twice`);
-    seen.add(a.id); st.installed_apps.push(entry(a));
+    seen.add(a.id); st.installed_apps.push({ ...entry(a), ...(a.schedule != null ? { schedule: checkSchedule(a.schedule) } : {}) });
   }
+  if (p.clock != null) { const c = Date.parse(String(p.clock)); if (Number.isNaN(c)) throw new AppsError("bad_profile", "'clock' must be an ISO time such as 2026-11-10T08:00:00Z"); st.clock = c; }
   if (p.current_app != null) { if (!seen.has(p.current_app)) throw new AppsError("bad_profile", `current_app '${p.current_app}' is not in 'apps'`); st.current_app = p.current_app; }
   if (p.network !== undefined) { if (typeof p.network !== "string") throw new AppsError("bad_profile", "'network' must be a profile name"); st.network = p.network; }
   if (p.settings !== undefined) {
@@ -226,7 +227,7 @@ export const MAX_BUNDLE_BYTES = 200 * 1024 * 1024;
 export function appsClientScript(iframeId = "app", seed = {}) {
   return `(function(){
 var AppsError=function(c,m){var e=new Error(m);e.code=c;return e},STORE_FIXTURE=${JSON.stringify(STORE_FIXTURE)};
-var entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},homeApps=${homeApps.toString()},installedIconsHtml=${installedIconsHtml.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
+var entry=${entry.toString()},text=${text.toString()},esc=${esc.toString()},note=${note.toString()},installApp=${installApp.toString()},switchApp=${switchApp.toString()},inWindow=${inWindow.toString()},checkSchedule=${checkSchedule.toString()},homeApps=${homeApps.toString()},installedIconsHtml=${installedIconsHtml.toString()},storeRowsHtml=${storeRowsHtml.toString()},createApps=${createApps.toString()};
 var loadProfile=${loadProfile.toString()},settingPatch=function(){};
 var r=document.querySelector('[data-part="phone-body"]');if(!r)return;
 var q=function(p){return r.querySelector('[data-part="'+p+'"]')},sc=q("store-screen"),home=q("home-screen");if(!sc||!home)return;

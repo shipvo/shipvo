@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
 import { renderFrame, statusClientScript } from "./frame.mjs";
-import { findApps, loadProfile, installApp, uninstallApp, switchApp, describeApps, profilePatch, AppsError, STORE_FIXTURE, resolveUrl } from "./apps.mjs";
+import { appsClientScript, findApps, loadProfile, installApp, uninstallApp, switchApp, describeApps, profilePatch, AppsError, STORE_FIXTURE, resolveUrl } from "./apps.mjs";
 import { createNav } from "./nav.mjs";
 
 const code = (fn) => { try { fn(); } catch (e) { return e.code; } return null; };
@@ -111,4 +111,16 @@ test("find_apps: no match is an empty list; limit is capped at 25", () => {
   const many = Array.from({ length: 40 }, (_, i) => ({ id: `a${i}`, name: `Bill ${i}`, version: "1" }));
   assert.equal(findApps(many, { query: "bill", limit: 99 }).length, 25);
   assert.equal(findApps(many, { query: "bill" }).length, 10);
+});
+
+test("the frame page script can draw scheduled apps (inWindow and checkSchedule are injected)", () => {
+  const seed = { apps: [{ id: "aa", name: "Aa", schedule: { from: "08:00", to: "12:00", timezone: "Europe/Berlin" } }, { id: "bb", name: "Bb" }], clock: "2026-11-10T06:00:00Z" };
+  const src = appsClientScript("app", seed);
+  const decl = src.slice(src.indexOf("var AppsError"), src.indexOf("var r=document"));
+  const draw = new Function(`${decl}\nreturn function(seedJson){var st=loadProfile(seedJson);return installedIconsHtml(st)}`)();
+  const ids = (h) => [...h.matchAll(/data-app="(\w+)"/g)].map((m) => m[1]).join(",");
+  assert.equal(ids(draw(seed)), "bb");
+  assert.equal(ids(draw({ ...seed, clock: "2026-11-10T07:00:00Z" })), "aa,bb");
+  assert.equal(code(() => loadProfile({ apps: [{ id: "a", schedule: { from: "1", to: "2", timezone: "UTC" } }] })), "bad_schedule");
+  assert.equal(code(() => loadProfile({ clock: "yesterday" })), "bad_profile");
 });

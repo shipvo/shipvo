@@ -451,12 +451,12 @@ async function act(id, body) {
       catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       return { current_app: s.apps.current_app, installed_apps: s.apps.installed_apps, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps)}` };
     }
-    // Show an app only inside a daily window on the sim clock; clear_schedule goes back to pin/hide. set_clock moves the sim clock (at: ISO time, or null for real time).
+    // Show an app only inside a daily window on the sim clock (bad_clock is a bad set_clock time); clear_schedule goes back to pin/hide. set_clock moves the sim clock (at: ISO time, or null for real time).
     case "schedule_app": case "clear_schedule": case "set_clock": {
       try {
         if (body.action === "set_clock") {
           const t = body.at == null ? null : Date.parse(String(body.at));
-          if (t !== null && Number.isNaN(t)) throw new SimError("bad_schedule", "at: expected an ISO time such as 2026-11-10T08:00:00Z, or null");
+          if (t !== null && Number.isNaN(t)) throw new SimError("bad_clock", "at: expected an ISO time such as 2026-11-10T08:00:00Z, or null");
           if (t === null) delete s.apps.clock; else s.apps.clock = t;
         } else scheduleApp(s.apps, String(body.id ?? ""), body.action === "clear_schedule" ? null : { from: body.from, to: body.to, timezone: body.timezone });
       } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
