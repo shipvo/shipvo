@@ -115,7 +115,6 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Refresh (data source).** A number of seconds on a web data source in an app spec. Shipvo asks the service again on that timer while the app is installed. See [App spec](spec-blocks.md#keep-a-data-source-fresh).
 
-**Signing seed.** The one secret value that lets you sign updates for your app. Phones only accept updates signed with it. Back it up once; nobody can recover it for you. See [Moving to a new machine](new-machine.md).
 **Signing seed.** The secret key that signs your releases. Every installed app pins its matching public key and accepts only updates signed with it. Shipvo never holds your seed, so back it up (see [Moving to a new machine](new-machine.md)).
 
 **Publish token.** A key that lets one machine or CI job publish releases for your app. `shipvo app create` issues a new one and revokes the old one.

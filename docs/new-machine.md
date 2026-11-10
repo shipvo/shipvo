@@ -38,7 +38,13 @@ npx -y @shipvo/cli publish
 
 `keys import` checks the seed against the public key in `shipvo.json` and refuses one that does not match, so you find out now, not when a release is rejected. It writes `.shipvo/seed.txt` with owner-only permissions.
 
-You should see `Signing key for "<your app>" restored to .shipvo/seed.txt (matches shipvo.json).` Check it worked:
+You should see:
+
+```text
+Signing key for "<your app>" restored to .shipvo/seed.txt (matches shipvo.json).
+```
+
+Check it worked:
 
 ```bash
 npx -y @shipvo/cli doctor
