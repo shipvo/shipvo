@@ -1,0 +1,2 @@
+- `@shipvo/spec`: new `parseCsv(text)` expression function reads CSV into a list of maps. New `saveFile` step (needs the `files` device permission) saves text as a named file; `app.files` lists saved files.
+- Migration: none; new function, step and `App.files` property.

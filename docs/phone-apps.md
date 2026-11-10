@@ -118,6 +118,20 @@ Any spec app can turn a collection into CSV with the `csv()` function. Return it
 
 The first line holds the column names. Fields with commas, quotes or line breaks are quoted, and lists such as tags are joined with `; `. Leave the column list out to export every field. Spreadsheets treat a cell that starts with `=`, `+`, `-` or `@` as a formula. For text that other people typed, map the field first, for example `data.entries.map(r, {'note': has(r.note) && r.note.startsWith('=') ? "'" + r.note : (has(r.note) ? r.note : '')})`, then pass that list to `csv()`.
 
+## Save as a file and import CSV
+
+A `saveFile` step keeps text as a named file on the phone. It needs the `files` device permission, on Android and iOS alike. Saving again with the same name replaces the file.
+
+```json
+{ "actions": { "save_diary": { "description": "Save the diary as diary.csv.", "input": {}, "do": [ { "saveFile": "diary.csv", "content": "{{ csv(data.entries, ['date', 'title']) }}", "mime": "text/csv" }, { "toast": "Saved diary.csv" } ] } } }
+```
+
+`parseCsv(text)` reads CSV text (quoted fields, doubled quotes, CRLF or LF, a leading byte-order mark) and returns a list with one map per row, keyed by the header row. Every value is text. Pass the list to an `insert` step or use `.map` to convert numbers. It reads what `csv()` writes.
+
+```json
+{ "actions": { "import_diary": { "description": "Add diary rows from CSV text.", "input": { "text": { "type": "text" } }, "do": [ { "return": "{{ parseCsv(input.text) }}" } ] } } }
+```
+
 ## Arrange the home screen
 
 `arrange_apps { session, id, pinned?, hidden?, position?, schedule? }` places an installed app. Pinned apps come first, then apps by `position` (0 first), then in install order. A hidden app is off the home screen but still installed, and `switch_app` still opens it. A `schedule` (`days`, `from`, `to`, for example Monday to Friday 08:00 to 18:00) shows the app only then. A window that crosses midnight belongs to the day it starts: `days: ["fri"], from: "22:00", to: "06:00"` shows Friday 22:00 until Saturday 06:00. `schedule: null` shows it always. Put a weekly planner on weekdays and weekend plans on Saturday, and the home screen follows the phone's clock.
