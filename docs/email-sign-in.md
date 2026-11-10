@@ -1,6 +1,8 @@
 # Test an email sign-in on Android and iOS
 
-This page is for anyone testing an app that signs in with a code or a link sent by email, whether you write the test yourself or ask an AI assistant to do it. You will get a test or an agent run that requests the email, reads the code, and finishes the sign-in on Android and iOS.
+This page is for developers and for anyone who drives an app with an assistant. You will learn how to finish a sign-in that sends a code or a link by email, in a test or through an agent, without a real mailbox.
+
+Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
 
 Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved. The inbox works the same on the Android and iOS phones.
 
@@ -69,17 +71,6 @@ Agents use three tools. Each takes the `session` from `open_app`.
                   "codes": ["482913"], "links": [], "received_at": "2026-11-10T09:00:00.000Z" } ] }
 ```
 
-## Troubleshooting
-
-| You see | Why | What to do |
-| --- | --- | --- |
-| `inbox_timeout` | No mail matched `subject` or `from` before `timeout` ran out. The message names the address it waited on | Check the app used the address from `inbox.address()`. Call `inbox_read` with no filter to see what did arrive, then loosen the filter. Filters match part of the text and ignore case |
-| `inbox_no_code` | The mail has no standalone 4 to 8 digit number. Raised by `phone.inbox.code()`; `inbox_wait` returns an empty `codes` list instead | Read `text` from `waitFor`. A code inside a longer number or a word is not picked up. Links are not codes: use `links` |
-| Status 550 from `inbox.shipvo.test/send` | The `to` address is not this session's address | Send to the address `inbox.address()` returns. Each session has its own |
-| `session_ended` | The session closed while you were waiting | Open a new session and request the mail again. The inbox does not carry over |
-| An old code is returned | An earlier mail in the same session still matches | Call `inbox_clear` before each sign-in attempt |
-| `bad_timeout` | `timeout_ms` is outside 0 to 25000 | Use a value in that range |
-
 ## Android and iOS
 
 The inbox, the tools and `phone.inbox` are the same on the Android and iOS phones. With MCP, open the session with `platform: "android"` or `platform: "ios"` in `open_app` and follow the same steps.
@@ -88,8 +79,8 @@ The inbox, the tools and `phone.inbox` are the same on the Android and iOS phone
 
 | You see | Cause | Fix |
 | --- | --- | --- |
-| `inbox_timeout` | No mail matched `subject` or `from` before `timeout` ran out | Call `inbox_read` (or `phone.inbox.list()`) to see what arrived. If it is empty, check that the app tapped the send button and that your `mockNetwork` rule has a `mail` field. If mail is there, loosen `subject`. |
-| `inbox_no_code` | The matching mail has no 4 to 8 digit number | Read the mail with `waitFor` and look at `text`. For a link, use `links[0]` instead. |
+| `inbox_timeout` | No mail matched `subject` or `from` before `timeout` (`timeout_ms` in the MCP tool) ran out | Call `inbox_read` (or `phone.inbox.list()`) to see what arrived. If it is empty, check that the app tapped the send button and that your `mockNetwork` rule has a `mail` field. If mail is there, loosen `subject`. |
+| `inbox_no_code` | The matching mail has no 4 to 8 digit number | Read the mail with `waitFor` and look at `text`. A code inside a longer number or a word is not picked up. For a link, use `links[0]` instead. |
 | `bad_timeout` | `timeout_ms` is above 25000 or not a whole number | Use a whole number from 0 to 25000. |
 | `session_ended` | The session closed while you waited | Open the app again. The inbox and its address are new for each session. |
 | Status 550 from `https://inbox.shipvo.test/send` | The `to` address is not this session's address | Send to the address from `inbox_read` or `phone.inbox.address()`. |

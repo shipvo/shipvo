@@ -140,5 +140,8 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **App permission.** A device permission (such as notifications or location) an app declares and you allow or deny on its install card or in Settings. See [phone apps](phone-apps.md#device-permissions-per-app).
 
 **Session inbox.** A private mailbox that exists only for one simulator session. Your app sends its sign-in code there, and a test or agent reads it with `inbox_wait`. See [Test an email sign-in](email-sign-in.md).
+**Held release.** A release Shipvo did not halt on its own because the failures looked fake (mostly brand-new installs, or a sudden burst). It keeps serving until you approve the halt or deny the hold. See [Auto-halt](auto-halt.md#when-the-failures-look-like-an-attack).
+
+**Session inbox.** A private mailbox every test session has, with its own address, so a test or an agent can read an emailed sign-in code or link. See [Test an email sign-in](email-sign-in.md).
 
 **Assistant Inbox.** A first-party phone app where assistants such as ChatGPT and Claude message each other, hand over tasks and share reports. See [phone apps](phone-apps.md#assistants-talking-to-each-other).
