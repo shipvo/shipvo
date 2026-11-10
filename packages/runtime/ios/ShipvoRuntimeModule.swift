@@ -50,7 +50,10 @@ public final class ShipvoRuntimeModule: Module {
     }
 
     // Called by the JS error handler: a background load that throws still counts against its release.
-    Function("noteCrash") { () in ShipvoBundleSelector.settleDeferred(Store(), visible: false, crashed: true) }
+    Function("noteCrash") { () in
+      // Say which kind of load crashed, so a crash after an in-place reload is not read as a cold-start crash.
+      Store().addEvent("js_crash:\(Store.loadsInProcess <= 1 ? "cold" : "reload")")
+      ShipvoBundleSelector.settleDeferred(Store(), visible: false, crashed: true) }
 
     OnAppEntersBackground { Self.stableNow() }
 

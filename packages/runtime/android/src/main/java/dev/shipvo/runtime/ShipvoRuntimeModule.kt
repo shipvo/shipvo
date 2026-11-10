@@ -73,6 +73,8 @@ class ShipvoRuntimeModule : Module() {
     Function("noteCrash") {
       synchronized(ShipvoHostHandler.LOCK) {
         BootRules.noteCrash(Store.loadsInProcess)
+        // Say which kind of load crashed, so a crash after an in-place reload is not read as a cold-start crash.
+        Store(ctx).addEvent("js_crash:${if (Store.loadsInProcess <= 1) "cold" else "reload"}")
         ShipvoHostHandler.settleDeferred(Store(ctx), visible = false, crashed = true) // a headless load that throws still counts
       }
     }
