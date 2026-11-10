@@ -10,7 +10,7 @@ cover: nodes
 kicker: Two agents,|two phones
 ---
 
-Most demos of AI agents on mobile apps show one agent and one screen. We wanted something harder to fake: two agents, two phones, one shared game, and rules the app enforces. So we built chess.
+Most demos of AI agents on mobile apps show one agent and one screen. We wanted two agents, two phones, one shared game, and rules the app enforces. So we built chess.
 
 An Android phone plays white. An iOS phone plays black. Both run the same chess app, side by side in a browser tab, and a move on one shows on the other. You can watch it at [shipvo.dev/demos/chess](/demos/chess/) with nothing to install, and press "Play against it" to take white yourself.
 
@@ -53,7 +53,7 @@ It records the page as one video: both phones, both clocks, the agent names and 
 An agent that is told "wait for your turn" can still try to move out of turn. So the app does not trust it. If black taps a piece first, the screen says:
 
 ```text
-It is white's turn. You play black. Wait for your turn.
+It is white's turn. You play black. Wait for your turn, then call get_board again.
 ```
 
 Nothing moves. The same happens to white after white's move. The game ends on checkmate, stalemate, a draw rule, or a move that takes longer than the move time, and the page shows the result.
@@ -62,12 +62,12 @@ This is the part worth copying for your own app. When an agent tests a flow, the
 
 ## What CI measures
 
-We do not ask you to take the demo on trust. These checks run as part of `pnpm -r test`. We ran the chess unit tests on this branch today: 31 passed across the engine, the move relay and the agent test.
+We do not ask you to take the demo on trust. These checks run as part of `pnpm -r test`. We ran the chess tests in [`apps/chess/test/`](https://github.com/shipvo/shipvo/tree/main/apps/chess/test) on this branch today: 31 passed across the engine, the move relay and the agent test.
 
 - **Move generation is checked against known counts.** The engine reproduces the standard perft numbers from the start position: 20, 400 and 8,902 moves at depths 1, 2 and 3. Castling, en passant, promotion, pins, stalemate and the repetition and 50-move rules each have a test. See `apps/chess/test/engine.test.ts`.
 - **Two scripted MCP clients play fool's mate** (1. f3 e5 2. g4 Qh4#), with no AI involved. Each attaches to its phone with `open_app`. The test checks that black's early move is refused, that white's second move in a row is refused, that both phones show "Checkmate, black wins", and that the move file ends with `1. f3 e5 2. g4 Qh4# 0-1`. See `apps/chess/test/agents.test.ts`.
 - **A side that takes too long loses.** With a 1.5 second move time, the page shows "Time out, black wins" and the move file records a time forfeit.
-- **A full 13-move game plays in Chromium.** `apps/chess/test/demo.test.ts` plays Légal's mate on both phones and checks that a move tapped on the Android phone appears on the iOS phone.
+- **A full 13-move game plays in Chromium.** `apps/chess/test/demo.test.ts` plays Légal's mate on both phones and checks that both phones show the same final position and the same result: "Checkmate, white wins" after 13 moves.
 
 The point of the scripted version is that the plumbing is tested without a language model. When a real pair of agents plays, any trouble is in their play, not in the phones.
 
