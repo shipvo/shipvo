@@ -39,6 +39,8 @@ Updates are interpreted JavaScript running on native capabilities the shell decl
 - **Integrity checks:** SHA-256 and size are verified before a bundle is staged; staging is atomic.
 - **Crash-loop protection:** a release that fails to boot 3 times is discarded automatically, and you can roll back to the previous release in one call.
 - **Staged rollouts:** cohort bands (1%, 10%, everyone) served as static signed pointers from the edge, with no device registry.
+- **Safe rollbacks with stored data:** a release declares a `stateVersion`, and a rollback to an older stored-data format is refused unless you pass `--allow-state-downgrade` ([Rollbacks and stored data](docs/rollbacks-and-stored-data.md)).
+- **Key rotation:** `shipvo keys root` creates an offline root key, and `shipvo keys rotate sign` and `upload` change keys without a new store build; rotations show in `shipvo audit` ([Key rotation](docs/key-rotation.md)).
 - **Telemetry for every release:** applied, reverted, cold-start time, download size and time.
 - **Control plane you can host yourself:** on Cloudflare Workers (KV, D1 and R2) or with Docker (`docker compose up`), with backup and restore commands ([self-hosting](docs/self-hosting.md)).
 - **Admin per app** at `/app/<id>/admin`: live content, prices, offers, orders, history, publish to every phone in seconds; the same typed owner commands are available to agents with a token.
@@ -46,7 +48,9 @@ Updates are interpreted JavaScript running on native capabilities the shell decl
 - **Simulated device:** `@shipvo/device` runs camera, location, biometrics, payments, notifications, share and network on phones (Expo modules) and in the simulator (system sheets in the accessibility tree, state set by the agent). Each capability declares its support level: real, simulated or unavailable.
 - **Shipvo Phone:** `shipvo run android` or `shipvo run ios` opens your app in an Android or iPhone frame in your browser, with live reload, a notification shade, Settings, a Browser app, network profiles and a device panel. No emulator or Xcode needed ([run](docs/run.md)).
 - **Describe an app and it appears:** your assistant calls `create_app` and `update_app` to build a spec app on the phone, then `arrange_apps`, `schedule_app`, `refresh_app` and `app_activity` to place it, time it, refresh its data and read what changed, on Android and iOS ([Describe an app](docs/describe-an-app.md), [Phone apps](docs/phone-apps.md)).
+- **Email sign-in without a mailbox:** every session has a private inbox, so a test or an agent reads the code or magic link and finishes the sign-in on Android and iOS ([Test an email sign-in](docs/email-sign-in.md)).
 - **Assistants talk to each other:** ChatGPT, Claude and others on one phone message each other and hand over tasks in the Assistant Inbox, on Android and iOS ([Phone apps](docs/phone-apps.md#assistants-talking-to-each-other)).
+- **Playground in your browser:** the sample app on an Android or iOS phone, with the device API, signed updates and up to 12 phones in one shareable link, no install ([Playground](docs/playground.md)).
 - **Lumi:** `shipvo lumi android|ios` tests your app while you watch: it walks every screen, reports findings with replay buttons, shows coverage and saves findings as tests ([Lumi](docs/lumi.md)).
 - **Pull request check:** `shipvo ci init --check` runs your tests and an explore pass on every pull request, with before and after screens of Android and iOS in the comment ([PR check](docs/ci-check.md)).
 - **Behaviour timeline:** the app admin compares how each release and pull request behaves on Android and iOS ([timeline](docs/timeline.md)).
