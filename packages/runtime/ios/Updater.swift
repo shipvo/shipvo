@@ -1,10 +1,39 @@
 import Foundation
+#if os(iOS)
+import os
+#endif
 
 struct UpdateError: Error { let message: String; init(_ m: String) { message = m } }
 
 /// Fetch, verify and stage the newest signed release for this device's band. Mirrors Android `check()`.
 /// Uses a bsdiff patch when the pointer lists one from the bundle this device runs (or the app's embedded bundle); any patch problem falls back to the full bundle.
 enum Updater {
+  /// Share of the memory iOS says is available (`os_proc_available_memory()`) that base + patch + output may use together.
+  /// Same share as Android `PatchStep.BUDGET_FRACTION`.
+  static let patchMemoryBudgetFraction = 0.4
+  static let overBudget = "over_memory_budget"
+
+  enum PatchDecision: Equatable { case apply, skip }
+
+  /// Pure: apply the patch only when base + patch + new output fit in the budget. A nil base size (unreadable base) skips.
+  static func patchDecision(baseSize: Int?, patchSize: Int, newSize: Int, availableBytes: Int) -> PatchDecision {
+    guard let baseSize else { return .skip }
+    return Double(baseSize + patchSize + newSize) <= Double(availableBytes) * patchMemoryBudgetFraction ? .apply : .skip
+  }
+
+  /// Bytes the app may still allocate. Tests set `availableMemoryOverride`.
+  static var availableMemoryOverride: Int?
+  static func availableMemory() -> Int {
+    if let o = availableMemoryOverride { return o }
+    #if os(iOS)
+    return Int(os_proc_available_memory())
+    #else
+    return Int(ProcessInfo.processInfo.physicalMemory)
+    #endif
+  }
+  private static func fileSize(_ path: String) -> Int? {
+    (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? Int
+  }
   private static func require(_ cond: Bool, _ msg: @autoclosure () -> String) throws { if !cond { throw UpdateError(msg()) } }
 
   private static func request(_ url: String, etag: String?) throws -> URLRequest {
@@ -75,9 +104,11 @@ enum Updater {
     var via = "full", downloadedBytes = 0
     let d0 = Store.now()
     var ready = false
-    if let patch = try? await patched(s, core: core, wantSha: wantSha, wantSize: wantSize, to: tmp) {
-      ready = true; via = "patch"; downloadedBytes = patch
-    }
+    var patchError: String?
+    do {
+      downloadedBytes = try await patched(s, core: core, wantSha: wantSha, wantSize: wantSize, to: tmp)
+      ready = true; via = "patch"
+    } catch let e as UpdateError where e.message == overBudget { patchError = overBudget } catch {}
     var downloadMs = (Store.now() - d0) * 1000
     var resumedFrom = 0
     if !ready {
@@ -100,6 +131,7 @@ enum Updater {
     try FileManager.default.moveItem(at: tmp, to: dest)
     stage(s, dest: dest, release: release, sha: wantSha, issuedAt: body["issued_at"] as? String, stateVersion: body["state_version"])
     return ["status": "staged", "release": release, "bytes": downloadedBytes, "via": via, "bundleBytes": size,
+            "patchError": patchError ?? NSNull(),
             "downloadMs": Int(downloadMs), "verifyMs": Int(verifyMs), "issuedAt": body["issued_at"] as? String ?? ""]
   }
 
@@ -155,6 +187,12 @@ enum Updater {
           let entry = list.first(where: { $0["from_sha256"] as? String == baseSha }),
           let purl = entry["url"] as? String, let psha = entry["sha256"] as? String, let psize = (entry["size"] as? NSNumber)?.intValue,
           psize > 0, psize < wantSize else { throw UpdateError("no usable patch") }
+    // Memory guard: decide from file sizes alone, before the patch or the base is read, so nothing is allocated when over budget.
+    let basePath = baseFile ?? s.appBundle.url(forResource: "main", withExtension: "jsbundle")?.path
+    guard let baseSize = basePath.flatMap({ fileSize($0) }) else { throw UpdateError("no base bundle") }
+    if patchDecision(baseSize: baseSize, patchSize: psize, newSize: wantSize, availableBytes: availableMemory()) == .skip {
+      s.addEvent("patch_failed"); throw UpdateError(overBudget)
+    }
     do {
       let (data, resp) = try await URLSession.shared.data(for: request(resolve(s, purl), etag: nil))
       try require((resp as? HTTPURLResponse)?.statusCode == 200 && data.count == psize && Verify.sha256Hex(data) == psha, "patch download invalid")
