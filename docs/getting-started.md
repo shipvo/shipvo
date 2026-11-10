@@ -73,6 +73,8 @@ To start from a reader app instead, add `--template content`: a list screen and 
 
 The `shop` template has a checkout a customer expects: plus and minus on each cart line, Undo after Remove, payment errors in plain words (for example "Your payment was declined. Try another method."), a message when the phone is offline, and an order confirmation screen with a Back to shop button. To see it, run `npx shipvo run android` or `npx shipvo run ios`, add a product and open the cart.
 
+Prices in `src/data/products.json` are whole numbers in the smallest unit: write `2400` for `24.00`. If a price looks like it is in the wrong unit, the app prints a `[shop]` warning that says what to write, and `npm test` fails until you fix it ([shop tutorial](tutorials/your-own-shop.md#troubleshooting)).
+
 ## 2. Run it in the simulator
 
 ```bash
