@@ -1,0 +1,2 @@
+- `@shipvo/sim`: the Settings app has a Secrets screen in the Android and iOS skins. It lists each saved key (app, name, domain, access, last used) with Rotate, Revoke and Use log. It shows metadata only, never a key value.
+- Migration: none.
