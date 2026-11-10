@@ -1,6 +1,6 @@
 # Record a demo video
 
-For founders working through an AI assistant. You get a short MP4 of your app with chapter markers, background music and a voice track. This page is a worked example. Options and error codes are in [Record a demo video of the phone](record.md), including the music and narration errors.
+For founders working through an AI assistant. By the end you have a short MP4 of your app with chapter markers, background music and a voice track, and a credit line to publish with it. This page is a worked example. Options and error codes are in [Record a demo video of the phone](record.md), including the music and narration errors.
 
 ## Before you start
 
@@ -78,10 +78,11 @@ duration=0.733
 | --- | --- | --- |
 | `recorder_unavailable` | The tool that films the phone is not installed | Ask your assistant to run `npm i -D playwright && npx playwright install chromium`, then try again |
 | `frame_unreachable` | The phone is not running | Start it with `shipvo sim` or `shipvo run`, then record again |
+| `recording_active` | A recording is already running | Ask the assistant to stop it first |
 | `encode_failed` | `ffmpeg` is missing | Install ffmpeg, then record again |
 | `narration_unreadable` or `music_failed` | The voice file or music step failed | Your silent video is kept. Fix the file path or install `python3`, then add sound again |
 | `music_unavailable` | The music script was not found | Set `SHIPVO_BGMUSIC` to the path of `bgmusic.py`, or leave music out and use narration only |
-| `recording_active` | A recording is already running | Call `record_stop` first, then record again |
+| The video is under a second long | Waits longer than 0.6 s are cut, and steps with no wait are fast | Ask the assistant to tap and scroll through the real screens |
 
 Every error code is explained in [Record a demo video of the phone](record.md#troubleshooting).
 

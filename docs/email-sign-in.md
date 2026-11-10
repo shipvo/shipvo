@@ -1,6 +1,8 @@
 # Test an email sign-in on Android and iOS
 
-Many apps sign in with a code or a link sent by email. Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
+This page is for developers and for anyone who drives an app with an assistant. You will learn how to finish a sign-in that sends a code or a link by email, in a test or through an agent, without a real mailbox.
+
+Every Shipvo session has its own private inbox, so a test or an agent can read that mail and finish the sign-in. Nothing leaves your machine and no outside mail service is involved.
 
 The inbox works the same on the Android and iOS phones.
 
@@ -65,7 +67,7 @@ The inbox, the tools and `phone.inbox` are the same on the Android and iOS phone
 
 | You see | Cause | Fix |
 | --- | --- | --- |
-| `inbox_timeout` | No mail matched `subject` or `from` before `timeout` ran out | Call `inbox_read` (or `phone.inbox.list()`) to see what arrived. If it is empty, check that the app tapped the send button and that your `mockNetwork` rule has a `mail` field. If mail is there, loosen `subject`. |
+| `inbox_timeout` | No mail matched `subject` or `from` before `timeout` (`timeout_ms` in the MCP tool) ran out | Call `inbox_read` (or `phone.inbox.list()`) to see what arrived. If it is empty, check that the app tapped the send button and that your `mockNetwork` rule has a `mail` field. If mail is there, loosen `subject`. |
 | `inbox_no_code` | The matching mail has no 4 to 8 digit number | Read the mail with `waitFor` and look at `text`. For a link, use `links[0]` instead. |
 | `bad_timeout` | `timeout_ms` is above 25000 or not a whole number | Use a whole number from 0 to 25000. |
 | `session_ended` | The session closed while you waited | Open the app again. The inbox and its address are new for each session. |
