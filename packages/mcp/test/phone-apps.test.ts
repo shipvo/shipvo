@@ -25,6 +25,11 @@ beforeAll(async () => {
     seen.push(body);
     const fail = (code: string, error: string) => res.end(JSON.stringify({ ok: false, code, error }));
     const ok = () => res.end(JSON.stringify({ ok: true, screen: `Home screen\ninstalled: ${[...installed.keys()].join(",")} current: ${current}` }));
+    if (body.action === "find_apps") {
+      const { findApps } = await import("../../sim/apps.mjs");
+      const { query, country, language, currency, limit } = body;
+      return res.end(JSON.stringify({ ok: true, apps: findApps(body.catalog ?? [], { query, country, language, currency, limit }, [...installed.keys()]) }));
+    }
     if (body.action === "install_app") {
       const app = (body.catalog ?? []).find((a: any) => a.id === body.id);
       if (!app) return fail("unknown_app", "no such app");
@@ -74,7 +79,7 @@ describe("phone app tools", () => {
     await c.close();
     const f = await connect({ PN_STORE_FIXTURE: "1" });
     const ok = await call(f, "list_store_apps");
-    expect(ok.structuredContent.apps.map((a: any) => a.id)).toEqual(["tide", "notes", "weather"]);
+    expect(ok.structuredContent.apps.map((a: any) => a.id)).toEqual(["tide", "notes", "weather", "splitly"]);
     await f.close();
   });
   it("install, switch and uninstall return typed codes", async () => {
@@ -117,5 +122,26 @@ describe("phone app tools", () => {
     const r = await call(c, "list_store_apps");
     expect(r.structuredContent.apps.map((a: any) => a.url)).toEqual(["app://tide@r13", "app://fresh@latest"]);
     await c.close(); cp.close();
+  });
+});
+
+describe("find_apps", () => {
+  it("is store_unreachable when the Store cannot be reached", async () => {
+    const c = await connect();
+    const r = await call(c, "find_apps", { session: "s1", query: "split bills" });
+    expect(r.isError).toBe(true); expect(r.structuredContent.code).toBe("store_unreachable");
+    await c.close();
+  });
+  it("sends the fixture catalog to the phone and returns the best match first", async () => {
+    const c = await connect({ PN_STORE_FIXTURE: "1" });
+    const r = await call(c, "find_apps", { session: "s-find", query: "split bills" });
+    expect(r.isError).toBeFalsy();
+    expect(r.structuredContent.apps[0].id).toBe("splitly");
+    const sent = seen.filter((b: any) => b.action === "find_apps").at(-1);
+    expect(sent.catalog.map((a: any) => a.id)).toContain("splitly");
+    const usd = await call(c, "find_apps", { session: "s-find", query: "split bills", currency: "USD" });
+    expect(usd.isError).toBeFalsy();
+    expect(usd.structuredContent.apps.map((a: any) => a.id)).not.toContain("splitly");
+    await c.close();
   });
 });

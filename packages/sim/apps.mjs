@@ -84,6 +84,38 @@ export function installApp(st, id, catalog = st.store, real) {
   note(st, "install_app", id, real ? { source: "real", sha256: real.sha256, bytes: real.bytes } : undefined); return st;
 }
 
+const words = (v) => String(v ?? "").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+const list = (v) => (Array.isArray(v) ? v : v == null ? [] : [v]).map((x) => String(x).toLowerCase());
+
+/**
+ * Search Store apps by need. `catalog` is the marketplace list; each app may declare description, tags, countries, languages
+ * and currencies. Matching is case-insensitive and word based over name, description and tags: every query word must appear,
+ * name hits count most. A filter drops an app only when the app declares that field and it does not include the value.
+ * Returns up to `limit` (default 10, max 25) of { id, name, description, version, installed }, best match first, then name.
+ */
+export function findApps(catalog, { query = "", country, language, currency, limit = 10 } = {}, installed = []) {
+  const q = words(query);
+  const n = Math.min(25, Math.max(1, Math.floor(Number(limit)) || 10));
+  const have = new Set(installed.map((a) => (typeof a === "string" ? a : a.id)));
+  const filters = [["countries", country], ["languages", language], ["currencies", currency]].filter(([, v]) => v);
+  const rows = [];
+  for (const a of catalog ?? []) {
+    if (!filters.every(([k, v]) => { const d = list(a[k]); return !d.length || d.includes(String(v).toLowerCase()); })) continue;
+    const nameW = new Set(words(a.name)), descW = new Set(words(a.description)), tagW = new Set(list(a.tags).flatMap(words));
+    let score = 0, ok = true;
+    for (const w of q) {
+      const hit = (set) => [...set].some((x) => x.startsWith(w));
+      const s = (hit(nameW) ? 3 : 0) + (hit(tagW) ? 2 : 0) + (hit(descW) ? 1 : 0);
+      if (!s) { ok = false; break; }
+      score += s;
+    }
+    if (!ok || (q.length && !score)) continue;
+    rows.push({ score, id: a.id, name: a.name || a.id, description: String(a.description ?? "").split(/(?<=[.!?])\s/)[0], version: a.version, installed: have.has(a.id) });
+  }
+  rows.sort((x, y) => y.score - x.score || String(x.name).localeCompare(String(y.name)));
+  return rows.slice(0, n).map(({ score, ...r }) => r);
+}
+
 /** Remove an app. If it was in front, the phone goes home and current_app is empty. Throws not_installed. */
 export function uninstallApp(st, id, nav) {
   if (!st.installed_apps.some((a) => a.id === id)) throw new AppsError("not_installed", `'${id}' is not installed`);
