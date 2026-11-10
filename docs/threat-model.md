@@ -69,9 +69,18 @@ The release key is the seed that `shipvo publish` signs with. Apps built with `r
 
 To replace a lost or leaked release key:
 
-1. Run `shipvo keygen --out new-seed.txt`. It writes the new seed and prints its public key. Move the seed to `.shipvo/seed.txt` or your CI secret once the rotation is live.
-2. Run `shipvo keys rotate sign` with the root seed and `--new-key <the public key>`. It prints a statement signed by the root key that names the new release key, a `sequence` and a `validFrom` time. `--valid-from` defaults to now, which is what an emergency needs.
-3. Run `shipvo keys rotate upload` as a signed-in owner. The control plane checks the root signature and hands the statement out with the pointer. It only passes the statement on. Each phone checks it again.
+1. Run `shipvo keygen --out new-seed.txt`. It writes the new seed and prints its public key.
+2. Sign a statement with the root key. `--sequence` must be above every statement you signed before (1 for the first). `--valid-from` defaults to now, which is what an emergency needs. `sign` prints to stdout, so save the output:
+
+   ```bash
+   npx -y @shipvo/cli keys rotate sign \
+     --root-seed-file root-seed.txt \
+     --new-key <the public key> \
+     --sequence 1 > rotation.json
+   ```
+
+   The statement is signed by the root key and names the new release key, the `sequence` and a `validFrom` time.
+3. Upload the file as a signed-in owner (`upload` refuses tokens): `npx -y @shipvo/cli keys rotate upload rotation.json`. The control plane checks the root signature and hands the statement out with the pointer. It only passes the statement on. Each phone checks it again.
 4. The Android and iOS runtimes check the root signature, the app id, and that the `sequence` is higher than the one they hold. When the phone's clock reaches `validFrom`, they switch to the new release key. From then on the leaked release key signs nothing the phone accepts.
 
 What a thief with only the release key can do: sign releases until each phone has the statement and has reached `validFrom`. A publish token or an agent token cannot make a statement, because phones check the root signature.
