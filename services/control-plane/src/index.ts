@@ -9,7 +9,7 @@ import { auth } from "./auth";
 import { sso } from "./sso";
 import { samlRoutes } from "./saml-routes";
 import { rotationRoutes } from "./rotation";
-import { listRotations, listRotationLog } from "./rotation-store";
+import { listRotations, listRotationLogBetween } from "./rotation-store";
 import { vaultRoutes } from "./vault";
 import { peopleRoutes } from "./people";
 import { phoneRoutes } from "./phone";
@@ -629,12 +629,16 @@ app.get("/audit/:app", async (c) => {
     `SELECT id, app_id, at, actor, actor_kind, action, release, release_id, before, after FROM audit_log WHERE app_id = ?${bq !== undefined ? " AND id < ?" : ""} ORDER BY id DESC LIMIT ?`,
   ).bind(...(bq !== undefined ? [appId, Number(bq), n] : [appId, n])).all();
   const plain = (results ?? []) as Record<string, unknown>[];
-  // Key rotation uploads are kept in key_rotation_log. The first page also carries the ones inside its time span, with negative ids so they never clash with audit_log ids.
-  // `limit` caps the audit_log rows. A full page stops at its oldest row's time; a short page is the end of the log, so it carries every rotation row.
+  // Key rotation uploads are kept in key_rotation_log. Each page also carries the rotation rows inside its time span, with negative ids so they never clash with audit_log ids.
+  // A page covers [its oldest row's time, the previous page's oldest row's time). The first page has no upper bound; a short page is the end of the log, so it has no lower bound.
   // Both tables write `at` with new Date().toISOString() (audit.ts, rotation-store.ts), so the strings compare in time order.
   const oldest = plain.length >= n ? String(plain[plain.length - 1].at) : undefined;
-  const rot = bq !== undefined ? [] : (await listRotationLog(c.env.DB, appId, 200))
-    .filter((r) => oldest === undefined || !(r.at < oldest))
+  let until: string | undefined;
+  if (bq !== undefined) {
+    const prev = await c.env.DB.prepare("SELECT at FROM audit_log WHERE app_id = ? AND id = ?").bind(appId, Number(bq)).first();
+    until = prev ? String((prev as { at: string }).at) : undefined;
+  }
+  const rot = (await listRotationLogBetween(c.env.DB, appId, oldest, until))
     .map((r) => ({
       id: -r.id, app_id: r.app_id, at: r.at, actor: r.actor, actor_kind: r.actor_kind, action: "key-rotation",
       release: null, release_id: null, before: null, after: { sequence: r.sequence, valid_from: r.valid_from },

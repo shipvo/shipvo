@@ -12,11 +12,17 @@ function mkDb(rows: any[], tokens: Record<string, string> = {}, rotLog: any[] = 
     first: async () => {
       if (sql.includes("FROM publish_tokens")) return tokens[args[0] as string] === args[1] ? { id: 1, expires_at: null } : null;
       if (sql.includes("FROM apps")) return { public_key: "k", bytes_used: 0 };
+      if (sql.includes("SELECT at FROM audit_log")) return rows.find((x) => x.app_id === args[0] && x.id === args[1]) ?? null;
       return null;
     },
     all: async () => {
       calls.push({ sql, args });
-      if (sql.includes("key_rotation_log")) return { results: rotLog.filter((x) => x.app_id === args[0]) };
+      if (sql.includes("key_rotation_log")) {
+        let i = 1;
+        const from = sql.includes("at >= ?") ? (args[i++] as string) : undefined;
+        const until = sql.includes("at < ?") ? (args[i++] as string) : undefined;
+        return { results: rotLog.filter((x) => x.app_id === args[0] && (from === undefined || x.at >= from) && (until === undefined || x.at < until)).sort((a, b) => b.id - a.id) };
+      }
       let r = rows.filter((x) => x.app_id === args[0]);
       if (sql.includes("id < ?")) r = r.filter((x) => x.id < (args[1] as number));
       r = r.sort((a, b) => b.id - a.id).slice(0, args[args.length - 1] as number);
@@ -81,7 +87,7 @@ describe("GET /audit/:app", () => {
     expect(body.rows.every((x: any) => x.app_id === "tide")).toBe(true);
     expect(JSON.stringify(body)).not.toContain(key);
   });
-  it("merges key rotation log rows into the first page only", async () => {
+  it("merges key rotation log rows by page time span", async () => {
     const { DB } = mkDb(mk(2, "tide").map((x, i) => ({ ...x, at: `2026-01-0${i + 1}` })), {}, [{ id: 4, app_id: "tide", at: "2026-01-05", actor: "ann", actor_kind: "person", sequence: 2, valid_from: "2026-01-05" }, { id: 1, app_id: "other", at: "2026-01-06", actor: "x", actor_kind: "person", sequence: 1, valid_from: "v" }]);
     const env = { DB, POINTERS: {} as any, OWNER_TOKEN: "tok" } as any;
     const H = { authorization: "Bearer tok" };
@@ -187,6 +193,14 @@ describe("audit on publish", () => {
       const rows = at(mk(3, "tide"), ["2026-01-01T00:00:00Z", "2026-01-03T00:00:00Z", "2026-01-05T00:00:00Z"]);
       const out = await call(rows, [rl(2, "2026-01-06T00:00:00Z"), rl(1, "2026-01-02T00:00:00Z")], "?limit=1");
       expect(out.map((x) => x.id)).toEqual([-2, 3]);
+    });
+    it("a rotation row older than the first page appears on a later page, once", async () => {
+      const rows = at(mk(4, "tide"), ["2026-01-01T00:00:00Z", "2026-01-03T00:00:00Z", "2026-01-05T00:00:00Z", "2026-01-07T00:00:00Z"]);
+      const rot = [rl(1, "2026-01-02T00:00:00Z"), rl(2, "2026-01-06T00:00:00Z")];
+      const p1 = await call(rows, rot, "?limit=2");
+      const p2 = await call(rows, rot, "?limit=2&before=3");
+      expect(p1.map((x) => x.id)).toEqual([4, -2, 3]);
+      expect(p2.map((x) => x.id)).toEqual([2, -1, 1]);
     });
     it("a short page carries every rotation row, interleaved by time", async () => {
       const rows = at(mk(3, "tide"), ["2026-01-01T00:00:00Z", "2026-01-03T00:00:00Z", "2026-01-05T00:00:00Z"]);

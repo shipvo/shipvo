@@ -16,10 +16,10 @@ export async function signingKey(argv: string[]) {
   if (sub === "root") {
     // New command only: makes the offline root key. It never touches the release seed and needs no shipvo.json.
     if (!a.out || a.out === "true") { console.error("Usage: shipvo keys root --out <file>   (writes the new root seed to a file; keep it offline)"); process.exit(2); }
-    if (existsSync(a.out)) { console.error(`${a.out} already exists. Refusing to overwrite a root seed.`); process.exit(1); }
     const rs = b64(randomBytes(32));
-    try { writeFileSync(a.out, rs + "\n", { mode: 0o600 }); }
-    catch (e) { console.error(`Could not write ${a.out}: ${(e as NodeJS.ErrnoException).code === "ENOENT" ? "the folder does not exist. Create it first." : (e as Error).message}`); process.exit(1); }
+    try { writeFileSync(a.out, rs + "\n", { mode: 0o600, flag: "wx" }); }
+    catch (e) { if ((e as NodeJS.ErrnoException).code === "EEXIST") { console.error(`${a.out} already exists. Refusing to overwrite a root seed.`); process.exit(1); }
+      console.error(`Could not write ${a.out}: ${(e as NodeJS.ErrnoException).code === "ENOENT" ? "the folder does not exist. Create it first." : (e as Error).message}`); process.exit(1); }
     try { chmodSync(a.out, 0o600); } catch {}
     console.error(`Root seed written to ${a.out}. Move it to offline storage and delete this file from this machine. Never put it in CI.`);
     console.log(`Root public key (not secret): ${pub(rs)}`);

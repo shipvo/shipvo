@@ -54,3 +54,10 @@ export async function listRotationLog(db: any, appId: string, limit = 50): Promi
     .bind(appId, Math.min(Math.max(1, limit), 200)).all();
   return (r.results ?? []) as RotationLogRow[];
 }
+
+/** Rotation log rows with `from <= at < until` (either bound optional), newest first. No row limit: the log only grows on rotation uploads. */
+export async function listRotationLogBetween(db: any, appId: string, from?: string, until?: string): Promise<RotationLogRow[]> {
+  const r = await db.prepare(`SELECT id, app_id, at, actor, actor_kind, sequence, valid_from FROM key_rotation_log WHERE app_id = ?${from !== undefined ? " AND at >= ?" : ""}${until !== undefined ? " AND at < ?" : ""} ORDER BY id DESC`)
+    .bind(...[appId, ...(from !== undefined ? [from] : []), ...(until !== undefined ? [until] : [])]).all();
+  return (r.results ?? []) as RotationLogRow[];
+}
