@@ -204,6 +204,12 @@ Owner rules, in `shipvo.json` or (for the control plane) with the `set_agent_pol
 - The `shipvo.json` read by `@shipvo/mcp` (from `PN_APP_DIR` or the current folder) can only make the rules stricter than the control plane's.
 - The signed-in admin at `/app/<id>/admin` is not gated: the confirm step is for agents holding the owner token.
 
+## Slow tools and tracing
+
+`publish_preview` and `upload_build` can take longer than a client waits for one call. They take `wait_ms` (default 20000) and return `{ status: "running", job }` if the work is not done. Call `job_status { job, wait_ms? }` until it returns `done` or `failed`. Calling the tool again while the job runs returns the same job. Details: [CLI guide](cli.md).
+
+If your client sends a W3C `traceparent` in the tool call's `_meta`, Shipvo records the trace id in the session's tool-call log, in `export_test` output and in `shipvo eval` run records, and echoes `traceparent` in the result `_meta`. `baggage` is never logged.
+
 ## Grading an agent
 
 `end_session` returns what the app actually sent to its backend, not what the agent says it did. `shipvo eval run` scores any agent or model that way: success per check, steps, time, errors and retries. See [Score an agent on an app task](eval.md). Earlier results: [agent-gate-results.md](agent-gate-results.md).
@@ -238,4 +244,5 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 - [Turn a session into a test](#turn-a-session-into-a-test) and [Test your app in CI](testing.md).
 - [Score an agent on an app task](eval.md).
 - [Run on a phone](run.md): watch the assistant work in your browser.
+- [The playground](playground.md): run `screen`, `tap` and `type` in your browser, no install.
 - [Phone apps](phone-apps.md): Settings, Browser, Store and updates on Shipvo Phone.

@@ -93,3 +93,9 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Playground: device API and over-the-air update panels in the browser | [getting-started](getting-started.md#try-it-in-your-browser-first) | | | |
 | `shipvo store policy` (privacy policy from what the app does) | [store](store.md) | | | |
 | `shipvo sim` and `shipvo preview` open a Capacitor project | [capacitor](capacitor.md#see-it-in-the-simulator) | | | |
+| The playground: update, device, agent and many-phones panels with shareable links | [playground](playground.md) | | | |
+| Slow tools return a job (`job_status`, `wait_ms`) and `traceparent` is recorded | [agents](agents.md#slow-tools-and-tracing) | | | |
+| Saved keys: list, rotate, revoke and use log | [spec-blocks](spec-blocks.md#manage-saved-keys) | | | |
+| Key rotation statements in the release pointer | [key-rotation](design/key-rotation.md) | | | |
+| `pin_app`, `hide_app`, and export or import of a phone's apps | [phone-apps](phone-apps.md) | | | |
+| `find_apps`, `create_app` and `update_app` | [phone-apps](phone-apps.md) | | | |

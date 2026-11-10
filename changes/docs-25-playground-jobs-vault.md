@@ -1,0 +1,1 @@
+- docs: new page "The playground" (panels, agent console, Many phones link parameters, troubleshooting); Agents covers `job_status` and `traceparent`; App spec covers managing saved keys; glossary and Shipped list updated.

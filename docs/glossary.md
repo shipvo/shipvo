@@ -98,3 +98,9 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Right-to-left (RTL).** Languages such as Arabic and Hebrew that read from right to left. A spec with `strings` for that language lays out right to left. See [App spec](spec-blocks.md#translations-and-right-to-left).
 
 **Playground.** The page at shipvo.dev/playground where a sample app runs on an Android phone and an iPhone in your browser, so you can try Shipvo before you install it.
+
+**Job (slow tool).** When `publish_preview` or `upload_build` take longer than `wait_ms`, they return a job id instead of a result. You read it with `job_status`. See [Agents](agents.md#slow-tools-and-tracing).
+
+**Traceparent.** A standard header value that carries a trace id from your tool into the logs of every system a request touches. Shipvo records it in the tool-call log. See [Agents](agents.md#slow-tools-and-tracing).
+
+**Rotation statement.** A signed note that says a release signing key has been replaced. The release pointer lists up to 8 of them so phones can follow the change. See [key rotation](design/key-rotation.md).

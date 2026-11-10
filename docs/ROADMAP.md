@@ -82,6 +82,19 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: Network profiles on the phone: `set_network_profile`, `setNetwork` in tests and `network` in `phone.json` ([Phone network](phone-network.md), #1338)
+- 2026-11-10: The release pointer carries up to 8 key rotation statements ([Key rotation](design/key-rotation.md), #1336)
+- 2026-11-10: Saved keys: list, rotate, revoke and use log in Settings, with four control-plane vault routes ([App spec](spec-blocks.md#manage-saved-keys), #1298, #1334)
+- 2026-11-10: `pin_app` and `hide_app` arrange the phone's home screen; a phone's spec apps and data can be exported and imported ([Phone apps](phone-apps.md), #1330, #1329)
+- 2026-11-10: `find_apps` searches the Store by need, country, language and currency ([Phone apps](phone-apps.md), #1315)
+- 2026-11-10: Playground Many phones with shareable links, 1 to 12 Android and iOS phones ([Playground](playground.md#many-phones), #1323, #1335)
+- 2026-11-09: Playground Agent panel with a tool console and Watch Lumi ([Playground](playground.md#run-an-agent-tool), #1290)
+- 2026-11-09: `publish_preview` and `upload_build` return a job you read with `job_status` ([Agents](agents.md#slow-tools-and-tracing), #1314)
+- 2026-11-09: `create_app` builds an app from a description and `update_app` edits it in place ([Phone apps](phone-apps.md), #1301, #1302)
+- 2026-11-09: App install is real and shares Store state with the MCP tools ([Phone apps](phone-apps.md), #1283)
+- 2026-11-09: MCP records a W3C `traceparent` from tool calls ([Agents](agents.md#slow-tools-and-tracing), #1288)
+- 2026-11-09: `POST /session` opens a `build_url` and replies with the build id ([Test your build](test-your-build.md), #1287)
+- 2026-11-09: The hosted MCP accepts Client ID Metadata Documents for sign-in ([Agents](agents.md), #1286)
 - 2026-11-08: Wallet, Calendar, Files and Photos, and Shop first-party spec apps ([Phone apps](phone-apps.md#first-party-apps), #1275, #1252, #1299, #1300)
 - 2026-11-08: App spec `vector` block, `motion`, translations, locale formatting and right-to-left ([App spec](spec-blocks.md#vector-drawings), #1271, #1274)
 - 2026-11-08: Playground Device API and over-the-air update panels, Android and iOS ([Getting started](getting-started.md#try-it-in-your-browser-first), #1276, #1278)

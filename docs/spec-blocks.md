@@ -215,6 +215,10 @@ A data source can call a service with a key you saved once in the secret form. T
 | `secret_revoked` | The key was revoked. | Save it again; saving clears the revocation. |
 | `secret_domain` | The key is saved for a different service than the URL's host. No request was sent. | Save the key for this domain, or fix the URL. |
 
+### Manage saved keys
+
+The Settings app lists the keys you saved, with metadata only (the key itself is never shown). You can rotate a key, revoke it and read its use log. The control plane serves these as `GET /vault/keys?app=`, `POST /vault/keys/:app/:name/rotate`, `DELETE /vault/keys/:app/:name` and `GET /vault/keys/:app/:name/uses`. The use log returns only your own rows. After a revoke, `GET /vault/status/:app/:name` returns `saved: false`, and a source that uses the key returns `secret_revoked` until you save it again. The simulator forwards the four routes under `/vault-ui/*` for the Settings app, on loopback and same-origin only, and keeps the owner token on the server.
+
 ## Errors you may see
 
 `validate` returns the JSON path and a fix for each error.
