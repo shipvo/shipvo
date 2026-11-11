@@ -51,7 +51,8 @@ export function containsKeyShapedText(text: string): boolean {
   return false;
 }
 
-const MAX_DEPTH = 8;
+// App specs nest screens, sections and actions about a dozen levels deep; 64 covers any real input and still bounds the walk.
+const MAX_DEPTH = 64;
 // Yields every string value and every object key. Past MAX_DEPTH it yields a marker that inputHasKey treats as a hit (fails closed).
 const TOO_DEEP = Symbol("too deep");
 function* strings(v: unknown, depth = 0): Generator<string | typeof TOO_DEEP> {

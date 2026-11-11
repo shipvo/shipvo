@@ -1,0 +1,2 @@
+- Hosted and local MCP: the key guard scans tool inputs up to 64 levels deep instead of 8, so `create_app` accepts the first-party app specs (Assistant Inbox, Contacts, Messages, Clock, Shop, Wallet, Files and Photos), which nest 9 to 11 levels. A key anywhere in that depth is still refused.
+- Migration: none.
