@@ -38,7 +38,7 @@ describe("the Assistant Inbox widget (MCP Apps)", () => {
       if (m.method === "ui/message") posted.push(m.params!.content![0].text);
       if (m.id != null) queueMicrotask(() => onMessage({ data: { jsonrpc: "2.0", id: m.id, result: {} } }));
     } };
-    const window = { parent, addEventListener: (_: string, f: typeof onMessage) => { onMessage = f; } };
+    const window = { parent, addEventListener: (type: string, f: typeof onMessage) => { if (type === "message") onMessage = f; } };
     const document = { getElementById: (id: string) => (els[id] ??= el()), documentElement: { scrollHeight: 100 } };
     vm.runInNewContext(script, { window, document, setInterval: () => 0, setTimeout: () => 0, queueMicrotask, Date, Map, Set, Array, String, Error, Promise });
     const msg = (id: number, from: string, to: string) => ({ id, from, to, body: `hi ${id}`, read: false, sent_on: "now" });
@@ -55,5 +55,24 @@ describe("the Assistant Inbox widget (MCP Apps)", () => {
     for (let i = 10; i < 40; i++) { all.push(msg(i, "Gemini", "anyone")); view(all); await tick(); }
     expect(posted).toHaveLength(20);
     expect(els.note.textContent).toMatch(/paused/);
+  });
+
+  it("in ChatGPT, uses window.openai to read the first result, poll and post", async () => {
+    const html = ((await c.readResource({ uri: URI })).contents[0] as { text: string }).text;
+    const script = /<script>([\s\S]*)<\/script>/.exec(html)![1];
+    const el = () => ({ textContent: "", innerHTML: "", hidden: false, checked: true, onclick: null, setAttribute() {} });
+    const els: Record<string, ReturnType<typeof el>> = {};
+    const msg = (id: number) => ({ id, from: "gemini", to: "chatgpt", body: `hi ${id}`, read: false, sent_on: "now" });
+    let inbox = [msg(1)]; const prompts: string[] = []; const calls: unknown[] = []; let tick: () => Promise<void> = async () => {};
+    const openai = { toolInput: { session: "team-1" }, toolOutput: { session: "team-1", me: "chatgpt", messages: inbox, tasks: [] },
+      callTool: async (name: string, args: unknown) => { calls.push([name, args]); return { structuredContent: { session: "team-1", me: "chatgpt", messages: inbox, tasks: [] } }; },
+      sendFollowUpMessage: async ({ prompt }: { prompt: string }) => { prompts.push(prompt); } };
+    const window = { openai, parent: { postMessage() {} }, addEventListener() {} };
+    const document = { getElementById: (id: string) => (els[id] ??= el()), documentElement: { scrollHeight: 100 } };
+    vm.runInNewContext(script, { window, document, setInterval: (f: () => Promise<void>) => { tick = f; return 0; }, setTimeout: () => 0, queueMicrotask, Date, Map, Set, Array, String, Error, Promise });
+    expect(els.who.textContent).toBe("you are chatgpt");                 // drawn from toolOutput before any poll
+    inbox = [msg(1), msg(2)]; await tick(); await new Promise((r) => setTimeout(r, 5));
+    expect(calls).toEqual([["inbox_view", { session: "team-1" }]]);
+    expect(prompts).toHaveLength(1); expect(prompts[0]).toContain('a message from gemini: "hi 2"');
   });
 });
