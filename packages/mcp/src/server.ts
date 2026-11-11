@@ -168,25 +168,28 @@ async function withBanner(out: unknown, sid: unknown, agent: string | undefined)
   const content = [{ ...first, text: `${banner}\n${first.text}` }, ...(out as { content: unknown[] }).content.slice(1)];
   return { ...(out as object), content };
 }
+// The client name the hosting service attached to a server built for one stateless request (see clientName in makeServer).
+const hostedClient = new WeakMap<McpServer, string>();
 const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: ToolCallback<S>) => {
+  const clientName = (): string | undefined => server.server.getClientVersion()?.name ?? hostedClient.get(server);
   const guarded = async (args: unknown, extra: unknown) => {
     const trace = traceFromMeta((extra as { _meta?: unknown } | undefined)?._meta);
     const entry = (): CallEntry => ({ tool: t.name, at: new Date().toISOString(), ...(trace ? { traceId: trace.traceId } : {}) });
     const sid = (args as { session?: unknown } | undefined)?.session;
     const log = typeof sid === "string" ? callLog.get(sid) : undefined;
     if (log) { log.push(entry()); if (log.length > 1000) log.splice(0, log.length - 1000); }
-    let out: unknown = inputHasKey(args) ? keyRefusal() : await caller.run(server.server.getClientVersion()?.name, () => (cb as (a: unknown, e: unknown) => unknown)(args, extra));
+    let out: unknown = inputHasKey(args) ? keyRefusal() : await caller.run(clientName(), () => (cb as (a: unknown, e: unknown) => unknown)(args, extra));
     if (t.name === "open_app") {
       // The session id is only known once the call returns.
       const opened = /^session: (\S+)/.exec((out as { content?: { text?: string }[] })?.content?.[0]?.text ?? "")?.[1];
       if (opened && sessions.has(opened)) callLog.set(opened, [entry()]);
     }
-    out = await withBanner(out, sid, server.server.getClientVersion()?.name);
+    out = await withBanner(out, sid, clientName());
     return trace && out && typeof out === "object" ? { ...out, _meta: { ...((out as { _meta?: object })._meta ?? {}), traceparent: trace.traceparent } } : out;
   };
   return server.tool(t.name, t.description, t.input, t.annotations, guarded as unknown as ToolCallback<S>);
 };
-type Ctx = { remote?: boolean; key?: string; app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string; local?: boolean };
+type Ctx = { remote?: boolean; client?: string; key?: string; app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string; local?: boolean };
 /** The package version, read from package.json next to dist/ so it never drifts from the published one. */
 const SERVER_VERSION: string = (() => { try { return JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version ?? "0.0.0"; } catch { return "0.0.0"; } })();
 // MCP 2026-07-28 caching hint on tools/list. The list depends on the per-request scope headers, so it is private to the caller.
@@ -205,12 +208,16 @@ const jobReply = (v: JobView<Done>) =>
 const codedError = (code: string, message: string) => Object.assign(new Error(message), { code });
 function makeServer(ctx: Ctx = {}) {
 const principal = ctx.key ?? "local";
+// The calling assistant: the name its client sent with initialize, or, on stateless HTTP where tool calls arrive without
+// it, the name the hosting service attached from the caller's key (x-shipvo-client).
+const clientName = (): string | undefined => server.server.getClientVersion()?.name ?? (ctx.client || undefined);
 const server = new McpServer({ name: "shipvo", version: SERVER_VERSION }, { instructions:
 `You can use Shipvo apps the way a person uses them on a phone, without a phone.
 Call open_app to get a session and the first screen. The screen is an accessibility tree: every button, field and text, with a [ref=eN]. Act with tap/type/scroll/back using refs, and read the screen that comes back each time.
 Only what is on screen is listed, like a phone: a horizontal product rail shows a few items, so "scroll right" on the rail (its ref) to see more; "scroll down" the page for the rest.
 System sheets (permission dialogs, the camera, the fingerprint prompt, payment prompts, notification banners, the share sheet) appear in the tree like any other screen: answer them by tapping, as a person would. Use set_device to decide what the phone has (a barcode in front of the camera, a location, whether the fingerprint matches, whether the payment is approved, network off) before the app asks for it.
 Finish a task by checking the final screen says what you expected (for example "Order placed"). Call end_session when done to get a report.` });
+if (ctx.client) hostedClient.set(server, ctx.client);
 
 // ctx.app: the app(s) this key opens, comma-separated (the beta app plus any the key owner has registered).
 const keyApps = ctx.app ? ctx.app.split(",").map((s) => s.trim()).filter(Boolean) : null;
@@ -227,7 +234,7 @@ use(server, tools.list_apps, async ({ query }) => {
   return text((lines.join("\n") || `no apps match "${query}"`) + phone);
 });
 
-const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, room }: { app: string; room?: string; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always"; platform?: "android" | "ios"; show?: boolean }) => {
+const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, room, restart }: { app: string; room?: string; restart?: boolean; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always"; platform?: "android" | "ios"; show?: boolean }) => {
   let id = app.split("@")[0];
   const buildId = /^[^@]+@build:([A-Za-z0-9_-]+)$/.exec(app)?.[1];
   const headlessOnly = attach === "never" || show === false;
@@ -255,11 +262,32 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, 
       }
     }
   }
+  let missingOn: string | null = null; let open: { session: string; release?: string | number; room?: string | null; skin?: string } | undefined;
+  if (ctx.scope === "read" && session) throw new Error("this key is read-only: it cannot open sessions");
+  // A session that is already open is reused, not started over: other assistants on this phone keep their apps and data.
+  if (session && !restart && !buildId && !live) {
+    open = ((await sim("/sessions", {})) as Act & { sessions?: { session: string; release?: string | number; room?: string | null; skin?: string }[] }).sessions?.find((s) => s.session === session);
+    if (open) {
+      const phone = await act({ session: session, action: "phone_apps" }) as Act & { current_app?: string; installed_apps?: { id: string }[] };
+      if (phone.ok !== false && phone.current_app !== id) {
+        if (!phone.installed_apps?.some((a) => a.id === id)) missingOn = session;
+        else { const sw = await act({ session: session, action: "switch_app", id }); if (sw.ok === false) return result(session, sw); }
+      }
+      if (!missingOn) {
+      const r = await act({ session: session, action: "screen" });
+      if (r.ok === false) return result(session, r);
+      if (!sessions.has(session)) { sessions.set(session, { app: id, steps: 0, startedAt: Date.now(), room: open.room ?? undefined, client: clientName(), platform: ctx.remote ? (open.skin as "android" | "ios" | undefined) ?? "android" : "headless" }); steps.set(session, [{ action: "open" }]); }
+      if (r.screen != null) trees.set(session, r.screen);
+      return text(`session: ${session}\napp: ${id} release: ${open.release ?? "local"}\nmode: reused the open session (its apps and data are kept; restart: true starts it over)\nvisible: no\n\n${r.screen ?? ""}`);
+      }
+    }
+  }
   // The key's app list always applies. A live run only replaces the "simulator knows this app" check.
   if (keyApps && !keyApps.includes(id)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
   if (!keyApps && !live && !(await localApps())[id]) return result("", { ok: false, code: "unknown_app", error: `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
+  if (missingOn) return result(sid, { ok: false, code: "not_installed", error: `session ${sid} is open and has no "${id}" app. Install it with install_app, or pass restart: true to start ${sid} over with ${id} (its other apps and data are lost).` });
   const mode = attach ?? "auto";
   if (mode === "always" && !live) return result("", { ok: false, code: "no_live_run", error: `no live shipvo run for "${id}" found in this directory or its parents (.shipvo/run.json missing, stale, or for another app). Start \`shipvo run android\` or \`shipvo run ios\`, or use attach: "auto".` });
   let attachNote = launchNote;
@@ -280,7 +308,7 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, 
       const r = await act({ session: sid, action: "screen" });
       if (!r.ok) { attached.delete(sid); attachedRun.delete(sid); d.close(); if (mode === "always") return result(sid, r); attachNote += ` (live run found but attach failed: ${r.error ?? r.code ?? "unknown error"})`; }
       else {
-        sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, client: server.server.getClientVersion()?.name, platform: live.platform }); steps.set(sid, [{ action: "open" }]);
+        sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, client: clientName(), platform: live.platform }); steps.set(sid, [{ action: "open" }]);
         if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
         // Lumi shows the step in the phone frame. tap, type, scroll and back are captioned by the page itself, from the element it acts on.
         void d.request("lumi", { caption: `Opened ${id}`, state: "working", hold: 1800 }, 1000).catch(() => {});
@@ -298,7 +326,7 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, 
     return result("", { ok: false, code: "build_not_supported", error: `the simulator did not load build ${buildId}, so no session was opened. Open ${id} without @build to use the published app.` });
   }
   if (r.ok === false) return result(sid, r);
-  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, client: server.server.getClientVersion()?.name, platform: ctx.remote ? platform ?? "android" : "headless" });
+  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, client: clientName(), platform: ctx.remote ? platform ?? "android" : "headless" });
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
   return text(`session: ${sid}\napp: ${id} release: ${buildId ? `build:${buildId}` : r.release ?? "local"}\nmode: headless session${attachNote}\nvisible: no\n\n${r.screen ?? ""}`);
@@ -352,7 +380,7 @@ use(server, tools.room_log, async ({ room, since }) => {
   return { ...text((rows.length ? rows.map(line).join("\n") : "no new entries") + `\ncursor: ${r.cursor}`), structuredContent: { room, entries: rows, cursor: r.cursor } };
 });
 use(server, tools.room_note, async ({ room, text: note }) => {
-  const r = await sim("/room_note", { room, text: note, agent: server.server.getClientVersion()?.name }) as Act & { cursor?: string };
+  const r = await sim("/room_note", { room, text: note, agent: clientName() }) as Act & { cursor?: string };
   return r.ok ? { ...text(`noted, cursor: ${r.cursor}`), structuredContent: { room, cursor: r.cursor } } : result("", r);
 });
 type Wait = { wait_for?: WaitFor; timeout_ms?: number; settle?: boolean };
@@ -902,7 +930,7 @@ if (argi < 0) {
     // Behind sim.shipvo.dev the Worker has checked the key and says which app and scope it grants; locally
     // there are no such headers and every app is allowed. A client's mcp-session-id header is ignored.
     const h = (n: string) => (req.headers[n] as string) || undefined;
-    const server = makeServer({ remote: true, key: h("x-shipvo-key"), app: h("x-shipvo-app"), publicApps: h("x-shipvo-public"), scope: h("x-shipvo-scope") as Ctx["scope"], ownerToken: h("x-shipvo-owner-token") });
+    const server = makeServer({ remote: true, client: h("x-shipvo-client"), key: h("x-shipvo-key"), app: h("x-shipvo-app"), publicApps: h("x-shipvo-public"), scope: h("x-shipvo-scope") as Ctx["scope"], ownerToken: h("x-shipvo-owner-token") });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     if (era2026 && msg) {
       // 2026-07-28 results carry resultType, and tools/list also carries ttlMs and cacheScope. 2025-era responses are untouched.

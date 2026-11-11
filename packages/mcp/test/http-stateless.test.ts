@@ -8,7 +8,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
 const root = resolve(__dirname, "..");
-let out = ""; let fake: http.Server; let proc: ChildProcess; let base = "";
+let out = ""; let fake: http.Server; const simSeen: { url: string; body: any }[] = []; let proc: ChildProcess; let base = "";
 const freePort = () => new Promise<number>((ok) => { const s = http.createServer().listen(0, () => { const p = (s.address() as { port: number }).port; s.close(() => ok(p)); }); });
 
 beforeAll(async () => {
@@ -18,7 +18,11 @@ beforeAll(async () => {
   fake = http.createServer(async (req, res) => {
     let raw = ""; for await (const c of req) raw += c;
     const sent = raw ? JSON.parse(raw) : {};
+    simSeen.push({ url: req.url ?? "", body: sent });
     res.writeHead(200, { "content-type": "application/json" });
+    if (req.url === "/sessions") return res.end(JSON.stringify({ ok: true, sessions: [{ session: "team-1", app: "tide", release: 31, room: "team-1", skin: "android" }] }));
+    if (sent.action === "phone_apps") return res.end(JSON.stringify({ ok: true, current_app: "tide", installed_apps: [{ id: "tide" }, { id: "inbox", kind: "spec" }] }));
+    if (sent.action === "switch_app") return res.end(JSON.stringify({ ok: true, screen: "heading Assistant Inbox" }));
     if (req.url === "/phones/export") return res.end(JSON.stringify({ ok: true, format: "shipvo.phones/v0", phones: [{ session: "s1", app: "tide" }] }));
     if (req.url === "/phones/import") return res.end(JSON.stringify({ ok: true, imported: (sent.phones ?? []).map((p: any) => p.session) }));
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu", name: "Table Menu" }] }));
@@ -188,5 +192,31 @@ describe("moving phones (hosted service only)", () => {
     const im = await phones("/phones/import", A, { format: "shipvo.phones/v0", phones: [{ session: "s1", app: "tide" }] });
     expect((await im.json() as any).imported).toEqual(["s1"]);
     expect((await fetch(base.replace("/mcp", "/phones/export"), { headers: { authorization: `Bearer ${A}` } })).status).toBe(404);   // POST only
+  });
+});
+
+describe("an open session shared by assistants", () => {
+  const call = async (name: string, args: Record<string, unknown>, headers: Record<string, string> = {}) =>
+    (await rpc("tools/call", { name, arguments: args }, headers)).body.result;
+  it("open_app reuses an open session instead of starting it over, and switches to the app", async () => {
+    simSeen.length = 0;
+    const r = await call("open_app", { app: "menu", session: "team-1" });
+    expect(r.content[0].text).toContain("not_installed");                 // "menu" is not on that phone: nothing is reset
+    expect(simSeen.some((s) => s.url === "/session")).toBe(false);
+    simSeen.length = 0;
+    const ok = await call("open_app", { app: "inbox", session: "team-1" });
+    expect(ok.content[0].text).toMatch(/^session: team-1\napp: inbox release: 31\nmode: reused the open session/);
+    expect(simSeen.find((s) => s.body.action === "switch_app")?.body.id).toBe("inbox");
+    expect(simSeen.some((s) => s.url === "/session")).toBe(false);
+  });
+  it("restart: true starts the session over", async () => {
+    simSeen.length = 0;
+    await call("open_app", { app: "menu", session: "team-1", restart: true });
+    expect(simSeen.some((s) => s.url === "/session" && s.body.session === "team-1")).toBe(true);
+  });
+  it("names the assistant from x-shipvo-client when a tool call carries no client name", async () => {
+    simSeen.length = 0;
+    await call("tap", { session: "team-1", ref: "e1" }, { "x-shipvo-client": "Gemini" });
+    expect(simSeen.find((s) => s.url === "/act")?.body.agent).toBe("Gemini");
   });
 });
