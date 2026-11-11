@@ -649,8 +649,9 @@ for (const style of ["android", "ios"]) {
 
     assert.equal((await call("/end", { session: sid })).ended, true);         // the old phone is gone
     assert.equal((await call("/phones/import", { format: "x", phones: [] })).code, "bad_export");
-    const im = await call("/phones/import", { format: ex.format, phones: [mine] });
-    assert.deepEqual(im.imported, [sid], JSON.stringify(im).slice(0, 400));
+    const im = await call("/phones/import", { format: ex.format, phones: [{ session: "bad id!", app: "tide" }, mine] });
+    assert.deepEqual(im.imported, [sid], JSON.stringify(im).slice(0, 400));   // a bad phone is skipped, not fatal
+    assert.deepEqual(im.failed.map((f) => f.session), ["bad id!"]);
     const back = (await act(sid, { action: "backup_phone" })).backup;
     assert.deepEqual(back.apps.find((a) => a.id === "notes").data.notes.map((n) => n.title), ["Harbour"]);
     const orders = await (await fetch(`http://localhost:${PORT}/s/~rm-${style}/orders`)).json();

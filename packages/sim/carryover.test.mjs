@@ -10,13 +10,12 @@ test("a published release stays the same release; a local or build app keeps its
   assert.equal(appSpecOf("menu", null), "menu");
 });
 
-test("checkPhones lists every problem and refuses a wrong format", () => {
+test("checkPhones refuses a wrong format, and skips only the phones with problems", () => {
   assert.throws(() => checkPhones({ format: "x", phones: [] }), (e) => e instanceof CarryoverError && e.code === "bad_export");
-  try {
-    checkPhones({ format: PHONES_FORMAT, phones: [{ session: "a b", app: "Tide" }, { session: "s1", app: "tide", room: "bad room", backend: { store: 1 } }, { session: "s1", app: "tide" }] });
-    assert.fail("no error");
-  } catch (e) {
-    for (const s of ["phones[0].session", "phones[0].app", "phones[1].room", "phones[1].backend", "session s1 appears more than once"]) assert.ok(e.message.includes(s), s);
-  }
-  assert.equal(checkPhones({ format: PHONES_FORMAT, phones: [{ session: "s1", app: "tide", room: null }] }).length, 1);
+  const { phones, skipped } = checkPhones({ format: PHONES_FORMAT, phones: [{ session: "a b", app: "Tide" }, { session: "s1", app: "tide", room: "bad room", backend: { store: 1 } }, { session: "s1", app: "tide" }, { session: "s1", app: "tide" }, { session: "s2", app: "menu", room: null }] });
+  assert.deepEqual(phones.map((p) => p.session), ["s1", "s2"]);
+  assert.deepEqual(skipped.map((s) => s.index), [0, 1, 3]);
+  for (const s of ["phones[0].session", "phones[0].app"]) assert.ok(skipped[0].error.includes(s), s);
+  for (const s of ["phones[1].room", "phones[1].backend"]) assert.ok(skipped[1].error.includes(s), s);
+  assert.ok(skipped[2].error.includes("session s1 appears more than once"));
 });
