@@ -60,15 +60,25 @@ export function cleanEnv(env: Env): Env {
 }
 
 /** The registered client name of an OAuth key ("ChatGPT", "Gemini"), or null for other keys. */
+// Assistants whose sign-in names no client: known by the host they sign in from (a client id URL or a redirect URI).
+const ASSISTANT_HOSTS: [RegExp, string][] = [[/(^|\.)(chatgpt\.com|openai\.com)$/, "ChatGPT"], [/(^|\.)(gemini\.google\.com|google\.com|googleapis\.com)$/, "Gemini"], [/(^|\.)(claude\.ai|claude\.com|anthropic\.com)$/, "Claude"]];
+function assistantOfUrls(urls: string[]): string | null {
+  for (const u of urls) { let host = ""; try { host = new URL(u).hostname.toLowerCase(); } catch { continue; } for (const [re, name] of ASSISTANT_HOSTS) if (re.test(host)) return name; }
+  return null;
+}
 export async function clientOfKey(env: Env, keyId: number): Promise<string | null> {
   const k = await env.DB.prepare("SELECT label FROM api_keys WHERE id = ?").bind(keyId).first<{ label: string | null }>();
   const label = k?.label ?? "";
   const now = /^shipvo oauth: (.+)$/.exec(label)?.[1];
-  if (now) return now.startsWith("shipvo_") || now.startsWith("https://") ? null : now.slice(0, 64);
-  const old = /^shipvo oauth \((shipvo_[\w]+)\)$/.exec(label)?.[1];   // keys made before labels carried the name
-  if (!old) return null;
-  const c = await env.DB.prepare("SELECT client_name FROM oauth_clients WHERE client_id = ?").bind(old).first<{ client_name: string | null }>();
-  return c?.client_name?.trim().slice(0, 64) || null;
+  const id = now ? (now.startsWith("shipvo_") || now.startsWith("https://") ? now : null) : /^shipvo oauth \((shipvo_[\w]+)\)$/.exec(label)?.[1] ?? null;   // older keys: "shipvo oauth (<client id>)"
+  if (now && !id) return now.slice(0, 64);
+  if (!id) return null;
+  if (id.startsWith("https://")) return assistantOfUrls([id]);   // a client id metadata URL
+  const c = await env.DB.prepare("SELECT client_name, redirect_uris FROM oauth_clients WHERE client_id = ?").bind(id).first<{ client_name: string | null; redirect_uris: string | null }>();
+  const named = c?.client_name?.trim().slice(0, 64);
+  if (named) return named;
+  let uris: string[] = []; try { uris = JSON.parse(c?.redirect_uris ?? "[]"); } catch {}
+  return assistantOfUrls(Array.isArray(uris) ? uris : []);
 }
 
 export default {

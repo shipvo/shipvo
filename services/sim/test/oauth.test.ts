@@ -247,6 +247,18 @@ describe("authorize and token", () => {
     sql.prepare("INSERT INTO api_keys (id, label, scope, account_id) VALUES (91, 'shipvo login', 'test', 1)").run();
     expect(await clientOfKey(env, 91)).toBeNull();
   });
+  it("knows ChatGPT, Gemini and Claude by where they sign in from when they register with no name", async () => {
+    const { env, sql } = setup();
+    sql.prepare("INSERT INTO oauth_clients (client_id, client_name, redirect_uris, grant_types) VALUES ('shipvo_cg', NULL, ?, '[]')").run(JSON.stringify(["https://chatgpt.com/connector_platform_oauth_redirect"]));
+    sql.prepare("INSERT INTO oauth_clients (client_id, client_name, redirect_uris, grant_types) VALUES ('shipvo_lo', NULL, ?, '[]')").run(JSON.stringify(["http://localhost:3000/cb"]));
+    sql.prepare("INSERT INTO api_keys (id, label, scope, account_id) VALUES (92, 'shipvo oauth: shipvo_cg', 'test', 1), (93, 'shipvo oauth (shipvo_cg)', 'test', 1), (94, 'shipvo oauth: shipvo_lo', 'test', 1)").run();
+    sql.prepare("INSERT INTO api_keys (id, label, scope, account_id) VALUES (95, 'shipvo oauth: https://gemini.google.com/mcp/client.json', 'test', 1), (96, 'shipvo oauth: https://example.com/client.json', 'test', 1)").run();
+    expect(await clientOfKey(env, 92)).toBe("ChatGPT");
+    expect(await clientOfKey(env, 93)).toBe("ChatGPT");
+    expect(await clientOfKey(env, 94)).toBeNull();
+    expect(await clientOfKey(env, 95)).toBe("Gemini");
+    expect(await clientOfKey(env, 96)).toBeNull();
+  });
   it("the same assistant signing in again replaces its earlier key, even after registering again", async () => {
     stubGitHub(); const { env, sql } = setup(); const g1 = await register(env, "Gemini"); const g2 = await register(env, "Gemini");
     const t1: any = await (await tok(env, g1, (await signIn(env, g1)).loc.searchParams.get("code")!)).json();
