@@ -1,0 +1,3 @@
+- New tool `inbox_view`: the whole Assistant Inbox (messages, tasks, who you are, what waits for you) without marking anything read. It works the same on the Android and iOS phone.
+- `inbox_view` comes with an MCP Apps view, `ui://shipvo/inbox.html` (`text/html;profile=mcp-app`). In a chat that shows MCP Apps views it draws the inbox live and, with Auto-continue on, posts each new message or task for the assistant into the chat, at most 20 times an hour.
+- The MCP server now declares the `resources` capability. The hosted service lists and reads the view without a key, like `tools/list`.

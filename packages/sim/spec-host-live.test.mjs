@@ -121,6 +121,22 @@ test("two assistants on one phone are told apart by the client name, with no nam
   assert.deepEqual(got.value.messages.map((m) => [m.from, m.to, m.body]), [["chatgpt", "claude", "Please test checkout."]]);
 });
 
+test("inbox_view shows the whole inbox and what waits for the caller, without marking anything read", async () => {
+  const INBOX = JSON.parse(readFileSync(new URL("../../templates/assistant-inbox/app.json", import.meta.url), "utf8"));
+  assert.ok((await call("/session", { session: "sp-view" })).ok);
+  assert.equal((await act("sp-view", { action: "inbox_view", agent: "claude-ai" })).code, "no_inbox");
+  assert.equal((await act("sp-view", { action: "create_app", id: "inbox", spec: INBOX })).ok, true);
+  await act("sp-view", { action: "app_action", id: "inbox", action_name: "send_message", input: { to: "claude", body: "Check the cart." }, agent: "openai-mcp" });
+  await act("sp-view", { action: "app_action", id: "inbox", action_name: "hand_off", input: { to: "claude", title: "Test checkout", detail: "" }, agent: "openai-mcp" });
+  const v = await act("sp-view", { action: "inbox_view", agent: "claude-ai" });
+  assert.equal(v.me, "claude");
+  assert.deepEqual(v.messages.map((m) => [m.from, m.to, m.body, m.read]), [["chatgpt", "claude", "Check the cart.", false]]);
+  assert.deepEqual(v.tasks.map((h) => [h.from, h.title, h.status !== "done"]), [["chatgpt", "Test checkout", true]]);
+  assert.equal(v.unread_for_me, 1); assert.equal(v.open_for_me, 1);
+  assert.equal((await act("sp-view", { action: "inbox_view", agent: "openai-mcp" })).unread_for_me, 0);
+  assert.equal((await act("sp-view", { action: "inbox_view", agent: "claude-ai" })).unread_for_me, 1);   // viewing reads nothing
+});
+
 for (const style of ["android", "ios"]) {
   test(`${style}: pending_banner tells each assistant what waits for it`, async () => {
     const INBOX = JSON.parse(readFileSync(new URL("../../templates/assistant-inbox/app.json", import.meta.url), "utf8"));

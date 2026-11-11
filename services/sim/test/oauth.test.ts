@@ -19,7 +19,7 @@ function setup() {
 }
 const call = (env: any, path: string, init?: RequestInit) => worker.fetch(new Request(O + path, init), env);
 const post = (env: any, path: string, body: unknown) => call(env, path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-const rpc = (env: any, method: string, headers: Record<string, string> = {}) => call(env, "/mcp", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: {} }) });
+const rpc = (env: any, method: string, headers: Record<string, string> = {}, params: unknown = {}) => call(env, "/mcp", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
 
 describe("metadata", () => {
   it("protected resource", async () => {
@@ -88,6 +88,17 @@ describe("401 challenge", () => {
   it("initialize and tools/list stay open", async () => {
     const { env } = setup();
     for (const m of ["initialize", "tools/list"]) { const r = await rpc(env, m); expect(r.status).toBe(200); expect(r.headers.get("www-authenticate")).toBeNull(); }
+  });
+  it("the inbox widget page can be listed and read without a key", async () => {
+    const { env } = setup();
+    const init = await (await rpc(env, "initialize")).json() as any;
+    expect(init.result.capabilities.resources).toBeDefined();
+    const list = await (await rpc(env, "resources/list")).json() as any;
+    expect(list.result.resources.map((r: any) => r.uri)).toContain("ui://shipvo/inbox.html");
+    const read = await (await rpc(env, "resources/read", {}, { uri: "ui://shipvo/inbox.html" })).json() as any;
+    expect(read.result.contents[0].mimeType).toBe("text/html;profile=mcp-app");
+    const tools = await (await rpc(env, "tools/list")).json() as any;
+    expect(tools.result.tools.find((t: any) => t.name === "inbox_view")._meta.ui.resourceUri).toBe("ui://shipvo/inbox.html");
   });
   it("a valid key passes the auth check", async () => {
     const { env, sql } = setup();
