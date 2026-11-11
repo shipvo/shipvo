@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
-import worker from "../src/index";
+import worker, { clientOfKey } from "../src/index";
 
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite");
 const O = "https://sim.shipvo.dev";
@@ -223,6 +223,18 @@ describe("authorize and token", () => {
     expect(sql.prepare("SELECT COUNT(*) n FROM api_keys WHERE revoked_at IS NULL").get().n).toBe(2);
     expect((await rpc(env, "tools/call", { authorization: "Bearer " + a.access_token })).status).toBe(503);   // valid key; no sandbox backend in tests
     expect((await rpc(env, "tools/call", { authorization: "Bearer " + b.access_token })).status).toBe(503);
+  });
+  it("knows which assistant a key belongs to, for keys made now and before names were in labels", async () => {
+    stubGitHub(); const { env, sql } = setup(); const g = await register(env, "Gemini"); const anon = await register(env);
+    await tok(env, g, (await signIn(env, g)).loc.searchParams.get("code")!);
+    await tok(env, anon, (await signIn(env, anon)).loc.searchParams.get("code")!);
+    const ids = (sql.prepare("SELECT id, label FROM api_keys ORDER BY id").all() as { id: number; label: string }[]);
+    expect(await clientOfKey(env, ids[0].id)).toBe("Gemini");
+    expect(await clientOfKey(env, ids[1].id)).toBeNull();                 // registered with no name
+    sql.prepare("INSERT INTO api_keys (id, label, scope, account_id) VALUES (90, ?, 'test', 1)").run(`shipvo oauth (${g})`);
+    expect(await clientOfKey(env, 90)).toBe("Gemini");                   // older label format
+    sql.prepare("INSERT INTO api_keys (id, label, scope, account_id) VALUES (91, 'shipvo login', 'test', 1)").run();
+    expect(await clientOfKey(env, 91)).toBeNull();
   });
   it("the same assistant signing in again replaces its earlier key, even after registering again", async () => {
     stubGitHub(); const { env, sql } = setup(); const g1 = await register(env, "Gemini"); const g2 = await register(env, "Gemini");

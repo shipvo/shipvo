@@ -1,0 +1,3 @@
+- `open_app` with a session id that is already open reuses that session: the phone switches to the app and keeps its other apps and data. Before, it started the session over, so one assistant opening a shared session wiped what another had installed (for example the Assistant Inbox). New `restart: true` starts a session over. An open session without the app returns `not_installed` instead of resetting it.
+- Hosted MCP: tool calls are named after the assistant that signed in (ChatGPT, Gemini), so Assistant Inbox messages show the real sender instead of `unknown`.
+- Migration: a caller that relied on `open_app` resetting an open session passes `restart: true`.

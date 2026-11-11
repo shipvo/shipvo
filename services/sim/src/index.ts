@@ -58,6 +58,18 @@ export function cleanEnv(env: Env): Env {
   return { ...env, GITHUB_CLIENT_ID: env.GITHUB_CLIENT_ID?.trim() || undefined, GITHUB_CLIENT_SECRET: env.GITHUB_CLIENT_SECRET?.trim() || undefined };
 }
 
+/** The registered client name of an OAuth key ("ChatGPT", "Gemini"), or null for other keys. */
+export async function clientOfKey(env: Env, keyId: number): Promise<string | null> {
+  const k = await env.DB.prepare("SELECT label FROM api_keys WHERE id = ?").bind(keyId).first<{ label: string | null }>();
+  const label = k?.label ?? "";
+  const now = /^shipvo oauth: (.+)$/.exec(label)?.[1];
+  if (now) return now.startsWith("shipvo_") || now.startsWith("https://") ? null : now.slice(0, 64);
+  const old = /^shipvo oauth \((shipvo_[\w]+)\)$/.exec(label)?.[1];   // keys made before labels carried the name
+  if (!old) return null;
+  const c = await env.DB.prepare("SELECT client_name FROM oauth_clients WHERE client_id = ?").bind(old).first<{ client_name: string | null }>();
+  return c?.client_name?.trim().slice(0, 64) || null;
+}
+
 export default {
   async fetch(req: Request, rawEnv: Env): Promise<Response> {
     const env = cleanEnv(rawEnv);
@@ -103,7 +115,11 @@ export default {
     headers.set("x-shipvo-public", pub.join(",")); headers.set("x-shipvo-scope", row.scope); headers.delete("authorization"); headers.delete("host");
     // The verified key, for the build lookup in open_app. Set after the client headers are copied, so a client-sent x-shipvo-key is replaced.
     headers.set("x-shipvo-key", key);
-    negotiateProtocolHeader(headers);   // a client newer than the server (ChatGPT) names a version the SDK would reject with 400
+    // The assistant behind an OAuth key, so the phone can say who sent a message even when a request carries no
+    // client name (stateless HTTP: the name only arrives with initialize). A client-sent value is never trusted.
+    headers.delete("x-shipvo-client");
+    const named = await clientOfKey(env, row.id); if (named) headers.set("x-shipvo-client", named);
+        negotiateProtocolHeader(headers);   // a client newer than the server (ChatGPT) names a version the SDK would reject with 400
     if (row.scope === "owner" && env.OWNER_TOKEN) headers.set("x-shipvo-owner-token", env.OWNER_TOKEN); else headers.delete("x-shipvo-owner-token");
 
     try {

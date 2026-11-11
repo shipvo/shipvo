@@ -1664,6 +1664,10 @@
           "type": "string",
           "description": "Session name (default: generated). One session is one phone."
         },
+        "restart": {
+          "type": "boolean",
+          "description": "Only with a session id that is already open: true starts that session over, empty, with this app. By default the open session is reused: the phone switches to this app and keeps its other apps and data."
+        },
         "room": {
           "type": "string",
           "description": "Room name. Every session opened with the same room on the same simulator shares one backend (orders, content, telemetry), read and written through the same store. Without room, each session has its own. 1 to 64 letters, digits, _ or -."
