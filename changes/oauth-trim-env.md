@@ -1,0 +1,2 @@
+- Hosted MCP: the GitHub client ID and secret are trimmed when read, so values pasted with spaces or a newline at the ends still sign in.
+- Migration: none.

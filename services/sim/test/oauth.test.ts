@@ -135,6 +135,16 @@ const tok = (env: any, client_id: string, code: string, over: Record<string, str
   call(env, "/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", client_id, code, code_verifier: VERIFIER, redirect_uri: REDIR, ...over }) });
 
 describe("authorize and token", () => {
+  it("a client ID or secret pasted with spaces or a newline at the ends still signs in", async () => {
+    const { env } = setup(); stubGitHub();
+    env.GITHUB_CLIENT_ID = "gh-id  "; env.GITHUB_CLIENT_SECRET = "\ngh-secret \n";
+    const id = await register(env);
+    const a = await startAuthorize(env, id);
+    expect(new URL(a.headers.get("location")!).searchParams.get("client_id")).toBe("gh-id");
+    const { loc } = await signIn(env, id);
+    const r = await tok(env, id, loc.searchParams.get("code")!);
+    expect(r.status).toBe(200);
+  });
   it("full PKCE exchange against a GitHub stub, and the token opens a session", async () => {
     stubGitHub(); const { env, sql } = setup(); const cid = await register(env);
     const { loc } = await signIn(env, cid);
