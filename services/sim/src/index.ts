@@ -91,8 +91,14 @@ async function existingSandbox(env: Env, keyId: number, path: string, init?: Req
 }
 
 /* ---------- Worker ---------- */
+/** Values pasted into the dashboard often carry spaces or a newline at the ends; GitHub rejects such a client ID. */
+export function cleanEnv(env: Env): Env {
+  return { ...env, GITHUB_CLIENT_ID: env.GITHUB_CLIENT_ID?.trim() || undefined, GITHUB_CLIENT_SECRET: env.GITHUB_CLIENT_SECRET?.trim() || undefined };
+}
+
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, rawEnv: Env): Promise<Response> {
+    const env = cleanEnv(rawEnv);
     const url = new URL(req.url);
     if (req.method === "OPTIONS") return new Response("", { status: 204, headers: CORS });
     if (url.pathname === "/" || url.pathname === "/health") return json({ ok: true, service: "shipvo-sim", backend: env.E2B_API_KEY ? "e2b" : env.SIM ? "containers" : "none", mcp: "/mcp", docs: "https://github.com/shipvo/shipvo/tree/main/packages/mcp" });
