@@ -3,6 +3,7 @@
 //   - E2B backend (default when E2B_API_KEY is set): one sandbox per MCP session, created on initialize,
 //     killed on DELETE or after idle. Perfect isolation, pay per second of use.
 //   - Cloudflare Containers backend (wrangler.containers.jsonc): one container per app.
+import { sandboxForKey, existingHost, QuotaError } from "./phones";
 import { Container, getContainer } from "@cloudflare/containers";
 import TOOLS from "./tools.json";
 import { handleOAuth, wwwAuthenticate } from "./oauth";
@@ -24,46 +25,7 @@ const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.diges
 const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS", "access-control-expose-headers": "mcp-session-id" };
 const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", ...CORS } });
 
-class QuotaError extends Error { constructor(public quota: number, public used: number) { super(`quota exhausted: ${used}/${quota} sandbox minutes used`); } }
-
-/* ---------- E2B backend ---------- */
-const e2bApi = (env: Env) => (env.E2B_API ?? "https://api.e2b.app").replace(/\/$/, "");
-async function e2b(env: Env, method: string, path: string, body?: unknown) {
-  const r = await fetch(`${e2bApi(env)}${path}`, { method, headers: { "X-API-Key": env.E2B_API_KEY!, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
-  const text = await r.text(); let data: any = null; try { data = text ? JSON.parse(text) : null; } catch {}
-  if (!r.ok) throw new Error(`e2b ${method} ${path}: ${r.status} ${text.slice(0, 200)}`);
-  return data;
-}
-async function newSandbox(env: Env, app: string, scope: string) {
-  const timeout = Number(env.SESSION_TIMEOUT_S ?? 1800);
-  const d = await e2b(env, "POST", "/sandboxes", { templateID: env.E2B_TEMPLATE ?? "shipvo-sim", timeout, metadata: { app, scope, by: "sim.shipvo.dev" } });
-  const id: string = d.sandboxID ?? d.sandboxId; const domain: string = d.domain ?? env.E2B_SANDBOX_DOMAIN ?? "e2b.app";
-  const host = `https://8787-${id}.${domain}`;
-  // Wait for the simulator and MCP inside to be ready (Chromium boot).
-  for (let i = 0; i < 60; i++) { try { const h = await fetch(`${host}/health`); if (h.ok) return { id, host }; } catch {} await new Promise((r) => setTimeout(r, 1000)); }
-  throw new Error("sandbox did not become ready");
-}
-const killSandbox = (env: Env, id: string) => e2b(env, "DELETE", `/sandboxes/${id}`).catch(() => {});
-const touchSandbox = (env: Env, id: string) => e2b(env, "POST", `/sandboxes/${id}/timeout`, { timeout: Number(env.SESSION_TIMEOUT_S ?? 1800) }).catch(() => {});
-
-// One sandbox ("phone pool") per API key: clients such as ChatGPT reconnect between tool calls, and the agent's
-// simulator sessions must survive that. The sandbox is created on first use and expires after idle time.
-async function sandboxForKey(env: Env, keyId: number, app: string, scope: string) {
-  const row = await env.DB.prepare("SELECT sandbox_id, sandbox_host, rev FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).first<{ sandbox_id: string; sandbox_host: string; rev: string | null }>();
-  if (row && env.SIM_REV && row.rev !== env.SIM_REV) { await killSandbox(env, row.sandbox_id); await env.DB.prepare("DELETE FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).run(); }   // built by an older deploy
-  else if (row) {
-    try { const h = await fetch(`${row.sandbox_host}/health`, { signal: AbortSignal.timeout(4000) }); if (h.ok) { touchSandbox(env, row.sandbox_id); return { id: row.sandbox_id, host: row.sandbox_host }; } } catch {}
-    await env.DB.prepare("DELETE FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).run();   // expired: make a new one
-  }
-  // Quota: starting a sandbox costs its lifetime in minutes (it idles out after SESSION_TIMEOUT_S).
-  const q = await env.DB.prepare("SELECT quota_minutes, used_minutes FROM api_keys WHERE id = ?").bind(keyId).first<{ quota_minutes: number; used_minutes: number }>();
-  const cost = Math.ceil(Number(env.SESSION_TIMEOUT_S ?? 1800) / 60);
-  if (q && q.quota_minutes > 0 && q.used_minutes + cost > q.quota_minutes) throw new QuotaError(q.quota_minutes, q.used_minutes);
-  const sb = await newSandbox(env, app, scope);
-  await env.DB.prepare("UPDATE api_keys SET used_minutes = used_minutes + ? WHERE id = ?").bind(cost, keyId).run();
-  await env.DB.prepare("INSERT OR REPLACE INTO sim_sessions (mcp_session, sandbox_id, sandbox_host, app_id, scope, rev) VALUES (?,?,?,?,?,?)").bind(`key:${keyId}`, sb.id, sb.host, app, scope, env.SIM_REV ?? null).run();
-  return sb;
-}
+/* ---------- E2B backend: see phones.ts ---------- */
 async function viaE2B(req: Request, env: Env, row: { id: number; app_id: string; scope: string }, headers: Headers): Promise<Response> {
   const target = await sandboxForKey(env, row.id, row.app_id, row.scope);
   const reqText = req.method === "POST" ? await req.clone().text() : "";
@@ -81,9 +43,9 @@ async function decorate(req: Request, env: Env, keyId: number, res: Response, re
 // An existing sandbox of a key (never starts one), for the watch page.
 async function existingSandbox(env: Env, keyId: number, path: string, init?: RequestInit): Promise<Response> {
   if (env.E2B_API_KEY) {
-    const row = await env.DB.prepare("SELECT sandbox_host FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).first<{ sandbox_host: string }>();
-    if (!row) throw new Error("no sandbox");
-    return fetch(`${row.sandbox_host}${path}`, init);
+    const host = await existingHost(env, keyId);
+    if (!host) throw new Error("no sandbox");
+    return fetch(`${host}${path}`, init);
   }
   const k = await env.DB.prepare("SELECT app_id FROM api_keys WHERE id = ?").bind(keyId).first<{ app_id: string }>();
   if (!env.SIM || !k) throw new Error("no sandbox");
