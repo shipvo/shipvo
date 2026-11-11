@@ -7,6 +7,7 @@ import { sandboxForKey, existingHost, QuotaError } from "./phones";
 import { Container, getContainer } from "@cloudflare/containers";
 import TOOLS from "./tools.json";
 import RESOURCES from "./resources.json";
+import WIDGETS from "./widgets.json";
 import { handleOAuth, wwwAuthenticate } from "./oauth";
 import { negotiateProtocolHeader } from "./protocol";
 import { handleWatch, addWatchUrl, watchUrl } from "./watch";
@@ -91,6 +92,9 @@ export default {
     const watch = await handleWatch(req, env, (k, p, i) => existingSandbox(env, k, p, i)); if (watch) return watch;
     // /mcp with Authorization: Bearer <key>, or, for clients that cannot send headers (ChatGPT's custom MCP
     // connectors offer only OAuth or none), /mcp/<key> or /mcp?key=<key>.
+    // Scripts of the MCP Apps views, for hosts whose page policy blocks inline scripts (ChatGPT). Static and public.
+    const widget = req.method === "GET" ? (WIDGETS as Record<string, string>)[url.pathname] : undefined;
+    if (widget) return new Response(widget, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=300", "access-control-allow-origin": "*" } });
     const pathKey = url.pathname.match(/^\/mcp\/([A-Za-z0-9_-]{8,})$/)?.[1];
     if (url.pathname !== "/mcp" && !pathKey) return json({ error: "not_found" }, 404);
 

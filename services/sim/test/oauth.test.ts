@@ -100,6 +100,15 @@ describe("401 challenge", () => {
     const tools = await (await rpc(env, "tools/list")).json() as any;
     expect(tools.result.tools.find((t: any) => t.name === "inbox_view")._meta.ui.resourceUri).toBe("ui://shipvo/inbox.html");
   });
+  it("serves the inbox view's script for hosts that block inline scripts", async () => {
+    const { env } = setup();
+    const r = await call(env, "/widgets/inbox.js");
+    expect(r.status).toBe(200); expect(r.headers.get("content-type")).toMatch(/javascript/);
+    const js = await r.text();
+    const read = await (await rpc(env, "resources/read", {}, { uri: "ui://shipvo/inbox.html" })).json() as any;
+    expect(read.result.contents[0].text).toContain(js);                   // the same code as the inline copy
+    expect((await call(env, "/widgets/other.js")).status).toBe(404);
+  });
   it("a valid key passes the auth check", async () => {
     const { env, sql } = setup();
     const h = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("goodkey12345")))].map((b) => b.toString(16).padStart(2, "0")).join("");
