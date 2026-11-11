@@ -8,7 +8,7 @@
 
 export type PhonesEnv = {
   DB: D1Database; E2B_API_KEY?: string; E2B_TEMPLATE?: string; E2B_API?: string; E2B_SANDBOX_DOMAIN?: string;
-  SESSION_TIMEOUT_S?: string; SIM_REV?: string;
+  SESSION_TIMEOUT_S?: string; SIM_REV?: string; OWNER_TOKEN?: string;
 };
 export class QuotaError extends Error { constructor(public quota: number, public used: number) { super(`quota exhausted: ${used}/${quota} sandbox minutes used`); } }
 
@@ -42,6 +42,16 @@ async function resumeSandbox(env: PhonesEnv, id: string, host: string, gapMs: nu
   return ready(host, 30, gapMs);
 }
 
+// Moving phones between sandboxes. Each sandbox is claimed once, right after it starts, with a token derived from a
+// Worker secret and the sandbox id, so only this Worker can export or import its phones.
+const hex = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
+const tokenFor = (env: PhonesEnv, id: string) => hex(`${env.OWNER_TOKEN ?? env.E2B_API_KEY ?? ""}:phones:${id}`);
+async function phonesCall(env: PhonesEnv, id: string, host: string, path: string, body?: unknown) {
+  const r = await fetch(`${host}${path}`, { method: "POST", headers: { authorization: `Bearer ${await tokenFor(env, id)}`, "content-type": "application/json" }, body: JSON.stringify(body ?? {}), signal: AbortSignal.timeout(120_000) });
+  if (!r.ok) throw new Error(`${path}: ${r.status}`);
+  return r.json() as Promise<any>;
+}
+
 /** The pool a key uses: its account's when it has one, otherwise its own. */
 export async function slotOf(env: PhonesEnv, keyId: number) {
   const k = await env.DB.prepare("SELECT account_id FROM api_keys WHERE id = ?").bind(keyId).first<{ account_id: number | null }>();
@@ -64,8 +74,18 @@ export async function sandboxForKey(env: PhonesEnv, keyId: number, app: string, 
   if (slot !== `key:${keyId}`) await env.DB.prepare("UPDATE sim_sessions SET mcp_session = ? WHERE mcp_session = ? AND NOT EXISTS (SELECT 1 FROM sim_sessions WHERE mcp_session = ?)").bind(slot, `key:${keyId}`, slot).run();
   const row = await env.DB.prepare("SELECT sandbox_id, sandbox_host, rev FROM sim_sessions WHERE mcp_session = ?").bind(slot).first<Row>();
   const drop = () => env.DB.prepare("DELETE FROM sim_sessions WHERE mcp_session = ?").bind(slot).run();
-  if (row && env.SIM_REV && row.rev !== env.SIM_REV) { await killSandbox(env, row.sandbox_id); await drop(); }   // built by an older deploy
-  else if (row) {
+  let carry: { phones: unknown[] } | null = null; let old: Row | null = null;
+  if (row && env.SIM_REV && row.rev !== env.SIM_REV) {
+    // Built by an older deploy: export its phones (waking it if paused), start a new one below, import them there,
+    // then delete the old one.
+    old = row;
+    try {
+      if (!(await healthy(row.sandbox_host))) await resumeSandbox(env, row.sandbox_id, row.sandbox_host, gapMs);
+      const ex = await phonesCall(env, row.sandbox_id, row.sandbox_host, "/phones/export");
+      if (ex?.ok && Array.isArray(ex.phones) && ex.phones.length) carry = ex;
+    } catch { /* an old sandbox without export, or gone: the new one starts empty */ }
+    await drop();
+  } else if (row) {
     if (await healthy(row.sandbox_host)) { touchSandbox(env, row.sandbox_id); return { id: row.sandbox_id, host: row.sandbox_host, resumed: false }; }
     const paid = await charge(env, keyId);
     if (await resumeSandbox(env, row.sandbox_id, row.sandbox_host, gapMs)) { await paid(); return { id: row.sandbox_id, host: row.sandbox_host, resumed: true }; }
@@ -74,6 +94,9 @@ export async function sandboxForKey(env: PhonesEnv, keyId: number, app: string, 
   const paid = await charge(env, keyId);
   const sb = await newSandbox(env, app, scope, gapMs);
   await paid();
+  await phonesCall(env, sb.id, sb.host, "/phones/claim").catch(() => {});
+  if (carry) await phonesCall(env, sb.id, sb.host, "/phones/import", carry).catch(() => {});
+  if (old) await killSandbox(env, old.sandbox_id);
   await env.DB.prepare("INSERT OR REPLACE INTO sim_sessions (mcp_session, sandbox_id, sandbox_host, app_id, scope, rev) VALUES (?,?,?,?,?,?)").bind(slot, sb.id, sb.host, app, scope, env.SIM_REV ?? null).run();
   return { ...sb, resumed: false };
 }

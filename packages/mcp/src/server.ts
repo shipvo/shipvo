@@ -849,9 +849,25 @@ if (argi < 0) {
   // Stateless (MCP 2026-07-28, and fine for 2025-era clients): no protocol session. Every request gets its own
   // McpServer and transport, built from that request's x-shipvo-* headers, so scope never outlives the request.
   // Simulator sessions are separate: they live in the simulator and travel as the `session` tool argument.
+  let phonesToken: string | null = null;   // set once by the hosted service: POST /phones/claim
   const httpServer = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://x");
     if (url.pathname === "/health") { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ ok: true })); }
+    // Moving phones to another simulator (the hosted service does this on deploy). The service claims the sandbox
+    // once, right after starting it, with a token only it knows; export and import then need that token.
+    if (url.pathname === "/phones/claim" || url.pathname === "/phones/export" || url.pathname === "/phones/import") {
+      let raw = ""; for await (const ch of req) raw += ch;
+      const auth = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+      if (req.method !== "POST" || !/^[A-Za-z0-9_-]{32,128}$/.test(auth)) { res.writeHead(404); return res.end(); }
+      if (url.pathname === "/phones/claim") {
+        if (phonesToken && phonesToken !== auth) { res.writeHead(409, { "content-type": "application/json" }); return res.end(JSON.stringify({ ok: false, error: "already claimed" })); }
+        phonesToken = auth; res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ ok: true }));
+      }
+      if (!phonesToken || auth !== phonesToken) { res.writeHead(404); return res.end(); }
+      const r = await fetch(`${SIM}${url.pathname}`, { method: "POST", headers: { "content-type": "application/json" }, body: raw || "{}" }).catch(() => null);
+      res.writeHead(r?.status ?? 502, { "content-type": "application/json" });
+      return res.end(r ? await r.text() : JSON.stringify({ ok: false, error: "simulator not reachable" }));
+    }
     if (url.pathname !== "/mcp") { res.writeHead(404); return res.end(); }
     // Keys: Bearer <key>. With no keys configured, the server is open (local use behind a tunnel you control).
     if (keys.size) { const k = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, ""); if (!keys.has(k)) { res.writeHead(401, { "content-type": "application/json" }); return res.end(JSON.stringify({ error: "invalid_api_key" })); } }

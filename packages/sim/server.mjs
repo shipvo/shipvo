@@ -37,6 +37,7 @@ import { createNav, pressHome, openRecents, resume, killApp, assertForeground, s
 import { assistantName } from "./identity.mjs";
 import { pendingBanner, waitForNew } from "./banner.mjs";
 import { createWakeups, WakeupError } from "./wakeup.mjs";
+import { PHONES_FORMAT, appSpecOf, checkPhones, CarryoverError } from "./carryover.mjs";
 import { createPermissionLog, PermissionLogError } from "./permission-log.mjs";
 import { actionDeviceNeeds } from "@shipvo/spec";
 import { initialConnectivity, applyConnectivity, networkOf, describeConnectivity, ConnectivityError } from "./connectivity.mjs";
@@ -1014,6 +1015,32 @@ const server = http.createServer(async (req, res) => {
       return send(200, { ok: true, entries: l.entries.filter((e) => e.n > since), cursor: String(l.n) });
     }
     if (url.pathname === "/end") return send(200, { ok: true, ended: await endSession(String(body.session)) });
+    // Every phone on this simulator, to move them to another one (the hosted service does this when it deploys a new version).
+    if (url.pathname === "/phones/export") {
+      const phones = [];
+      for (const [id, s] of sessions) {
+        const bk = backendOf(id, s.room);
+        const read = (f) => { try { return readFileSync(join(DIR, f), "utf8"); } catch { return null; } };
+        let backup = null; try { backup = (await act(id, { action: "backup_phone" })).backup; } catch {}
+        phones.push({ session: id, app: s.app, release: s.release ?? null, skin: s.skin, room: s.room ?? null, backend: read(`${bk}.json`) == null ? null : { store: read(`${bk}.json`), log: read(`${bk}.json.log`) ?? "" }, backup });
+      }
+      return send(200, { ok: true, format: PHONES_FORMAT, at: new Date().toISOString(), phones });
+    }
+    // Recreates the phones of an export: same session id, app release, skin and room, then the backup and the app's mock backend.
+    if (url.pathname === "/phones/import") {
+      let phones; try { phones = checkPhones(body); } catch (e) { if (e instanceof CarryoverError) return send(200, { ok: false, code: e.code, error: e.message }); throw e; }
+      const imported = [], failed = [], done = new Set();
+      for (const p of phones) {
+        try {
+          await newSession(p.session, { app: appSpecOf(p.app, p.release), skin: p.skin, ...(p.room ? { room: p.room } : {}) });
+          const bk = backendOf(p.session, p.room ?? undefined);
+          if (p.backend && !done.has(bk)) { writeFileSync(join(DIR, `${bk}.json`), p.backend.store); writeFileSync(join(DIR, `${bk}.json.log`), p.backend.log ?? ""); done.add(bk); }
+          if (p.backup) { const r = await act(p.session, { action: "restore_phone", backup: p.backup, replace: true }); if (r.failed?.length) failed.push({ session: p.session, error: `store apps not restored: ${r.failed.map((f) => f.id).join(", ")}` }); }
+          imported.push(p.session);
+        } catch (e) { failed.push({ session: p.session, error: String(e?.message ?? e).split("\n")[0] }); }
+      }
+      return send(200, { ok: true, imported, ...(failed.length ? { failed } : {}) });
+    }
     if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof BuildCacheError || (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_room" || e.code === "bad_app"))) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, ...(s.build ? { build: s.build } : {}), screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const s0 = sessions.get(body.session); const prevScreen = s0?.lastScreen; const r = await act(body.session, body);

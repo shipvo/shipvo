@@ -34,6 +34,7 @@
     "backup.mjs",
     "search.mjs",
     "connectivity.mjs",
+    "carryover.mjs",
     "wakeup.mjs",
     "reminders.mjs",
     "frame.mjs",

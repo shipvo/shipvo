@@ -22,10 +22,20 @@ function setup() {
 /** A fake E2B: sandboxes are running, paused or gone; health answers only for running ones. */
 function stubE2B(refuseAutoPause = false) {
   const boxes = new Map<string, "running" | "paused">(); const calls: string[] = []; const created: any[] = []; let n = 0;
+  const claims = new Map<string, string>(); const phones = new Map<string, unknown[]>();
   vi.stubGlobal("fetch", async (input: any, init?: any) => {
     const u = new URL(String(input?.url ?? input)); const m = init?.method ?? "GET";
     const host = /^8787-(\w+)\.e2b\.app$/.exec(u.host);
-    if (host) return new Response("", { status: u.pathname === "/health" && boxes.get(host[1]) === "running" ? 200 : 502 });
+    if (host) {
+      const id = host[1]; const up = boxes.get(id) === "running";
+      if (u.pathname === "/health") return new Response("", { status: up ? 200 : 502 });
+      if (!up || !u.pathname.startsWith("/phones/")) return new Response("", { status: 502 });
+      const auth = String(init?.headers?.authorization ?? "").replace("Bearer ", "");
+      if (u.pathname === "/phones/claim") { if (claims.has(id) && claims.get(id) !== auth) return new Response("", { status: 409 }); claims.set(id, auth); return Response.json({ ok: true }); }
+      if (claims.get(id) !== auth) return new Response("", { status: 404 });
+      if (u.pathname === "/phones/export") return Response.json({ ok: true, format: "shipvo.phones/v0", phones: phones.get(id) ?? [] });
+      if (u.pathname === "/phones/import") { phones.set(id, JSON.parse(init.body).phones); return Response.json({ ok: true }); }
+    }
     calls.push(`${m} ${u.pathname}`);
     if (m === "POST" && u.pathname === "/sandboxes") { const body = JSON.parse(init.body); created.push(body); if (refuseAutoPause && body.autoPause) return new Response("autoPause not allowed", { status: 400 }); const id = `sb${++n}`; boxes.set(id, "running"); return Response.json({ sandboxID: id, domain: "e2b.app", autoPause: body.autoPause }); }
     const c = /^\/v2\/sandboxes\/(\w+)\/connect$/.exec(u.pathname);
@@ -34,7 +44,7 @@ function stubE2B(refuseAutoPause = false) {
     if (/\/timeout$/.test(u.pathname)) return new Response(null, { status: 204 });
     throw new Error("unexpected " + m + " " + u);
   });
-  return { boxes, calls, created };
+  return { boxes, calls, created, claims, phones };
 }
 afterEach(() => vi.unstubAllGlobals());
 
@@ -102,5 +112,41 @@ describe("phone pools", () => {
     sql.exec("INSERT INTO api_keys (id, account_id) VALUES (1, 7)");
     expect((await sandboxForKey(env, 1, "app", "test", 0)).id).toBe("sb1");
     expect(e.created.map((b) => b.autoPause ?? null)).toEqual([true, null]);
+  });
+
+  it("a deploy moves the phones into the new version and deletes the old sandbox", async () => {
+    const { env, sql } = setup(); const e = stubE2B();
+    sql.exec("INSERT INTO api_keys (id, account_id) VALUES (1, 7)");
+    await sandboxForKey(env, 1, "app", "test", 0);
+    expect(e.claims.get("sb1")).toMatch(/^[0-9a-f]{64}$/);                  // claimed right after start
+    const mine = [{ session: "s1", app: "tide", release: 31, backend: { store: '{"orders":[{"ref":"TT-1001"}]}', log: "" } }];
+    e.phones.set("sb1", mine);
+    e.boxes.set("sb1", "paused");                                          // idle when the deploy lands
+    env.SIM_REV = "r2";
+    const sb = await sandboxForKey(env, 1, "app", "test", 0);
+    expect(sb.id).toBe("sb2");
+    expect(e.phones.get("sb2")).toEqual(mine);
+    expect(e.boxes.has("sb1")).toBe(false);
+    expect(e.claims.get("sb2")).not.toBe(e.claims.get("sb1"));            // each sandbox has its own token
+    expect(sql.prepare("SELECT rev FROM sim_sessions").get().rev).toBe("r2");
+  });
+
+  it("a deploy over an old sandbox that cannot export still gives a working phone", async () => {
+    const { env, sql } = setup(); const e = stubE2B();
+    sql.exec("INSERT INTO api_keys (id, account_id) VALUES (1, 7)");
+    e.boxes.set("old", "running");
+    sql.exec("INSERT INTO sim_sessions (mcp_session, sandbox_id, sandbox_host, app_id, scope, rev) VALUES ('acct:7', 'old', 'https://8787-old.e2b.app', 'app', 'test', 'r0')");
+    const sb = await sandboxForKey(env, 1, "app", "test", 0);
+    expect(sb.id).toBe("sb1"); expect(e.phones.get("sb1")).toBeUndefined(); expect(e.boxes.has("old")).toBe(false);
+  });
+
+  it("export and import refuse a caller without the sandbox's token", async () => {
+    const { env, sql } = setup(); const e = stubE2B();
+    sql.exec("INSERT INTO api_keys (id, account_id) VALUES (1, 7)");
+    const sb = await sandboxForKey(env, 1, "app", "test", 0);
+    e.phones.set(sb.id, [{ session: "s1" }]);
+    const r = await fetch(`${sb.host}/phones/export`, { method: "POST", headers: { authorization: "Bearer " + "x".repeat(64) } });
+    expect(r.status).toBe(404);
+    expect((await fetch(`${sb.host}/phones/claim`, { method: "POST", headers: { authorization: "Bearer " + "y".repeat(64) } })).status).toBe(409);
   });
 });
