@@ -19,6 +19,8 @@ beforeAll(async () => {
     let raw = ""; for await (const c of req) raw += c;
     const sent = raw ? JSON.parse(raw) : {};
     res.writeHead(200, { "content-type": "application/json" });
+    if (req.url === "/phones/export") return res.end(JSON.stringify({ ok: true, format: "shipvo.phones/v0", phones: [{ session: "s1", app: "tide" }] }));
+    if (req.url === "/phones/import") return res.end(JSON.stringify({ ok: true, imported: (sent.phones ?? []).map((p: any) => p.session) }));
     if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu", name: "Table Menu" }] }));
     if (req.url === "/session") return res.end(JSON.stringify({ ok: true, release: "local", screen: "heading Table Menu" }));
     if (sent.action === "open_url" && sent.url === "plain") return res.end(JSON.stringify({ ok: false, code: "invalid_url", error: "not a URL", screen: "heading Home" }));
@@ -165,5 +167,26 @@ describe("stateless HTTP", () => {
     const meta = { "io.modelcontextprotocol/protocolVersion": "2026-07-28" };
     expect((await rpc("tools/list", { _meta: meta })).status).toBe(400);
     expect((await rpc("tools/list", { _meta: meta }, { "mcp-method": "tools/list" })).status).toBe(200);
+  });
+});
+
+describe("moving phones (hosted service only)", () => {
+  const phones = (path: string, token?: string, body?: unknown) => fetch(base.replace("/mcp", path), { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body ?? {}) });
+  const A = "a".repeat(64), B = "b".repeat(64);
+  it("export and import answer nothing before the sandbox is claimed", async () => {
+    expect((await phones("/phones/export", A)).status).toBe(404);
+    expect((await phones("/phones/export")).status).toBe(404);
+  });
+  it("one claim; then only the claimer's token exports and imports", async () => {
+    expect((await phones("/phones/claim", "short")).status).toBe(404);
+    expect((await phones("/phones/claim", A)).status).toBe(200);
+    expect((await phones("/phones/claim", A)).status).toBe(200);          // the same token again is fine
+    expect((await phones("/phones/claim", B)).status).toBe(409);          // nobody else can take it over
+    expect((await phones("/phones/export", B)).status).toBe(404);
+    const ex = await phones("/phones/export", A);
+    expect(ex.status).toBe(200); expect((await ex.json() as any).phones[0].app).toBe("tide");
+    const im = await phones("/phones/import", A, { format: "shipvo.phones/v0", phones: [{ session: "s1", app: "tide" }] });
+    expect((await im.json() as any).imported).toEqual(["s1"]);
+    expect((await fetch(base.replace("/mcp", "/phones/export"), { headers: { authorization: `Bearer ${A}` } })).status).toBe(404);   // POST only
   });
 });

@@ -612,3 +612,35 @@ for (const style of ["android", "ios"]) {
     assert.equal(log.length, 5); assert.equal(log[1].to.airplane, true);
   });
 }
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: /phones/export and /phones/import move a phone with its apps, data, room and the app's orders`, async () => {
+    const NOTES = JSON.parse(readFileSync(new URL("../../templates/notes-tasks/app.json", import.meta.url), "utf8"));
+    const sid = `sp-move-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style, room: `rm-${style}` })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "notes", spec: NOTES, style, open: false })).ok, true);
+    assert.equal((await act(sid, { action: "app_action", id: "notes", action_name: "add_note", input: { title: "Harbour", body: "rope" } })).ok, true);
+    // An order in the app's mock backend, the way Tide & Tackle places one.
+    const order = { ref: "TT-1001", total: 3500 };
+    const posted = await fetch(`http://localhost:${PORT}/s/~rm-${style}/o/orders`, { method: "POST", body: JSON.stringify({ order }) });
+    assert.ok(posted.ok);
+    const ex = await call("/phones/export", {});
+    assert.equal(ex.format, "shipvo.phones/v0");
+    const mine = ex.phones.find((p) => p.session === sid);
+    assert.equal(mine.room, `rm-${style}`); assert.equal(mine.skin, style);
+    assert.match(mine.backend.store, /TT-1001/);
+    assert.ok(mine.backup.apps.some((a) => a.id === "notes"));
+
+    assert.equal((await call("/end", { session: sid })).ended, true);         // the old phone is gone
+    assert.equal((await call("/phones/import", { format: "x", phones: [] })).code, "bad_export");
+    const im = await call("/phones/import", { format: ex.format, phones: [mine] });
+    assert.deepEqual(im.imported, [sid], JSON.stringify(im).slice(0, 400));
+    const back = (await act(sid, { action: "backup_phone" })).backup;
+    assert.deepEqual(back.apps.find((a) => a.id === "notes").data.notes.map((n) => n.title), ["Harbour"]);
+    const orders = await (await fetch(`http://localhost:${PORT}/s/~rm-${style}/orders`)).json();
+    assert.deepEqual(orders.orders.map((o) => o.ref), ["TT-1001"]);
+    const listed = (await call("/sessions", {})).sessions.find((s) => s.session === sid);
+    assert.equal(listed.room, `rm-${style}`);
+    await call("/end", { session: sid });
+  });
+}

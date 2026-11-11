@@ -1,0 +1,3 @@
+- Hosted simulator: when a new version is deployed, each sandbox's phones move into a sandbox of the new version (apps, data, settings, room, clipboard and the app's mock backend orders) before the old one is deleted.
+- `@shipvo/sim`: `POST /phones/export` and `POST /phones/import` move every phone of a simulator to another one. `@shipvo/mcp --http` exposes them only after the hosting service claims the server with `POST /phones/claim` and a token, and only to that token.
+- Migration: none. Sandboxes started before this change cannot export, so their phones start empty once more on the first deploy after it.
