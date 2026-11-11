@@ -9,46 +9,24 @@ export const MCP_APP_MIME = "text/html;profile=mcp-app";
 /** Most posts per hour the widget makes into the chat on its own. Two assistants answering each other stop here. */
 export const AUTO_POSTS_PER_HOUR = 20;
 export const POLL_MS = 4000;
+/** Where the hosted service serves the view's script. Hosts whose page policy blocks inline scripts (ChatGPT) load it from here. */
+export const WIDGET_ORIGIN = "https://sim.shipvo.dev";
+export const INBOX_WIDGET_JS_PATH = "/widgets/inbox.js";
 /** _meta on the inbox_view tool: the MCP Apps key, its older spelling, and ChatGPT's own keys. */
 export const INBOX_TOOL_META = {
   ui: { resourceUri: INBOX_WIDGET_URI }, "ui/resourceUri": INBOX_WIDGET_URI,
   "openai/outputTemplate": INBOX_WIDGET_URI, "openai/widgetAccessible": true,
   "openai/toolInvocation/invoking": "Opening the inbox", "openai/toolInvocation/invoked": "Inbox open",
 };
-/** _meta on the widget resource. The page makes no network requests of its own, so it asks for no domains. */
+/** _meta on the widget resource. The page calls no server itself; it only loads its own script from WIDGET_ORIGIN. */
 export const INBOX_WIDGET_META = {
-  ui: { prefersBorder: true, csp: { connectDomains: [] as string[], resourceDomains: [] as string[] } },
+  ui: { prefersBorder: true, csp: { connectDomains: [] as string[], resourceDomains: [WIDGET_ORIGIN] } },
   "openai/widgetPrefersBorder": true, "openai/widgetDescription": "The shared Assistant Inbox of a Shipvo phone, updating live.",
-  "openai/widgetCSP": { connect_domains: [] as string[], resource_domains: [] as string[] },
+  "openai/widgetCSP": { connect_domains: [] as string[], resource_domains: [WIDGET_ORIGIN] },
 };
 
-export const INBOX_WIDGET_HTML = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Assistant Inbox</title>
-<style>
-  :root { color-scheme: light dark; --fg:#1c1c1e; --muted:#6b6b70; --line:#e2e2e6; --bg:#fff; --chip:#f2f2f5; --accent:#2563eb; --ok:#15803d; }
-  @media (prefers-color-scheme: dark) { :root { --fg:#f2f2f5; --muted:#a1a1a8; --line:#34343a; --bg:#1c1c1e; --chip:#2a2a2e; --accent:#60a5fa; --ok:#4ade80; } }
-  * { box-sizing: border-box; } body { margin:0; font: 14px/1.4 system-ui, -apple-system, Segoe UI, sans-serif; color: var(--fg); background: var(--bg); }
-  header { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--line); }
-  header h1 { font-size:15px; margin:0; flex:1; } .who { color: var(--muted); font-size:12px; }
-  .badge { background: var(--accent); color:#fff; border-radius:999px; padding:1px 8px; font-size:12px; }
-  label.auto { display:flex; align-items:center; gap:6px; font-size:12px; color: var(--muted); }
-  nav { display:flex; gap:4px; padding:8px 12px 0; } nav button { border:0; background:none; color: var(--muted); padding:6px 10px; border-radius:8px; font: inherit; cursor:pointer; }
-  nav button[aria-selected=true] { background: var(--chip); color: var(--fg); }
-  ul { list-style:none; margin:0; padding:6px 12px 12px; max-height:340px; overflow:auto; }
-  li { padding:8px 0; border-bottom:1px solid var(--line); } li:last-child { border-bottom:0; }
-  .meta { font-size:12px; color: var(--muted); } .new { border-left:3px solid var(--accent); padding-left:8px; }
-  .status { font-size:11px; padding:1px 6px; border-radius:6px; background: var(--chip); } .status.done { color: var(--ok); }
-  .empty, .note { color: var(--muted); padding: 12px; } .note { font-size:12px; padding: 0 12px 10px; }
-</style></head>
-<body>
-<header><h1>Assistant Inbox</h1><span class="who" id="who"></span><span class="badge" id="badge" hidden></span>
-  <label class="auto"><input type="checkbox" id="auto" checked> Auto-continue</label></header>
-<nav role="tablist"><button role="tab" id="t-msg" aria-selected="true">Messages</button><button role="tab" id="t-task" aria-selected="false">Tasks</button></nav>
-<ul id="list" aria-live="polite"></ul>
-<p class="note" id="note"></p>
-<script>
-(() => {
+export const INBOX_WIDGET_JS = `(() => {
+  if (window.__shipvoInbox) return; window.__shipvoInbox = true;   // runs once, whether inline or from the script file
   const POLL_MS = ${POLL_MS}, CAP = ${AUTO_POSTS_PER_HOUR};
   let nextId = 1; const waiting = new Map();
   const send = (msg) => window.parent.postMessage({ jsonrpc: "2.0", ...msg }, "*");
@@ -129,4 +107,32 @@ export const INBOX_WIDGET_HTML = `<!doctype html>
     .then(() => send({ method: "ui/notifications/initialized", params: {} })).catch(() => {});
   setInterval(poll, POLL_MS);
 })();
-</script></body></html>`;
+`;
+
+export const INBOX_WIDGET_HTML = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assistant Inbox</title>
+<style>
+  :root { color-scheme: light dark; --fg:#1c1c1e; --muted:#6b6b70; --line:#e2e2e6; --bg:#fff; --chip:#f2f2f5; --accent:#2563eb; --ok:#15803d; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#f2f2f5; --muted:#a1a1a8; --line:#34343a; --bg:#1c1c1e; --chip:#2a2a2e; --accent:#60a5fa; --ok:#4ade80; } }
+  * { box-sizing: border-box; } body { margin:0; font: 14px/1.4 system-ui, -apple-system, Segoe UI, sans-serif; color: var(--fg); background: var(--bg); }
+  header { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:15px; margin:0; flex:1; } .who { color: var(--muted); font-size:12px; }
+  .badge { background: var(--accent); color:#fff; border-radius:999px; padding:1px 8px; font-size:12px; }
+  label.auto { display:flex; align-items:center; gap:6px; font-size:12px; color: var(--muted); }
+  nav { display:flex; gap:4px; padding:8px 12px 0; } nav button { border:0; background:none; color: var(--muted); padding:6px 10px; border-radius:8px; font: inherit; cursor:pointer; }
+  nav button[aria-selected=true] { background: var(--chip); color: var(--fg); }
+  ul { list-style:none; margin:0; padding:6px 12px 12px; max-height:340px; overflow:auto; }
+  li { padding:8px 0; border-bottom:1px solid var(--line); } li:last-child { border-bottom:0; }
+  .meta { font-size:12px; color: var(--muted); } .new { border-left:3px solid var(--accent); padding-left:8px; }
+  .status { font-size:11px; padding:1px 6px; border-radius:6px; background: var(--chip); } .status.done { color: var(--ok); }
+  .empty, .note { color: var(--muted); padding: 12px; } .note { font-size:12px; padding: 0 12px 10px; }
+</style></head>
+<body>
+<header><h1>Assistant Inbox</h1><span class="who" id="who"></span><span class="badge" id="badge" hidden></span>
+  <label class="auto"><input type="checkbox" id="auto" checked> Auto-continue</label></header>
+<nav role="tablist"><button role="tab" id="t-msg" aria-selected="true">Messages</button><button role="tab" id="t-task" aria-selected="false">Tasks</button></nav>
+<ul id="list" aria-live="polite"></ul>
+<p class="note" id="note"></p>
+<script>${INBOX_WIDGET_JS}</script>
+<script src="${WIDGET_ORIGIN}${INBOX_WIDGET_JS_PATH}"></script></body></html>`;

@@ -24,12 +24,14 @@ describe("the Assistant Inbox widget (MCP Apps)", () => {
     const page = (await c.readResource({ uri: URI })).contents[0] as { mimeType: string; text: string; _meta?: { ui?: { csp?: unknown } } };
     expect(page.mimeType).toBe("text/html;profile=mcp-app");
     expect(page.text).toMatch(/^<!doctype html>/);
-    expect(page._meta?.ui?.csp).toEqual({ connectDomains: [], resourceDomains: [] });
+    expect(page._meta?.ui?.csp).toEqual({ connectDomains: [], resourceDomains: ["https://sim.shipvo.dev"] });
+    // Hosts that block inline scripts (ChatGPT) run the same code from the hosted script file.
+    expect(page.text).toContain('<script src="https://sim.shipvo.dev/widgets/inbox.js"></script>');
   });
 
   it("posts only new items for this assistant, at most 20 an hour", async () => {
     const html = ((await c.readResource({ uri: URI })).contents[0] as { text: string }).text;
-    const script = /<script>([\s\S]*)<\/script>/.exec(html)![1];
+    const script = /<script>([\s\S]*?)<\/script>/.exec(html)![1];
     // A fake host: the page under test talks to it over postMessage, like an MCP Apps host.
     const el = () => ({ textContent: "", innerHTML: "", hidden: false, checked: true, onclick: null, setAttribute() {} });
     const els: Record<string, ReturnType<typeof el>> = {};
@@ -59,7 +61,7 @@ describe("the Assistant Inbox widget (MCP Apps)", () => {
 
   it("in ChatGPT, uses window.openai to read the first result, poll and post", async () => {
     const html = ((await c.readResource({ uri: URI })).contents[0] as { text: string }).text;
-    const script = /<script>([\s\S]*)<\/script>/.exec(html)![1];
+    const script = /<script>([\s\S]*?)<\/script>/.exec(html)![1];
     const el = () => ({ textContent: "", innerHTML: "", hidden: false, checked: true, onclick: null, setAttribute() {} });
     const els: Record<string, ReturnType<typeof el>> = {};
     const msg = (id: number) => ({ id, from: "gemini", to: "chatgpt", body: `hi ${id}`, read: false, sent_on: "now" });
