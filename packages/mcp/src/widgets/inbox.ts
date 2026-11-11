@@ -52,7 +52,15 @@ export const INBOX_WIDGET_HTML = `<!doctype html>
   const POLL_MS = ${POLL_MS}, CAP = ${AUTO_POSTS_PER_HOUR};
   let nextId = 1; const waiting = new Map();
   const send = (msg) => window.parent.postMessage({ jsonrpc: "2.0", ...msg }, "*");
-  const request = (method, params) => new Promise((resolve, reject) => {
+  // ChatGPT also offers its own bridge (window.openai). Use it for calling tools and posting into the chat when it is there.
+  const oa = () => (typeof window.openai === "object" && window.openai) || null;
+  const request = (method, params) => {
+    const o = oa();
+    if (o && method === "tools/call" && typeof o.callTool === "function") return Promise.resolve(o.callTool(params.name, params.arguments));
+    if (o && method === "ui/message" && typeof o.sendFollowUpMessage === "function") return Promise.resolve(o.sendFollowUpMessage({ prompt: params.content[0].text })).then(() => ({}));
+    return rpc(method, params);
+  };
+  const rpc = (method, params) => new Promise((resolve, reject) => {
     const id = nextId++; waiting.set(id, { resolve, reject }); send({ id, method, params });
     setTimeout(() => { if (waiting.delete(id)) reject(new Error(method + " timed out")); }, 30000);
   });
@@ -114,6 +122,9 @@ export const INBOX_WIDGET_HTML = `<!doctype html>
   $("t-msg").onclick = () => { tab = "msg"; $("t-msg").setAttribute("aria-selected", "true"); $("t-task").setAttribute("aria-selected", "false"); render(); };
   $("t-task").onclick = () => { tab = "task"; $("t-task").setAttribute("aria-selected", "true"); $("t-msg").setAttribute("aria-selected", "false"); render(); };
 
+  const first = oa(); if (first && first.toolOutput) take({ structuredContent: first.toolOutput });
+  if (first && first.toolInput && first.toolInput.session) session = first.toolInput.session;
+  window.addEventListener("openai:set_globals", () => { const o = oa(); if (o && o.toolOutput) take({ structuredContent: o.toolOutput }); });
   request("ui/initialize", { appInfo: { name: "shipvo-inbox", version: "1" }, appCapabilities: {}, protocolVersion: "2026-01-26" })
     .then(() => send({ method: "ui/notifications/initialized", params: {} })).catch(() => {});
   setInterval(poll, POLL_MS);
