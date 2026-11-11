@@ -24,6 +24,7 @@ import { traceFromMeta } from "./trace.js";
 import { findTarget } from "./record.js";
 import { Recorder, RecorderError } from "./recorder.js";
 import { connectDriver, findLiveRun, type Driver, type RunInfo } from "./attach.js";
+import { INBOX_WIDGET_URI, INBOX_WIDGET_HTML, INBOX_WIDGET_META, INBOX_TOOL_META, MCP_APP_MIME } from "./widgets/inbox.js";
 import { BuildError, hostedKey, resolveBuild, uploadBuild } from "./build-upload.js";
 import { findProjectDir, hasDesktop, localShipvo, runUrl, startRun } from "./launch.js";
 import { JobStore, type JobView } from "./jobs.js";
@@ -444,6 +445,18 @@ use(server, tools.list_wakeups,
   async ({ session }) => { need(session); const r = await act({ session, action: "list_wakeups" }) as Act & { wakeups?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ wakeups: r.wakeups }, null, 2)); });
 use(server, tools.clear_wakeup,
   async ({ session, name }) => { need(session); const r = await act({ session, action: "clear_wakeup", name }) as Act & { cleared?: boolean }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cleared: r.cleared === true })); });
+// The live inbox: a tool result the model reads, and an MCP Apps view (ui://shipvo/inbox.html) the host draws next to it.
+type InboxView = Act & { me?: string | null; messages?: { from: string; to: string; body: string; read: boolean }[]; tasks?: { from: string; to: string; title: string; status: string }[]; unread_for_me?: number; open_for_me?: number };
+const inboxTool = use(server, tools.inbox_view,
+  async ({ session }) => { need(session); const r = await act({ session, action: "inbox_view" }) as InboxView;
+    if (!r.ok) return result(session, r);
+    const lines = [`inbox for ${r.me ?? "an unnamed assistant"}: ${r.unread_for_me ?? 0} unread, ${r.open_for_me ?? 0} open tasks for you`,
+      ...(r.messages ?? []).slice(-10).map((m) => `- ${m.from} → ${m.to}${m.read ? "" : " (unread)"}: ${m.body}`),
+      ...(r.tasks ?? []).slice(-5).map((h) => `- task ${h.from} → ${h.to} [${h.status}]: ${h.title}`)];
+    return { ...text(lines.join("\n")), structuredContent: { session, me: r.me ?? null, messages: r.messages ?? [], tasks: r.tasks ?? [], unread_for_me: r.unread_for_me ?? 0, open_for_me: r.open_for_me ?? 0 } }; });
+inboxTool.update({ _meta: INBOX_TOOL_META });
+server.registerResource("assistant-inbox-widget", INBOX_WIDGET_URI, { title: "Assistant Inbox", description: "Live Assistant Inbox view for inbox_view results.", mimeType: MCP_APP_MIME, _meta: INBOX_WIDGET_META },
+  async () => ({ contents: [{ uri: INBOX_WIDGET_URI, mimeType: MCP_APP_MIME, text: INBOX_WIDGET_HTML, _meta: INBOX_WIDGET_META }] }));
 use(server, tools.permission_log,
   async ({ session, app, permission, event, limit }) => { need(session); const r = await act({ session, action: "permission_log", app, permission, event, limit }) as Act & { entries?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ entries: r.entries }, null, 2)); });
 use(server, tools.get_connectivity,
@@ -924,7 +937,7 @@ if (argi < 0) {
       }
       if (msg.method === "server/discover") {
         res.writeHead(200, { "content-type": "application/json" });
-        return res.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id ?? null, result: { resultType: "complete", supportedVersions: SUPPORTED_VERSIONS, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "shipvo", version: SERVER_VERSION } } }));
+        return res.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id ?? null, result: { resultType: "complete", supportedVersions: SUPPORTED_VERSIONS, capabilities: { tools: { listChanged: false }, resources: { listChanged: false } }, serverInfo: { name: "shipvo", version: SERVER_VERSION } } }));
       }
     }
     // Behind sim.shipvo.dev the Worker has checked the key and says which app and scope it grants; locally

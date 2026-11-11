@@ -1357,6 +1357,41 @@
     }
   },
   {
+    "name": "inbox_view",
+    "description": "Show the Assistant Inbox of this phone live in the chat: every message and task between assistants, who you are, and what waits for you. In a chat that shows MCP Apps views, a live inbox appears and, with auto-continue on, each new message or task for you is posted into the chat so you can answer it right away (at most 20 an hour). Install the Assistant Inbox first (create_app, id inbox). Changes nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "ui": {
+        "resourceUri": "ui://shipvo/inbox.html"
+      },
+      "ui/resourceUri": "ui://shipvo/inbox.html",
+      "openai/outputTemplate": "ui://shipvo/inbox.html",
+      "openai/widgetAccessible": true,
+      "openai/toolInvocation/invoking": "Opening the inbox",
+      "openai/toolInvocation/invoked": "Inbox open"
+    }
+  },
+  {
     "name": "inbox_wait",
     "description": "Wait for mail in this session's private inbox (its address is in the result; type it into the app's email field). Returns the first message that matches, already there or arriving within timeout_ms: from, subject, text, the 4 to 8 digit codes and the links in it. Use it to finish an emailed code or magic-link sign-in. Fails with inbox_timeout when nothing matches in time. Only this session can read this inbox; mail is kept in memory and removed when the session ends.",
     "inputSchema": {

@@ -809,6 +809,16 @@ async function act(id, body) {
       break;
     }
     // The line MCP puts at the start of every tool result: what waits for the calling assistant in the Assistant Inbox app. Changes nothing.
+    // The Assistant Inbox as a live view: who is asking, every message and task (newest last), and what waits for them.
+    case "inbox_view": {
+      const data = specHost.dataOf(sidOf(s), "inbox");
+      if (!data) throw new SimError("no_inbox", "the Assistant Inbox is not installed on this phone: install it with create_app (id inbox) from templates/assistant-inbox");
+      const me = assistantName(body.agent);
+      const mine = (to) => !!me && (to === me || to === "anyone");
+      const messages = (data.messages ?? []).slice(-50).map((m) => ({ id: m.id, from: m.from, to: m.to, body: m.body, sent_on: m.sent_on, read: !!m.read }));
+      const tasks = (data.handoffs ?? []).slice(-50).map((h) => ({ id: h.id, from: h.from, to: h.to, title: h.title, detail: h.detail, status: h.status, reply: h.reply ?? "", created_on: h.created_on }));
+      return { me: me || null, messages, tasks, unread_for_me: messages.filter((m) => !m.read && mine(m.to)).length, open_for_me: tasks.filter((h) => h.status !== "done" && mine(h.to)).length };
+    }
     case "pending_banner": return { banner: pendingBanner(specHost.dataOf(sidOf(s), "inbox"), assistantName(body.agent)) };
     // Blocks until something waits for the calling assistant in the Assistant Inbox app, or the time is up. Changes nothing.
     case "wait_for_event": {

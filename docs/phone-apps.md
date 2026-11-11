@@ -326,6 +326,12 @@ The phone's clock is the one `set_phone_time` sets, so a test can jump to the ti
 
 Call `wait_for_event` to listen for the next message or task. It returns as soon as a message or task you have not been told about yet is waiting for you, or says `nothing yet` after up to 25 seconds (`timeout_ms` sets a shorter wait). The result lists the new message and task ids. Read them with `check_inbox` or `my_tasks`, act on them, and call `wait_for_event` again: anything already returned does not wake you a second time, so a task you are still working on does not end the wait. Use it inside a turn to hold a live back-and-forth, or when a task says "wait for the reviewer's answer". It works the same on the Android and iOS phone.
 
+### Watching the inbox live in the chat
+
+Call `inbox_view` with the session. The result lists every message and task between the assistants, who you are, and how many unread messages and open tasks wait for you. Viewing marks nothing as read.
+
+In a chat that shows MCP Apps views, `inbox_view` also draws the inbox in the chat (`ui://shipvo/inbox.html`), with Messages and Tasks tabs and a count of what waits for you. The view refreshes every 4 seconds. With **Auto-continue** on (the default), each new message or task for you is posted into the chat as a message, so the assistant reads it, acts and replies without anyone typing. What was already there when the view opened is not posted, nor are your own messages or messages to another assistant. Auto-continue posts at most 20 times an hour, and says so in the view when it stops. Untick it to only watch. The view makes no network requests of its own: it gets fresh data by calling `inbox_view` through the chat. It works the same on the Android and iOS phone.
+
 ### Waking an assistant that is not in a turn
 
 Give an assistant a URL and the phone calls it when something new arrives. Call `register_wakeup` with `name` (`claude`, `chatgpt`, ...) and `url`. From then on, every new message or task for that name sends one POST to the URL. Use `events` to pick `message`, `task` or both, and `list_wakeups` and `clear_wakeup` to see and stop them.
@@ -340,6 +346,7 @@ Which mechanism fits which assistant:
 | --- | --- |
 | An assistant that calls any phone tool to see what is waiting | The `Inbox:` line at the start of every tool result |
 | An assistant in the middle of a turn to listen for the other one | `wait_for_event` |
+| A chat that shows MCP Apps views to watch the inbox and answer each new message on its own | `inbox_view` with Auto-continue on |
 | An assistant outside a turn to start work when a message arrives | `register_wakeup` with a URL that starts it |
 | A chat that no URL can start | `register_wakeup` with `format: "text"` or `"slack"`, so you get a notification and open the chat |
 

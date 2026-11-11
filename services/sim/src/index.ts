@@ -6,6 +6,7 @@
 import { sandboxForKey, existingHost, QuotaError } from "./phones";
 import { Container, getContainer } from "@cloudflare/containers";
 import TOOLS from "./tools.json";
+import RESOURCES from "./resources.json";
 import { handleOAuth, wwwAuthenticate } from "./oauth";
 import { negotiateProtocolHeader } from "./protocol";
 import { handleWatch, addWatchUrl, watchUrl } from "./watch";
@@ -92,9 +93,12 @@ export default {
       if (msg && !Array.isArray(msg) && msg.jsonrpc === "2.0") {
         if (msg.method === "notifications/initialized") return new Response(null, { status: 202, headers: CORS });
         const rpc = (result: unknown) => json({ jsonrpc: "2.0", id: msg.id ?? null, result });
-        if (msg.method === "initialize") return rpc({ protocolVersion: msg.params?.protocolVersion ?? "2025-03-26", capabilities: { tools: { listChanged: false } }, serverInfo: { name: "shipvo", version: "0.0.6" }, instructions: "Shipvo lets an assistant use a React Native app in a simulated phone. Tools that open or act on an app need an API key: Authorization: Bearer <key> (run `npx @shipvo/cli login`). https://shipvo.dev/docs/test-with-an-assistant/" });
+        if (msg.method === "initialize") return rpc({ protocolVersion: msg.params?.protocolVersion ?? "2025-03-26", capabilities: { tools: { listChanged: false }, resources: { listChanged: false } }, serverInfo: { name: "shipvo", version: "0.0.6" }, instructions: "Shipvo lets an assistant use a React Native app in a simulated phone. Tools that open or act on an app need an API key: Authorization: Bearer <key> (run `npx @shipvo/cli login`). https://shipvo.dev/docs/test-with-an-assistant/" });
         if (msg.method === "ping") return rpc({});
         if (msg.method === "tools/list") return rpc({ tools: TOOLS });
+        // The MCP Apps pages (such as the live inbox) are static, so hosts can fetch them before signing in.
+        if (msg.method === "resources/list") return rpc({ resources: RESOURCES.map(({ contents: _, ...r }) => r) });
+        if (msg.method === "resources/read") { const r = RESOURCES.find((x) => x.uri === (msg.params as { uri?: string } | undefined)?.uri); return r ? rpc({ contents: r.contents }) : json({ jsonrpc: "2.0", id: msg.id ?? null, error: { code: -32002, message: "Resource not found" } }); }
       }
     }
     const challenge = { "www-authenticate": wwwAuthenticate(url.origin) };
