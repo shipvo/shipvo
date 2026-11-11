@@ -1,0 +1,1 @@
+- Hosted MCP: an assistant that signs in without giving a client name (ChatGPT, Gemini, Claude) is now known by the address it signs in from, so `inbox_view` and Assistant Inbox messages show who it is instead of no name.
