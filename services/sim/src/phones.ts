@@ -47,7 +47,7 @@ async function resumeSandbox(env: PhonesEnv, id: string, host: string, gapMs: nu
 const hex = async (s: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)))].map((b) => b.toString(16).padStart(2, "0")).join("");
 const tokenFor = (env: PhonesEnv, id: string) => hex(`${env.OWNER_TOKEN ?? env.E2B_API_KEY ?? ""}:phones:${id}`);
 async function phonesCall(env: PhonesEnv, id: string, host: string, path: string, body?: unknown) {
-  const r = await fetch(`${host}${path}`, { method: "POST", headers: { authorization: `Bearer ${await tokenFor(env, id)}`, "content-type": "application/json" }, body: JSON.stringify(body ?? {}), signal: AbortSignal.timeout(120_000) });
+  const r = await fetch(`${host}${path}`, { method: "POST", headers: { authorization: `Bearer ${await tokenFor(env, id)}`, "content-type": "application/json" }, body: JSON.stringify(body ?? {}), signal: AbortSignal.timeout(path === "/phones/claim" ? 15_000 : 300_000) });
   if (!r.ok) throw new Error(`${path}: ${r.status}`);
   return r.json() as Promise<any>;
 }
@@ -66,6 +66,9 @@ async function charge(env: PhonesEnv, keyId: number) {
   return async () => { await env.DB.prepare("UPDATE api_keys SET used_minutes = used_minutes + ? WHERE id = ?").bind(cost, keyId).run(); };
 }
 
+/** One line per carry-over step in the Worker log (wrangler tail, or Workers Logs in the dashboard): which phones moved and which did not. */
+function report(slot: string, step: "export" | "import", detail: Record<string, unknown>) { console.log(JSON.stringify({ carryover: step, slot, ...detail })); }
+
 type Row = { sandbox_id: string; sandbox_host: string; rev: string | null };
 /** Finds, resumes or starts the sandbox for a key. `gapMs` is the wait between readiness checks (tests pass 0). */
 export async function sandboxForKey(env: PhonesEnv, keyId: number, app: string, scope: string, gapMs = 1000) {
@@ -83,7 +86,8 @@ export async function sandboxForKey(env: PhonesEnv, keyId: number, app: string, 
       if (!(await healthy(row.sandbox_host))) await resumeSandbox(env, row.sandbox_id, row.sandbox_host, gapMs);
       const ex = await phonesCall(env, row.sandbox_id, row.sandbox_host, "/phones/export");
       if (ex?.ok && Array.isArray(ex.phones) && ex.phones.length) carry = ex;
-    } catch { /* an old sandbox without export, or gone: the new one starts empty */ }
+      report(slot, "export", { from: row.sandbox_id, phones: Array.isArray(ex?.phones) ? ex.phones.length : null });
+    } catch (e) { report(slot, "export", { from: row.sandbox_id, error: String((e as Error)?.message ?? e) }); /* an old sandbox without export, or gone: the new one starts empty */ }
     await drop();
   } else if (row) {
     if (await healthy(row.sandbox_host)) { touchSandbox(env, row.sandbox_id); return { id: row.sandbox_id, host: row.sandbox_host, resumed: false }; }
@@ -95,7 +99,9 @@ export async function sandboxForKey(env: PhonesEnv, keyId: number, app: string, 
   const sb = await newSandbox(env, app, scope, gapMs);
   await paid();
   await phonesCall(env, sb.id, sb.host, "/phones/claim").catch(() => {});
-  if (carry) await phonesCall(env, sb.id, sb.host, "/phones/import", carry).catch(() => {});
+  if (carry) await phonesCall(env, sb.id, sb.host, "/phones/import", carry)
+    .then((r) => report(slot, "import", { to: sb.id, imported: r?.imported ?? [], failed: r?.failed ?? [], ...(r?.ok === false ? { error: r.error } : {}) }))
+    .catch((e) => report(slot, "import", { to: sb.id, error: String((e as Error)?.message ?? e) }));
   if (old) await killSandbox(env, old.sandbox_id);
   await env.DB.prepare("INSERT OR REPLACE INTO sim_sessions (mcp_session, sandbox_id, sandbox_host, app_id, scope, rev) VALUES (?,?,?,?,?,?)").bind(slot, sb.id, sb.host, app, scope, env.SIM_REV ?? null).run();
   return { ...sb, resumed: false };

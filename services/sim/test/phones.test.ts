@@ -131,6 +131,18 @@ describe("phone pools", () => {
     expect(sql.prepare("SELECT rev FROM sim_sessions").get().rev).toBe("r2");
   });
 
+  it("logs what each deploy carried over, so a lost phone can be traced", async () => {
+    const { env, sql } = setup(); const e = stubE2B(); const lines: any[] = [];
+    vi.spyOn(console, "log").mockImplementation((s: string) => { lines.push(JSON.parse(s)); });
+    sql.exec("INSERT INTO api_keys (id, account_id) VALUES (1, 7)");
+    await sandboxForKey(env, 1, "app", "test", 0);
+    e.phones.set("sb1", [{ session: "team-1", app: "tide" }]);
+    env.SIM_REV = "r2";
+    await sandboxForKey(env, 1, "app", "test", 0);
+    expect(lines).toEqual([{ carryover: "export", slot: "acct:7", from: "sb1", phones: 1 }, { carryover: "import", slot: "acct:7", to: "sb2", imported: [], failed: [] }]);
+    vi.restoreAllMocks();
+  });
+
   it("a deploy over an old sandbox that cannot export still gives a working phone", async () => {
     const { env, sql } = setup(); const e = stubE2B();
     sql.exec("INSERT INTO api_keys (id, account_id) VALUES (1, 7)");

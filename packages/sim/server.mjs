@@ -1038,7 +1038,7 @@ const server = http.createServer(async (req, res) => {
     }
     // Recreates the phones of an export: same session id, app release, skin and room, then the backup and the app's mock backend.
     if (url.pathname === "/phones/import") {
-      let phones; try { phones = checkPhones(body); } catch (e) { if (e instanceof CarryoverError) return send(200, { ok: false, code: e.code, error: e.message }); throw e; }
+      let phones, skipped; try { ({ phones, skipped } = checkPhones(body)); } catch (e) { if (e instanceof CarryoverError) return send(200, { ok: false, code: e.code, error: e.message }); throw e; }
       const imported = [], failed = [], done = new Set();
       for (const p of phones) {
         try {
@@ -1049,6 +1049,7 @@ const server = http.createServer(async (req, res) => {
           imported.push(p.session);
         } catch (e) { failed.push({ session: p.session, error: String(e?.message ?? e).split("\n")[0] }); }
       }
+      for (const s of skipped) failed.push({ session: s.session, error: s.error });
       return send(200, { ok: true, imported, ...(failed.length ? { failed } : {}) });
     }
     if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof BuildCacheError || (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_room" || e.code === "bad_app"))) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, ...(s.build ? { build: s.build } : {}), screen: await screen(s.page) }); }
