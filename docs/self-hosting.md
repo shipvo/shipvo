@@ -174,7 +174,7 @@ Send an empty `url` to remove it. `http://` URLs and URLs with a user name or pa
 
 ## The hosted simulator (optional)
 
-`services/sim` is a second Worker that gives agents the simulator over HTTPS without a laptop: it checks an API key (D1 `api_keys`, created with the owner command `create_api_key`), starts or reuses an [E2B](https://e2b.dev) sandbox per key from the `shipvo-sim` template (`services/sim/Dockerfile`: Playwright + `@shipvo/sim` + `@shipvo/mcp --http`), and proxies `/mcp`. Deploy with the `deploy-sim` workflow; it needs `E2B_API_KEY`, `SIM_OWNER_TOKEN` and `SIM_SMOKE_KEY` secrets. A Cloudflare Containers backend is kept in `wrangler.containers.jsonc` for accounts with Workers Paid.
+`services/sim` is a second Worker that gives agents the simulator over HTTPS without a laptop: it checks an API key (D1 `api_keys`, created with the owner command `create_api_key`), starts, reuses or resumes an [E2B](https://e2b.dev) sandbox per GitHub account (per key for a key with no account) from the `shipvo-sim` template; an idle sandbox pauses, keeping its phones and their data, (`services/sim/Dockerfile`: Playwright + `@shipvo/sim` + `@shipvo/mcp --http`), and proxies `/mcp`. Deploy with the `deploy-sim` workflow; it needs `E2B_API_KEY`, `SIM_OWNER_TOKEN` and `SIM_SMOKE_KEY` secrets. For OAuth sign-in (ChatGPT, Gemini and other clients that register themselves), create a GitHub OAuth app with the callback URL `https://<your sim host>/` and set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` as Worker secrets. A Cloudflare Containers backend is kept in `wrangler.containers.jsonc` for accounts with Workers Paid.
 
 ## Hermes bytecode version
 

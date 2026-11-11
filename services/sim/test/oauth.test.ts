@@ -116,7 +116,7 @@ function stubGitHub() {
 }
 afterEach(() => vi.unstubAllGlobals());
 
-async function register(env: any) { return ((await (await post(env, "/register", { redirect_uris: [REDIR] })).json()) as any).client_id as string; }
+async function register(env: any, client_name?: string) { return ((await (await post(env, "/register", { redirect_uris: [REDIR], ...(client_name ? { client_name } : {}) })).json()) as any).client_id as string; }
 async function startAuthorize(env: any, client_id: string, over: Record<string, string> = {}) {
   const q = new URLSearchParams({ response_type: "code", client_id, redirect_uri: REDIR, code_challenge: await challengeOf(VERIFIER), code_challenge_method: "S256", state: "xyz", ...over });
   return call(env, "/authorize?" + q, { redirect: "manual" });
@@ -216,10 +216,18 @@ describe("authorize and token", () => {
     await call(env, `/authorize/callback?code=gh-ok&state=${st}`, { redirect: "manual" });
     expect((await call(env, `/authorize/callback?code=gh-ok&state=${st}`, { redirect: "manual" })).status).toBe(400);
   });
-  it("a new sign-in replaces the account's earlier test key, even from another client", async () => {
-    stubGitHub(); const { env, sql } = setup(); const c1 = await register(env); const c2 = await register(env);
-    const t1: any = await (await tok(env, c1, (await signIn(env, c1)).loc.searchParams.get("code")!)).json();
-    const t2: any = await (await tok(env, c2, (await signIn(env, c2)).loc.searchParams.get("code")!)).json();
+  it("each assistant keeps its own key: another assistant signing in does not sign it out", async () => {
+    stubGitHub(); const { env, sql } = setup(); const chatgpt = await register(env, "ChatGPT"); const gemini = await register(env, "Gemini");
+    const a: any = await (await tok(env, chatgpt, (await signIn(env, chatgpt)).loc.searchParams.get("code")!)).json();
+    const b: any = await (await tok(env, gemini, (await signIn(env, gemini)).loc.searchParams.get("code")!)).json();
+    expect(sql.prepare("SELECT COUNT(*) n FROM api_keys WHERE revoked_at IS NULL").get().n).toBe(2);
+    expect((await rpc(env, "tools/call", { authorization: "Bearer " + a.access_token })).status).toBe(503);   // valid key; no sandbox backend in tests
+    expect((await rpc(env, "tools/call", { authorization: "Bearer " + b.access_token })).status).toBe(503);
+  });
+  it("the same assistant signing in again replaces its earlier key, even after registering again", async () => {
+    stubGitHub(); const { env, sql } = setup(); const g1 = await register(env, "Gemini"); const g2 = await register(env, "Gemini");
+    const t1: any = await (await tok(env, g1, (await signIn(env, g1)).loc.searchParams.get("code")!)).json();
+    const t2: any = await (await tok(env, g2, (await signIn(env, g2)).loc.searchParams.get("code")!)).json();
     expect(sql.prepare("SELECT COUNT(*) n FROM api_keys WHERE revoked_at IS NULL").get().n).toBe(1);
     expect((await rpc(env, "tools/call", { authorization: "Bearer " + t1.access_token })).status).toBe(401);
     expect((await rpc(env, "tools/call", { authorization: "Bearer " + t2.access_token })).status).toBe(503);
