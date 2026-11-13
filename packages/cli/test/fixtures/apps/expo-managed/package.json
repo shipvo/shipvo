@@ -1,0 +1,1 @@
+{ "name": "habits", "main": "index.js", "dependencies": { "expo": "~58.0.21", "react": "19.0.0", "react-native": "0.88.1" } }
