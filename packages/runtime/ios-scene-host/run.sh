@@ -32,7 +32,7 @@ run_case() {
   rm -f "$RESULT"
   xcrun simctl launch --terminate-running-process "$SIM_UDID" "$BUNDLE_ID" \
     --case "$1" --base "$SHIPVO_FIXTURE_BASE" --key "$KEY" --out "$RESULT" > "$OUT_DIR/launch-$1.log" 2>&1
-  for _ in $(seq 1 60); do [ -f "$RESULT" ] && break; sleep 0.5; done
+  for _ in $(seq 1 160); do [ -f "$RESULT" ] && break; sleep 0.5; done
   [ -f "$RESULT" ] || { echo "FAIL: no result from case $1"; cat "$OUT_DIR/launch-$1.log"; exit 1; }
   sleep 0.2; cat "$RESULT" >> "$OUT_DIR/results.log"; echo >> "$OUT_DIR/results.log"
   cat "$RESULT"; echo

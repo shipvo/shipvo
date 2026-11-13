@@ -298,7 +298,7 @@
         "params": { "type": "object" },
         "notify": { "type": "object" },
         "toast": { "type": "string" },
-        "saveFile": { "type": "string" },
+        "saveFile": { "type": ["string", "object"] },
         "content": { "type": "string" },
         "mime": { "type": "string" },
         "confirm": { "type": ["string", "object"] },
