@@ -118,6 +118,20 @@ Any spec app can turn a collection into CSV with the `csv()` function. Return it
 
 The first line holds the column names. Fields with commas, quotes or line breaks are quoted, and lists such as tags are joined with `; `. Leave the column list out to export every field. Spreadsheets treat a cell that starts with `=`, `+`, `-` or `@` as a formula. For text that other people typed, map the field first, for example `data.entries.map(r, {'note': has(r.note) && r.note.startsWith('=') ? "'" + r.note : (has(r.note) ? r.note : '')})`, then pass that list to `csv()`.
 
+## Save data into a collection
+
+The object form of `saveFile` stores text as a file in one of the app's collections. Pair it with `csv()` to save an export the person can find later. The step needs the `files` device permission, and works the same on Android and iOS.
+
+```json
+{ "do": [ { "saveFile": { "to": "files", "name": "diary.csv", "mime": "text/csv", "content": "{{ csv(data.entries) }}" } } ] }
+```
+
+This form adds a new record each time, even with the same name. The string form in "Save as a file" below replaces the file with the same name. Use the collection form to keep a history or list files in the app; use the string form for one named file.
+
+Declare the `to` collection under `data` with the fields `id`, `name`, `kind`, `mime`, `size`, `content` and `added`.
+
+Each file gets the next `id` and the fields `name`, `kind` (`file`), `mime` (default `text/plain`), `size` in bytes, `content` and `added`. Read the content back with `parseCsv()` to import it.
+
 ## Save as a file
 
 A `saveFile` step keeps text as a named file on the phone. It needs the `files` device permission, on Android and iOS alike. Saving again with the same name replaces the file.
@@ -382,6 +396,11 @@ Which mechanism fits which assistant:
 | A scheduled app is missing from the home screen | Its schedule is not active at the phone's clock | Read the home text, which says when it starts; call `set_phone_time`, or `switch_app` still opens it |
 | `updated: false` from `mark_read`, `start_task` or `finish_task` | The id is wrong, the message is for another assistant, or the task is already started or done | Read the `reason`, list yours with `check_inbox` or `my_tasks`, and use an id from there |
 | `permission_denied` from an app action | You denied the permission the action needs | Allow it in Settings, in the app's permission row, then run the action again |
+| `bad_time` from `set_reminder` | `at` is not a phone-clock time like `2026-11-14T09:00`, or you passed both or neither of `at` and `in_minutes` | Give exactly one; `in_minutes` is a number from 0 to 525600 |
+| `bad_repeat` from `set_reminder` | `repeat` is not a value the phone knows | Use `none`, `daily` or `weekly` |
+| `bad_events`, `bad_format` or `bad_secret` from `register_wakeup` | `events` is not `message` and `task`, `format` is not a known one, or the secret is under 16 characters | Fix the field named in the message, or leave `secret` out and one is made for you |
+| `host_not_allowed` or `bad_url` from `register_wakeup` | The wake-up URL is private or is not http or https | Use a public https URL |
+| `a11y_audit` lists `missing_label` | A control has no accessible name | Give the control a label, then call `a11y_audit` again |
 | `timeout` from `browser_wait_for` | The text did not appear in time | Raise `timeout_ms` (up to 30000) or check the page with `browser_screenshot` |
 
 ## Next steps
@@ -389,3 +408,6 @@ Which mechanism fits which assistant:
 - [Agents and Shipvo apps](agents.md): every tool.
 - [Simulated device features](device-api.md): camera, location, payment, notifications.
 - [Run on a phone in your browser](run.md): watch the phone while your assistant drives it.
+- [Describe an app and it appears](describe-an-app.md): the founder path to a spec app.
+- [Test an email sign-in](email-sign-in.md): read emailed codes and links in a test.
+- [A2UI on Shipvo Phone](a2ui.md): open agent-described screens.

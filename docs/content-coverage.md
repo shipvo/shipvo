@@ -145,3 +145,17 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Lumi benchmark (`scripts/lumi/bench.mjs`: screens, flows and planted bugs on fixed apps) | [lumi-bench](lumi-bench.md) | | | |
 | App spec validator (`validate`, error paths and fixes, network and write permissions) | [app-spec-validator](app-spec-validator.md) | | | |
 | Crash-loop revert paths on Android (trial boots, promoted boots, 60 s window) | [android-crash-loop-paths](android-crash-loop-paths.md) | | | |
+| `shipvo session` (any Expo app on a headless phone, framed screenshots and video, phone models) | [session](session.md) | | | |
+| A2UI 1.0 on Shipvo Phone (`a2ui_send`, `a2ui_actions`, `shipvo session --a2ui`) | [a2ui](a2ui.md) | | | |
+| Bug-catch benchmark (23 seeded bugs on Android and iOS) | [bug-bench](bug-bench.md) | | | |
+| Accessibility audit (`a11y_audit`) | [phone-apps](phone-apps.md#check-accessibility) | | | |
+| Permission log (`permission_log`) | [phone-apps](phone-apps.md#see-the-permission-log) | | | |
+| Share sheet and clipboard across apps | [phone-apps](phone-apps.md#share-sheet-and-clipboard) | | | |
+| Whole-phone backup (`backup_phone`, `restore_phone`) | [phone-apps](phone-apps.md#back-up-and-restore-the-whole-phone) | | | |
+| Search across the phone (`search_phone`) | [phone-apps](phone-apps.md#search-across-the-phone) | | | |
+| Wi-Fi, mobile data and airplane mode (`get_connectivity`, `set_connectivity`) | [phone-apps](phone-apps.md#wi-fi-mobile-data-and-airplane-mode) | | | |
+| Reminders (`set_reminder`, `list_reminders`, `cancel_reminder`) | [phone-apps](phone-apps.md#reminders) | | | |
+| Wake-ups for assistants outside a turn (`register_wakeup`, `wait_for_event`, live inbox view) | [phone-apps](phone-apps.md#waking-an-assistant-that-is-not-in-a-turn) | | | |
+| Spec `saveFile` and `parseCsv` (save and import CSV on the phone) | [phone-apps](phone-apps.md#save-as-a-file) | | | |
+| Contacts, Messages and Clock first-party apps | [phone-apps](phone-apps.md#first-party-apps) | | | |
+

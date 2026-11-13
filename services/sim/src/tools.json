@@ -2654,6 +2654,31 @@
     }
   },
   {
+    "name": "room_report",
+    "description": "One summary per session in a room: agent, steps, seconds, errors, last screen title and notes. Use it to collect every sub-agent's result in one call.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "room": {
+          "type": "string",
+          "description": "Room name used in open_app"
+        }
+      },
+      "required": [
+        "room"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "room_note",
     "description": "Post a short plain-text note (up to 500 characters) to a room so the other agents see it in room_log.",
     "inputSchema": {
