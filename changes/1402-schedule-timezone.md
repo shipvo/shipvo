@@ -1,3 +1,0 @@
-- `@shipvo/mcp`: `schedule_app` takes an optional `timezone` (an IANA name such as `Europe/Berlin`). `arrange_apps` accepts it inside `schedule`. `from`, `to` and `days` are read in that zone. A bad name fails with `bad_timezone`.
-- `@shipvo/sim`: the schedule stores `timezone`; without it the window is read by the phone clock as before.
-- Migration: none; new optional input.

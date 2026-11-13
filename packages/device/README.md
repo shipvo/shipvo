@@ -18,5 +18,7 @@ await device.notifications.show({ title: "Order confirmed", body: "TT-1001 is be
 
 Apps that import Expo modules directly also work in the simulator: add `withShipvoSim` from `@shipvo/device/metro` to `metro.config.js`.
 
+Simulator builds can also run your app's Android and iOS code. Add the Babel plugin `@shipvo/device/babel` for builds with `PN_SIM` set, and `Platform.OS` and `Platform.select` follow the phone the session simulates. Pass `{ nativeFiles: true }` to `withShipvoSim` and relative imports pick `.native.js` files. Both apply to your own files only. See `docs/device-api.md` in the repo.
+
 
 On phones, mount `<ScanHost />` from `@shipvo/device/scan` once at the app root so `device.camera.scan()` has a screen to show. Full reference: `docs/device-api.md` in the repo.

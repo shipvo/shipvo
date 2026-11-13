@@ -1,2 +1,0 @@
-- `@shipvo/sim` (hosted MCP): sign-in accepts Client ID Metadata Documents (URL `client_id`s) and the metadata advertises `client_id_metadata_document_supported` and `authorization_response_iss_parameter_supported`. Every redirect to a client now carries `iss`. `POST /register` keeps working.
-- Migration: none; additive.

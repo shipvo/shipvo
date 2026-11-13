@@ -1,1 +1,0 @@
-- mcp: a test now creates a spec app and types into its form field by a `f1e7` ref. The ref schema for tap, type, scroll and wait_for already accepts the frame prefix.

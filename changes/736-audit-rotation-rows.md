@@ -1,2 +1,0 @@
-- `@shipvo/control-plane`: `GET /audit/:app` now also returns `key-rotation` rows (sequence and `valid_from` in `after`), merged by time with publishes and rollbacks on the first page.
-- Migration: none; new `action` value `key-rotation`.

@@ -1,1 +1,0 @@
-- Docs: the parity results page says who it is for, lists the steps to run parity yourself on Android and iOS, and ends with next steps; the action feature log page has steps to record a walk.

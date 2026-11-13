@@ -1,2 +1,0 @@
-- Docs: the gallery list in App spec blocks now includes the reading board, meal planner and favourite places specs; Agents notes that prefixed refs after a restart are accepted; Adapters notes the Android patch memory fallback (`out_of_memory`, `over_memory_budget`).
-- Migration: none.

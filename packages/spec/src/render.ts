@@ -38,6 +38,8 @@ export interface RenderOptions extends EvalOptions {
   state?: Record<string, unknown>;
   /** Route params for the screen. */
   params?: Record<string, unknown>;
+  /** The phone's network, read in expressions as `network.online` and `network.type` ("wifi", "cellular" or "none"). Default: online on Wi-Fi. The object is read on every render, so changing it in place changes what the app sees. */
+  network?: { online: boolean; type?: "wifi" | "cellular" | "none" };
   /** Form values typed so far, by form key (the block's `id`, or its `label`), then field name. Set by {@link createApp}. */
   drafts?: Record<string, Record<string, unknown>>;
   /** Validation messages to show, by form key, then field name. Set by {@link createApp}. */
@@ -105,7 +107,7 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
   for (const [k, v] of Object.entries<Obj>(s.data ?? {})) {
     if (v.source === "collection" && !(k in data)) data[k] = v.seed ?? [];
   }
-  const base = () => ({ ...data, data, state, route: { params: options.params ?? {} } });
+  const base = () => ({ ...data, data, state, route: { params: options.params ?? {} }, network: { online: options.network?.online !== false, type: options.network?.online === false ? "none" : options.network?.type ?? "wifi" } });
   for (const [k, v] of Object.entries<Obj>(s.data ?? {})) {
     if (v.source === "computed") {
       try { data[k] = evaluateTemplate(String(v.value), base(), options); } catch { data[k] = null; }

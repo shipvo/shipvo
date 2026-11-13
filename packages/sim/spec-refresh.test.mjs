@@ -203,3 +203,20 @@ test("history records what each version changed and sources() lists the http sou
   assert.deepEqual(host.history("s", "app").at(-1).changes, ["added screen 'about'", "changed data 'price'"]);
   assert.deepEqual(host.sources("s", "app"), [{ name: "price", refresh: 90 }]);
 });
+
+test("offline: scheduled refreshes and refresh_app do not fetch, and the app reads network as offline until it is back", async () => {
+  const sp = spec(); sp.screens[0].body.push({ type: "text", value: "{{ network.online ? 'net ' + network.type : 'no network' }}" });
+  const { host, timers, tick, calls } = setup(sp);
+  assert.match(JSON.stringify(host.tree("s", "app")), /net wifi/);
+  assert.deepEqual(host.setNetwork("s", { online: false }), { online: false, type: "none" });
+  assert.match(JSON.stringify(host.tree("s", "app")), /no network/);
+  await tick(timers[0]);
+  assert.equal(calls(), 0);
+  const r = await host.refresh("s", "app");
+  assert.equal(calls(), 0); assert.deepEqual(r.updated, []); assert.match(r.errors[0].message, /^offline/);
+  host.setNetwork("s", { online: true, type: "cellular" });
+  assert.match(JSON.stringify(host.tree("s", "app")), /net cellular/);
+  await tick(timers[0]);
+  assert.equal(calls(), 1);
+  assert.match(JSON.stringify(host.tree("s", "app")), /Price 10/);
+});

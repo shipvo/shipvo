@@ -1,1 +1,0 @@
-- Docs: getting-started explains that an Android patch falls back to the full download (`over_memory_budget`, `out_of_memory`), and the agents page explains prefixed refs after a restart and `stale_ref`.
