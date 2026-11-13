@@ -4,6 +4,21 @@ Dated, newest first. Package versions are on npm under `@shipvo`.
 
 ## 2026-11-13 (release)
 
+- **@shipvo/mcp 0.0.14**: mcp-tools: publish @shipvo/mcp-tools
+- **@shipvo/mcp-tools 0.0.2**: mcp-tools: publish @shipvo/mcp-tools; sim: listen on this machine only; A2UI tools in @shipvo/mcp; a failed build reports its first error; mcp: phone models and framed screenshots; a speed benchmark; a refreshed skill; mcp: live Assistant Inbox view (MCP Apps) with auto-continue; mcp: open_app reuses an open session; hosted calls carry the assistant's name
+- **@shipvo/runtime 0.1.8**: runtime: scene host waits for activation before reporting
+- **@shipvo/spec 0.0.6**: spec: saveFile step saves CSV and other text as a file (slice 1 of #1460)
+
+### Changes
+
+- `@shipvo/spec`: new `saveFile` action step saves text, such as the result of `csv()`, as a file in a collection of the app. It needs the `files` device permission. Works the same on Android and iOS.
+- Migration: none; new step.
+- Tooling: `scripts/busy-apply/run.mjs` applies a staged update N times under a busy JS loop on the Android emulator and the iOS Simulator and counts crashes, reload time and empty native module state. No package API changes.
+- runtime: the iOS scene host test waits for the app to be active before it reports, so a slow Simulator launch no longer reads a trial-boot count too early.
+- `@shipvo/mcp-tools`: now published to npm. It exports the registry of every Shipvo MCP tool (`tools`, `toolList`, `describeTools()`) and the key-in-input checks. See `docs/mcp-tools.md`. Migration: none; `@shipvo/mcp` still bundles the registry it was built with.
+
+## 2026-11-13 (release)
+
 - **@shipvo/cli 0.1.9**: sim: listen on this machine only; A2UI tools in @shipvo/mcp; a failed build reports its first error; sim: Shipvo Phone reads A2UI 1.0, and shipvo session opens A2UI messages on a phone; mcp: phone models and framed screenshots; a speed benchmark; a refreshed skill; sim: real phone models, a file-read fix, and fixes from running real apps; cli: shipvo session, any Expo app on Shipvo Phone from the shell, with framed screenshots and video
 - **@shipvo/device 0.1.7**: bug-bench: a bug-catch benchmark, and phone platform mode for simulator builds; sim: Wi-Fi, mobile data and airplane mode, readable by every app (slice 8 of #1460); sim: share sheet and clipboard across apps (slice 5 of #1460); mcp+sim: set_reminder, list_reminders and cancel_reminder fire a notification at a time on the phone's clock (slice 3 of #1460)
 - **@shipvo/mcp 0.0.13**: sim: listen on this machine only; A2UI tools in @shipvo/mcp; a failed build reports its first error; mcp: phone models and framed screenshots; a speed benchmark; a refreshed skill; mcp: inbox view loads its script from sim.shipvo.dev for hosts that block inline scripts; mcp: inbox view uses ChatGPT's widget bridge; Google client is gemini; mcp: live Assistant Inbox view (MCP Apps) with auto-continue

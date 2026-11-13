@@ -1,0 +1,9 @@
+{
+ "description": "Shared BSDIFF40 patch vector for Capacitor Android tests. Base, patch and new bundle are base64; hashes are sha-256 hex. Built with a single control entry, so any bspatch must rebuild `new` exactly.",
+ "base": "UEstdGVzdC1idW5kbGU6IDxodG1sPnJlbGVhc2UgMjwvaHRtbD4=",
+ "baseSha256": "6ae1d00803e163e326b771b118d9b20ff402157d9e1350c1c77b0b4414e4f9c4",
+ "patch": "QlNESUZGNDArAAAAAAAAADgAAAAAAAAAMAAAAAAAAABCWmg5MUFZJlNZKxkpWwAABdAASBgBACAAIYaBmgxWybi7kinChIFYyUrYQlpoOTFBWSZTWXko8EQAAAB0CeAAABAAAIBABAAEAAAIIAAxDAggbRCy9BOdDxdyRThQkHko8ERCWmg5MUFZJlNZD0Xa2wAAA5mAAACABQJGlAAgADEAMCAGnqRWdaEHi7kinChIB6LtbYA=",
+ "patchSha256": "76b52b77ad673b30cf19294678c40162730a9b0e9fde5fe09c5e8010ca3075c8",
+ "new": "UEstdGVzdC1idW5kbGU6IDxodG1sPnJlbGVhc2UgMyB3aXRoIG1vcmU8L2h0bWw+",
+ "newSha256": "ca4911ccb8274a62aeb5fd576ad8f7efd6e6ffa21ee9210e9615137ec8e33a3b"
+}
