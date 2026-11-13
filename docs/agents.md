@@ -40,6 +40,7 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `list_apps(query?)` | Apps this key can open: the sample app, your own, and every public app on [shipvo.dev/apps](https://shipvo.dev/apps); `query` searches name, description and category |
 | `list_sessions` | Open sessions on this server, to resume after a reconnect. Each row shows app, platform, room, who opened it (the MCP client name), start time and current screen title |
 | `room_log(room, since?)` | Read-only. What every session in a room did, oldest first, plus the notes agents posted. See [Room log and notes](#room-log-and-notes) |
+| `room_report(room)` | Read-only. One summary per session in a room: agent, steps, seconds, errors, last screen title and notes. See [Collect one summary per session](#collect-one-summary-per-session) |
 | `room_note(room, text)` | Post a plain-text note (up to 500 characters) for the other agents in the room |
 | `open_app(app, session?, seed_cart?, dark?, attach?, platform?, show?, room?)` | A phone-sized session; returns the first screen. If `shipvo run` is up for this app (`.shipvo/run.json` in the working directory or a parent, up to the git root), the session drives that phone instead and the result says `attached to the live shipvo run phone`; otherwise it says `headless session`. `attach`: `auto` (default), `never` (always headless), `always` (error with no live run). `show: true` opens the phone in your browser and starts `shipvo run <platform>` when none is up; by default that happens only on a desktop machine whose project has `shipvo` installed. A server over HTTP never starts a run. `platform` applies only when a phone is started; with `show: false`, `attach: never` or a live run attached as it is, the result says it was ignored. Attached sessions support screen, tap, type, scroll, back and screenshot; other tools return `not_supported_attached`. Attach needs Node 22+; if attach fails in `auto` mode the headless result says why. `app@release` still attaches to the local run. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
 | `upload_build(dir?, app?, skip_build?)` | Build this project, upload it for your key and return a build id. Open it on the hosted phone with `open_app("<app>@build:<id>")`. Local (stdio) server only. See [Test your build](test-your-build.md) |
@@ -110,6 +111,35 @@ Errors:
 | `bad_cursor` | `since` is not a cursor from an earlier read. Leave `since` out to read from the start |
 | `bad_note` | The note is empty |
 | `note_too_long` | The note is over 500 characters. Shorten it |
+
+## Collect one summary per session
+
+Use `room_report` when a lead agent has sent other agents to test parts of one app and wants every result in one call, instead of reading the whole log. It is for the lead agent, and for you when you want a quick answer to "what did each phone do?".
+
+1. Open two or more sessions with the same `room`, as in [Rooms](#rooms-several-phones-one-backend).
+2. Let each agent work. An agent can post what it found with `room_note`.
+3. Call `room_report("demo")`.
+
+Example reply (the figures here are made up to show the shape):
+
+```text
+s1 (claude-code): 12 steps in 48s, 0 errors, screen "Cart"
+s2 (cursor): 5 steps in 20s, 1 errors, screen "Checkout", notes: Pay button does nothing
+```
+
+`structuredContent.sessions` holds the same rows as data:
+
+| Field | Meaning |
+| --- | --- |
+| `session` | The session id |
+| `agent` | The agent name your MCP client reports, or `null` |
+| `steps` | Actions the session took in the room |
+| `seconds` | Time from the session's first to its last logged action or note |
+| `errors` | Actions that ended in an error |
+| `last_screen_title` | The latest screen title the log recorded, or `null` |
+| `notes` | Notes posted with `room_note`, in order |
+
+A note counts for a session when it carries that session, or when its agent opened exactly one session in the room. Sessions come back in the order they started. `room_report` reads the same log as `room_log`, so it keeps the latest 1000 entries, changes nothing and can be called as often as you like. A room with no open session returns `no_room`.
 
 ## Driving the live phone
 
@@ -289,7 +319,7 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 
 **The `watch_url` shows an error or does not load.** The link is valid for one hour, for one session. Call `open_app` again for a new one. If there is no `watch_url` in the reply, you are on a local simulator; open `/watch` there instead.
 
-**`room_log` or `room_note` returns `no_room`.** The room ends when its last session ends, and its log goes with it. Open a session with `room` again and read the log while a session is still open.
+**`room_log`, `room_report` or `room_note` returns `no_room`.** The room ends when its last session ends, and its log goes with it. Open a session with `room` again and read the log while a session is still open.
 
 **Two sessions do not see each other's orders.** They were opened without the same `room`. Open both with the same `room` value on the same simulator (see [Rooms](#rooms-several-phones-one-backend)).
 
