@@ -1,0 +1,1 @@
+- device: `Share.share` records a pending share and `receiveShare` hands one to the foreground app.
