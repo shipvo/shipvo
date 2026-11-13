@@ -1,0 +1,204 @@
+{
+  "slug": "two-assistants-one-phone",
+  "posterAt": 6,
+  "title": "Two assistants, one phone: the Assistant Inbox",
+  "tutorial": "docs/phone-apps.md",
+  "voice": "af_heart",
+  "pushIn": true,
+  "retention": {
+    "hook": "0-3 s: 'Two assistants. One phone. One hands work to the other.' with a message flying to a real phone screen.",
+    "promise": "By 8 s: ChatGPT sends a task, Claude finishes it, on Android and iOS.",
+    "openLoops": [
+      {
+        "question": "Will the task Claude is asked for come back finished?",
+        "opens": "reply scene (about 62 s): 'Watch the Tasks tab'",
+        "paysOff": "done scene (about 84 s): the task shows done with Claude's reply"
+      },
+      {
+        "question": "Does the phone really know who is calling?",
+        "opens": "install scene (about 18 s): 'Nobody types a name'",
+        "paysOff": "send scene (about 38 s): the sender fills itself in as chatgpt"
+      },
+      {
+        "question": "What if the wrong assistant tries to act?",
+        "opens": "done scene (about 84 s)",
+        "paysOff": "safe scene (about 96 s): updated false, with the reason"
+      }
+    ],
+    "reHooks": [
+      "a flash card in every scene (about every 5 to 8 s)",
+      "scene change every 9 to 12 s, a new tool card every 2 to 3 s",
+      "before and after: the empty inbox, then a finished task",
+      "Android and iOS side by side at about 108 s"
+    ],
+    "payoff": "The finished task with Claude's reply on the real phone screen, then the same on iOS.",
+    "nextStep": "npx shipvo agents setup, then the guide at shipvo.dev/learn; next episode: have an assistant test your app"
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "visual": "aiHook",
+      "min": 0,
+      "narration": "Two A I assistants share one phone. Watch one hand work to the other. By the end, ChatGPT has sent a task, Claude has finished it, on Android and iOS.",
+      "flashes": [
+        {
+          "at": 5.0,
+          "text": "One phone. Two assistants."
+        }
+      ]
+    },
+    {
+      "id": "why",
+      "visual": "aiWhy",
+      "min": 0,
+      "narration": "Normally each assistant works alone. You copy and paste between chats. Here, they share a phone.",
+      "flashes": [
+        {
+          "at": 4.5,
+          "text": "No copy and paste"
+        }
+      ]
+    },
+    {
+      "id": "install",
+      "visual": "aiInstall",
+      "min": 0,
+      "narration": "Connect both assistants to the same phone, and install the Assistant Inbox. The phone knows who is calling from the name each one connects with. Nobody types a name.",
+      "flashes": [
+        {
+          "at": 4.2,
+          "text": "The phone knows who is calling"
+        },
+        {
+          "at": 8.6,
+          "text": "No names to type"
+        }
+      ]
+    },
+    {
+      "id": "send",
+      "visual": "aiSend",
+      "min": 0,
+      "narration": "First, ChatGPT calls send message, to Claude. Look at the phone. Chat G P T to Claude. The sender filled itself in.",
+      "caption": "First, ChatGPT calls send_message, to Claude. Look at the phone: chatgpt to claude. The sender filled itself in.",
+      "flashes": [
+        {
+          "at": 5.4,
+          "text": "Sender filled in"
+        }
+      ]
+    },
+    {
+      "id": "banner",
+      "visual": "aiBanner",
+      "min": 0,
+      "narration": "Claude's next call of any phone tool starts with one line. Inbox, one unread for Claude. Nobody says check your inbox.",
+      "caption": "Claude's next call of any phone tool starts with one line: Inbox, 1 unread for claude. Nobody says \"check your inbox\".",
+      "flashes": [
+        {
+          "at": 5.0,
+          "text": "Seen on the next call"
+        }
+      ]
+    },
+    {
+      "id": "reply",
+      "visual": "aiReply",
+      "min": 0,
+      "narration": "Claude reads it with check inbox, and answers. Yes. Send it over as a task. Will the task come back finished? Watch the Tasks tab.",
+      "caption": "Claude reads it with check_inbox, and answers: \"Yes. Send it over as a task.\" Will the task come back finished? Watch the Tasks tab.",
+      "flashes": [
+        {
+          "at": 6.0,
+          "text": "Will it come back?"
+        }
+      ]
+    },
+    {
+      "id": "handoff",
+      "visual": "aiHandoff",
+      "min": 0,
+      "narration": "Now ChatGPT hands off a task. Review the checkout plan. It appears on the Tasks tab, waiting for Claude.",
+      "caption": "Now ChatGPT hands off a task: Review checkout plan. It appears on the Tasks tab, waiting for Claude.",
+      "flashes": [
+        {
+          "at": 4.6,
+          "text": "A task, waiting"
+        }
+      ]
+    },
+    {
+      "id": "work",
+      "visual": "aiWork",
+      "min": 0,
+      "narration": "Claude lists its tasks. Starts the task. Then finishes it, with a reply.",
+      "caption": "Claude lists its tasks, starts the task, then finishes it with a reply.",
+      "flashes": [
+        {
+          "at": 3.5,
+          "text": "Start"
+        },
+        {
+          "at": 6.5,
+          "text": "Finish"
+        }
+      ]
+    },
+    {
+      "id": "done",
+      "visual": "aiDone",
+      "min": 0,
+      "narration": "Back on ChatGPT's side, sent tasks shows it done, with the answer. Plan looks good. Add a back button on the cart.",
+      "caption": "Back on ChatGPT's side, sent_tasks shows it done, with the answer: \"Plan looks good. Add a back button on the cart.\"",
+      "flashes": [
+        {
+          "at": 5.5,
+          "text": "Done, with a reply"
+        }
+      ]
+    },
+    {
+      "id": "safe",
+      "visual": "aiSafe",
+      "min": 0,
+      "narration": "Only the right assistant can act. A task for someone else returns updated false, and says why. Nobody is told it worked when it did not.",
+      "caption": "Only the right assistant can act. A task for someone else returns updated: false, and says why. Nobody is told it worked when it did not.",
+      "flashes": [
+        {
+          "at": 5.4,
+          "text": "Honest answers"
+        }
+      ]
+    },
+    {
+      "id": "ios",
+      "visual": "aiIos",
+      "min": 0,
+      "narration": "The same exchange runs on Android and iOS. Same data. Same tabs.",
+      "flashes": [
+        {
+          "at": 4.5,
+          "text": "Android + iOS"
+        }
+      ]
+    },
+    {
+      "id": "cta",
+      "visual": "aiCta",
+      "min": 0,
+      "narration": "That is two assistants, one inbox. Run npx shipvo agents setup, connect both, and install the Assistant Inbox. The guide is at shipvo dot dev, slash learn. Next, have an assistant test your app.",
+      "caption": "That is two assistants, one inbox. Run npx shipvo agents setup, connect both, and install the Assistant Inbox. The guide is at shipvo.dev/learn. Next, have an assistant test your app.",
+      "flashes": [
+        {
+          "at": 3.0,
+          "text": "Two assistants. One inbox."
+        },
+        {
+          "at": 9.0,
+          "text": "npx shipvo agents setup"
+        }
+      ]
+    }
+  ],
+  "music": null
+}

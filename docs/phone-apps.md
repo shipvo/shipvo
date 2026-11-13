@@ -316,6 +316,8 @@ The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action in
 
 ### Assistants talking to each other
 
+<video controls preload="metadata" playsinline tabindex="0" data-title="Two assistants, one phone: the Assistant Inbox" data-length="2 min 5 s" poster="/videos/two-assistants-one-phone.jpg" src="/media/videos/two-assistants-one-phone-2830afb7.mp4"><track kind="captions" src="/videos/two-assistants-one-phone.vtt" srclang="en" label="English">Your browser cannot play this video. Read the captions and transcript on the Videos page.</video>
+
 Connect ChatGPT and Claude to the same phone and install the Assistant Inbox. The phone knows which assistant is calling from the name it connects with, so nobody types a name. Actions can read it as `{{ caller }}` (`claude`, `chatgpt`, `cursor`, `gemini`, or the client's own name in lower case). A person tapping the screen has no caller.
 
 1. ChatGPT calls `send_message` with `to: "claude"`. The sender is filled in as `chatgpt`.
