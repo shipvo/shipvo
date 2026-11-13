@@ -48,7 +48,7 @@ import { searchPhone, SearchError } from "./search.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 import { statusFromDevice } from "./frame.mjs";
-import { MODELS, findModel, modelContext } from "./models.mjs";
+import { MODELS, DEFAULT_MODEL, findModel, modelContext } from "./models.mjs";
 import { capturePage, contentSize, showShot, shotArgs, encodeFrames, CaptureError } from "./capture.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
@@ -1108,6 +1108,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== "POST") return send(404, { error: "not found" });
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
     if (url.pathname === "/apps") return send(200, { ok: true, apps: [{ id: DEFAULT_APP, name: APP_NAME }] });
+    if (url.pathname === "/models") return send(200, { ok: true, models: MODELS.map(({ name, platform, width, height, scale }) => ({ name, platform, width, height, scale })), defaults: DEFAULT_MODEL });
     if (url.pathname === "/sessions") return send(200, { ok: true, sessions: await Promise.all([...sessions.entries()].map(async ([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, skin: s.skin, model: s.model ?? null, streaming: isWatched(s) || !!s.browser?.screencast, url: s.page.url(), room: s.room ?? null, title: await s.page.title().catch(() => "") }))) });
     if (url.pathname === "/room_log" || url.pathname === "/room_note") {
       const room = String(body.room ?? "");

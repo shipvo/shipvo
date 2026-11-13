@@ -31,6 +31,40 @@ Every app logic and device hardware bug was caught in both builds. The five chec
 
 The benchmark is also the app's test. `pnpm -r test` builds the app, runs all 45 checks and fails if a seeded bug is missed or a check stops passing on the fixed screen.
 
+## Speed and size
+
+`apps/bug-bench/bench/speed.mjs` times what an agent does all day on Shipvo Phone, and measures what the agent has to read. Measured on 13 Nov 2026 in a development container (Linux, 4 CPUs, Node 22.23.4, Chrome Headless Shell) with `node bench/speed.mjs`. Times are the median of 10 runs (5 for opening a phone). A second run gave the same numbers within 10 ms.
+
+| | Pixel 8 | iPhone 16 |
+| --- | --- | --- |
+| Open a phone, to its first screen | 1,243 ms | 1,219 ms |
+| Read the screen | 167 ms | 165 ms |
+| Tap | 396 ms | 396 ms |
+| Type | 388 ms | 380 ms |
+| Screenshot | 250 ms | 250 ms |
+| Screenshot of the phone in its frame | 370 ms | 369 ms |
+| A screen as a tree (median of 5 screens) | 205 bytes | 205 bytes |
+| The same screen as a PNG | 37,833 bytes | 39,830 bytes |
+
+A tap and a type include the wait for the screen to settle and the new screen in the reply. The tree is what an agent reads to act; on these screens the picture of the same screen is 185 times (Pixel 8) and 194 times (iPhone 16) its size.
+
+Memory of the simulator and its browser, with phones held open: 589 MB with none, 936 MB with 1, 1,459 MB with 3, 2,016 MB with 5. Each extra phone adds 270 MB. A phone model adds nothing to that: the same run with no model, a Pixel 8 and an iPhone 16 gave 268.7, 268.3 and 268.9 MB per extra phone.
+
+### Two apps from GitHub
+
+The same measurements on the first screen of two open-source Expo apps, built from their public source and opened with `shipvo session`. Same container, same day, median of 10 screen reads, 5 screenshots and 3 opens.
+
+| | Obytes starter, Pixel 8 | Obytes starter, iPhone 16 | Bluesky, Pixel 8 | Bluesky, iPhone 16 |
+| --- | --- | --- | --- | --- |
+| Open a phone, to its first screen | 1,268 ms | 1,271 ms | 4,608 ms | 4,575 ms |
+| Read the screen | 169 ms | 170 ms | 249 ms | 257 ms |
+| Screenshot | 259 ms | 269 ms | 931 ms | 843 ms |
+| Screenshot of the phone in its frame | 392 ms | 400 ms | 1,355 ms | 1,369 ms |
+| The screen as a tree | 385 bytes | 385 bytes | 436 bytes | 436 bytes |
+| The same screen as a PNG | 131,968 bytes | 151,204 bytes | 832,633 bytes | 827,438 bytes |
+
+Both apps were then used end to end: the Obytes starter (Expo 54, expo-router) through onboarding, form validation, login, its feed, a post screen, a phone restart on that screen, Settings, the theme sheet, dark theme and logout; Bluesky (Expo 58, React Navigation) through its welcome screen, the signed-out Discover feed, the drawer menu and the sign-in form.
+
 ## Run it
 
 1. Install and build the packages:
@@ -48,6 +82,7 @@ The benchmark is also the app's test. `pnpm -r test` builds the app, runs all 45
    ```
 
 3. Read the table it prints. `results.json` holds one row per check with `fixedPass`, `buggyPass` and `result`.
+4. For the speed and size numbers, run `node bench/speed.mjs --out speed.json`. `--models "Pixel 8,iPhone 16 Pro"` picks the phones and `--skip-build` reuses the build.
 
 Options: `--skip-build` (use the existing `sim-dist`), `--parallel <n>` (checks at a time, default 4), `--json` (print the JSON instead of the table), `--out <file>`, `--port <n>`. Set `BUG_BENCH_PHONE_PLATFORM=off` to build without phone platform mode.
 

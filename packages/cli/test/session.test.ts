@@ -168,6 +168,19 @@ describe("shipvo session", () => {
     ]);
   });
 
+  it("errors lists what the app threw and scripts that did not load", async () => {
+    const { deps, state } = setup();
+    const id = (await run(deps, ["start"])).doc.data.id;
+    const clean = await run(deps, ["errors"]);
+    expect(clean.doc.code).toBe("no_errors"); expect(clean.doc.data).toEqual({ session: id, errors: [] });
+    state.reply.errors = { ok: true, errors: ["TypeError: x is undefined", "a script did not load (404): /static/app.js"], screen: "" };
+    const { doc, exit } = await run(deps, ["errors"]);
+    expect(exit).toBe(0); expect(doc.code).toBe("errors");
+    expect(doc.summary).toBe("The app has 2 errors.");
+    expect(doc.data.errors).toEqual(["TypeError: x is undefined", "a script did not load (404): /static/app.js"]);
+    expect(state.posts.at(-1)!.body).toEqual({ session: id, action: "errors" });
+  });
+
   it("passes on the simulator's error code when an action fails", async () => {
     const { deps, state } = setup();
     await run(deps, ["start"]);

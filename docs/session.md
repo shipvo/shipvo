@@ -77,6 +77,7 @@ shipvo session type e8 "Hans"               # type into a field
 shipvo session scroll down                  # or up, left, right; add a ref to scroll inside an element
 shipvo session back                         # the app's Back button
 shipvo session screenshot --out shots/home.png
+shipvo session errors                       # what the app threw, and scripts that did not load
 ```
 
 `tap`, `type`, `scroll` and `back` print the new screen. `type` also returns the value the field holds.

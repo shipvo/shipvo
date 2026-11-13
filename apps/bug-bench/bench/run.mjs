@@ -20,7 +20,7 @@ export function build() {
   if (r.status !== 0) throw new Error(`the web build failed:\n${(r.stdout + r.stderr).trim().split("\n").slice(-12).join("\n")}`);
 }
 
-/** Starts the simulator for this app. Resolves { base, stop } once it listens. */
+/** Starts the simulator for this app. Resolves { base, stop, pid } once it listens. */
 export async function startSim(port) {
   const server = createRequire(join(app, "package.json")).resolve("@shipvo/sim/server.mjs");
   const dir = mkdtempSync(join(tmpdir(), "bug-bench-"));
@@ -29,7 +29,7 @@ export async function startSim(port) {
   const stop = async () => { if (proc.exitCode === null) { const done = new Promise((r) => proc.once("exit", r)); proc.kill("SIGKILL"); await done; } proc.stderr.destroy(); rmSync(dir, { recursive: true, force: true }); };
   const base = `http://127.0.0.1:${port}`;
   for (let i = 0; i < 450; i++) {
-    try { await fetch(`${base}/sessions`); return { base, stop }; }
+    try { await fetch(`${base}/sessions`); return { base, stop, pid: proc.pid }; }
     catch { if (proc.exitCode !== null) { await stop(); throw new Error(`the simulator stopped: ${err}`); } await new Promise((r) => setTimeout(r, 200)); }
   }
   await stop(); throw new Error(`the simulator did not start on port ${port}: ${err}`);

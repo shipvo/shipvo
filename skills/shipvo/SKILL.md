@@ -31,17 +31,28 @@ shipvo sim --watch       # rebuild on file changes
 
 ## Test any Expo app from the shell
 
+Works in any Expo app folder. No `shipvo.json`, no emulator, no account.
+
 ```bash
-shipvo session start android --max-duration-minutes 20 --json   # or ios; no shipvo.json needed
-shipvo session start --device "iPhone 16 Pro"   # a named phone model; `shipvo session devices` lists them
-shipvo session screen            # tree with [ref=eN]
-shipvo session tap e6            # also: type <ref> <text>, scroll <dir>, back
-shipvo session screenshot --out shots/home.png        # the phone in its frame
+shipvo session start android --max-duration-minutes 20 --json   # a Pixel 8; `ios` is an iPhone 16
+shipvo session start --device "iPhone 16 Pro" --json            # a named model; `shipvo session devices` lists them
+shipvo session screen            # the screen as a tree; every element you can act on has [ref=eN]
+shipvo session tap e6            # also: type <ref> <text>, scroll <up|down|left|right> [<ref>], back
+shipvo session errors            # what the app threw, and scripts that did not load
+shipvo session screenshot --out shots/home.png        # the phone in its frame, for a person to look at
 shipvo session record start      # then act, then: shipvo session record stop --out videos/run.mp4
-shipvo session stop
+shipvo session stop              # then `shipvo session clean` removes stopped sessions and their files
 ```
 
-Every result has `next`: run its first command. The session stops on its own at `data.expires_at`. `web_deps_missing` means run the `npx expo install ...` command in `next`. Details: `docs/session.md`.
+How to work:
+
+1. Start with `--json` and read `data.screen`. Every result has `next`: its first command is the usual next step.
+2. Act by ref. Refs change when the screen changes, so use the refs from the newest result, never an older one.
+3. After each action read the screen it returns. Do not assume the action worked.
+4. A blank or wrong screen: run `shipvo session errors` before anything else.
+5. Save a screenshot of each screen you check, and stop the session when you are done. It also stops on its own at `data.expires_at`.
+
+When a command fails, `code` says what to do: `web_deps_missing` (run the command in `next`), `build_failed` (the summary names the cause), `bad_model` (use a name from `shipvo session devices`), `stale_ref` (read the screen again), `covered` (something is on top of that element: close it or tap the one on top), `no_session` or `session_stopped` (start a session). Full workflow and what the phone does for real apps: `references/session.md`.
 
 ## Test it through @shipvo/mcp
 
@@ -51,7 +62,7 @@ Add the server to your MCP config (`shipvo mcp` prints it):
 { "mcpServers": { "shipvo": { "command": "npx", "args": ["-y", "@shipvo/mcp"] } } }
 ```
 
-Then: `open_app("<app id>")` → `screen(session)` (tree with `[ref=eN]`) → `tap` / `type` / `scroll` / `back` → `screenshot`. Use `set_device` for location, permissions, biometrics, payment and network. The tree shows what a person with a screen reader would get. To walk the whole app and get a report, run `shipvo explore`. Tool list: `references/mcp.md`.
+Then: `open_app("<app id>")` → `screen(session)` (tree with `[ref=eN]`) → `tap` / `type` / `scroll` / `back` → `screenshot`. `phone_models` lists the phones; pass one as `open_app(model: "iPhone 16 Pro")`. `screenshot(frame: true)` returns the phone in its frame. Use `set_device` for location, permissions, biometrics, payment and network. The tree shows what a person with a screen reader would get. To walk the whole app and get a report, run `shipvo explore`. Tool list: `references/mcp.md`.
 
 ## Write and run @shipvo/test tests
 
