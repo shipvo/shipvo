@@ -68,4 +68,31 @@ describe("spec runner through the dispatcher", () => {
     expect(status("morning")).toBe("ok");
     expect(sql.prepare("SELECT COUNT(*) AS n FROM app_run_results WHERE name = 'morning'").get().n).toBe(1);
   });
+
+  it("keeps a key sent in the URL query out of results and logs", async () => {
+    const { env, sql, due } = await setup();
+    due("morning", "2026-11-07T08:00:00.000Z");
+    const qspec = { ...spec, data: { weather: { ...spec.data.weather, get: "https://api.weather.test/forecast-q", auth: { secret: "WEATHER_KEY", type: "query", name: "apikey" } } } };
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...a) => { logs.push(a.join(" ")); });
+    const urls: string[] = [];
+    const fetch = async (url: string) => { urls.push(url); return { ok: true, status: 200, text: async () => JSON.stringify(upstream) }; };
+    await dispatchSchedules(env.DB, scheduleRunner(env, { loadSpec: async () => qspec, fetch }), { now });
+    spy.mockRestore();
+    expect(urls[0]).toContain(`apikey=${encodeURIComponent(KEY)}`);
+    expect(logs.length).toBeGreaterThan(0);
+    expect(logs.join("\n")).not.toContain(KEY);
+    expect(logs.join("\n")).not.toContain("apikey");
+    expect(sql.prepare("SELECT result FROM app_run_results").get().result).not.toContain(KEY);
+  });
+
+  it("records a missing key for one person and still stores the result for another", async () => {
+    const { env, sql, due } = await setup();
+    sql.prepare("INSERT INTO phone_apps (person_id, app_id, installed_at) VALUES (2, 'tide', '2026-01-01')").run();
+    due("morning", "2026-11-07T08:00:00.000Z");
+    const fetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify(upstream) });
+    await dispatchSchedules(env.DB, scheduleRunner(env, { loadSpec: async () => spec, fetch }), { now });
+    expect(sql.prepare("SELECT last_status FROM app_schedules").get().last_status).toMatch(/^error: /);
+    expect(sql.prepare("SELECT person FROM app_run_results").all().map((r: any) => r.person)).toEqual([1]);
+  });
 });

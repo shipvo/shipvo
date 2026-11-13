@@ -10,6 +10,8 @@ type Env = { DB: D1Database; VAULT_MASTER_KEY?: string };
 export type LoadSpec = (env: Env, app: string) => Promise<unknown | null>;
 export type RunnerOptions = { loadSpec?: LoadSpec; fetch?: RunContext["fetch"]; log?: RunContext["log"] };
 
+type Sched = { id?: string; do?: unknown[] };
+
 // Shared across runs in one isolate; authed entries are keyed by person and app through cacheScope.
 const cache = memoryCache();
 
@@ -49,8 +51,8 @@ export async function runSpecAction(env: Env, who: { person: string; app: string
  */
 export function scheduleRunner(env: Env, o: RunnerOptions = {}): RunSchedule {
   return async (app, name) => {
-    const s: any = await spec(env, app, o);
-    const sched = Array.isArray(s.schedules) ? s.schedules.find((x: any) => x?.id === name) : undefined;
+    const s = (await spec(env, app, o)) as { schedules?: Sched[]; actions?: Record<string, unknown> };
+    const sched = Array.isArray(s.schedules) ? s.schedules.find((x) => x?.id === name) : undefined;
     if (!sched || !Array.isArray(sched.do)) throw new RunError("bad_spec", `App ${app} has no schedule ${name}.`);
     const key = `schedule:${name}`;
     const withStep = { ...s, actions: { ...s.actions, [key]: { do: sched.do } } };
