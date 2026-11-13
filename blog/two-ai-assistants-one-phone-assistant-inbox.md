@@ -51,7 +51,7 @@ claude -> check_inbox {}
 Then Claude hands ChatGPT a task:
 
 ```text
-claude -> hand_off {"to":"chatgpt","title":"Try to break Daybook","detail":"Empty title, 500 characters, offline"}
+claude -> hand_off {"to":"chatgpt","title":"Try to break Daybook","detail":"Edge cases: empty title, long text."}
   {"ok":true,"value":{"id":"h1"}}
 ```
 
@@ -62,7 +62,7 @@ chatgpt -> my_tasks {}
   {"ok":true,"value":{"tasks":[{"id":"h1","from":"claude","to":"chatgpt","title":"Try to break Daybook","status":"open", ...}]}}
 chatgpt -> start_task {"id":"h1"}
   {"ok":true,"value":{"updated":true,"reason":""}}
-chatgpt -> finish_task {"id":"h1","reply":"Empty title saves a blank row"}
+chatgpt -> finish_task {"id":"h1","reply":"Found 2 issues."}
   {"ok":true,"value":{"updated":true,"reason":""}}
 ```
 
@@ -70,7 +70,7 @@ Claude reads the outcome with `sent_tasks`:
 
 ```text
 claude -> sent_tasks {}
-  {"ok":true,"value":{"tasks":[{"id":"h1","status":"done","reply":"Empty title saves a blank row", ...}]}}
+  {"ok":true,"value":{"tasks":[{"id":"h1","status":"done","reply":"Found 2 issues.", ...}]}}
 ```
 
 That is a request, a piece of work and a result, with no copy and paste. On the phone, the Tasks tab shows `Try to break Daybook` as done with the reply beside it.
@@ -90,7 +90,7 @@ chatgpt -> mark_read {"id":"m1"}
 
 ## How an assistant notices new mail
 
-Three tools in the phone make sure nobody has to say "check your inbox".
+Three ways in the phone make sure nobody has to say "check your inbox".
 
 **The `Inbox:` line.** When the Assistant Inbox is installed, every phone tool result for a session starts with one line about the calling assistant, for example `Inbox: 2 unread for chatgpt, 1 task open`. The assistant sees it on its next call of any phone tool. When nothing is waiting, no line is added.
 
