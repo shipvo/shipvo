@@ -18,6 +18,7 @@ export const SESSION_USAGE = `Usage: shipvo session <command> [options]
   start [android|ios] [--device "<model>"] [--name <n>] [--max-duration-minutes <n>] [--port <n>] [--skip-build]
   devices
   screen | back | screenshot [--out <file>] [--no-frame]
+  errors                    what the app threw, and scripts that did not load
   record start | record stop [--out <file>]
   tap <ref> | type <ref> <text> | scroll <up|down|left|right> [<ref>]
   get | list | stop
@@ -213,6 +214,10 @@ export async function actSession(d: SessionDeps, verb: string, words: string[], 
   else body = {};
   const res = await post(d, r.port, "/act", { session: r.id, action: verb, ...body });
   if (!res?.ok) throw new CliFailure(res?.error ?? "The action failed.", res?.code ?? res?.reason ?? "action_failed", 1, [driveNext(r.id)[0]]);
+  if (verb === "errors") {
+    const errors: string[] = Array.isArray(res.errors) ? res.errors.map(String) : [];
+    return { code: errors.length ? "errors" : "no_errors", summary: errors.length ? `The app has ${errors.length} error${errors.length === 1 ? "" : "s"}.` : "The app has no errors.", data: { session: r.id, errors }, next: driveNext(r.id) };
+  }
   if (verb === "record_start") return { code: "recording", summary: `Recording session ${r.id}. Run \`shipvo session record stop\` to save the video.`, data: { session: r.id, path: res.path }, next: [{ command: `shipvo session record stop --id ${r.id} --json`, why: "Save the video when the steps are done." }] };
   if (verb === "screenshot" || verb === "record_stop") {
     const path = o.out ? resolve(d.root, o.out) : String(res.path);
@@ -290,7 +295,7 @@ export async function session(argv: string[], deps: SessionDeps = defaultDeps())
     else if (verb === "devices") { const { models, defaults } = await deps.models(deps.root); done = { code: "listed", summary: `${models.length} phone models. Defaults: ${defaults.android} for android, ${defaults.ios} for ios.`, data: { devices: models.map(({ name, platform, width, height, scale }) => ({ name, platform, width, height, scale })), defaults }, next: START_NEXT }; }
     else if (verb === "get") { const r = pick(deps, flags.id); done = { code: r.status, summary: `Session ${r.id} is ${r.status === "in_progress" ? "running" : "stopped"}.`, data: view(deps.root, r), next: r.status === "in_progress" ? driveNext(r.id) : START_NEXT }; }
     else if (verb === "list") { const list = all(deps); done = { code: "listed", summary: `${list.length} session${list.length === 1 ? "" : "s"} in this folder.`, data: { sessions: list }, next: list.some((s) => s.status === "in_progress") ? [] : START_NEXT }; }
-    else if (["screen", "tap", "type", "scroll", "back", "screenshot", "record"].includes(verb)) done = await actSession(deps, verb, rest, { id: flags.id, out: flags.out, noFrame: flags["no-frame"] === "true" });
+    else if (["screen", "tap", "type", "scroll", "back", "screenshot", "record", "errors"].includes(verb)) done = await actSession(deps, verb, rest, { id: flags.id, out: flags.out, noFrame: flags["no-frame"] === "true" });
     else throw new UsageError(`Unknown session command "${verb}".\n${SESSION_USAGE}`);
     doc = envelope(done.code, done.summary, done.data, done.next, 0);
   } catch (e) {
@@ -303,6 +308,7 @@ export async function session(argv: string[], deps: SessionDeps = defaultDeps())
     (exit ? console.error : console.log)(doc.summary);
     const screen = (doc.data as { screen?: string }).screen;
     if (screen) console.log(screen);
+    if (verb === "errors") for (const e of (doc.data as { errors?: string[] }).errors ?? []) console.log(`- ${e}`);
     if (verb === "devices") for (const m of (doc.data as { devices?: PhoneModel[] }).devices ?? []) console.log(`${m.name.padEnd(18)} ${m.platform.padEnd(8)} ${m.width}x${m.height} @${m.scale}x`);
     if (verb === "list") for (const s of (doc.data as { sessions?: SessionRecord[] }).sessions ?? []) console.log(`${s.id}  ${s.status}  ${s.device ?? s.platform}  ${s.name}  ${s.url}`);
     for (const n of doc.next) console.error(`next: ${n.command}  (${n.why})`);

@@ -1743,6 +1743,10 @@
           ],
           "description": "Which phone to show: 'android' or 'ios' (default: the live run's, else android). Ignored when no phone is started (show false, attach never, or a live run is attached as it is)"
         },
+        "model": {
+          "type": "string",
+          "description": "Phone model for a headless session, from phone_models, for example 'iPhone 16 Pro' or 'Galaxy S24'. The session gets that phone's screen size, pixel ratio, user agent and platform. Ignored when a live run is attached."
+        },
         "show": {
           "type": "boolean",
           "description": "true: open the phone in the user's browser so they can watch (default on a computer with a desktop, when the project has `shipvo` installed; a server over HTTP never starts a run). false: headless, nobody sees it (default in CI)."
@@ -2010,6 +2014,22 @@
         "session"
       ],
       "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "phone_models",
+    "description": "The phone models a headless session can be, each with its platform, screen size in CSS pixels and pixel ratio, and the default model for android and ios. Pass a name to open_app as `model`.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2693,6 +2713,10 @@
         "session": {
           "type": "string",
           "description": "Session from open_app"
+        },
+        "frame": {
+          "type": "boolean",
+          "description": "true: the whole phone, the app inside its Android or iPhone frame with the status bar, for showing a person. Headless sessions only. Default false: the app's screen alone."
         }
       },
       "required": [

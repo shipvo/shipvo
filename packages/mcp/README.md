@@ -33,6 +33,7 @@ The result gets a line `Waited: matched | timed out after <ms> ms` and `structur
 | `unknown_app` | The app id is not one this server or key can open. | Call `list_apps` and use an id from it. |
 | `sim_timeout` | The simulator did not answer in time. The action may have run. | Call `screen` to see where the app is. Do not repeat the action blindly. |
 | `needs_confirm` | An owner command that cannot be undone did nothing and returned a plan and a one-time `challenge`. | Show the plan to the owner and ask them to approve it at `challenge.approval_url` in the admin. Then call again with the same args and `approval: <challenge id>`. `confirm: true` does nothing. |
+| `bad_model` | `open_app` got a `model` the simulator does not know. | Call `phone_models` and use a name from it. |
 | `bad_url` | `open_url` got a URL the app cannot take. | Fix the URL and call again. |
 | `no_url_listener` | The app is not listening for URLs. | Use the app's screens instead. |
 | `phone_locked` | The phone is locked, so tap, type, scroll and back were not sent. | Call `unlock`, then try again. |
@@ -46,9 +47,15 @@ The result gets a line `Waited: matched | timed out after <ms> ms` and `structur
 | `bad_note` | A `room_note` text is empty. | Send 1 to 500 characters. |
 | `bad_cursor` | `since` is not a cursor from an earlier `room_log` or `room_note`. | Leave `since` out to read the whole log. |
 
-Tools: `list_apps`, `open_app`, `upload_build` (see [docs/test-your-build.md](../../docs/test-your-build.md)), `publish_preview`, `job_status` (slow tools return `{ status: "running", job }` after `wait_ms`; poll with `job_status`, see [docs/cli.md](../../docs/cli.md)), `attach_session`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `export_test`, `end_session`, `owner_describe`, `owner_command`, `room_log`, `room_note`, `approvals_list`, `approval_approve` (both need an owner token, and the MCP agent counts as an agent: it cannot approve an agent's hold).
+Tools: `list_apps`, `phone_models`, `open_app`, `upload_build` (see [docs/test-your-build.md](../../docs/test-your-build.md)), `publish_preview`, `job_status` (slow tools return `{ status: "running", job }` after `wait_ms`; poll with `job_status`, see [docs/cli.md](../../docs/cli.md)), `attach_session`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `push_notification`, `notifications`, `open_notification`, `device_log`, `export_test`, `end_session`, `owner_describe`, `owner_command`, `room_log`, `room_note`, `approvals_list`, `approval_approve` (both need an owner token, and the MCP agent counts as an agent: it cannot approve an agent's hold).
 
 `export_test { session }` is read-only. It turns the taps, typing, scrolls, `back` and `set_device` calls recorded in a session into a `@shipvo/test` script and returns the source. Targets are named by visible text; an ambiguous target becomes a `// TODO` comment, and a password-like field uses `process.env.SHIPVO_TEST_<LABEL>` so the typed value is never in the output. Only sessions opened through this server are recorded; an unknown session returns `no_session`. Steps are dropped when the session ends. `payment.pin` is removed from recorded `set_device` calls. Only labels and roles that look like a password, passcode or PIN are treated as secret; other secret-like fields (card number, token) are exported as typed. `type` with `enter: true` and `scroll` with a `ref` are recorded without the Enter or the ref, so a replay can differ from the session.
+
+## Phone models and framed screenshots
+
+`phone_models` lists the phones a headless session can be, each with its platform, screen size in CSS pixels and pixel ratio, and the default for android and ios. Pass a name to `open_app` as `model` (for example `"iPhone 16 Pro"` or `"Galaxy S24"`) and the session is that phone: its screen size, pixel ratio, user agent and platform. `model` applies to headless sessions; a live `shipvo run` phone is attached as it is.
+
+`screenshot` takes `frame: true` to return the whole phone, the app inside its Android or iPhone frame with the status bar, for showing a person. Without it the result is the app's screen alone.
 
 ## Record a demo video
 

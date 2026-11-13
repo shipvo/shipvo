@@ -235,7 +235,7 @@ use(server, tools.list_apps, async ({ query }) => {
   return text((lines.join("\n") || `no apps match "${query}"`) + phone);
 });
 
-const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, room, restart }: { app: string; room?: string; restart?: boolean; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always"; platform?: "android" | "ios"; show?: boolean }) => {
+const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, room, restart, model }: { app: string; room?: string; restart?: boolean; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always"; platform?: "android" | "ios"; show?: boolean; model?: string }) => {
   let id = app.split("@")[0];
   const buildId = /^[^@]+@build:([A-Za-z0-9_-]+)$/.exec(app)?.[1];
   const headlessOnly = attach === "never" || show === false;
@@ -320,7 +320,7 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, 
       attachNote += ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
-  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), ...(room ? { room } : {}), ...(ctx.remote && platform ? { skin: platform } : {}), ...(buildUrl ? { build: buildId } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number; build?: string };
+  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), ...(room ? { room } : {}), ...(ctx.remote && platform ? { skin: platform } : {}), ...(model ? { model } : {}), ...(buildUrl ? { build: buildId } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number; build?: string };
   if (r.code === "sim_timeout") return result(sid, r);
   // Only report a build as open when the simulator says it loaded that build. Otherwise the phone shows another app version.
   if (buildId && r.ok !== false && r.build !== buildId) {
@@ -409,14 +409,20 @@ use(server, tools.type,
 use(server, tools.scroll, 
   async ({ session, direction, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const box = ref ? await locating(session, ref, true) : undefined; const first = await act({ session, action: "scroll", direction, ref }); if (first.ok && recorder.drawing) void recorder.trail(...scrollTrail(direction, box)); const w = await waiting(session, first, { wait_for, timeout_ms, settle }); return acted(session, "scroll", w.r, { waited: w.waited, compact, step: { action: "scroll", direction } }); });
 use(server, tools.back, async ({ session, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await act({ session, action: "back" }), { wait_for, timeout_ms, settle }); return acted(session, "back", w.r, { waited: w.waited, compact, step: { action: "back" } }); });
-use(server, tools.screenshot, async ({ session }) => {
-  need(session); const r = await act({ session, action: "screenshot" });
+use(server, tools.screenshot, async ({ session, frame }) => {
+  need(session); const r = await act({ session, action: "screenshot", ...(frame ? { frame: true } : {}) });
   if (!r.ok) return result(session, r);
   if (!r.image && !r.path) throw new Error("no screenshot");
   // `source` says where the pixels came from: the live tab, a DOM drawing, or the headless browser.
   const source = r.source ?? "headless";
   const head = `source: ${source}` + (r.unsupported?.length ? `\nnot drawn: ${r.unsupported.join(", ")}` : "");
   return { content: [{ type: "image" as const, data: r.image ?? readFileSync(r.path!).toString("base64"), mimeType: r.image && r.mime === "image/jpeg" ? "image/jpeg" : "image/png" }, { type: "text" as const, text: `${head}\n\n${r.screen ?? ""}` }] };
+});
+use(server, tools.phone_models, async () => {
+  const r = (await sim("/models", {})) as Act & { models?: { name: string; platform: string; width: number; height: number; scale: number }[]; defaults?: Record<string, string> };
+  if (!r.ok || !r.models) return result("", { ok: false, code: r.code ?? "sim_unreachable", error: r.error ?? "the simulator did not list its phone models" });
+  const lines = r.models.map((m) => `${m.name} | ${m.platform} | ${m.width}x${m.height} @${m.scale}x`);
+  return { content: [{ type: "text" as const, text: `Defaults: android is ${r.defaults?.android}, ios is ${r.defaults?.ios}\n\n${lines.join("\n")}` }], structuredContent: { ok: true, models: r.models, defaults: r.defaults ?? {} } };
 });
 // The simulated device: what the phone has, and what happens to it.
 use(server, tools.set_device, async ({ session, ...device }) => { need(session); const r = await act({ session, action: "set_device", device }); if (r.ok) steps.get(session)?.push({ action: "set_device", device: device.payment?.pin === undefined ? device : { ...device, payment: { ...device.payment, pin: undefined } } }); return result(session, r); });

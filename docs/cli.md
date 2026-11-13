@@ -191,6 +191,7 @@ shipvo session devices
 shipvo session screen | tap <ref> | type <ref> <text> | scroll <up|down|left|right> [<ref>] | back
 shipvo session screenshot [--out <file>] [--no-frame]
 shipvo session record start | record stop [--out <file>]
+shipvo session errors
 shipvo session get | list | stop | clean
 ```
 
