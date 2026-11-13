@@ -9,7 +9,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = pickPort(12800, 100);
+const PORT = pickPort(13700, 100);
 
 test("SIGTERM exits the server and frees the port", async () => {
   const root = mkdtempSync(join(tmpdir(), "sim-term-"));
