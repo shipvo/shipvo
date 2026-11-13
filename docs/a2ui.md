@@ -75,6 +75,18 @@ The Shipvo Phone catalog is an A2UI catalog document. Use its components with `"
 
 `openUrl` runs only when a person taps a button. It does not run from a binding, and it does not run when the agent asks for it with `callRendererFunction`: the agent gets `INVALID_FUNCTION_CALL`. A tap records the address under `effects` in `a2ui actions`. Functions that need no tap, such as `email` or `numeric`, answer the agent with their value.
 
+## From an MCP client
+
+`@shipvo/mcp` has three A2UI tools, so an agent can check its own screen without a file or a shell:
+
+| Tool | What it does |
+| --- | --- |
+| `a2ui_open(messages, session?, model?)` | Opens the messages on a phone and returns the session and the screen as a tree. It says how many messages were applied and lists each refused one with its code and reason. |
+| `a2ui_send(session, messages)` | Applies more messages and returns the screen after them. |
+| `a2ui_actions(session, since?)` | Returns the A2UI `action` messages the screen sent to the agent, and `next` to pass as `since` on the following call. |
+
+`screen`, `tap`, `type`, `scroll` and `screenshot` work on the session as on any app. `phone_models` lists the phones `model` can name.
+
 ## Over the simulator's HTTP API
 
 `POST /session` with `"a2ui": true` opens an A2UI session; `a2ui_messages` (a list, or JSON lines as text) are applied before the page opens. `POST /act` with `"action": "a2ui_send"` takes `messages` or `jsonl`, and `"action": "a2ui_actions"` takes an optional `since`. The engine is `@shipvo/sim/a2ui.mjs`: `createA2ui()` returns `apply`, `applyAll`, `html`, `op` and `take`.
@@ -86,6 +98,7 @@ The Shipvo Phone catalog is an A2UI catalog document. Use its components with `"
 | `no_file` | The A2UI file is missing or empty. | Check the path. |
 | `bad_message` | The file starts like a JSON list but is not valid JSON. | Fix the file, or use one message per line. |
 | `a2ui_errors` | `a2ui send` refused one or more messages. | Read `data.errors`: each has a code, a message and a path. |
+| `data.a2ui_errors` on `session start` | The simulator refused one or more messages of the file. The summary says how many. | Read each entry: it has a code and a message. Fix the file, or send the fixed messages with `a2ui send`. |
 | `not_a2ui` | The session was not started with `--a2ui`. | Start one with `shipvo session start --a2ui <file>`. |
 | The screen says "No surface yet." | No `createSurface` has been applied. | Send one, with a component whose id is `root`. |
 

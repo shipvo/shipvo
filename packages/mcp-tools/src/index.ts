@@ -95,6 +95,19 @@ export const tools = {
   back: def("back", "Go back one screen." + CH, { session: sid, compact, wait_for: waitFor, timeout_ms: timeoutMs, settle }, WR, []),
   screenshot: def("screenshot", "A PNG of the phone screen (for checking layout, colours, images). The result says `source`: tab-capture (the person's live tab), rendered (the page drawn to an image; it lists what it could not draw) or headless. The tree from `screen` is usually enough to act.", { session: sid, frame: z.boolean().optional().describe("true: the whole phone, the app inside its Android or iPhone frame with the status bar, for showing a person. Headless sessions only. Default false: the app's screen alone.") }, RO, []),
   phone_models: def("phone_models", "The phone models a headless session can be, each with its platform, screen size in CSS pixels and pixel ratio, and the default model for android and ios. Pass a name to open_app as `model`.", {}, RO, []),
+  a2ui_open: def("a2ui_open", "Open A2UI v1.0 messages as a screen on a phone and return it as a tree. The messages are the agent's own: createSurface, updateComponents, updateDataModel, deleteSurface. Needs no app. Then use screen, tap, type and screenshot on the session like any app, a2ui_send to change the screen and a2ui_actions to read what the person did.", {
+  messages: z.array(z.record(z.string(), z.unknown())).describe("A2UI messages, each { version: \"1.0\", createSurface | updateComponents | updateDataModel | deleteSurface: {...} }"),
+  session: z.string().optional().describe("Session name (default: generated)"),
+  model: z.string().optional().describe("Phone model from phone_models, for example 'iPhone 16 Pro' (default: Pixel 8)"),
+}, WR, ["bad_model","bad_message"]),
+  a2ui_send: def("a2ui_send", "Send more A2UI messages to a session from a2ui_open and return the screen after them. The result says how many were applied and lists each refused message with the reason.", {
+  session: sid,
+  messages: z.array(z.record(z.string(), z.unknown())).describe("A2UI messages to apply in order"),
+}, WR, ["not_a2ui","bad_message"]),
+  a2ui_actions: def("a2ui_actions", "What an A2UI session sent to the agent: the action messages from buttons the person pressed, with their context read from the data model. Pass `since` (the `next` of the last call) to get only newer ones.", {
+  session: sid,
+  since: z.number().int().min(0).optional().describe("Return messages after this position (the `next` of an earlier call)"),
+}, RO, ["not_a2ui"]),
   set_device: def("set_device", "Change what the simulated phone has: location, the address book (contacts), calendar events, files for the file picker, a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.", {
   session: sid,
   location: z.object({ latitude: z.number(), longitude: z.number(), accuracy: z.number().optional() }).optional(),

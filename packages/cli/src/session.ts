@@ -190,8 +190,9 @@ export async function startSession(d: SessionDeps, o: { platform?: Platform; dev
     started_at: new Date(started).toISOString(), expires_at: new Date(started + minutes * 60_000).toISOString(),
   };
   save(d.root, rec);
-  return { code: "started", summary: `${info.name} is open on a simulated ${model.name}. It stops at ${rec.expires_at}.`,
-    data: { ...view(d.root, rec), screen: opened.screen, mcp_env: { PN_SIM: rec.url } }, next: driveNext(id) };
+  const refused: unknown[] = Array.isArray(opened.errors) ? opened.errors : [];
+  return { code: "started", summary: `${info.name} is open on a simulated ${model.name}${refused.length ? `, with ${refused.length} A2UI message${refused.length === 1 ? "" : "s"} refused (see data.a2ui_errors)` : ""}. It stops at ${rec.expires_at}.`,
+    data: { ...view(d.root, rec), screen: opened.screen, ...(refused.length ? { a2ui_errors: refused } : {}), mcp_env: { PN_SIM: rec.url } }, next: driveNext(id) };
 }
 
 export async function stopSession(d: SessionDeps, id?: string): Promise<Done> {

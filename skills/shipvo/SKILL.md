@@ -62,7 +62,7 @@ shipvo session a2ui send update.jsonl     # change the open screen one message a
 shipvo session a2ui actions               # the action messages the screen sent to the agent
 ```
 
-`screen`, `tap`, `type`, `screenshot` and `record` work as in any session. Details: `docs/a2ui.md`.
+`screen`, `tap`, `type`, `screenshot` and `record` work as in any session. Details: `docs/a2ui.md`. Over MCP the same is `a2ui_open`, `a2ui_send` and `a2ui_actions`.
 
 ## Test it through @shipvo/mcp
 
