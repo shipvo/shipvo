@@ -254,7 +254,7 @@ The agent's "what next" command. It prints one JSON line:
 
 `GET /health/<app>/releases` answers "is this release healthy?" for the 20 newest releases of an app. It is read-only. Send an owner session or a publish token whose role may read the summary (viewer and above). Without credentials it returns 401, and with a role that may not read it returns 403.
 
-For each release it returns, for Android and iOS side by side:
+For each release it returns, for Android and iOS side by side (plus `unknown` for reports that name neither):
 
 - `applied` and `healthy`: verified `applied` and `content_applied` reports.
 - `reverted`: `crash_loop_revert` reports.
@@ -262,7 +262,7 @@ For each release it returns, for Android and iOS side by side:
 - `bands`: the bands (`b0`, `b1`, `b2`) whose live pointer serves the release on that platform.
 - `halted_bands`: those bands, when the release is the halted one. Empty otherwise.
 
-Counts come from the verified rows in the `telemetry` table. A report counts as iOS when its device model is an iPhone, iPad or iPod, and as Android otherwise. Example response, from the route's test with seeded Android and iOS telemetry (`services/control-plane/test/release-health.test.ts`):
+Counts come from the verified rows in the `telemetry` table. A report counts as Android when it carries an Android API level, and as iOS when its device model is an iPhone, iPad or iPod. A report with neither is counted under `unknown`, not guessed. Example response from the route run over seeded SQLite telemetry (`services/control-plane/test/release-health.test.ts`, the same `HEALTH_SQL` the route runs; unverified rows are left out):
 
 ```json
 {
@@ -273,10 +273,10 @@ Counts come from the verified rows in the `telemetry` table. A report counts as 
       "halted": true,
       "platforms": {
         "android": {
-          "applied": 40,
-          "healthy": 40,
-          "reverted": 3,
-          "failed": 3,
+          "applied": 4,
+          "healthy": 4,
+          "reverted": 1,
+          "failed": 1,
           "bands": [
             "b0",
             "b1"
@@ -287,16 +287,24 @@ Counts come from the verified rows in the `telemetry` table. A report counts as 
           ]
         },
         "ios": {
-          "applied": 30,
-          "healthy": 30,
+          "applied": 3,
+          "healthy": 3,
           "reverted": 0,
-          "failed": 2,
+          "failed": 0,
           "bands": [
             "b0"
           ],
           "halted_bands": [
             "b0"
           ]
+        },
+        "unknown": {
+          "applied": 2,
+          "healthy": 2,
+          "reverted": 0,
+          "failed": 0,
+          "bands": [],
+          "halted_bands": []
         }
       }
     },
@@ -305,8 +313,8 @@ Counts come from the verified rows in the `telemetry` table. A report counts as 
       "halted": false,
       "platforms": {
         "android": {
-          "applied": 90,
-          "healthy": 90,
+          "applied": 0,
+          "healthy": 0,
           "reverted": 0,
           "failed": 0,
           "bands": [
@@ -315,13 +323,21 @@ Counts come from the verified rows in the `telemetry` table. A report counts as 
           "halted_bands": []
         },
         "ios": {
-          "applied": 80,
-          "healthy": 80,
+          "applied": 0,
+          "healthy": 0,
           "reverted": 0,
           "failed": 0,
           "bands": [
             "b2"
           ],
+          "halted_bands": []
+        },
+        "unknown": {
+          "applied": 0,
+          "healthy": 0,
+          "reverted": 0,
+          "failed": 0,
+          "bands": [],
           "halted_bands": []
         }
       }

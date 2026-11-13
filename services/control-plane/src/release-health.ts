@@ -2,7 +2,9 @@
 import { FAILED_EVENTS, HEALTHY_EVENTS } from "./halt";
 
 export type Platform = "android" | "ios";
-export type Row = { release: number; platform: Platform; event: string; n: number };
+/** `unknown`: reports with neither an Android API level nor an Apple device model. */
+export type Attributed = Platform | "unknown";
+export type Row = { release: number; platform: Attributed; event: string; n: number };
 export type PlatformHealth = {
   /** Reports that the update was applied (`applied` and `content_applied`). */
   applied: number;
@@ -17,13 +19,13 @@ export type PlatformHealth = {
   /** Bands that serve this release while it is halted; empty when it is not halted. */
   halted_bands: string[];
 };
-export type ReleaseHealth = { release: number; halted: boolean; platforms: Record<Platform, PlatformHealth> };
+export type ReleaseHealth = { release: number; halted: boolean; platforms: Record<Attributed, PlatformHealth> };
 
 const BANDS = ["b0", "b1", "b2"];
 const empty = (): PlatformHealth => ({ applied: 0, healthy: 0, reverted: 0, failed: 0, bands: [], halted_bands: [] });
 
-/** Telemetry carries no platform column: an Android API level or a model that is not an Apple device means Android; iPhone, iPad and iPod models mean iOS. */
-export const PLATFORM_SQL = "CASE WHEN android_api IS NOT NULL THEN 'android' WHEN device_model LIKE 'iPhone%' OR device_model LIKE 'iPad%' OR device_model LIKE 'iPod%' THEN 'ios' ELSE 'android' END";
+/** Telemetry carries no platform column. An Android API level means Android; an iPhone, iPad or iPod model means iOS; any other row is `unknown`, never guessed. */
+export const PLATFORM_SQL = "CASE WHEN android_api IS NOT NULL THEN 'android' WHEN device_model LIKE 'iPhone%' OR device_model LIKE 'iPad%' OR device_model LIKE 'iPod%' THEN 'ios' ELSE 'unknown' END";
 
 export const HEALTH_SQL =
   `SELECT release, ${PLATFORM_SQL} AS platform, event, COUNT(*) AS n FROM telemetry WHERE app_id = ? AND verified = 1 ` +
@@ -34,7 +36,7 @@ export function buildHealth(rows: Row[], live: Record<Platform, Record<string, n
   const byRelease = new Map<number, ReleaseHealth>();
   const get = (release: number) => {
     let r = byRelease.get(release);
-    if (!r) { r = { release, halted: haltedRelease === release, platforms: { android: empty(), ios: empty() } }; byRelease.set(release, r); }
+    if (!r) { r = { release, halted: haltedRelease === release, platforms: { android: empty(), ios: empty(), unknown: empty() } }; byRelease.set(release, r); }
     return r;
   };
   for (const row of rows) {

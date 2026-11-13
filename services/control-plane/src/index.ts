@@ -397,6 +397,7 @@ app.get("/health/:app/releases", async (c) => {
   const no = await roleDenied(c, appId, "read_summary"); if (no) return no;
   const rows = (await c.env.DB.prepare(HEALTH_SQL).bind(appId, appId).all<Row>()).results ?? [];
   const live: Record<Platform, Record<string, number>> = { android: {}, ios: {} };
+  const majors: Record<Platform, Record<string, number>> = { android: {}, ios: {} }; // highest shell major seen per band wins
   let haltedRelease: number | null = null;
   if (c.env.POINTERS) {
     let cursor: string | undefined;
@@ -406,7 +407,7 @@ app.get("/health/:app/releases", async (c) => {
         const parts = String(k.name).split("/"); // p/<app>/<major>/[ios/]<band>
         const ios = parts.length === 5 && parts[3] === "ios";
         if (!ios && parts.length !== 4) continue;
-        try { const env = JSON.parse((await c.env.POINTERS.get(k.name)) ?? "null"); const rel = JSON.parse(env.body).release; if (Number.isInteger(rel)) live[ios ? "ios" : "android"][parts[parts.length - 1]!] = rel; } catch { /* skip a bad pointer */ }
+        try { const env = JSON.parse((await c.env.POINTERS.get(k.name)) ?? "null"); const rel = JSON.parse(env.body).release; if (Number.isInteger(rel)) { const slot = live[ios ? "ios" : "android"], band = parts[parts.length - 1]!; if (slot[band] === undefined || Number(parts[2]) >= (majors[ios ? "ios" : "android"][band] ?? 0)) { slot[band] = rel; majors[ios ? "ios" : "android"][band] = Number(parts[2]); } } } catch { /* skip a bad pointer */ }
       }
       cursor = page.list_complete ? undefined : page.cursor;
     } while (cursor);
