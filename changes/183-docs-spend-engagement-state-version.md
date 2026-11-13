@@ -1,0 +1,2 @@
+- Docs: new sections for the per-app spend limit, `engagementReport`, `getAppliedStateVersion()` and crash load kinds; glossary terms for spend limit, state version and quiet tester.
+- Migration: none.

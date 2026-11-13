@@ -29,6 +29,15 @@ Runtime.markHealthy();                   // call once the first screen rendered
 
 `shipvo init` wires all of this for you.
 
+### Read the state version
+
+```ts
+import { getAppliedStateVersion } from "@shipvo/runtime";
+const v = await getAppliedStateVersion(); // number, or null for the embedded bundle or a release with no stateVersion
+```
+
+See [Rollbacks and stored data](https://shipvo.dev/docs/rollbacks-and-stored-data).
+
 ## Patches on small heaps (Android)
 
 A patch needs the base, the patch and the output in memory together. If the phone runs out of memory while applying one, or those three together are more than a share of the app's heap limit, the runtime downloads the full bundle instead. The update still installs and is verified the same way. `patchError` in the state reports `out_of_memory` or `over_memory_budget`, so you can see how often it happens.
@@ -48,6 +57,8 @@ onRuntimeEvents((events) => console.log(events)); // see the drained strings, fo
 To turn the automatic report off, pass `reportEvents: false` to the config plugin (it lands in `expo.extra.shipvo`), and call `reportRuntimeEvents()` yourself. `forwardRuntimeEvents(events, send)` and `FORWARDED_EVENTS` are also exported for custom senders. If you call `Runtime.consumeEvents()` yourself, you take events away from the report.
 
 The control plane accepts `download_failed` events.
+
+Crash events say when the crash happened. An uncaught JS error is sent as `js_crash_cold` (the process had just started) or `js_crash_reload` (after an in-place reload). A `crash_loop_revert` report carries `load_kind` with the same two values. Android and iOS send both.
 
 ## Signed telemetry
 

@@ -85,6 +85,10 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-10: Set a monthly spend limit for each installed app; an assistant cannot change it ([Phone apps](phone-apps.md#set-a-spend-limit-for-an-app), #1573)
+- 2026-11-10: `engagementReport` shows closed-test tester days, quiet testers and warnings ([Store details](store.md#read-your-tester-numbers), #1583)
+- 2026-11-10: `getAppliedStateVersion()` tells your app which state version is running, on Android and iOS ([Rollbacks and stored data](rollbacks-and-stored-data.md#read-the-state-version-in-your-app), #1550)
+- 2026-11-10: Crash reports say whether a crash was on a cold start or after a reload, on Android and iOS ([runtime](../packages/runtime/README.md#events), #1589, #1556)
 - 2026-11-10: `schedule_app` and `arrange_apps` read a schedule in the time zone you name, for example `Europe/Berlin` ([Phone apps](phone-apps.md#arrange-the-home-screen), #1536)
 - 2026-11-10: Every phone tool result starts with an `Inbox:` line when something waits for the calling assistant ([Phone apps](phone-apps.md), #1545)
 - 2026-11-10: Run the simulator-vs-device parity check yourself on Android and iOS from the Actions tab, with the results page reorganised ([Parity results](parity-results.md#run-it-yourself))

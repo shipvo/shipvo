@@ -145,3 +145,10 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Lumi benchmark (`scripts/lumi/bench.mjs`: screens, flows and planted bugs on fixed apps) | [lumi-bench](lumi-bench.md) | | | |
 | App spec validator (`validate`, error paths and fixes, network and write permissions) | [app-spec-validator](app-spec-validator.md) | | | |
 | Crash-loop revert paths on Android (trial boots, promoted boots, 60 s window) | [android-crash-loop-paths](android-crash-loop-paths.md) | | | |
+| Per-app monthly spend limit, set by the person (`/phone/apps/<app>/spend-limit`) | [phone-apps](phone-apps.md#set-a-spend-limit-for-an-app), [threat-model](threat-model.md) | | | |
+| Closed-test tester report (`engagementReport` in `@shipvo/store`) | [store](store.md#read-your-tester-numbers) | | | |
+| `getAppliedStateVersion()` in `@shipvo/runtime` | [rollbacks-and-stored-data](rollbacks-and-stored-data.md#read-the-state-version-in-your-app) | | | |
+| Crash events carry the load kind (`js_crash_cold`, `js_crash_reload`, `load_kind`) | [runtime](../packages/runtime/README.md#events) | | | |
+| Accessibility audit (`a11y_audit`, `phone.a11yAudit()`) | [phone-apps](phone-apps.md#check-accessibility) | | | |
+| Search across the phone (`search_phone`) | [phone-apps](phone-apps.md#search-across-the-phone) | | | |
+| Wake an assistant by webhook (`register_wakeup`, `wait_for_event`) | [agents](agents.md), [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | |
