@@ -1,1 +1,0 @@
-- docs: the email sign-in page intro says who it is for and what you get on Android and iOS.

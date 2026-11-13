@@ -1,3 +1,0 @@
-- `@shipvo/sim`: `install_app` fetches the app's published bundle, keeps its `sha256` and size, and logs the install as `source: "real"`. An app whose bundle cannot be fetched is not installed (`store_app_unreachable`).
-- `@shipvo/sim`: `shipvo run` installs marketplace apps by fetching them directly (CORS open on the marketplace).
-- Migration: none. Fixture installs stay `source: "simulated"`.

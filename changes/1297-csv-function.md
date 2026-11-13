@@ -1,2 +1,0 @@
-- `@shipvo/spec`: new `csv(rows, columns?)` expression function returns RFC 4180 CSV text (header row, quoted fields, CRLF). Lists join with `; `.
-- Migration: none; new function.

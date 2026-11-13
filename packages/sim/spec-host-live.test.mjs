@@ -121,6 +121,22 @@ test("two assistants on one phone are told apart by the client name, with no nam
   assert.deepEqual(got.value.messages.map((m) => [m.from, m.to, m.body]), [["chatgpt", "claude", "Please test checkout."]]);
 });
 
+test("inbox_view shows the whole inbox and what waits for the caller, without marking anything read", async () => {
+  const INBOX = JSON.parse(readFileSync(new URL("../../templates/assistant-inbox/app.json", import.meta.url), "utf8"));
+  assert.ok((await call("/session", { session: "sp-view" })).ok);
+  assert.equal((await act("sp-view", { action: "inbox_view", agent: "claude-ai" })).code, "no_inbox");
+  assert.equal((await act("sp-view", { action: "create_app", id: "inbox", spec: INBOX })).ok, true);
+  await act("sp-view", { action: "app_action", id: "inbox", action_name: "send_message", input: { to: "claude", body: "Check the cart." }, agent: "openai-mcp" });
+  await act("sp-view", { action: "app_action", id: "inbox", action_name: "hand_off", input: { to: "claude", title: "Test checkout", detail: "" }, agent: "openai-mcp" });
+  const v = await act("sp-view", { action: "inbox_view", agent: "claude-ai" });
+  assert.equal(v.me, "claude");
+  assert.deepEqual(v.messages.map((m) => [m.from, m.to, m.body, m.read]), [["chatgpt", "claude", "Check the cart.", false]]);
+  assert.deepEqual(v.tasks.map((h) => [h.from, h.title, h.status !== "done"]), [["chatgpt", "Test checkout", true]]);
+  assert.equal(v.unread_for_me, 1); assert.equal(v.open_for_me, 1);
+  assert.equal((await act("sp-view", { action: "inbox_view", agent: "openai-mcp" })).unread_for_me, 0);
+  assert.equal((await act("sp-view", { action: "inbox_view", agent: "claude-ai" })).unread_for_me, 1);   // viewing reads nothing
+});
+
 for (const style of ["android", "ios"]) {
   test(`${style}: pending_banner tells each assistant what waits for it`, async () => {
     const INBOX = JSON.parse(readFileSync(new URL("../../templates/assistant-inbox/app.json", import.meta.url), "utf8"));
@@ -236,6 +252,28 @@ for (const style of ["android", "ios"]) {
     assert.equal((await act(sid, { action: "unlock", pin: "2468" })).locked, false);
     assert.equal((await act(sid, { action: "set_lock_method", method: "none" })).code, "wrong_pin");
     assert.equal((await act(sid, { action: "set_lock_method", method: "none", current: "2468" })).ok, true);
+  });
+  test(`${style}: share puts text into another app, and the clipboard survives switching apps`, async () => {
+    const NOTES = JSON.parse(readFileSync(new URL("../../templates/notes-tasks/app.json", import.meta.url), "utf8"));
+    const sid = `sp-share-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "notes", spec: NOTES, style })).ok, true);
+    const tg = await act(sid, { action: "share_targets" });
+    assert.deepEqual(tg.targets.map((x) => `${x.app}.${x.action}:${x.field}`).sort(), ["notes.add_note:body", "notes.add_task:title"]);
+    assert.equal((await act(sid, { action: "share", to: "notes", text: "Buy rope" })).code, "pick_action");
+    const r = await act(sid, { action: "share", to: "notes", action_name: "add_note", text: "Harbour list\nrope, hooks", from: "browser" });
+    assert.equal(r.ok, true, JSON.stringify(r).slice(0, 300));
+    const notes = (await act(sid, { action: "export_apps", ids: ["notes"] })).apps[0].data.notes;
+    assert.deepEqual(notes.map((n) => [n.title, n.body]), [["Harbour list", "Harbour list\nrope, hooks"]]);
+    const ev = (await act(sid, { action: "app_activity", id: "notes" })).apps[0].events.filter((e) => e.name === "share");
+    assert.equal(ev.length, 1); assert.equal(ev[0].action, "add_note"); assert.equal(ev[0].from, "browser");
+    assert.equal((await act(sid, { action: "share", to: "nope", text: "x" })).code, "not_installed");
+    assert.equal((await act(sid, { action: "set_clipboard", text: "lamp order 42" })).ok, true);
+    assert.equal((await act(sid, { action: "get_clipboard" })).text, "lamp order 42");
+    assert.equal((await act(sid, { action: "switch_app", id: "notes" })).ok, true);
+    assert.equal((await act(sid, { action: "get_clipboard" })).text, "lamp order 42");
+    await act(sid, { action: "device_reset" });
+    assert.equal((await act(sid, { action: "get_clipboard" })).text, "");
   });
 }
 
@@ -459,3 +497,181 @@ test("import_apps does not warn about a valid hand-written layout, and names eac
   const str = await act("pl-h", { action: "import_apps", replace: true, apps: [app("pinned")] });
   assert.deepEqual(str.warnings, ["apps[0].placement: not valid, ignored (expected an object)"]);
 });
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: backup_phone and restore_phone move apps, data, layout, settings and the clipboard to a new phone`, async () => {
+    const NOTES = JSON.parse(readFileSync(new URL("../../templates/notes-tasks/app.json", import.meta.url), "utf8"));
+    const a = `sp-bk-a-${style}`, b = `sp-bk-b-${style}`;
+    assert.ok((await call("/session", { session: a, skin: style, phone: { settings: { dark_mode: true } } })).ok);
+    { const _r = await act(a, { action: "create_app", id: "notes", spec: NOTES, style, open: false }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+    { const _r = await act(a, { action: "app_action", id: "notes", action_name: "add_note", input: { title: "Harbour", body: "rope, hooks" } }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+    { const _r = await act(a, { action: "pin_app", id: "notes", pinned: true }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+    { const _r = await act(a, { action: "install_app", id: "tidewatch", permissions: { location: false } }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+    const bk = await act(a, { action: "backup_phone" });
+    assert.equal(bk.ok, true, JSON.stringify(bk).slice(0, 300));
+    assert.equal(bk.backup.format, "shipvo.phone-backup/v0");
+    assert.equal(bk.backup.settings.dark_mode, true); assert.equal(typeof bk.backup.clipboard, "string");
+    const wire = { ...JSON.parse(JSON.stringify(bk.backup)), clipboard: "lamp order 42" };
+
+    assert.ok((await call("/session", { session: b, skin: style })).ok);
+    assert.equal((await act(b, { action: "restore_phone", backup: { ...wire, settings: { dark_mode: "on" } } })).code, "bad_backup");
+    assert.ok(!(await act(b, { action: "phone_apps" })).installed_apps.some((x) => x.id === "notes"));
+    const r = await act(b, { action: "restore_phone", backup: wire });
+    assert.equal(r.ok, true, JSON.stringify(r).slice(0, 400));
+    assert.deepEqual(r.restored.apps, ["notes"]); assert.deepEqual(r.restored.store_apps, ["tidewatch"]);
+    assert.deepEqual(r.installed_apps.find((x) => x.id === "tidewatch").permissions, { notifications: true, location: false }); assert.ok(r.restored.settings.includes("dark_mode")); assert.equal(r.restored.clipboard, true);
+    const back = (await act(b, { action: "backup_phone" })).backup;
+    const notes = back.apps.find((x) => x.id === "notes");
+    assert.deepEqual(notes.data.notes.map((n) => [n.title, n.body]), [["Harbour", "rope, hooks"]]);
+    assert.deepEqual(notes.placement, wire.apps.find((x) => x.id === "notes").placement);
+    assert.equal(back.settings.dark_mode, true); assert.equal(back.clipboard, "lamp order 42");
+    assert.deepEqual(back.store_apps.map((x) => x.id).sort(), wire.store_apps.map((x) => x.id).sort());
+    assert.equal((await act(b, { action: "restore_phone", backup: wire })).code, "already_installed");
+    { const _r = await act(b, { action: "restore_phone", backup: wire, replace: true }); assert.equal(_r.ok, true, JSON.stringify(_r).slice(0, 400)); }
+  });
+}
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: with a spec app open (no device layer) the phone keeps the reminder itself, at the phone time, and it can be dismissed`, async () => {
+    const sid = `sp-remsys-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "gifts", spec: GIFTS, style })).ok, true);
+    assert.equal((await act(sid, { action: "set_time", at: "2026-11-14T09:00:00" })).ok, true);
+    await act(sid, { action: "set_reminder", title: "Pay rent", in_minutes: 5 });
+    await act(sid, { action: "set_time", at: "2026-11-14T09:05:00" });
+    const got = (await act(sid, { action: "notifications" })).notifications.filter((n) => n.title === "Pay rent");
+    assert.equal(got.length, 1); assert.match(got[0].id, /^sys\d+$/); assert.equal(got[0].app, "Reminders");
+    assert.equal(new Date(got[0].at).toISOString().slice(0, 16), new Date("2026-11-14T09:05:00").toISOString().slice(0, 16));
+    assert.deepEqual((await act(sid, { action: "list_reminders" })).fired.map((f) => [f.title, f.delivered]), [["Pay rent", true]]);
+    assert.equal((await act(sid, { action: "dismiss_notification", id: got[0].id })).ok, true);
+    assert.equal((await act(sid, { action: "notifications" })).notifications.filter((n) => n.title === "Pay rent").length, 0);
+    assert.equal((await act(sid, { action: "dismiss_notification", id: got[0].id })).code, "not_found");
+  });
+}
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: a reminder arrives as a notification when the phone clock reaches it, with the app closed`, async () => {
+    const sid = `sp-rem-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "set_time", at: "2026-11-14T09:00:00" })).ok, true);
+    const set = await act(sid, { action: "set_reminder", title: "Call Ada", body: "About the invoice", in_minutes: 10 });
+    assert.equal(set.ok, true); assert.equal(set.reminder.at, "2026-11-14T09:10");
+    await act(sid, { action: "press_home" });
+    assert.equal((await act(sid, { action: "notifications" })).notifications.length, 0);
+    await act(sid, { action: "set_time", at: "2026-11-14T09:09:00" });
+    assert.equal((await act(sid, { action: "notifications" })).notifications.length, 0);
+    await act(sid, { action: "set_time", at: "2026-11-14T09:10:00" });
+    const got = (await act(sid, { action: "notifications" })).notifications;
+    assert.equal(got.length, 1); assert.equal(got[0].title, "Call Ada"); assert.equal(got[0].body, "About the invoice"); assert.equal(got[0].data.reminder, set.reminder.id);
+    const list = await act(sid, { action: "list_reminders" });
+    assert.deepEqual(list.reminders, []); assert.deepEqual(list.fired.map((f) => [f.title, f.delivered]), [["Call Ada", true]]);
+    // a daily reminder comes back the next day; cancelling stops it
+    const d = await act(sid, { action: "set_reminder", title: "Standup", at: "2026-11-14T09:30", repeat: "daily" });
+    await act(sid, { action: "set_time", at: "2026-11-14T09:30:00" });
+    await act(sid, { action: "set_time", at: "2026-11-15T09:30:00" });
+    assert.equal((await act(sid, { action: "notifications" })).notifications.filter((n) => n.title === "Standup").length, 2);
+    assert.equal((await act(sid, { action: "cancel_reminder", id: d.reminder.id })).cancelled, true);
+    await act(sid, { action: "set_time", at: "2026-11-16T09:30:00" });
+    assert.equal((await act(sid, { action: "notifications" })).notifications.filter((n) => n.title === "Standup").length, 2);
+    const bad = await act(sid, { action: "set_reminder", title: "x" });
+    assert.equal(bad.ok, false); assert.equal(bad.code, "bad_time");
+  });
+}
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: Contacts, Messages and Clock install and keep their data`, async () => {
+    const spec = (n) => JSON.parse(readFileSync(new URL(`../../templates/${n}/app.json`, import.meta.url), "utf8"));
+    const sid = `sp-sys-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    for (const id of ["contacts", "messages", "clock"]) assert.equal((await act(sid, { action: "create_app", id, spec: spec(id), style })).ok, true, id);
+    const run = (id, action_name, input = {}, agent) => act(sid, { action: "app_action", id, action_name, input, ...(agent ? { agent } : {}) });
+    await run("contacts", "add_contact", { name: "Ada Obi", phone: "+237 650 000 111" });
+    assert.deepEqual((await run("contacts", "find_contacts", { text: "ada" })).value.contacts.map((c) => c.name), ["Ada Obi"]);
+    await run("messages", "receive_text", { from: "Ada Obi", body: "Friday at nine?" });
+    await run("messages", "send_text", { to: "Ada Obi", body: "Yes" });
+    const conv = (await run("messages", "list_conversations")).value.threads;
+    assert.deepEqual(conv.map((t) => [t.with, t.last, t.unread]), [["Ada Obi", "Yes", 1]]);
+    assert.equal((await run("messages", "read_conversation", { with: "Ada Obi" })).value.texts.length, 2);
+    assert.equal((await run("messages", "list_conversations")).value.threads[0].unread, 0);
+    assert.equal((await run("clock", "add_alarm", { time: "06:45", label: "Boat" })).value.added, true);
+    assert.equal((await run("clock", "add_alarm", { time: "6:45" })).value.added, false);
+    assert.deepEqual((await run("clock", "list_alarms")).value.alarms.map((a) => [a.time, a.on]), [["06:45", true]]);
+    // the data is on the phone: a restart keeps it
+    await act(sid, { action: "restart" });
+    assert.deepEqual((await run("contacts", "find_contacts", {})).value.contacts.map((c) => c.name), ["Ada Obi"]);
+    assert.equal((await run("clock", "list_alarms")).value.alarms.length, 1);
+  });
+}
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: Wi-Fi, mobile data and airplane mode change what apps read, and http data does not load offline`, async () => {
+    const NET = {
+      spec: "shipvo.app/v0",
+      app: { id: "netwatch", name: "Net Watch" },
+      permissions: { network: ["api.example.com"] },
+      data: { price: { source: "http", get: "https://api.example.com/p", select: "price" } },
+      screens: [{ id: "home", title: "Home", body: [{ type: "text", value: "{{ network.online ? 'Online on ' + network.type : 'Offline' }}" }] }],
+    };
+    const sid = `sp-net-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "netwatch", spec: NET, style })).ok, true);
+    const shows = async (text) => { const r = await act(sid, { action: "screen" }); assert.match(r.screen, new RegExp(text), r.screen); };
+    assert.deepEqual((await act(sid, { action: "get_connectivity" })).connectivity, { wifi: true, mobile_data: true, airplane: false, online: true, type: "wifi" });
+    await shows("Online on wifi");
+    assert.equal((await act(sid, { action: "set_connectivity", wifi: false })).connectivity.type, "cellular");
+    await shows("Online on cellular");
+    const air = await act(sid, { action: "set_connectivity", airplane: true });
+    assert.deepEqual(air.connectivity, { wifi: false, mobile_data: false, airplane: true, online: false, type: "none" });
+    await shows("Offline");
+    const r = await act(sid, { action: "refresh_app", id: "netwatch" });
+    assert.deepEqual(r.updated, []); assert.match(r.errors[0].message, /^offline/);
+    assert.equal((await act(sid, { action: "set_connectivity", mobile_data: true })).code, "airplane_on");
+    assert.equal((await act(sid, { action: "set_connectivity", wifi: true })).connectivity.online, true);
+    assert.deepEqual((await act(sid, { action: "set_connectivity", airplane: false })).connectivity, { wifi: false, mobile_data: true, airplane: false, online: true, type: "cellular" });
+    await act(sid, { action: "set_network_profile", profile: "offline" });
+    assert.equal((await act(sid, { action: "get_connectivity" })).connectivity.online, false);
+    await shows("Offline");
+    await act(sid, { action: "set_network_profile", profile: "online" });
+    // A spec app page has no device layer: the shade and Control Center (and so the tiles) cannot open over it,
+    // so the redraw after a network change never leaves a panel half open, and controls still work after it.
+    assert.equal((await act(sid, { action: style === "ios" ? "open_control_center" : "open_notifications" })).code, "no_device");
+    assert.equal((await act(sid, { action: "set_connectivity", wifi: true })).ok, true);
+    assert.equal((await act(sid, { action: "screen" })).ok, true);
+    assert.equal((await act(sid, { action: "set_connectivity" })).code, "bad_value");
+    const log = (await act(sid, { action: "device_log" })).log.filter((e) => e.name === "connectivity");
+    assert.equal(log.length, 5); assert.equal(log[1].to.airplane, true);
+  });
+}
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: /phones/export and /phones/import move a phone with its apps, data, room and the app's orders`, async () => {
+    const NOTES = JSON.parse(readFileSync(new URL("../../templates/notes-tasks/app.json", import.meta.url), "utf8"));
+    const sid = `sp-move-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style, room: `rm-${style}` })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "notes", spec: NOTES, style, open: false })).ok, true);
+    assert.equal((await act(sid, { action: "app_action", id: "notes", action_name: "add_note", input: { title: "Harbour", body: "rope" } })).ok, true);
+    // An order in the app's mock backend, the way Tide & Tackle places one.
+    const order = { ref: "TT-1001", total: 3500 };
+    const posted = await fetch(`http://localhost:${PORT}/s/~rm-${style}/o/orders`, { method: "POST", body: JSON.stringify({ order }) });
+    assert.ok(posted.ok);
+    const ex = await call("/phones/export", {});
+    assert.equal(ex.format, "shipvo.phones/v0");
+    const mine = ex.phones.find((p) => p.session === sid);
+    assert.equal(mine.room, `rm-${style}`); assert.equal(mine.skin, style);
+    assert.match(mine.backend.store, /TT-1001/);
+    assert.ok(mine.backup.apps.some((a) => a.id === "notes"));
+
+    assert.equal((await call("/end", { session: sid })).ended, true);         // the old phone is gone
+    assert.equal((await call("/phones/import", { format: "x", phones: [] })).code, "bad_export");
+    const im = await call("/phones/import", { format: ex.format, phones: [{ session: "bad id!", app: "tide" }, mine] });
+    assert.deepEqual(im.imported, [sid], JSON.stringify(im).slice(0, 400));   // a bad phone is skipped, not fatal
+    assert.deepEqual(im.failed.map((f) => f.session), ["bad id!"]);
+    const back = (await act(sid, { action: "backup_phone" })).backup;
+    assert.deepEqual(back.apps.find((a) => a.id === "notes").data.notes.map((n) => n.title), ["Harbour"]);
+    const orders = await (await fetch(`http://localhost:${PORT}/s/~rm-${style}/orders`)).json();
+    assert.deepEqual(orders.orders.map((o) => o.ref), ["TT-1001"]);
+    const listed = (await call("/sessions", {})).sessions.find((s) => s.session === sid);
+    assert.equal(listed.room, `rm-${style}`);
+    await call("/end", { session: sid });
+  });
+}

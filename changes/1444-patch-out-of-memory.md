@@ -1,2 +1,0 @@
-- `@shipvo/runtime` (Android): a patch that runs out of memory, or whose base, patch and output together exceed a share of the app's heap limit, now falls back to the full download. `patchError` reports `out_of_memory` or `over_memory_budget`.
-- Migration: none.

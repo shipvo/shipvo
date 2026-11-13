@@ -125,7 +125,16 @@ export class SpecHost {
     this.guarded = guardedFetch();
     this.context = context ?? (() => ({ fetch: this.guarded, secrets: () => ({ refused: "unavailable" }), cache: this.cache }));
     this.refreshing = new Map();
+    this.networks = new Map();
   }
+
+  /** The phone's network for a session, shared by every app on it. Apps read it as `network`; http sources do not fetch while it is offline. */
+  network(session) {
+    if (!this.networks.has(session)) this.networks.set(session, { online: true, type: "wifi" });
+    return this.networks.get(session);
+  }
+  /** Changes the session's network in place, so every running app sees it on its next render. */
+  setNetwork(session, { online, type }) { Object.assign(this.network(session), { online: online !== false, type: online === false ? "none" : type ?? "wifi" }); return { ...this.network(session) }; }
 
   /** Re-runs each http data source that sets `refresh` (seconds) on that interval, until the app is dropped or replaced. */
   schedule(session, id) {
@@ -142,6 +151,7 @@ export class SpecHost {
         try {
           const cur = this.running.get(k);
           if (!cur || cur !== r) return;
+          if (!this.network(session).online) return; // offline: keep the last value and try again on the next tick
           // Refresh runs bypass the cache: a `cache` longer than `refresh` must not turn the refresh into a no-op.
           const { cache: _cache, ...ctx } = this.context(session, id);
           const value = await runSource(cur.spec, name, { ...ctx, scope: { state: cur.app.state, data: cur.app.data, ...cur.app.data } });
@@ -163,6 +173,7 @@ export class SpecHost {
     const out = { updated: [], errors: [] };
     if (!cur) return out;
     const names = Object.entries(cur.spec?.data ?? {}).filter(([n, s]) => s?.source === "http" && (!sources || sources.includes(n))).map(([n]) => n);
+    if (!this.network(session).online) { for (const name of names) out.errors.push({ source: name, message: "offline: the phone has no network (Wi-Fi and mobile data are off, or airplane mode is on)" }); return out; }
     for (const name of names) {
       try {
         const { cache: _cache, ...ctx } = this.context(session, id);
@@ -182,7 +193,7 @@ export class SpecHost {
   /** Starts an app from a spec. Resolves { ok: true } or { ok: false, errors } with a JSON path and a fix for each problem. */
   create(session, id, spec, { style = "android", reduceMotion = false, data, state, permissions = {} } = {}) {
     const devicePermissions = { ...permissions };   // shared with the running app: setPermissions changes it in place
-    const made = createApp(spec, { style, reduceMotion, devicePermissions, ...(data ? { data } : {}), ...(state ? { state } : {}) });
+    const made = createApp(spec, { style, reduceMotion, devicePermissions, network: this.network(session), ...(data ? { data } : {}), ...(state ? { state } : {}) });
     if (!made.ok) return { ok: false, errors: made.errors };
     this.running.set(key(session, id), { app: made.app, spec, style, reduceMotion, devicePermissions, version: 1, history: [{ version: 1, at: Date.now(), changes: [`created: ${describeSpec(spec)}`] }] });
     this.schedule(session, id);
@@ -200,7 +211,7 @@ export class SpecHost {
     const keep = (names, from) => Object.fromEntries(Object.entries(from).filter(([k]) => names.includes(k)));
     const collections = Object.entries(spec?.data ?? {}).filter(([, v]) => v?.source === "collection").map(([k]) => k);
     const stateKeys = Object.keys(spec?.state ?? {});
-    const made = createApp(spec, { style: cur.style, reduceMotion: cur.reduceMotion, devicePermissions: cur.devicePermissions, data: keep(collections, cur.app.data), state: keep(stateKeys, cur.app.state) });
+    const made = createApp(spec, { style: cur.style, reduceMotion: cur.reduceMotion, devicePermissions: cur.devicePermissions, network: this.network(session), data: keep(collections, cur.app.data), state: keep(stateKeys, cur.app.state) });
     if (!made.ok) return { ok: false, errors: made.errors };
     const from = cur.version;
     this.running.set(key(session, id), { ...cur, app: made.app, spec, version: from + 1, history: [...cur.history, { version: from + 1, at: Date.now(), changes: diffSpec(cur.spec, spec) }] });
@@ -244,7 +255,7 @@ export class SpecHost {
   /** The app's current data, or undefined when it is not running. */
   dataOf(session, id) { return this.running.get(key(session, id))?.app.data; }
   drop(session, id) { this.unschedule(key(session, id)); return this.running.delete(key(session, id)); }
-  dropSession(session) { for (const k of [...this.running.keys()]) if (k.startsWith(`${session}/`)) { this.unschedule(k); this.running.delete(k); } }
+  dropSession(session) { for (const k of [...this.running.keys()]) if (k.startsWith(`${session}/`)) { this.unschedule(k); this.running.delete(k); } this.networks.delete(session); }
 
   /** The page for an app's current screen. */
   page(session, id) {
