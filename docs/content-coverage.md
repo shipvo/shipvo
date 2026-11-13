@@ -158,4 +158,4 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Wake-ups for assistants outside a turn (`register_wakeup`, `wait_for_event`, live inbox view) | [phone-apps](phone-apps.md#waking-an-assistant-that-is-not-in-a-turn) | | | |
 | Spec `saveFile` and `parseCsv` (save and import CSV on the phone) | [phone-apps](phone-apps.md#save-as-a-file) | | | |
 | Contacts, Messages and Clock first-party apps | [phone-apps](phone-apps.md#first-party-apps) | | | |
-
+| One summary per session in a room (`room_report`) | [agents](agents.md#collect-one-summary-per-session) | | | |

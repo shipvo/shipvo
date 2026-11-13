@@ -1,0 +1,1 @@
+- docs: Agents page explains `room_report` (one summary per session in a room: agent, steps, seconds, errors, last screen title, notes), with fields and the `no_room` error.
