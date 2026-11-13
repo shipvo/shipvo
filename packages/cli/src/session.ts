@@ -6,7 +6,7 @@ import { copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSyn
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { randomBytes } from "node:crypto";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { rebuildInto, waitListening } from "./sim.js";
@@ -16,6 +16,8 @@ import { CliFailure, UsageError, emit, envelope, type Done, type Next } from "./
 export const SESSION_USAGE = `Usage: shipvo session <command> [options]
 
   start [android|ios] [--device "<model>"] [--name <n>] [--max-duration-minutes <n>] [--port <n>] [--skip-build]
+  start --a2ui <file>       open A2UI messages (JSON lines or a JSON list) on a phone; needs no app folder
+  a2ui send <file> | a2ui actions [--since <n>]   send more A2UI messages; read what the screen sent to the agent
   devices
   screen | back | screenshot [--out <file>] [--no-frame]
   errors                    what the app threw, and scripts that did not load
@@ -143,16 +145,29 @@ export async function pickModel(d: SessionDeps, o: { platform?: Platform; device
   return m;
 }
 
-export async function startSession(d: SessionDeps, o: { platform?: Platform; device?: string; name?: string; minutes?: number; port?: number; skipBuild?: boolean }): Promise<Done> {
+/** A2UI messages from a file: JSON lines as text, or a JSON list as a list. The simulator checks each message. */
+export function readA2ui(root: string, file: string): string | unknown[] {
+  let text: string;
+  try { text = readFileSync(resolve(root, file), "utf8"); }
+  catch { throw new CliFailure(`Cannot read ${file}.`, "no_file", 2); }
+  if (!text.trim()) throw new CliFailure(`${file} is empty.`, "no_file", 2);
+  if (text.trimStart().startsWith("[")) { try { const list = JSON.parse(text); if (Array.isArray(list)) return list; } catch { throw new CliFailure(`${file} starts like a JSON list but is not valid JSON.`, "bad_message", 2); } }
+  return text;
+}
+const a2uiBody = (input: string | unknown[]) => (typeof input === "string" ? { jsonl: input } : { messages: input });
+
+export async function startSession(d: SessionDeps, o: { platform?: Platform; device?: string; name?: string; minutes?: number; port?: number; skipBuild?: boolean; a2ui?: string }): Promise<Done> {
   const minutes = o.minutes ?? DEFAULT_MINUTES;
-  const info = projectInfo(d.root);
+  // An A2UI session shows screens an agent describes, so it needs no app folder and no build.
+  const a2ui = o.a2ui === undefined ? undefined : readA2ui(d.root, o.a2ui);
+  const info = a2ui === undefined ? projectInfo(d.root) : { app: "a2ui", name: `A2UI ${basename(o.a2ui!)}`, missingWebDeps: [] as string[], router: false };
   const model = await pickModel(d, o);
   const platform = model.platform;
   if (info.missingWebDeps.length) {
     throw new CliFailure(`The app needs ${info.missingWebDeps.join(", ")} to run on Shipvo Phone.`, "web_deps_missing", 1,
       [{ command: `npx expo install ${info.missingWebDeps.join(" ")}`, why: "Add the packages Expo uses to build for web." }]);
   }
-  if (!o.skipBuild || !existsSync(join(d.root, "sim-dist", "index.html"))) {
+  if (a2ui === undefined && (!o.skipBuild || !existsSync(join(d.root, "sim-dist", "index.html")))) {
     console.error(`Building ${info.name} for Shipvo Phone…`);
     try { await d.build(d.root); }
     catch (e) { throw new CliFailure(describeWebBuildFailure((e as { output?: string }).output ?? (e as Error).message), "build_failed", 1); }
@@ -165,7 +180,7 @@ export async function startSession(d: SessionDeps, o: { platform?: Platform; dev
   mkdirSync(join(dirOf(d.root), id), { recursive: true });
   const pid = await d.startServer({ server, port, app: info.app, dir: join(dirOf(d.root), id), root: d.root });
   let opened: any;
-  try { opened = await post(d, port, "/session", { session: id, app: info.app, model: model.name, ...(info.router ? { root_mount: true } : {}) }); }
+  try { opened = await post(d, port, "/session", a2ui === undefined ? { session: id, app: info.app, model: model.name, ...(info.router ? { root_mount: true } : {}) } : { session: id, a2ui: true, a2ui_messages: a2ui, model: model.name }); }
   catch (e) { d.kill(pid); throw e; }
   if (!opened?.ok) { d.kill(pid); throw new CliFailure(`The app did not open: ${opened?.error ?? "unknown error"}`, opened?.code ?? "open_failed", 1); }
   const started = d.now();
@@ -202,7 +217,7 @@ export function cleanSessions(d: SessionDeps): Done {
 const DIRECTIONS = new Set(["up", "down", "left", "right"]);
 
 /** One action on the phone. `words` are the positionals after the verb. */
-export async function actSession(d: SessionDeps, verb: string, words: string[], o: { id?: string; out?: string; noFrame?: boolean }): Promise<Done> {
+export async function actSession(d: SessionDeps, verb: string, words: string[], o: { id?: string; out?: string; noFrame?: boolean; since?: number }): Promise<Done> {
   const r = pick(d, o.id);
   if (r.status !== "in_progress") throw new CliFailure(`Session ${r.id} is stopped (${r.stop_reason}).`, "session_stopped", 1, START_NEXT);
   let body: Record<string, unknown>;
@@ -210,10 +225,17 @@ export async function actSession(d: SessionDeps, verb: string, words: string[], 
   else if (verb === "type") { if (words.length < 2) throw new UsageError("type needs a ref and the text, for example: shipvo session type e4 \"hello\""); body = { ref: words[0], text: words.slice(1).join(" ") }; }
   else if (verb === "scroll") { if (!DIRECTIONS.has(words[0])) throw new UsageError("scroll needs up, down, left or right."); body = { direction: words[0], ...(words[1] ? { ref: words[1] } : {}) }; }
   else if (verb === "screenshot") body = { frame: !o.noFrame };
+  else if (verb === "a2ui") {
+    if (words[0] === "send") { if (!words[1]) throw new UsageError("a2ui send needs a file, for example: shipvo session a2ui send update.jsonl"); verb = "a2ui_send"; body = a2uiBody(readA2ui(d.root, words[1])); }
+    else if (words[0] === "actions") { verb = "a2ui_actions"; body = o.since === undefined ? {} : { since: o.since }; }
+    else throw new UsageError("a2ui needs send <file> or actions.");
+  }
   else if (verb === "record") { if (words[0] !== "start" && words[0] !== "stop") throw new UsageError("record needs start or stop."); verb = `record_${words[0]}`; body = {}; }
   else body = {};
   const res = await post(d, r.port, "/act", { session: r.id, action: verb, ...body });
   if (!res?.ok) throw new CliFailure(res?.error ?? "The action failed.", res?.code ?? res?.reason ?? "action_failed", 1, [driveNext(r.id)[0]]);
+  if (verb === "a2ui_send") return { code: (res.errors ?? []).length ? "a2ui_errors" : "sent", summary: `${res.applied} message${res.applied === 1 ? "" : "s"} applied${(res.errors ?? []).length ? `, ${res.errors.length} refused` : ""}.`, data: { session: r.id, applied: res.applied, errors: res.errors ?? [], surfaces: res.surfaces ?? [], screen: res.screen }, next: [{ command: `shipvo session a2ui actions --id ${r.id} --json`, why: "Read what the screen sent to the agent." }] };
+  if (verb === "a2ui_actions") return { code: "actions", summary: `${(res.messages ?? []).length} message${(res.messages ?? []).length === 1 ? "" : "s"} for the agent.`, data: { session: r.id, messages: res.messages ?? [], next: res.next ?? 0, effects: res.effects ?? [], surfaces: res.surfaces ?? [] }, next: driveNext(r.id) };
   if (verb === "errors") {
     const errors: string[] = Array.isArray(res.errors) ? res.errors.map(String) : [];
     return { code: errors.length ? "errors" : "no_errors", summary: errors.length ? `The app has ${errors.length} error${errors.length === 1 ? "" : "s"}.` : "The app has no errors.", data: { session: r.id, errors }, next: driveNext(r.id) };
@@ -270,7 +292,7 @@ export function defaultDeps(root = process.cwd()): SessionDeps {
 export async function session(argv: string[], deps: SessionDeps = defaultDeps()): Promise<number> {
   const json = argv.includes("--json");
   const flags: Record<string, string> = {}; const words: string[] = [];
-  const VALUE = new Set(["id", "name", "max-duration-minutes", "port", "out", "device"]);
+  const VALUE = new Set(["id", "name", "max-duration-minutes", "port", "out", "device", "a2ui", "since"]);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith("--")) words.push(a);
@@ -289,13 +311,13 @@ export async function session(argv: string[], deps: SessionDeps = defaultDeps())
       if (minutes !== undefined && !(minutes > 0 && minutes <= 24 * 60)) throw new UsageError("--max-duration-minutes needs a number from 1 to 1440.");
       const port = flags.port === undefined ? undefined : Number(flags.port);
       if (port !== undefined && !(Number.isInteger(port) && port > 0 && port < 65536)) throw new UsageError("--port needs a number from 1 to 65535.");
-      done = await startSession(deps, { platform, device: flags.device, name: flags.name, minutes, port, skipBuild: flags["skip-build"] === "true" });
+      done = await startSession(deps, { platform, device: flags.device, a2ui: flags.a2ui, name: flags.name, minutes, port, skipBuild: flags["skip-build"] === "true" });
     } else if (verb === "stop") done = await stopSession(deps, flags.id);
     else if (verb === "clean") done = cleanSessions(deps);
     else if (verb === "devices") { const { models, defaults } = await deps.models(deps.root); done = { code: "listed", summary: `${models.length} phone models. Defaults: ${defaults.android} for android, ${defaults.ios} for ios.`, data: { devices: models.map(({ name, platform, width, height, scale }) => ({ name, platform, width, height, scale })), defaults }, next: START_NEXT }; }
     else if (verb === "get") { const r = pick(deps, flags.id); done = { code: r.status, summary: `Session ${r.id} is ${r.status === "in_progress" ? "running" : "stopped"}.`, data: view(deps.root, r), next: r.status === "in_progress" ? driveNext(r.id) : START_NEXT }; }
     else if (verb === "list") { const list = all(deps); done = { code: "listed", summary: `${list.length} session${list.length === 1 ? "" : "s"} in this folder.`, data: { sessions: list }, next: list.some((s) => s.status === "in_progress") ? [] : START_NEXT }; }
-    else if (["screen", "tap", "type", "scroll", "back", "screenshot", "record", "errors"].includes(verb)) done = await actSession(deps, verb, rest, { id: flags.id, out: flags.out, noFrame: flags["no-frame"] === "true" });
+    else if (["screen", "tap", "type", "scroll", "back", "screenshot", "record", "errors", "a2ui"].includes(verb)) done = await actSession(deps, verb, rest, { id: flags.id, out: flags.out, noFrame: flags["no-frame"] === "true", since: flags.since === undefined ? undefined : Number(flags.since) || 0 });
     else throw new UsageError(`Unknown session command "${verb}".\n${SESSION_USAGE}`);
     doc = envelope(done.code, done.summary, done.data, done.next, 0);
   } catch (e) {

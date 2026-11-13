@@ -15,6 +15,7 @@
     "./screen-rules.mjs": "./screen-rules.mjs",
     "./network-profiles.mjs": "./network-profiles.mjs",
     "./models.mjs": "./models.mjs",
+    "./a2ui.mjs": "./a2ui.mjs",
     "./frame.mjs": {
       "types": "./frame.d.mts",
       "default": "./frame.mjs"
@@ -65,6 +66,8 @@
     "build-open.mjs",
     "capture.mjs",
     "models.mjs",
+    "a2ui.mjs",
+    "a2ui-page.mjs",
     "README.md"
   ],
   "peerDependencies": {
