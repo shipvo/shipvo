@@ -1,0 +1,2 @@
+- Docs: release format v1 spec at `docs/spec/release-format.md`, in the docs sidebar, with a test that checks it against `@shipvo/schema`.
+- Migration: none.
