@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "Bug Bench",
+    "slug": "bug-bench",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "web": { "output": "single" }
+  }
+}
