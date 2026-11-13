@@ -121,7 +121,7 @@ Screen-independent values the app keeps while running (filters, selected tab, fo
 
 Expressions inside `{{ }}` are [CEL, the Common Expression Language](https://cel.dev) (decided 6 Nov 2026), evaluated with [`@bufbuild/cel`](https://github.com/bufbuild/cel-es). CEL has no loops or recursion, cannot reach the network or anything undeclared, and its evaluation cost is bounded. Every expression is type-checked during validation against the app's data, state and route types, so a wrong field name is an error with a suggestion before anything runs.
 
-- Names in scope: `data.<name>` (or the bare name for data entries), `state.<name>`, `item` (inside list templates), `input` (inside actions), `result` (after a `call` step), `route.params`, `now`, `person` (locale, time zone, language).
+- Names in scope: `data.<name>` (or the bare name for data entries), `state.<name>`, `item` (inside list templates), `input` (inside actions), `result` (after a `call` step), `route.params`, `now`, `person` (locale, time zone, language), `network` (`online`, and `type`: `wifi`, `cellular` or `none`).
 - CEL macros for lists: `charges.filter(c, c.status == 'succeeded')`, `charges.map(c, c.amount)`, `charges.exists(c, c.status == 'failed')`, `charges.all(c, c.paid)`.
 - Shipvo function library, registered with types so the checker knows them:
   - numbers and lists: `sum(list<num>)`, `avg`, `min`, `max`, `count(list)`, `unique(list, field?)`, `sortBy(list, field, 'asc'|'desc')`, `groupBy(list, field)`, `first`, `last`, `take(list, n)`;
@@ -132,6 +132,7 @@ Expressions inside `{{ }}` are [CEL, the Common Expression Language](https://cel
   - export: `csv(rows)` or `csv(rows, ['col', ...])` returns CSV text with a header row, quoted fields and CRLF line ends. Lists become `a; b`. Return it from an action to hand it to an agent, or put it in state to show it.
   - fallbacks: `orElse(value, fallback)`, or CEL's `has(x.field) ? x.field : fallback`.
 - Limits: 2,000 characters per expression and a cost limit per evaluation (CEL cost estimation); over-limit expressions are validation errors.
+- `saveFile` step: `{ "saveFile": "diary.csv", "content": "{{ csv(data.entries) }}", "mime": "text/csv" }` saves text as a named file. `content` is required. `mime` is optional and defaults to `text/plain`. The name may not contain a slash. Saving again with the same name replaces the file. The step needs the `files` device permission, also when it sits inside `then` or `else`. Saved files are on `app.files`.
 
 ## 8. Screens and navigation
 
@@ -208,6 +209,7 @@ Steps (v0): `refresh`, `insert`, `update`, `delete` (collections), `http` (calls
 Rules:
 - Every interactive block either calls a named action or a single built-in step. UI-only steps (navigate, set) are not published to agents.
 - Actions that change data outside the app (`http` writes) are marked `"effect": "external"` automatically and always go through the one-time approval flow unless the person granted standing permission.
+- An action with `"share": "<text input>"` is a share target: text shared from another app on the phone goes into that input. The validator checks that the input exists and is text.
 - Agents see the same action list in `describe_app`, plus the screen's labelled tree, so they can use the UI or call actions directly.
 
 ## 11. Schedules and notifications

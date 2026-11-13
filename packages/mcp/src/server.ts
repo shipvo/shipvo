@@ -24,6 +24,7 @@ import { traceFromMeta } from "./trace.js";
 import { findTarget } from "./record.js";
 import { Recorder, RecorderError } from "./recorder.js";
 import { connectDriver, findLiveRun, type Driver, type RunInfo } from "./attach.js";
+import { INBOX_WIDGET_URI, INBOX_WIDGET_HTML, INBOX_WIDGET_META, INBOX_TOOL_META, MCP_APP_MIME } from "./widgets/inbox.js";
 import { BuildError, hostedKey, resolveBuild, uploadBuild } from "./build-upload.js";
 import { findProjectDir, hasDesktop, localShipvo, runUrl, startRun } from "./launch.js";
 import { JobStore, type JobView } from "./jobs.js";
@@ -168,25 +169,28 @@ async function withBanner(out: unknown, sid: unknown, agent: string | undefined)
   const content = [{ ...first, text: `${banner}\n${first.text}` }, ...(out as { content: unknown[] }).content.slice(1)];
   return { ...(out as object), content };
 }
+// The client name the hosting service attached to a server built for one stateless request (see clientName in makeServer).
+const hostedClient = new WeakMap<McpServer, string>();
 const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: ToolCallback<S>) => {
+  const clientName = (): string | undefined => server.server.getClientVersion()?.name ?? hostedClient.get(server);
   const guarded = async (args: unknown, extra: unknown) => {
     const trace = traceFromMeta((extra as { _meta?: unknown } | undefined)?._meta);
     const entry = (): CallEntry => ({ tool: t.name, at: new Date().toISOString(), ...(trace ? { traceId: trace.traceId } : {}) });
     const sid = (args as { session?: unknown } | undefined)?.session;
     const log = typeof sid === "string" ? callLog.get(sid) : undefined;
     if (log) { log.push(entry()); if (log.length > 1000) log.splice(0, log.length - 1000); }
-    let out: unknown = inputHasKey(args) ? keyRefusal() : await caller.run(server.server.getClientVersion()?.name, () => (cb as (a: unknown, e: unknown) => unknown)(args, extra));
+    let out: unknown = inputHasKey(args) ? keyRefusal() : await caller.run(clientName(), () => (cb as (a: unknown, e: unknown) => unknown)(args, extra));
     if (t.name === "open_app") {
       // The session id is only known once the call returns.
       const opened = /^session: (\S+)/.exec((out as { content?: { text?: string }[] })?.content?.[0]?.text ?? "")?.[1];
       if (opened && sessions.has(opened)) callLog.set(opened, [entry()]);
     }
-    out = await withBanner(out, sid, server.server.getClientVersion()?.name);
+    out = await withBanner(out, sid, clientName());
     return trace && out && typeof out === "object" ? { ...out, _meta: { ...((out as { _meta?: object })._meta ?? {}), traceparent: trace.traceparent } } : out;
   };
   return server.tool(t.name, t.description, t.input, t.annotations, guarded as unknown as ToolCallback<S>);
 };
-type Ctx = { remote?: boolean; key?: string; app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string; local?: boolean };
+type Ctx = { remote?: boolean; client?: string; key?: string; app?: string; scope?: "test" | "owner" | "read"; ownerToken?: string; publicApps?: string; local?: boolean };
 /** The package version, read from package.json next to dist/ so it never drifts from the published one. */
 const SERVER_VERSION: string = (() => { try { return JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version ?? "0.0.0"; } catch { return "0.0.0"; } })();
 // MCP 2026-07-28 caching hint on tools/list. The list depends on the per-request scope headers, so it is private to the caller.
@@ -205,12 +209,16 @@ const jobReply = (v: JobView<Done>) =>
 const codedError = (code: string, message: string) => Object.assign(new Error(message), { code });
 function makeServer(ctx: Ctx = {}) {
 const principal = ctx.key ?? "local";
+// The calling assistant: the name its client sent with initialize, or, on stateless HTTP where tool calls arrive without
+// it, the name the hosting service attached from the caller's key (x-shipvo-client).
+const clientName = (): string | undefined => server.server.getClientVersion()?.name ?? (ctx.client || undefined);
 const server = new McpServer({ name: "shipvo", version: SERVER_VERSION }, { instructions:
 `You can use Shipvo apps the way a person uses them on a phone, without a phone.
 Call open_app to get a session and the first screen. The screen is an accessibility tree: every button, field and text, with a [ref=eN]. Act with tap/type/scroll/back using refs, and read the screen that comes back each time.
 Only what is on screen is listed, like a phone: a horizontal product rail shows a few items, so "scroll right" on the rail (its ref) to see more; "scroll down" the page for the rest.
 System sheets (permission dialogs, the camera, the fingerprint prompt, payment prompts, notification banners, the share sheet) appear in the tree like any other screen: answer them by tapping, as a person would. Use set_device to decide what the phone has (a barcode in front of the camera, a location, whether the fingerprint matches, whether the payment is approved, network off) before the app asks for it.
 Finish a task by checking the final screen says what you expected (for example "Order placed"). Call end_session when done to get a report.` });
+if (ctx.client) hostedClient.set(server, ctx.client);
 
 // ctx.app: the app(s) this key opens, comma-separated (the beta app plus any the key owner has registered).
 const keyApps = ctx.app ? ctx.app.split(",").map((s) => s.trim()).filter(Boolean) : null;
@@ -227,7 +235,7 @@ use(server, tools.list_apps, async ({ query }) => {
   return text((lines.join("\n") || `no apps match "${query}"`) + phone);
 });
 
-const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, room }: { app: string; room?: string; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always"; platform?: "android" | "ios"; show?: boolean }) => {
+const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, room, restart, model }: { app: string; room?: string; restart?: boolean; session?: string; seed_cart?: any[]; dark?: boolean; attach?: "auto" | "never" | "always"; platform?: "android" | "ios"; show?: boolean; model?: string }) => {
   let id = app.split("@")[0];
   const buildId = /^[^@]+@build:([A-Za-z0-9_-]+)$/.exec(app)?.[1];
   const headlessOnly = attach === "never" || show === false;
@@ -255,11 +263,32 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, 
       }
     }
   }
+  let missingOn: string | null = null; let open: { session: string; release?: string | number; room?: string | null; skin?: string } | undefined;
+  if (ctx.scope === "read" && session) throw new Error("this key is read-only: it cannot open sessions");
+  // A session that is already open is reused, not started over: other assistants on this phone keep their apps and data.
+  if (session && !restart && !buildId && !live) {
+    open = ((await sim("/sessions", {})) as Act & { sessions?: { session: string; release?: string | number; room?: string | null; skin?: string }[] }).sessions?.find((s) => s.session === session);
+    if (open) {
+      const phone = await act({ session: session, action: "phone_apps" }) as Act & { current_app?: string; installed_apps?: { id: string }[] };
+      if (phone.ok !== false && phone.current_app !== id) {
+        if (!phone.installed_apps?.some((a) => a.id === id)) missingOn = session;
+        else { const sw = await act({ session: session, action: "switch_app", id }); if (sw.ok === false) return result(session, sw); }
+      }
+      if (!missingOn) {
+      const r = await act({ session: session, action: "screen" });
+      if (r.ok === false) return result(session, r);
+      if (!sessions.has(session)) { sessions.set(session, { app: id, steps: 0, startedAt: Date.now(), room: open.room ?? undefined, client: clientName(), platform: ctx.remote ? (open.skin as "android" | "ios" | undefined) ?? "android" : "headless" }); steps.set(session, [{ action: "open" }]); }
+      if (r.screen != null) trees.set(session, r.screen);
+      return text(`session: ${session}\napp: ${id} release: ${open.release ?? "local"}\nmode: reused the open session (its apps and data are kept; restart: true starts it over)\nvisible: no\n\n${r.screen ?? ""}`);
+      }
+    }
+  }
   // The key's app list always applies. A live run only replaces the "simulator knows this app" check.
   if (keyApps && !keyApps.includes(id)) return result("", { ok: false, code: "unknown_app", error: `this key opens: ${keyApps.join(", ")}` });
   if (!keyApps && !live && !(await localApps())[id]) return result("", { ok: false, code: "unknown_app", error: `unknown app "${id}". Apps: ${Object.keys(await localApps()).join(", ")}` });
   if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
   const sid = session ?? `${id}-${Date.now().toString(36)}`;
+  if (missingOn) return result(sid, { ok: false, code: "not_installed", error: `session ${sid} is open and has no "${id}" app. Install it with install_app, or pass restart: true to start ${sid} over with ${id} (its other apps and data are lost).` });
   const mode = attach ?? "auto";
   if (mode === "always" && !live) return result("", { ok: false, code: "no_live_run", error: `no live shipvo run for "${id}" found in this directory or its parents (.shipvo/run.json missing, stale, or for another app). Start \`shipvo run android\` or \`shipvo run ios\`, or use attach: "auto".` });
   let attachNote = launchNote;
@@ -280,7 +309,7 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, 
       const r = await act({ session: sid, action: "screen" });
       if (!r.ok) { attached.delete(sid); attachedRun.delete(sid); d.close(); if (mode === "always") return result(sid, r); attachNote += ` (live run found but attach failed: ${r.error ?? r.code ?? "unknown error"})`; }
       else {
-        sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, client: server.server.getClientVersion()?.name, platform: live.platform }); steps.set(sid, [{ action: "open" }]);
+        sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, client: clientName(), platform: live.platform }); steps.set(sid, [{ action: "open" }]);
         if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
         // Lumi shows the step in the phone frame. tap, type, scroll and back are captioned by the page itself, from the element it acts on.
         void d.request("lumi", { caption: `Opened ${id}`, state: "working", hold: 1800 }, 1000).catch(() => {});
@@ -291,14 +320,14 @@ const openApp = async ({ app, session, seed_cart, dark, attach, platform, show, 
       attachNote += ` (live run found but attach failed: ${(e as Error).message})`;
     }
   }
-  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), ...(room ? { room } : {}), ...(ctx.remote && platform ? { skin: platform } : {}), ...(buildUrl ? { build: buildId } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number; build?: string };
+  const r = await sim("/session", { session: sid, app, ...(buildUrl ? { build_url: buildUrl } : {}), ...(room ? { room } : {}), ...(ctx.remote && platform ? { skin: platform } : {}), ...(model ? { model } : {}), ...(buildUrl ? { build: buildId } : {}), seed_cart: seed_cart?.map((l) => ({ ...l, product_id: l.product_id ?? l.id, quantity: l.quantity ?? l.qty })), dark }) as Act & { release?: string | number; build?: string };
   if (r.code === "sim_timeout") return result(sid, r);
   // Only report a build as open when the simulator says it loaded that build. Otherwise the phone shows another app version.
   if (buildId && r.ok !== false && r.build !== buildId) {
     return result("", { ok: false, code: "build_not_supported", error: `the simulator did not load build ${buildId}, so no session was opened. Open ${id} without @build to use the published app.` });
   }
   if (r.ok === false) return result(sid, r);
-  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, client: server.server.getClientVersion()?.name, platform: ctx.remote ? platform ?? "android" : "headless" });
+  sessions.set(sid, { app: id, steps: 0, startedAt: Date.now(), room, client: clientName(), platform: ctx.remote ? platform ?? "android" : "headless" });
   steps.set(sid, [{ action: "open" }]);
   if (r.screen != null) trees.set(sid, r.screen); else trees.delete(sid);
   return text(`session: ${sid}\napp: ${id} release: ${buildId ? `build:${buildId}` : r.release ?? "local"}\nmode: headless session${attachNote}\nvisible: no\n\n${r.screen ?? ""}`);
@@ -352,7 +381,7 @@ use(server, tools.room_log, async ({ room, since }) => {
   return { ...text((rows.length ? rows.map(line).join("\n") : "no new entries") + `\ncursor: ${r.cursor}`), structuredContent: { room, entries: rows, cursor: r.cursor } };
 });
 use(server, tools.room_note, async ({ room, text: note }) => {
-  const r = await sim("/room_note", { room, text: note, agent: server.server.getClientVersion()?.name }) as Act & { cursor?: string };
+  const r = await sim("/room_note", { room, text: note, agent: clientName() }) as Act & { cursor?: string };
   return r.ok ? { ...text(`noted, cursor: ${r.cursor}`), structuredContent: { room, cursor: r.cursor } } : result("", r);
 });
 type Wait = { wait_for?: WaitFor; timeout_ms?: number; settle?: boolean };
@@ -380,14 +409,42 @@ use(server, tools.type,
 use(server, tools.scroll, 
   async ({ session, direction, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const box = ref ? await locating(session, ref, true) : undefined; const first = await act({ session, action: "scroll", direction, ref }); if (first.ok && recorder.drawing) void recorder.trail(...scrollTrail(direction, box)); const w = await waiting(session, first, { wait_for, timeout_ms, settle }); return acted(session, "scroll", w.r, { waited: w.waited, compact, step: { action: "scroll", direction } }); });
 use(server, tools.back, async ({ session, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await act({ session, action: "back" }), { wait_for, timeout_ms, settle }); return acted(session, "back", w.r, { waited: w.waited, compact, step: { action: "back" } }); });
-use(server, tools.screenshot, async ({ session }) => {
-  need(session); const r = await act({ session, action: "screenshot" });
+use(server, tools.screenshot, async ({ session, frame }) => {
+  need(session); const r = await act({ session, action: "screenshot", ...(frame ? { frame: true } : {}) });
   if (!r.ok) return result(session, r);
   if (!r.image && !r.path) throw new Error("no screenshot");
   // `source` says where the pixels came from: the live tab, a DOM drawing, or the headless browser.
   const source = r.source ?? "headless";
   const head = `source: ${source}` + (r.unsupported?.length ? `\nnot drawn: ${r.unsupported.join(", ")}` : "");
   return { content: [{ type: "image" as const, data: r.image ?? readFileSync(r.path!).toString("base64"), mimeType: r.image && r.mime === "image/jpeg" ? "image/jpeg" : "image/png" }, { type: "text" as const, text: `${head}\n\n${r.screen ?? ""}` }] };
+});
+use(server, tools.phone_models, async () => {
+  const r = (await sim("/models", {})) as Act & { models?: { name: string; platform: string; width: number; height: number; scale: number }[]; defaults?: Record<string, string> };
+  if (!r.ok || !r.models) return result("", { ok: false, code: r.code ?? "sim_unreachable", error: r.error ?? "the simulator did not list its phone models" });
+  const lines = r.models.map((m) => `${m.name} | ${m.platform} | ${m.width}x${m.height} @${m.scale}x`);
+  return { content: [{ type: "text" as const, text: `Defaults: android is ${r.defaults?.android}, ios is ${r.defaults?.ios}\n\n${lines.join("\n")}` }], structuredContent: { ok: true, models: r.models, defaults: r.defaults ?? {} } };
+});
+// A2UI: the agent's own messages drawn as a phone screen. The session then takes screen, tap, type and screenshot like any app.
+type A2uiAct = Act & { applied?: number; errors?: { code?: string; message?: string }[]; surfaces?: string[]; messages?: unknown[]; next?: number; effects?: unknown[] };
+const a2uiSent = (r: A2uiAct) => `${r.applied ?? 0} applied${r.errors?.length ? `, ${r.errors.length} refused:\n${r.errors.map((e) => `  ${e.code ?? "error"}: ${e.message ?? ""}`).join("\n")}` : ""}`;
+use(server, tools.a2ui_open, async ({ messages, session, model }) => {
+  if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
+  const sid = session ?? `a2ui-${Date.now().toString(36)}`;
+  const r = (await sim("/session", { session: sid, a2ui: true, a2ui_messages: messages, ...(model ? { model } : {}) })) as A2uiAct;
+  if (!r.ok) return result(sid, r);
+  sessions.set(sid, { app: "a2ui", steps: 0, startedAt: Date.now(), client: clientName(), platform: "headless" });
+  return { ...text(`Session: ${sid}\n${a2uiSent(r)}\n\n${r.screen ?? ""}`), structuredContent: { ok: true, session: sid, applied: r.applied ?? 0, errors: r.errors ?? [] } };
+});
+use(server, tools.a2ui_send, async ({ session, messages }) => {
+  need(session); const r = (await act({ session, action: "a2ui_send", messages })) as A2uiAct;
+  if (!r.ok) return result(session, r);
+  return { ...text(`${a2uiSent(r)}\n\n${r.screen ?? ""}`), structuredContent: { ok: true, applied: r.applied ?? 0, errors: r.errors ?? [], surfaces: r.surfaces ?? [] } };
+});
+use(server, tools.a2ui_actions, async ({ session, since }) => {
+  need(session); const r = (await act({ session, action: "a2ui_actions", ...(since !== undefined ? { since } : {}) })) as A2uiAct;
+  if (!r.ok) return result(session, r);
+  const list = r.messages ?? [];
+  return { ...text(list.length ? list.map((x) => JSON.stringify(x)).join("\n") : "No messages for the agent yet."), structuredContent: { ok: true, messages: list, next: r.next ?? 0, effects: r.effects ?? [], surfaces: r.surfaces ?? [] } };
 });
 // The simulated device: what the phone has, and what happens to it.
 use(server, tools.set_device, async ({ session, ...device }) => { need(session); const r = await act({ session, action: "set_device", device }); if (r.ok) steps.get(session)?.push({ action: "set_device", device: device.payment?.pin === undefined ? device : { ...device, payment: { ...device.payment, pin: undefined } } }); return result(session, r); });
@@ -402,6 +459,12 @@ use(server, tools.wait_for_event,
   async ({ session, timeout_ms }) => { need(session); const r = await act({ session, action: "wait_for_event", timeout_ms }) as Act & { event?: boolean; banner?: string; pending?: unknown };
     if (!r.ok) return result(session, r);
     return { ...text(r.event ? "Something is waiting for you. Read it with check_inbox or my_tasks." : "nothing yet"), structuredContent: { event: r.event === true, ...(r.pending ? { pending: r.pending } : {}) } }; });
+use(server, tools.set_reminder,
+  async ({ session, title, body, at, in_minutes, repeat }) => { need(session); const r = await act({ session, action: "set_reminder", title, body, at, in_minutes, repeat }) as Act & { reminder?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.reminder, null, 2)); });
+use(server, tools.list_reminders,
+  async ({ session }) => { need(session); const r = await act({ session, action: "list_reminders" }) as Act & { reminders?: unknown; fired?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ reminders: r.reminders, fired: r.fired }, null, 2)); });
+use(server, tools.cancel_reminder,
+  async ({ session, id }) => { need(session); const r = await act({ session, action: "cancel_reminder", id }) as Act & { cancelled?: boolean }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cancelled: r.cancelled === true })); });
 use(server, tools.register_wakeup,
   async ({ session, name, url, events, secret, format, allow_private }) => { need(session); const r = await act({ session, action: "register_wakeup", name, url, events, secret, format, allow_private }) as Act & { wakeup?: unknown };
     if (!r.ok) return result(session, r);
@@ -410,6 +473,38 @@ use(server, tools.list_wakeups,
   async ({ session }) => { need(session); const r = await act({ session, action: "list_wakeups" }) as Act & { wakeups?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ wakeups: r.wakeups }, null, 2)); });
 use(server, tools.clear_wakeup,
   async ({ session, name }) => { need(session); const r = await act({ session, action: "clear_wakeup", name }) as Act & { cleared?: boolean }; if (!r.ok) return result(session, r); return text(JSON.stringify({ cleared: r.cleared === true })); });
+// The live inbox: a tool result the model reads, and an MCP Apps view (ui://shipvo/inbox.html) the host draws next to it.
+type InboxView = Act & { me?: string | null; messages?: { from: string; to: string; body: string; read: boolean }[]; tasks?: { from: string; to: string; title: string; status: string }[]; unread_for_me?: number; open_for_me?: number };
+const inboxTool = use(server, tools.inbox_view,
+  async ({ session }) => { need(session); const r = await act({ session, action: "inbox_view" }) as InboxView;
+    if (!r.ok) return result(session, r);
+    const lines = [`inbox for ${r.me ?? "an unnamed assistant"}: ${r.unread_for_me ?? 0} unread, ${r.open_for_me ?? 0} open tasks for you`,
+      ...(r.messages ?? []).slice(-10).map((m) => `- ${m.from} → ${m.to}${m.read ? "" : " (unread)"}: ${m.body}`),
+      ...(r.tasks ?? []).slice(-5).map((h) => `- task ${h.from} → ${h.to} [${h.status}]: ${h.title}`)];
+    return { ...text(lines.join("\n")), structuredContent: { session, me: r.me ?? null, messages: r.messages ?? [], tasks: r.tasks ?? [], unread_for_me: r.unread_for_me ?? 0, open_for_me: r.open_for_me ?? 0 } }; });
+inboxTool.update({ _meta: INBOX_TOOL_META });
+server.registerResource("assistant-inbox-widget", INBOX_WIDGET_URI, { title: "Assistant Inbox", description: "Live Assistant Inbox view for inbox_view results.", mimeType: MCP_APP_MIME, _meta: INBOX_WIDGET_META },
+  async () => ({ contents: [{ uri: INBOX_WIDGET_URI, mimeType: MCP_APP_MIME, text: INBOX_WIDGET_HTML, _meta: INBOX_WIDGET_META }] }));
+use(server, tools.permission_log,
+  async ({ session, app, permission, event, limit }) => { need(session); const r = await act({ session, action: "permission_log", app, permission, event, limit }) as Act & { entries?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ entries: r.entries }, null, 2)); });
+use(server, tools.get_connectivity,
+  async ({ session }) => { need(session); const r = await act({ session, action: "get_connectivity" }) as Act & { connectivity?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.connectivity)); });
+use(server, tools.set_connectivity,
+  async ({ session, wifi, mobile_data, airplane }) => { need(session); const r = await act({ session, action: "set_connectivity", wifi, mobile_data, airplane }) as Act & { connectivity?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.connectivity)); });
+use(server, tools.share_targets,
+  async ({ session }) => { need(session); const r = await act({ session, action: "share_targets" }) as Act & { targets?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ targets: r.targets }, null, 2)); });
+use(server, tools.share,
+  async ({ session, to, text: body, title, action, from }) => { need(session); const r = await act({ session, action: "share", to, text: body, title, action_name: action, from }) as Act & { shared?: unknown; value?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ shared: r.shared, value: r.value }, null, 2)); });
+use(server, tools.get_clipboard,
+  async ({ session }) => { need(session); const r = await act({ session, action: "get_clipboard" }) as Act & { text?: string }; if (!r.ok) return result(session, r); return text(JSON.stringify({ text: r.text ?? "" })); });
+use(server, tools.set_clipboard,
+  async ({ session, text: body }) => { need(session); const r = await act({ session, action: "set_clipboard", text: body }) as Act & { text?: string }; if (!r.ok) return result(session, r); return text(JSON.stringify({ text: r.text ?? "" })); });
+use(server, tools.backup_phone,
+  async ({ session }) => { need(session); const r = await act({ session, action: "backup_phone" }) as Act & { backup?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify(r.backup)); });
+use(server, tools.restore_phone,
+  async ({ session, backup, replace }) => { need(session); const r = await act({ session, action: "restore_phone", backup, replace }) as Act & { restored?: unknown; skipped?: unknown; failed?: unknown; warnings?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ restored: r.restored, ...(r.skipped ? { skipped: r.skipped } : {}), ...(r.failed ? { failed: r.failed } : {}), ...(r.warnings ? { warnings: r.warnings } : {}) }, null, 2)); });
+use(server, tools.search_phone,
+  async ({ session, query, app, limit }) => { need(session); const r = await act({ session, action: "search_phone", query, app, limit }) as Act & { results?: unknown; count?: number; truncated?: boolean; query?: string }; if (!r.ok) return result(session, r); return text(JSON.stringify({ query: r.query, count: r.count, truncated: r.truncated, results: r.results }, null, 2)); });
 use(server, tools.inbox_wait,
   async ({ session, subject, from, timeout_ms }) => { need(session); const r = await act({ session, action: "inbox_wait", subject, from, timeout_ms }) as Act & { address?: string; message?: unknown }; if (!r.ok) return result(session, r); return text(JSON.stringify({ address: r.address, message: r.message }, null, 2)); });
 use(server, tools.inbox_read,
@@ -823,9 +918,25 @@ if (argi < 0) {
   // Stateless (MCP 2026-07-28, and fine for 2025-era clients): no protocol session. Every request gets its own
   // McpServer and transport, built from that request's x-shipvo-* headers, so scope never outlives the request.
   // Simulator sessions are separate: they live in the simulator and travel as the `session` tool argument.
+  let phonesToken: string | null = null;   // set once by the hosted service: POST /phones/claim
   const httpServer = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://x");
     if (url.pathname === "/health") { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ ok: true })); }
+    // Moving phones to another simulator (the hosted service does this on deploy). The service claims the sandbox
+    // once, right after starting it, with a token only it knows; export and import then need that token.
+    if (url.pathname === "/phones/claim" || url.pathname === "/phones/export" || url.pathname === "/phones/import") {
+      let raw = ""; for await (const ch of req) raw += ch;
+      const auth = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+      if (req.method !== "POST" || !/^[A-Za-z0-9_-]{32,128}$/.test(auth)) { res.writeHead(404); return res.end(); }
+      if (url.pathname === "/phones/claim") {
+        if (phonesToken && phonesToken !== auth) { res.writeHead(409, { "content-type": "application/json" }); return res.end(JSON.stringify({ ok: false, error: "already claimed" })); }
+        phonesToken = auth; res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ ok: true }));
+      }
+      if (!phonesToken || auth !== phonesToken) { res.writeHead(404); return res.end(); }
+      const r = await fetch(`${SIM}${url.pathname}`, { method: "POST", headers: { "content-type": "application/json" }, body: raw || "{}" }).catch(() => null);
+      res.writeHead(r?.status ?? 502, { "content-type": "application/json" });
+      return res.end(r ? await r.text() : JSON.stringify({ ok: false, error: "simulator not reachable" }));
+    }
     if (url.pathname !== "/mcp") { res.writeHead(404); return res.end(); }
     // Keys: Bearer <key>. With no keys configured, the server is open (local use behind a tunnel you control).
     if (keys.size) { const k = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, ""); if (!keys.has(k)) { res.writeHead(401, { "content-type": "application/json" }); return res.end(JSON.stringify({ error: "invalid_api_key" })); } }
@@ -854,13 +965,13 @@ if (argi < 0) {
       }
       if (msg.method === "server/discover") {
         res.writeHead(200, { "content-type": "application/json" });
-        return res.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id ?? null, result: { resultType: "complete", supportedVersions: SUPPORTED_VERSIONS, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "shipvo", version: SERVER_VERSION } } }));
+        return res.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id ?? null, result: { resultType: "complete", supportedVersions: SUPPORTED_VERSIONS, capabilities: { tools: { listChanged: false }, resources: { listChanged: false } }, serverInfo: { name: "shipvo", version: SERVER_VERSION } } }));
       }
     }
     // Behind sim.shipvo.dev the Worker has checked the key and says which app and scope it grants; locally
     // there are no such headers and every app is allowed. A client's mcp-session-id header is ignored.
     const h = (n: string) => (req.headers[n] as string) || undefined;
-    const server = makeServer({ remote: true, key: h("x-shipvo-key"), app: h("x-shipvo-app"), publicApps: h("x-shipvo-public"), scope: h("x-shipvo-scope") as Ctx["scope"], ownerToken: h("x-shipvo-owner-token") });
+    const server = makeServer({ remote: true, client: h("x-shipvo-client"), key: h("x-shipvo-key"), app: h("x-shipvo-app"), publicApps: h("x-shipvo-public"), scope: h("x-shipvo-scope") as Ctx["scope"], ownerToken: h("x-shipvo-owner-token") });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     if (era2026 && msg) {
       // 2026-07-28 results carry resultType, and tools/list also carries ttlMs and cacheScope. 2025-era responses are untouched.

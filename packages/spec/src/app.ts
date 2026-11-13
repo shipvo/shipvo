@@ -17,12 +17,17 @@ export type PressResult =
 /** Who is calling. `caller` is the assistant's name (for example "claude" or "chatgpt"); actions read it as `{{ caller }}`. Empty when a person taps the screen. */
 export interface CallContext { caller?: string }
 
+/** A file saved by a `saveFile` step. */
+export interface SavedFile { name: string; mime: string; size: number; content: string }
+
 export interface App {
   /** The screen on top of the history. */
   readonly screen: string;
   readonly state: Record<string, unknown>;
   /** Collection data by name. */
   readonly data: Record<string, unknown>;
+  /** Files the app saved with a `saveFile` step, newest last. */
+  readonly files: SavedFile[];
   render(): RenderResult;
   /** Types a value into a form field. `form` and `field` are the names in the screen tree. */
   setField(form: string, field: string, value: unknown): void;
@@ -111,6 +116,7 @@ export function actionDeviceNeeds(spec: unknown, action: string): string[] {
     for (const st of steps) {
       if (!st || typeof st !== "object") continue;
       if ("notify" in st) need.add("notifications");
+      if ("saveFile" in st) need.add("files");
       if (typeof (st as Obj).navigate === "string") {
         const target = screens.find((x) => (x as Obj)?.id === (st as Obj).navigate) as Obj | undefined;
         blockNeeds(target?.body, need);
@@ -136,6 +142,7 @@ export function createApp(spec: unknown, options: CreateAppOptions = {}): { ok: 
   Object.assign(state, options.state);
   const data: Record<string, unknown> = { ...options.data };
   for (const [k, v] of Object.entries<Obj>(s.data ?? {})) if (v.source === "collection" && !(k in data)) data[k] = structuredClone(v.seed ?? []);
+  const files: SavedFile[] = [];
   const history: { screen: string; params: Record<string, unknown>; sheet?: boolean }[] = [{ screen: options.screen ?? s.screens[0].id, params: options.params ?? {} }];
   const drafts: Record<string, Record<string, unknown>> = {};
   const fieldErrors: Record<string, Record<string, string>> = {};
@@ -184,6 +191,26 @@ export function createApp(spec: unknown, options: CreateAppOptions = {}): { ok: 
         data[st.delete] = coll(st.delete).filter((item) => !(!st.where || test(st.where, { ...scope, item })));
       } else if (typeof st.set === "string") state[st.set.replace(/^state\./, "")] = ev(st.value, scope);
       else if ("notify" in st) { /* shown by the phone; the permission was checked before the action ran */ }
+      else if (st.saveFile && typeof st.saveFile === "object") {
+        const f = ev(st.saveFile, scope) as Obj;
+        if (typeof f.to !== "string" || !f.to) throw new Error("saveFile needs \"to\", the collection that holds files.");
+        if (typeof f.name !== "string" || !f.name.trim()) throw new Error("saveFile needs a file name.");
+        if (/[\\/\0]/.test(f.name.trim())) throw new Error("saveFile needs a file name with no slash");
+        if (typeof f.content !== "string") throw new Error("saveFile needs text content.");
+        const mime = typeof f.mime === "string" && f.mime ? f.mime : "text/plain";
+        const list = coll(f.to);
+        const id = list.reduce((m, x) => Math.max(m, typeof x.id === "number" ? x.id : 0), 0) + 1;
+        list.push({ id, name: f.name.trim(), kind: "file", mime, size: new TextEncoder().encode(f.content).length, content: f.content, added: options.now ?? new Date().toISOString() });
+      }
+      else if (typeof st.saveFile === "string") {
+        const name = String(ev(st.saveFile, scope)).trim();
+        if (!name || /[\\/\0]/.test(name)) throw new Error("saveFile needs a file name with no slash");
+        if (st.content === undefined) throw new Error("saveFile needs content");
+        const content = String(ev(st.content, scope));
+        const file = { name, mime: String(ev(st.mime ?? "text/plain", scope)), size: new TextEncoder().encode(content).length, content };
+        const at = files.findIndex((f) => f.name === name);
+        if (at >= 0) files[at] = file; else files.push(file);
+      }
       else if (typeof st.toast === "string") toast = String(ev(st.toast, scope));
       else if (typeof st.navigate === "string") go(st.navigate, ev(st.params ?? {}, scope) as Obj, st.presentation);
       else if (typeof st.if === "string") {
@@ -225,6 +252,7 @@ export function createApp(spec: unknown, options: CreateAppOptions = {}): { ok: 
     get screen() { return top().screen; },
     state,
     data,
+    files,
     render: () => current().result,
     setField(form, field, value) {
       const f = find("form", form);

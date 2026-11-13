@@ -1,1 +1,0 @@
-- Docs: "Room log and notes" in the Agents guide (`room_log`, `room_note`, cursors, errors, troubleshooting), plus a glossary link.

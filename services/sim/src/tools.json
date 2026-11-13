@@ -25,6 +25,107 @@
     }
   },
   {
+    "name": "a2ui_actions",
+    "description": "What an A2UI session sent to the agent: the action messages from buttons the person pressed, with their context read from the data model. Pass `since` (the `next` of the last call) to get only newer ones.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "since": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Return messages after this position (the `next` of an earlier call)"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "a2ui_open",
+    "description": "Open A2UI v1.0 messages as a screen on a phone and return it as a tree. The messages are the agent's own: createSurface, updateComponents, updateDataModel, deleteSurface. Needs no app. Then use screen, tap, type and screenshot on the session like any app, a2ui_send to change the screen and a2ui_actions to read what the person did.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "description": "A2UI messages, each { version: \"1.0\", createSurface | updateComponents | updateDataModel | deleteSurface: {...} }"
+        },
+        "session": {
+          "type": "string",
+          "description": "Session name (default: generated)"
+        },
+        "model": {
+          "type": "string",
+          "description": "Phone model from phone_models, for example 'iPhone 16 Pro' (default: Pixel 8)"
+        }
+      },
+      "required": [
+        "messages"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "a2ui_send",
+    "description": "Send more A2UI messages to a session from a2ui_open and return the screen after them. The result says how many were applied and lists each refused message with the reason.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "description": "A2UI messages to apply in order"
+        }
+      },
+      "required": [
+        "session",
+        "messages"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "app_activity",
     "description": "What was built and changed on the phone: for each app made with create_app, its versions with a plain line for what changed in each (added, removed or changed screens, actions and data), its http data sources and how often each refreshes, and its events (create, update, action, data refresh). Pass id for one app. Fails with not_installed.",
     "inputSchema": {
@@ -345,6 +446,31 @@
     }
   },
   {
+    "name": "backup_phone",
+    "description": "Back up the whole phone as one JSON object, on Android and iOS: every app you built with its spec, data, settings, home-screen place and permission answers; every Store app with its listing and permission answers; the system settings; and the clipboard. Saved keys in the vault are never in it. Pass the object to restore_phone on this phone or another. Changes nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "browser_back",
     "description": "Go back one page in the phone browser. Returns the snapshot.",
     "inputSchema": {
@@ -658,6 +784,35 @@
     },
     "annotations": {
       "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "cancel_reminder",
+    "description": "Cancel a reminder by id. Returns whether it existed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
       "destructiveHint": false
     },
     "execution": {
@@ -1047,6 +1202,56 @@
     }
   },
   {
+    "name": "get_clipboard",
+    "description": "The text on the phone's clipboard, the same one apps copy to and paste from on Android and iOS.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_connectivity",
+    "description": "The phone's Wi-Fi, mobile data and airplane mode switches, and the network every app sees from them: online and type (wifi, cellular or none). Android and iOS.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "get_network_profile",
     "description": "Read the phone's current network profile name (online until set_network_profile or phone.json changes it).",
     "inputSchema": {
@@ -1253,6 +1458,41 @@
     }
   },
   {
+    "name": "inbox_view",
+    "description": "Show the Assistant Inbox of this phone live in the chat: every message and task between assistants, who you are, and what waits for you. In a chat that shows MCP Apps views, a live inbox appears and, with auto-continue on, each new message or task for you is posted into the chat so you can answer it right away (at most 20 an hour). Install the Assistant Inbox first (create_app, id inbox). Changes nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "ui": {
+        "resourceUri": "ui://shipvo/inbox.html"
+      },
+      "ui/resourceUri": "ui://shipvo/inbox.html",
+      "openai/outputTemplate": "ui://shipvo/inbox.html",
+      "openai/widgetAccessible": true,
+      "openai/toolInvocation/invoking": "Opening the inbox",
+      "openai/toolInvocation/invoked": "Inbox open"
+    }
+  },
+  {
     "name": "inbox_wait",
     "description": "Wait for mail in this session's private inbox (its address is in the result; type it into the app's email field). Returns the first message that matches, already there or arriving within timeout_ms: from, subject, text, the 4 to 8 digit codes and the links in it. Use it to finish an emailed code or magic-link sign-in. Fails with inbox_timeout when nothing matches in time. Only this session can read this inbox; mail is kept in memory and removed when the session ends.",
     "inputSchema": {
@@ -1415,6 +1655,31 @@
     }
   },
   {
+    "name": "list_reminders",
+    "description": "The reminders waiting on the phone (id, title, next time, repeat) and the last ones that fired with whether each was delivered.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "list_sessions",
     "description": "Open simulator sessions (phones) on this server: id, app, platform, room, who opened it (the MCP client name), start time and current screen title. Use to resume after a reconnect or to see who shares a room.",
     "inputSchema": {
@@ -1535,6 +1800,10 @@
           "type": "string",
           "description": "Session name (default: generated). One session is one phone."
         },
+        "restart": {
+          "type": "boolean",
+          "description": "Only with a session id that is already open: true starts that session over, empty, with this app. By default the open session is reused: the phone switches to this app and keeps its other apps and data."
+        },
         "room": {
           "type": "string",
           "description": "Room name. Every session opened with the same room on the same simulator shares one backend (orders, content, telemetry), read and written through the same store. Without room, each session has its own. 1 to 64 letters, digits, _ or -."
@@ -1574,6 +1843,10 @@
             "ios"
           ],
           "description": "Which phone to show: 'android' or 'ios' (default: the live run's, else android). Ignored when no phone is started (show false, attach never, or a live run is attached as it is)"
+        },
+        "model": {
+          "type": "string",
+          "description": "Phone model for a headless session, from phone_models, for example 'iPhone 16 Pro' or 'Galaxy S24'. The session gets that phone's screen size, pixel ratio, user agent and platform. Ignored when a live run is attached."
         },
         "show": {
           "type": "boolean",
@@ -1793,6 +2066,71 @@
         "app"
       ],
       "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "permission_log",
+    "description": "Every device permission decision on the phone, oldest first, on Android and iOS: when an app was granted or denied a permission (by install, import, update or the Settings switch), when a permission was removed, and each time an app action used a permission or was blocked by a denial, with the assistant that called it. Filter by app, permission or event. Changes nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "app": {
+          "type": "string",
+          "description": "Only this app id"
+        },
+        "permission": {
+          "type": "string",
+          "description": "Only this permission, such as camera or notifications"
+        },
+        "event": {
+          "type": "string",
+          "enum": [
+            "granted",
+            "denied",
+            "removed",
+            "used",
+            "blocked"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500,
+          "description": "Most recent entries to return (default 100)"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "phone_models",
+    "description": "The phone models a headless session can be, each with its platform, screen size in CSS pixels and pixel ratio, and the default model for android and ios. Pass a name to open_app as `model`.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2227,6 +2565,41 @@
     }
   },
   {
+    "name": "restore_phone",
+    "description": "Put a backup from backup_phone on this phone: apps with their data and layout, Store apps with their permission answers, system settings and the clipboard. Every part is checked first, and a bad backup changes nothing. Apps you built that are already on the phone need replace: true. A Store app that is already installed is skipped and listed in skipped.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "backup": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The backup object from backup_phone"
+        },
+        "replace": {
+          "type": "boolean",
+          "description": "Replace apps already on the phone (default false)"
+        }
+      },
+      "required": [
+        "session",
+        "backup"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "resume_app",
     "description": "Tap the app icon on the home screen, or its card in the app switcher: the app comes back (AppState \"active\") with its screen kept. Fails with app_in_foreground if it is already in front.",
     "inputSchema": {
@@ -2441,6 +2814,10 @@
         "session": {
           "type": "string",
           "description": "Session from open_app"
+        },
+        "frame": {
+          "type": "boolean",
+          "description": "true: the whole phone, the app inside its Android or iPhone frame with the status bar, for showing a person. Headless sessions only. Default false: the app's screen alone."
         }
       },
       "required": [
@@ -2535,6 +2912,46 @@
     }
   },
   {
+    "name": "search_phone",
+    "description": "Find text anywhere on the phone in one call: rows in every app's data (contacts, messages, alarms, notes, tasks and any app you built) and notifications. Not case sensitive. Each hit says the app, the collection, the row id, the field that matched and a short snippet, with the full row. Use app to look in one app, or 'notifications'. Changes nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "query": {
+          "type": "string",
+          "description": "Text to look for, up to 200 characters"
+        },
+        "app": {
+          "type": "string",
+          "description": "Only this app id, or 'notifications'"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Most results to return (default 20)"
+        }
+      },
+      "required": [
+        "session",
+        "query"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "secret_status",
     "description": "Whether a key is saved in the vault, as { saved, valid, access }. Never returns the key. valid is null when it was not checked. Needs an owner token.",
     "inputSchema": {
@@ -2556,6 +2973,70 @@
     },
     "annotations": {
       "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "set_clipboard",
+    "description": "Put text on the phone's clipboard so the next paste in any app gets it. It stays when you switch apps.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "text": {
+          "type": "string",
+          "description": "Up to 20000 characters"
+        }
+      },
+      "required": [
+        "session",
+        "text"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "set_connectivity",
+    "description": "Turn Wi-Fi, mobile data or airplane mode on or off for the whole phone, as in quick settings on Android and iOS. Airplane mode turns both radios off; Wi-Fi can come back on during it, and leaving it restores the radios as they were. Every app sees the result: apps you built read it as {{ network.online }} and {{ network.type }}, and their web data does not load while the phone is offline. The open app's screen is drawn again. Logged in device_log as \"connectivity\".",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "wifi": {
+          "type": "boolean"
+        },
+        "mobile_data": {
+          "type": "boolean"
+        },
+        "airplane": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
       "destructiveHint": false
     },
     "execution": {
@@ -2936,6 +3417,56 @@
     }
   },
   {
+    "name": "set_reminder",
+    "description": "Set a reminder on the phone: at the time you give (on the phone's clock, see set_phone_time) a notification with the title and body arrives, whether or not an app is open. Give at (a time like 2026-11-14T09:00) or in_minutes, not both. repeat is none, daily or weekly. With Do Not Disturb or Focus on, it is kept in the notification shade without a banner. It arrives whatever the app notification permissions say, as a phone's own reminders do. Read what arrived with notifications. Fails with bad_time, bad_title, too_long, bad_repeat or too_many.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "title": {
+          "type": "string",
+          "description": "What to remind (up to 200 characters)"
+        },
+        "body": {
+          "type": "string",
+          "description": "More detail (up to 1000 characters)"
+        },
+        "at": {
+          "type": "string",
+          "description": "Phone-clock time such as 2026-11-14T09:00"
+        },
+        "in_minutes": {
+          "type": "number",
+          "description": "Minutes from now on the phone's clock (0 to 525600)"
+        },
+        "repeat": {
+          "type": "string",
+          "enum": [
+            "none",
+            "daily",
+            "weekly"
+          ]
+        }
+      },
+      "required": [
+        "session",
+        "title"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "set_setting",
     "description": "Change one system setting, as a person would in the phone's Settings screen. The app sees it through Appearance (dark_mode), PixelRatio.getFontScale (font_size), AccessibilityInfo (bold_text, reduce_motion), I18nManager (rtl) and Intl (language). Setting language to ar turns rtl on; en and fr turn it off. Fails with unknown_setting for a key that does not exist and bad_value for a value it does not take. Logged in device_log as simulated.",
     "inputSchema": {
@@ -2967,6 +3498,78 @@
     },
     "annotations": {
       "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "share",
+    "description": "Share text into another app on the phone, like picking it in the share sheet: the text goes into that app's share action (for example a new note in Notes and Tasks). A title input that is not the share input gets `title`, or the first line of the text. Logged in app_activity as \"share\". Use share_targets to see which apps take shared text.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "to": {
+          "type": "string",
+          "description": "App id from share_targets"
+        },
+        "text": {
+          "type": "string",
+          "description": "The text to share, up to 5000 characters"
+        },
+        "title": {
+          "type": "string",
+          "description": "A title for the shared item (default: the first line of the text)"
+        },
+        "action": {
+          "type": "string",
+          "description": "The share action, when the app has more than one (from share_targets)"
+        },
+        "from": {
+          "type": "string",
+          "description": "The app the text is shared from, for the activity log"
+        }
+      },
+      "required": [
+        "session",
+        "to",
+        "text"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "share_targets",
+    "description": "The apps on this phone that take shared text, like the share sheet on Android and iOS: app id and name, the action and the input that receives the text.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
       "destructiveHint": false
     },
     "execution": {

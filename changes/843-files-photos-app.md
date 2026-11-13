@@ -1,2 +1,0 @@
-- `@shipvo/spec`: new first-party Files and Photos spec app in `templates/files-photos` with `save_file`, `find_files`, `move_to_album` and `delete_file`, and photo and file lists sorted by album.
-- Migration: none; new template.

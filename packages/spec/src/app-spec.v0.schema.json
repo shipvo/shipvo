@@ -276,6 +276,7 @@
         },
         "returns": { "type": "object" },
         "effect": { "enum": ["none", "external"] },
+        "share": { "type": "string", "minLength": 1, "description": "Makes this action a share target: the text input that receives text shared from another app." },
         "do": { "type": "array", "items": { "$ref": "#/$defs/step" } }
       }
     },
@@ -297,6 +298,9 @@
         "params": { "type": "object" },
         "notify": { "type": "object" },
         "toast": { "type": "string" },
+        "saveFile": { "type": ["string", "object"] },
+        "content": { "type": "string" },
+        "mime": { "type": "string" },
         "confirm": { "type": ["string", "object"] },
         "if": { "type": "string" },
         "then": { "type": "array", "items": { "$ref": "#/$defs/step" } },

@@ -1,2 +1,0 @@
-- Site: the playground OTA panel (`/playground/#ota`) publishes a signed update to the sample app, stages it to 10% and 100%, crashes it and shows the rollback, on Android and iOS phones. The signature result, cohort counts and crash-loop threshold are recorded at build time from the real signer, verifier, cohort bands and runtime code.
-- Migration: none.

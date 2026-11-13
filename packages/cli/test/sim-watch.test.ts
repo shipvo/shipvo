@@ -148,6 +148,15 @@ describe("rebuildInto", () => {
     expect(existsSync(join(root, ".shipvo", "sim-prev"))).toBe(false);
   });
 
+  it("a failed build keeps its first error, however long the stack trace under it", async () => {
+    const { rebuildInto } = await import("../src/sim");
+    const root = project();
+    const cmd = node("console.error('SyntaxError: src/App.js: Unexpected token');console.error(('    at frame\\n').repeat(2000));process.exit(1)") + " --";
+    const err = await rebuildInto({ root, command: cmd }).catch((e) => e);
+    expect(err.output).toContain("SyntaxError: src/App.js: Unexpected token");
+    expect(err.output.length).toBeLessThan(8100);
+  });
+
   it("does not fail on build output larger than 1 MB", async () => {
     const { rebuildInto } = await import("../src/sim");
     const root = project();

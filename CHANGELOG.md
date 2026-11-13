@@ -2,6 +2,379 @@
 
 Dated, newest first. Package versions are on npm under `@shipvo`.
 
+## 2026-11-13 (release)
+
+- **@shipvo/cli 0.1.9**: sim: listen on this machine only; A2UI tools in @shipvo/mcp; a failed build reports its first error; sim: Shipvo Phone reads A2UI 1.0, and shipvo session opens A2UI messages on a phone; mcp: phone models and framed screenshots; a speed benchmark; a refreshed skill; sim: real phone models, a file-read fix, and fixes from running real apps; cli: shipvo session, any Expo app on Shipvo Phone from the shell, with framed screenshots and video
+- **@shipvo/device 0.1.7**: bug-bench: a bug-catch benchmark, and phone platform mode for simulator builds; sim: Wi-Fi, mobile data and airplane mode, readable by every app (slice 8 of #1460); sim: share sheet and clipboard across apps (slice 5 of #1460); mcp+sim: set_reminder, list_reminders and cancel_reminder fire a notification at a time on the phone's clock (slice 3 of #1460)
+- **@shipvo/mcp 0.0.13**: sim: listen on this machine only; A2UI tools in @shipvo/mcp; a failed build reports its first error; mcp: phone models and framed screenshots; a speed benchmark; a refreshed skill; mcp: inbox view loads its script from sim.shipvo.dev for hosts that block inline scripts; mcp: inbox view uses ChatGPT's widget bridge; Google client is gemini; mcp: live Assistant Inbox view (MCP Apps) with auto-continue
+- **@shipvo/runtime 0.1.7**: runtime: crash events carry the load kind, cold or reload (slice of #1523); runtime: crash_loop_revert events carry the load kind (cold or reload); runtime: Android checks release platform, band thresholds test; runtime: iOS skips a patch that would not fit in memory; runtime: getAppliedStateVersion() on Android and iOS (slice of #1414)
+- **@shipvo/schema 0.0.8**: runtime: crash events carry the load kind, cold or reload (slice of #1523); runtime: crash_loop_revert events carry the load kind (cold or reload); release: declare state_version and guard rollbacks against older stored-data formats
+- **@shipvo/sim 0.1.9**: sim: listen on this machine only; A2UI tools in @shipvo/mcp; a failed build reports its first error; sim: Shipvo Phone reads A2UI 1.0, and shipvo session opens A2UI messages on a phone; mcp: phone models and framed screenshots; a speed benchmark; a refreshed skill; sim: real phone models, a file-read fix, and fixes from running real apps; cli: shipvo session, any Expo app on Shipvo Phone from the shell, with framed screenshots and video
+- **@shipvo/spec 0.0.5**: sim: Wi-Fi, mobile data and airplane mode, readable by every app (slice 8 of #1460); templates: Contacts, Messages and Clock spec apps (slice 2 of #1460); sim: share sheet and clipboard across apps (slice 5 of #1460); spec: parseCsv() and saveFile step (slice 1 of #1460); spec: parseCsv() reads CSV text into rows (slice 1 of #1460)
+- **@shipvo/store 0.0.4**: store: engagementReport turns tester telemetry into day count and warnings; store: shipvo store policy writes a privacy policy from what the app does; cli: eas setup iOS config uses only EAS built-in functions
+- **@shipvo/test 0.1.6**: test: plain message when the simulator is not running; mcp: a11y_audit finds unlabelled controls and small tap targets; mcp, sim: private inbox per session for email-code and magic-link sign-in; mcp: network profile tools, setNetwork test API and phone.json network
+
+### Changes
+
+- Docs: Troubleshooting for network proxy refusal codes and Capacitor builds; ledger rows and roadmap lines for `app_activity`, `refresh_app` and `schedule_app`; glossary entry for app activity.
+- docs: new page "Describe an app and it appears" with steps for founders, the tools and errors for developers, a validated example spec and troubleshooting.
+- Migration: none.
+- docs: `@shipvo/mcp` README lists `room_log` and `room_note` and their error codes.
+- sim: on the hosted phone, `open_app` takes `platform: "android" | "ios"` and its result includes `watch_url`, a short-lived read-only link to watch the phone live at sim.shipvo.dev/watch/<session>. Take over shows only for the key's owner signed in with GitHub.
+- `@shipvo/sim`: `POST /session` with a `build_url` fetches the build into the build cache, unpacks it, opens it as the app and replies with `build: <id>`. A bad, oversize or unreachable URL returns a typed error (`bad_url`, `host_not_allowed`, `too_large`, `unreachable`, `bad_build`) and no session is left behind.
+- `@shipvo/mcp`: `open_app("<app>@build:<id>")` sends the build id with `build_url`, so the reply names the build that opened. No exported API changes.
+- mcp: new `room_log(room, since?)` tool reads what every session in a room did (time, session, agent, tool, target, change line) and the notes agents post, with a cursor for newer entries.
+- mcp: new `room_note(room, text)` tool posts a plain-text note of up to 500 characters; a longer note fails with `note_too_long`. Both tools are new, so nothing needs migrating.
+- sim: `@shipvo/sim` fetches a `build_url` into a size-capped build cache. It checks the host with the same allow-list as the phone browser (also on every redirect), enforces a size cap and a timeout, stores the build by sha256 content id and returns the id. Errors are `bad_url`, `host_not_allowed`, `too_large` and `unreachable`, and none leaves a file behind. No exported API changes.
+- Measured scale benchmark on larger machines: 4-CPU, 15.6 GB result, shown on the simulators page and covered by the page check.
+- `site`: the playground Device API panel sets location, camera, biometrics, payment, notification and airplane mode on the Android and iOS phone, and the sample app shows each result.
+- Site: the playground OTA panel (`/playground/#ota`) publishes a signed update to the sample app, stages it to 10% and 100%, crashes it and shows the rollback, on Android and iOS phones. The signature result, cohort counts and crash-loop threshold are recorded at build time from the real signer, verifier, cohort bands and runtime code.
+- Migration: none.
+- site: the playground Agent panel has a tool console (`screen`, `tap`, `type`, `device_log`) and a "Watch Lumi" run on the sample app, on Android and iOS.
+- `shipvo.dev`: Many phones in the playground reads `?phones=6&mix=both&dark=1`, and a Copy link button shares the current setup.
+- Migration: none.
+- `shipvo.dev`: the playground "Many phones" entry shows 1 to 12 Android and iOS phones side by side, with a count and a mix control.
+- Migration: none.
+- Docs: the EAS Update migration and telemetry export pages now say who they are for, and add troubleshooting and next steps.
+- `@shipvo/sim` (hosted MCP): sign-in accepts Client ID Metadata Documents (URL `client_id`s) and the metadata advertises `client_id_metadata_document_supported` and `authorization_response_iss_parameter_supported`. Every redirect to a client now carries `iss`. `POST /register` keeps working.
+- Migration: none; additive.
+- mcp: tool calls with a valid W3C `traceparent` in `_meta` record the trace id in the session's tool-call log, `export_test` output and `shipvo eval` run records, and the result `_meta` echoes `traceparent`. `baggage` is never logged. No migration needed.
+- `@shipvo/sim`: `install_app` fetches the app's published bundle, keeps its `sha256` and size, and logs the install as `source: "real"`. An app whose bundle cannot be fetched is not installed (`store_app_unreachable`).
+- `@shipvo/sim`: `shipvo run` installs marketplace apps by fetching them directly (CORS open on the marketplace).
+- Migration: none. Fixture installs stay `source: "simulated"`.
+- Docs: the app marketplace plan covers declarative apps, the submission flow and the next steps (`docs/design/app-marketplace.md`).
+- `@shipvo/sim`: new page `/phone?session=<name>` draws the phone frame for a live session (Android and iOS). Its home screen and Store share the session's installed apps with the MCP tools: Install tapped in the page shows in `device_log`, and `install_app` from the tools draws its icon. New read action `phone_apps`.
+- Migration: none; new page and action.
+- Docs: Auto-halt explains held releases (fresh installs and bursts, approve or deny). The CodePush migration page says who it is for and adds troubleshooting and next steps. The adapters page now lists where each rule runs and links next steps.
+- `@shipvo/sim`: new `app_activity` action lists each spec app's versions with what changed, its `http` data sources and its events. `update_app` events in `device_log` now carry the change lines.
+- `@shipvo/mcp`: new tool `app_activity`.
+- Migration: none; new tool.
+- `@shipvo/sim`: new `arrange_apps` (pin, hide, position and schedule an app on the home screen) and `set_time` (the phone's clock; the MCP tool is `set_phone_time`). `shipvo run` draws each app's placement from `phone.json` on its Android and iOS home screen.
+- `@shipvo/mcp`: new tools `arrange_apps` and `set_phone_time`.
+- Migration: none; new tools. phone.json apps may carry a `placement` object.
+- New first-party spec app, Assistant Inbox (`templates/assistant-inbox`): assistants on one phone send each other messages, hand over tasks with status and a reply, and share research, review and synthesis reports. Eleven actions become MCP tools: `send_message`, `check_inbox`, `mark_read`, `read_thread`, `hand_off`, `my_tasks`, `start_task`, `finish_task`, `sent_tasks`, `share_report`, `get_reports`. Marking read, starting and finishing only work on what was sent to the caller (or to `anyone`).
+- `@shipvo/spec`: actions can read `{{ caller }}`, the name of the assistant that called them. `app.call(action, input, { caller })` sets it. New export type `CallContext`.
+- `@shipvo/sim`: `app_action` names the caller from the MCP client name (`claude`, `chatgpt`, `cursor`, `gemini`, `copilot`, `mistral`, or the client's own name) and records it in the device log.
+- Migration: none; new fields and app.
+- `@shipvo/sim`: new `create_app` action starts an app from a spec and installs it with an icon on the home screen; `run_app_action` runs one of its actions by name. Spec apps render as labelled HTML, so tap, type and scroll work on them on Android and iOS.
+- `@shipvo/mcp`: new tools `create_app` and `run_app_action`.
+- `@shipvo/sim` now depends on `@shipvo/spec`.
+- Migration: none; new tools.
+- `@shipvo/sim`: a `screenshot` taken on the home screen now includes the icons of installed apps.
+- `@shipvo/spec`: new `csv(rows, columns?)` expression function returns RFC 4180 CSV text (header row, quoted fields, CRLF). Lists join with `; `.
+- Migration: none; new function.
+- CI: the hosted phone redeploys when `packages/spec` changes, because the image bundles it. Before, a spec-only change such as `csv()` did not reach the hosted phone until the next sim or MCP change.
+- Migration: none.
+- `@shipvo/sim`: `import_apps` lists a warning for each field of an app's exported layout (`placement`) that is rejected, for example `apps[0].placement.schedule: not valid, dropped`. Valid layouts, including hand-written ones, import without a warning.
+- `@shipvo/mcp`: `export_phone_apps` and `import_phone_apps` descriptions mention the home-screen layout.
+- Migration: none.
+- Hosted simulator: a client that names a newer MCP protocol version than the server speaks, such as ChatGPT, now connects. The gateway maps an unknown `MCP-Protocol-Version` header to the newest version the server supports, so the handshake settles on that version instead of failing with a 400.
+- Migration: none.
+- `templates/assistant-inbox`: `mark_read`, `start_task` and `finish_task` return `updated: false` with a reason when nothing matched (not yours, not found, already started or done), instead of reporting success. A finished task keeps its first reply.
+- Migration: tools that read the result of these three actions now get `{ updated, reason }` instead of nothing.
+- spec: a data source can set `refresh` (seconds, 30 or more). The sim re-runs it on that interval while the app is installed, within the runner's cost limits, and the open screen and its labelled tree update. Existing specs are unchanged.
+- CI: new workflow `pr-shots-upload` uploads PR screenshots pushed under `pr-shots/<pr>/` to the media bucket, served at `shipvo.dev/media/pr-shots/<pr>/<file>`.
+- Migration: none.
+- `@shipvo/sim`: new `refresh_app` action fetches a spec app's `http` data sources now, skips the cache, redraws the open screen when data changed, and logs `data_refresh`. A failed source keeps its last good data.
+- `@shipvo/mcp`: new tool `refresh_app`.
+- Migration: none; new tool.
+- `@shipvo/mcp`: tools that take an element `ref` (tap, type, scroll, wait_for) now accept the prefixed refs the phone returns after a restart, such as `f1e2`, and `p1e5`. Before, they were refused.
+- Migration: none.
+- `@shipvo/sim`: new actions `schedule_app` (show an app in a daily time window on the phone's clock) and `clear_schedule`. They set and remove the same schedule as `arrange_apps`.
+- `@shipvo/mcp`: new tools `schedule_app` and `clear_schedule`.
+- Migration: none; new tools.
+- `@shipvo/sim`: `export_apps` carries each spec app's `placement` (including its schedule) and `import_apps` restores it. `device_log` records `schedule_app` and `clear_schedule` under their own names.
+- `@shipvo/sim`: new `update_app` action replaces a spec app's spec as a new version; entered data and state carry over, and a bad spec changes nothing.
+- `@shipvo/mcp`: new tool `update_app`.
+- Migration: none; new tool.
+- mcp: new tool `job_status { job, wait_ms? }`. `publish_preview` and `upload_build` take an optional `wait_ms` (default 20000) and return `{ status: "running", job }` if the work is not done by then. Read the job with `job_status` (`running`, `done` or `failed` with a typed error). The same request while a job runs returns the same job; jobs belong to the key that started them and are kept for 15 minutes after they finish. Migration: none for clients that wait for the result; the result is unchanged when the work finishes within `wait_ms`.
+- `scripts`: `scripts/first-run/continuous.mjs` joins the first-run JSON from one job into one init-to-applied timeline for Android and iOS, and refuses mixed commits or platforms.
+- `@shipvo/sim`: new `pin_app` and `hide_app` actions. Pinned apps lead the home screen in the order pinned; hidden apps leave the home screen and app list but keep their data. `update_app` keeps both.
+- `@shipvo/mcp`: new tools `pin_app` and `hide_app`.
+- Migration: none; new tools.
+- `@shipvo/sim`: new `export_apps` and `import_apps` actions copy a phone's spec apps (spec, style, data, settings) out and onto another phone. Import checks every spec first and lists each problem with its path; `invalid_spec` messages now keep all their lines.
+- `@shipvo/mcp`: new tools `export_phone_apps` and `import_phone_apps`.
+- Migration: none; new tools.
+- Docs: network profile tools (MCP, `phone.setNetwork`, `phone.json`) are linked from the device API page.
+- Migration: none.
+- spec: `actionDeviceNeeds` also finds the device permission for camera, scanner and file blocks on a screen an action opens with `navigate`, so a denied permission gives `permission_denied` for those actions too.
+- cli: `shipvo run` and `shipvo sim --watch` no longer clear the Metro cache on rebuilds after a save. The first build still clears it.
+- run: the build error bar is pinned to the top of the page, under the title bar, so it is visible in small windows on the Android and iOS frames.
+- `@shipvo/cli`: the shop template prints a plain message when a price in `src/data/products.json` looks like it is in the wrong unit (for example `24` or `12.5` instead of `2400` or `1250`). The generated test checks it too.
+- Migration: none; new `priceProblems` export in the generated `src/money.ts`.
+- `@shipvo/mcp`: `schedule_app` takes an optional `timezone` (an IANA name such as `Europe/Berlin`). `arrange_apps` accepts it inside `schedule`. `from`, `to` and `days` are read in that zone. A bad name fails with `bad_timezone`.
+- `@shipvo/sim`: the schedule stores `timezone`; without it the window is read by the phone clock as before.
+- Migration: none; new optional input.
+- Docs: new "Export data as CSV" section in the app spec guide, a restart-refs entry in the Agents troubleshooting, and the Android patch memory fallback in the `@shipvo/runtime` README.
+- Migration: none.
+- `@shipvo/runtime`: new export `getAppliedStateVersion(): Promise<number | null>` (Android and iOS). It returns the `state_version` the running bundle was published with, or `null` if the release declared none or the embedded bundle runs. The runtime now keeps `state_version` from the signed pointer next to the release id. Additive: no migration needed.
+- `@shipvo/schema`: release pointers take an optional `state_version` (positive integer).
+- `@shipvo/cli`: set `stateVersion` in `shipvo.json` and `shipvo publish` signs it into the release. `shipvo rollback` refuses to send phones to a lower `state_version` unless you pass `--allow-state-downgrade`; the control plane records the downgrade in the audit log.
+- Migration: none. Releases without `state_version` behave as before.
+- `@shipvo/mcp`: new tools `inbox_wait`, `inbox_read` and `inbox_clear`. Every session has a private inbox with its own address (`s-<id>@inbox.shipvo.test`). `inbox_wait` returns the first mail that matches a subject or sender, or fails with the typed error `inbox_timeout`. `inbox_read` returns subject, text, 4 to 8 digit codes and links, and changes nothing.
+- `@shipvo/sim`: session inbox, kept in memory only and removed when the session ends. Mail comes from `set_network_mocks` rules with a `mail` field, or from a POST to `https://inbox.shipvo.test/send`.
+- `@shipvo/test`: `phone.inbox` (`address`, `waitFor`, `code`, `list`, `clear`) and an optional `mail` field on `mockNetwork` rules.
+- Docs: [Test an email sign-in on Android and iOS](../docs/email-sign-in.md).
+- Migration: none. The change is additive.
+- Docs: getting-started explains that an Android patch falls back to the full download (`over_memory_budget`, `out_of_memory`), and the agents page explains prefixed refs after a restart and `stale_ref`.
+- Docs: setup steps, troubleshooting and next steps for single sign-on and auto-halt.
+- Docs: the gallery list in App spec blocks now includes the reading board, meal planner and favourite places specs; Agents notes that prefixed refs after a restart are accepted; Adapters notes the Android patch memory fallback (`out_of_memory`, `over_memory_budget`).
+- Migration: none.
+- Docs: new page "Rollbacks and stored data" (`stateVersion`, `--allow-state-downgrade`) with troubleshooting and a glossary entry.
+- Migration: none.
+- Docs: Troubleshooting table added to the demo video worked example; the CodePush guide links to the stored-data rollback check.
+- Migration: none.
+- `@shipvo/runtime`: on iOS, a patch that would not fit in memory is skipped and the full download is used. The update result reports `patchError` as `over_memory_budget`, the same value as Android.
+- Migration: none; additive.
+- `@shipvo/runtime` (Android): a patch that runs out of memory, or whose base, patch and output together exceed a share of the app's heap limit, now falls back to the full download. `patchError` reports `out_of_memory` or `over_memory_budget`.
+- Migration: none.
+- New MCP tools `get_connectivity` and `set_connectivity`: Wi-Fi, mobile data and airplane mode for the whole phone, on Android and iOS. Error codes `bad_value`, `airplane_on`.
+- `@shipvo/spec`: expressions can read `network.online` and `network.type` (`wifi`, `cellular` or `none`). New render option `network`. Default: online on Wi-Fi.
+- `@shipvo/device`: airplane mode turns Wi-Fi and mobile data off, Wi-Fi can come back on during it (and the phone is then online), and leaving it restores the radios. Before, airplane mode was always offline and left the radio switches as they were.
+- Spec apps' http data sources do not fetch while the phone is offline.
+- Migration: a test that set `airplane: true` with Wi-Fi on and expected offline still gets offline, because airplane mode now turns Wi-Fi off. Setting `wifi: true` in airplane mode now means online.
+- `@shipvo/spec`: new `saveFile` step (needs the `files` device permission) saves text as a named file. `content` is required and `mime` defaults to `text/plain`. `app.files` lists saved files.
+- Migration: none; new step and `App.files` property.
+- `@shipvo/spec`: new `parseCsv(text)` expression function reads CSV text into a list of maps keyed by the header row, so apps can import what `csv()` exports.
+- Migration: none; new function.
+- New MCP tool `permission_log`: every grant, denial and removal of a device permission (by install, import, update or Settings) and every use or block by an app action, with the calling assistant, on Android and iOS. Filters `app`, `permission`, `event`, `limit`. Error codes `bad_limit`, `bad_event`.
+- Migration: none; this is a new tool.
+- New MCP tools `backup_phone` and `restore_phone`: back up the whole phone (apps you built with data, layout and permission answers; Store apps with permission answers; system settings; the clipboard) and restore it on the same or another phone, on Android and iOS. A bad backup changes nothing. Error codes `bad_backup`, `invalid_spec`, `already_installed`.
+- Migration: none; these are new tools. The backup format is `shipvo.phone-backup/v0`.
+- New MCP tools `set_reminder`, `list_reminders` and `cancel_reminder`: a notification arrives at a time on the phone's clock (`at` or `in_minutes`), once or `daily` or `weekly`, with an app open or not. Do Not Disturb and Focus keep it in the shade without a banner. Typed errors `bad_time`, `bad_title`, `too_long`, `bad_repeat`, `too_many`.
+- `@shipvo/sim`: new `set_reminder`, `list_reminders` and `cancel_reminder` actions; `set_time` fires reminders that became due; `notifications` includes the phone's own notifications.
+- `@shipvo/device`: the simulated device's internal push takes `{ system: true }` for the phone's own notifications, which need no app permission. The public API is unchanged.
+- Migration: none; new tools.
+- New MCP tool `search_phone`: finds text in every app's data and in notifications, in one call, on Android and iOS. Optional `app` and `limit`. Error codes `bad_query`, `bad_limit`, `not_installed`.
+- Migration: none; this is a new tool.
+- New MCP tools `share_targets`, `share`, `get_clipboard` and `set_clipboard`: share text from one app into another and copy and paste on the phone, on Android and iOS. Error codes `not_a_share_target`, `pick_action`, `bad_text`.
+- `@shipvo/spec`: an action can declare `"share": "<text input>"` to take shared text. The validator checks that the input exists and is text. Notes and Tasks takes shared text as a note or a task.
+- `@shipvo/device`: the clipboard is kept in sessionStorage, so it outlives a page load (switching apps).
+- Migration: none; `share` is an optional key and the tools are new.
+- New first-party spec apps: Contacts (`templates/contacts`), Messages (`templates/messages`) and Clock (`templates/clock`). Contacts: `add_contact`, `find_contacts`, `update_contact`, `set_favorite`, `delete_contact`, `show_matches`. Messages: `send_text`, `receive_text`, `list_conversations`, `read_conversation`, `delete_conversation`. Clock: `add_alarm`, `list_alarms`, `set_alarm`, `delete_alarm`, `start_timer`, `stop_timer`, `list_timers`, `add_place`, `delete_place`. Files and Camera roll are the existing Files and Photos app.
+- Migration: none; new apps.
+- Docs: Assistant Inbox refusals (`updated`, `reason`), permissions detected from camera, scanner and file blocks, patch fallback on small heaps (Android), refs after a phone restart.
+- Migration: none.
+- Runtime (Android): a pointer marked for iOS is refused. Android pointers carry no `platform` and are accepted. A test keeps the band thresholds in the schema, `Store.kt` and `Store.swift` equal.
+- mcp: a test now creates a spec app and types into its form field by a `f1e7` ref. The ref schema for tap, type, scroll and wait_for already accepts the frame prefix.
+- mcp: `app_activity` and `refresh_app` now return readable text and `structuredContent` (versions, change lines, sources, events; updated sources and errors). `export_phone_apps` also returns `structuredContent`.
+- mcp: `create_app`, `update_app`, `run_app_action`, `app_activity`, `press_home` and other tools on a live `shipvo run` phone now say how to continue: open the app with `attach: "never"` and watch it at `/watch`.
+- `@shipvo/mcp`: every phone tool result that carries a `session` now starts with a line such as `Inbox: 2 unread for chatgpt, 1 task open` when the Assistant Inbox has something waiting for the calling assistant. Nothing is added when nothing waits.
+- `@shipvo/sim`: new `pending_banner` action returns that line for the calling assistant.
+- Migration: a client that parses a tool result as JSON should skip a first line that starts with `Inbox:`.
+- New MCP tool `wait_for_event`: waits up to 25 seconds until a new message or task is waiting for the calling assistant in the Assistant Inbox, and returns at once when one already is. Items already returned do not wake the assistant again. Returns `nothing yet` when the time is up. Typed errors `bad_timeout` and `no_caller`.
+- `@shipvo/sim`: new `wait_for_event` action next to `pending_banner`.
+- Migration: none; a new tool.
+- site: on a phone screen, the playground scrolls the phone into view after a Device API choice or a signed-update step, and shows the result line next to the buttons.
+- Site: links, the apps search field and category chips, brand download links and feature links are at least 44 px at phone width; the docs "#" heading anchor is hidden on touch screens.
+- `@shipvo/runtime`: an uncaught JS error now queues a `js_crash:<cold|reload>` event, and `reportRuntimeEvents` sends it as `js_crash_cold` or `js_crash_reload`. Crash reports say whether the crash happened on a cold start or after an in-place reload, on Android and iOS.
+- `@shipvo/schema`: the telemetry `event` enum accepts `js_crash_cold` and `js_crash_reload`.
+- Migration: none; shells without this change send no `js_crash_*` events.
+
+- `@shipvo/runtime`: a `crash_loop_revert` event now says which load it happened in (`cold` or `reload`). The native event is `crash_loop_revert:<release>:<kind>` and the telemetry report body carries `load_kind`.
+- `@shipvo/schema`: `Telemetry` has an optional `load_kind`.
+- Migration: none. Older shells send events without a kind, and `load_kind` is left out.
+- Docs: the "Test an email sign-in" page is now in the docs sidebar and `llms.txt`. The phone apps page explains that camera, scanner and file blocks respect per-app permissions. Glossary adds Session inbox and Assistant Inbox.
+- `register_wakeup` takes `format`: `json` (default), `text` (one plain line for a push service such as ntfy) or `slack` (`{"text": line}`). The text and slack formats tell the person to open their chat when a message or task arrives for an assistant that no URL can start. New error code `bad_format`. `list_wakeups` shows the format.
+- Migration: none; `format` is optional.
+- New MCP tools `register_wakeup`, `list_wakeups` and `clear_wakeup`: when a new message or task arrives for an assistant name in the Assistant Inbox, the phone POSTs a signed JSON note (who, message or task, a one-line summary, the ids; never the message text) to the registered URL. Failed calls are retried twice. Every delivery is in `device_log`. Private and local addresses are refused unless `allow_private` is set.
+- `@shipvo/sim`: new `register_wakeup`, `list_wakeups` and `clear_wakeup` actions.
+- Migration: none; new tools.
+- Scripts: `pnpm sbom` writes a CycloneDX 1.5 bill of materials for each published package to `dist-sbom/`.
+- Docs: [Test an email sign-in](../docs/email-sign-in.md) now has troubleshooting and next steps, and the README lists it. The demo video worked example has a troubleshooting table.
+- test: when the simulator is not running, every test now fails with "Cannot reach the simulator at <url>. Start it with: npx shipvo sim" instead of a raw ECONNREFUSED.
+- docs: the `shipvo audit` section lists key rotations as `key-rotation` rows.
+- docs: Key rotation and CLI guide show `key-rotation` rows in `shipvo audit`; the email sign-in page has a Troubleshooting table and Next steps.
+- Migration: none.
+- docs: `shipvo audit` documents the `key-rotation` row and the four action values; the key rotation page shows how to see a rotation in the log.
+- Migration: none.
+- docs: the email sign-in page intro says who it is for and what you get on Android and iOS.
+- Docs: the `shipvo run` tree bridge page lists its `tap`, `type`, `scroll` and `back` actions and has troubleshooting. The `--record-features` page has a first paragraph, a runnable example, troubleshooting and next steps.
+- docs: parity results page has a how-to-run section, troubleshooting and next steps; OTA spike page ends with next steps.
+- docs: the parity page now has a run-it-yourself section, troubleshooting and next steps, and the glossary explains saved key, patch, gallery and parity.
+- Docs: the timeline page shows how to send a pull request report with `curl` and lists the upload errors; the eval page explains `time_limit` and usage errors.
+- Docs: Phone apps page covers the `timezone` option of `schedule_app`, `bad_timezone` and the attached-phone hint; the Lumi ranker page gets an intro, troubleshooting and next steps, and the Lumi benchmark and ranker pages are in the sidebar.
+- Docs: Phone apps page adds a worked `timezone` example for `schedule_app` and a sharper `bad_timezone` troubleshooting row.
+- `@shipvo/store`: new export `engagementReport(rows, { now, windowDays, needed, recruit })` turns tester telemetry into a day count, per-tester active and quiet days, and plain-English warnings for the closed test.
+- Migration: none; new export.
+- store: `shipvo store policy` writes `privacy-policy.md` and `privacy-policy.html` from the capabilities in shipvo.json. Each data use comes from a derived item; open questions are listed for you. Set `listing.privacy.company` and `listing.privacy.contactEmail`; `--strict` exits 1 while either is missing. Nothing is uploaded.
+- store: `@shipvo/store` exports `renderPolicyText`. `StoreManifest.listing` accepts an optional `privacy` object. No migration needed.
+- control-plane: SAML sign-in routes `/saml/<org>/start`, `/saml/<org>/acs` and `/saml/<org>/metadata`, configured with `SAML_ORGS`. Sessions and roles match the OIDC login.
+- Migration: none. New optional setting `SAML_ORGS`.
+- `@shipvo/cli`: `shipvo sim` and `shipvo preview` open a Capacitor project's built web directory (`webDir` from `capacitor.config.*`) on the Android and iOS skins.
+- Migration: none; Expo apps build as before.
+- `@shipvo/mcp`: new read-only tool `a11y_audit` lists controls with no accessible name (`missing_label`) and tap targets under 48 dp (Android style) or 44 pt (iPhone style) (`small_target`).
+- `@shipvo/test`: new `phone.a11yAudit()`.
+- Migration: none; new API.
+- `@shipvo/mcp`: new tools `set_network_profile(session, profile)` and `get_network_profile(session)`. An unknown name fails with `unknown_profile`.
+- `@shipvo/test`: new `phone.setNetwork("slow-4g")` and `phone.getNetwork()`.
+- `phone.json` accepts `"network": "<profile>"`, applied when the phone starts. An unknown name fails the session with `bad_profile`.
+- Migration: none; new tools and a new optional field.
+- `@shipvo/control-plane`: `GET /audit/:app` now also returns `key-rotation` rows (sequence and `valid_from` in `after`), merged by time with publishes and rollbacks on the first page.
+- Migration: none; new `action` value `key-rotation`.
+- `@shipvo/cli`: `shipvo keys root --out <file>` creates the offline root key for key rotation. It writes the seed with mode 0600, refuses to overwrite, and prints only the public key to pin.
+- Migration: none; new command.
+- docs: `new-machine.md` starts the lost-seed path with root-key rotation on Android and iOS, and covers apps without a root key separately.
+- Migration: none; docs only.
+- docs: the threat model has a "Lost or leaked release key" section for Android and iOS.
+- Migration: none.
+- spec: the `calendar` block shows events from a data source as a month, week or agenda (`view`), with each event in the screen tree. The `map` block draws pins from data on a canvas with no tile network calls, with each pin in the screen tree. Both render on Android and iOS skins. With `onSelect`, tapping an event or pin (`press` by its title) runs the action. Bad fields are validation errors with JSON paths. No migration.
+- `@shipvo/spec`: a gallery of eight example specs in `packages/spec/gallery/` (habit tracker, workout log, expense splitter, trip checklist, flashcards, reading board with `kanban`, meal planner with `calendar`, favourite places with `map`), checked by a test.
+- Migration: none; not part of the published package.
+- spec: `renderScreen` takes `language` and `locale`. Text matching a key in `strings[language]` is translated, and money, numbers and dates use the locale. Right-to-left languages set `dir: "rtl"` on the screen tree and the HTML.
+- spec: the validator warns about `strings` keys that no text in the spec uses.
+- spec: the `vector` block draws rect, circle, path, text and linear gradient shapes with attributes bound to expressions, on Android and iOS skins. It needs a `label`, and its screen-tree name includes its `value`. Unknown shapes are validation errors with JSON paths.
+- spec: `motion` on any block supports `enter` (fade, slide, scale) and `change` (countUp, pulse). The theme `motion: "none"` and the new `reduceMotion` render option remove all animation fields. `RenderOptions` gains `reduceMotion`; no migration needed.
+- docs: new sections for the `calendar` and `map` spec blocks, and opening a hosted build from a link with `build_url`.
+- `@shipvo/sim`: the simulator forwards four vault key routes (list, rotate, revoke, use log) under `/vault-ui/*` for the Settings app, on loopback and same-origin only. The owner token stays on the server.
+- Migration: none; new routes.
+- sim: the Settings app has a Secrets screen. It lists each saved key with app, name, domain, access and last used, loaded through `/vault-ui/keys`. It shows metadata only, never a key value. Android and iOS skins. No exported API changes.
+- `@shipvo/sim`: each key on the Secrets screen in Settings has a Revoke button. It asks to confirm, deletes the key and removes the row, on Android and iPhone skins.
+- Migration: none.
+- `@shipvo/sim`: each key on the Secrets screen in Settings has a Rotate button. It shows a one-time link to save the new key, never a key value, on Android and iOS skins.
+- Migration: none.
+- `@shipvo/control-plane`: new vault routes `GET /vault/keys?app=` (metadata only), `POST /vault/keys/:app/:name/rotate`, `DELETE /vault/keys/:app/:name` and `GET /vault/keys/:app/:name/uses`. After a revoke, `GET /vault/status/:app/:name` returns `saved: false`.
+- The use log now returns only the calling owner's rows.
+- Migration: none; uses existing tables.
+- `@shipvo/sim`: the Settings app has a Secrets screen in the Android and iOS skins. It lists each saved key (app, name, domain, access, last used) with Rotate, Revoke and Use log. It shows metadata only, never a key value.
+- Migration: none.
+- `@shipvo/sim`: the Secrets screen has a Use log button on each saved key. It shows the time, app, host and outcome of each use, in the Android and iOS skins. A key that was never used shows "Not used yet."
+- Migration: none.
+- `@shipvo/sim`: the install consent card lists each device permission an app declares, with Allow and Deny. Answers are stored per app, shown in `installed_apps`, kept in phone.json, `export_apps` and `import_apps`, and changed later with one Settings toggle per app and permission (`set_app_permission`).
+- `@shipvo/spec`: an action that needs a denied device permission (a `notify` step needs `notifications`) returns `permission_denied` and names the permission. New export `actionDeviceNeeds`; `createApp` takes `devicePermissions`.
+- Migration: none; new options and a new error code.
+- sim: the Settings switch on the `/phone` page now calls `set_app_permission` on the session, so it changes what the app may do (Android and iOS). `set_app_permission` also returns `profile`, the phone as a phone.json object that keeps the answers.
+- sim: `update_app` adds an answer (allowed to start) for each newly declared device permission and drops answers for permissions the new version no longer asks for.
+- `@shipvo/spec`: new first-party Files and Photos spec app in `templates/files-photos` with `save_file`, `find_files`, `move_to_album` and `delete_file`, and photo and file lists sorted by album.
+- Migration: none; new template.
+- `@shipvo/mcp`: new tool `find_apps(session, query, country?, language?, currency?, limit?)` searches the Store by need and returns id, name, description, version and installed state, best match first. Fails with `store_unreachable` when the marketplace cannot be reached. The `PN_STORE_FIXTURE=1` list now has a fourth app, `splitly`.
+- Migration: none; new tool.
+- `@shipvo/spec`: new first-party Shop spec app in `templates/shop` with `add_product`, `find_products`, `place_order` and `list_orders`, and a currency setting.
+- Migration: none; new template.
+- Control plane: a person can set a monthly spend limit per installed app (`PUT` and `GET /phone/apps/<app>/spend-limit`). The default is 0, so no money moves. An assistant token gets 403. `authorizeSpend` checks and records an amount against the limit in one statement and returns `spend_limit` with `limit` and `spent` when the amount would pass it. Each change and refusal is audited. New migration `0025_spend_limit.sql` (additive). No migration steps needed for existing apps.
+- `@shipvo/spec`: new first-party Wallet spec app in `templates/wallet` with `save_pass`, `find_pass` and `delete_pass`, passes grouped by kind and an expiring-soon list.
+- Migration: none; new template.
+- site: the "In this article" links on blog posts are 44 px tall on phones.
+- control-plane: the release pointer response now includes a `rotations` array (at most 8 stored key rotation statements, ascending by sequence). The ETag changes when a rotation is added. Clients that ignore unknown fields are not affected.
+- `@shipvo/sim`: Shipvo Phone reads A2UI version 1.0. `POST /session` with `a2ui: true` opens a session that draws A2UI surfaces: every component of the A2UI basic catalog, data bindings, list templates, checks and function calls. The `a2ui_send` action applies more messages one piece at a time, and `a2ui_actions` returns the A2UI `action` messages the screen sent to the agent. The engine is exported as `@shipvo/sim/a2ui.mjs`.
+- `@shipvo/sim`: the Shipvo Phone catalog (Stat, Badge, Progress) is an A2UI catalog document, served at `/a2ui/catalog.json`.
+- `@shipvo/sim`: a function that needs a person's tap (`openUrl`) runs only from a tap, never from a binding or from the agent's `callRendererFunction`.
+- `@shipvo/cli`: `shipvo session start --a2ui <file>` opens A2UI messages on a phone with no app folder; `shipvo session a2ui send <file>` and `shipvo session a2ui actions` send more messages and read the actions. See `docs/a2ui.md`.
+- Migration: none; new session kind, new actions and new commands.
+- `apps/bug-bench`: the bug-catch benchmark. An Expo app with 23 seeded bugs (app logic, device hardware, Android and iOS only code) and a runner that opens each one fixed and buggy on the Android and iOS phones and counts the bugs that show up. See `docs/bug-bench.md`.
+- `@shipvo/device`: new `@shipvo/device/babel` plugin. In simulator builds, `Platform.OS` and `Platform.select` in the app's own files follow the phone the session simulates.
+- `@shipvo/device`: `withShipvoSim(config, { nativeFiles: true })` makes the app's relative imports pick `.native.js` files in simulator builds.
+- Migration: none. The plugin and the option are opt-in; builds that do not add them are unchanged.
+- Hosted phones: moving phones into a new version on deploy no longer drops every phone when one has a problem. That phone is skipped and listed under `failed`; the rest move over.
+- The hosted Worker logs one line for each step (`{"carryover":"export"|"import", ...}`) with the phones moved and any that failed, and waits up to 5 minutes for each step.
+- Hosted MCP: an assistant that signs in without giving a client name (ChatGPT, Gemini, Claude) is now known by the address it signs in from, so `inbox_view` and Assistant Inbox messages show who it is instead of no name.
+- docs: "Test your app with an assistant" now says who it is for, and its check section is renamed Troubleshooting. "Moving to a new machine" now says who it is for, shows the expected `keys import` output and adds a `shipvo doctor` check.
+- Migration: none.
+- Docs: the agents page lists the app-building and home-screen tools (`create_app`, `update_app`, `arrange_apps` and more) and explains `invalid_spec`.
+- Docs: the glossary adds element ref, Capacitor, gallery and caller. The action feature log page says who it is for, has numbered steps, troubleshooting and next steps.
+- Migration: none.
+- Docs: the parity results page says who it is for, lists the steps to run parity yourself on Android and iOS, and ends with next steps; the action feature log page has steps to record a walk.
+- Docs: the app spec validator page and the Android crash-loop revert page are in the sidebar, with steps, real output, troubleshooting and next steps.
+- docs: the Lumi benchmark and simulator cost pages now say who they are for, give numbered steps and expected output, and end with troubleshooting and next steps.
+- Docs: the agent gate results page has steps to run the check yourself and a troubleshooting section; the Lumi benchmark page has troubleshooting and next steps.
+- docs: the agents guide gains the `/watch` page, a room example and hosted sign-in discovery; the app spec guide gains `kanban` and `timeline` blocks. No migration.
+- docs: the app spec guide gains `vector` drawings, `motion`, translations and right-to-left; the phone apps page lists Calendar, Files and Photos, Wallet and Shop; getting started points to the playground. No migration.
+- docs: Self-hosting now documents the saved-key (vault) routes, the simulator's `/vault-ui/*` forward and the `rotations` array in the pointer response. Getting started documents the playground Many phones link parameters. The glossary has a Vault entry.
+- Migration: none.
+- docs: The agents page lists `job_status` and `wait_ms` for slow tools and explains the `running` answer. The glossary has a Job entry.
+- Migration: none.
+- docs: The simulated phone page now explains the Secrets screen in Settings and has a Troubleshooting row for it.
+- Migration: none.
+- docs: The Capacitor page opens with who it is for and what you get, and links to next steps.
+- docs: the phone apps page lists `bad_placement`, `bad_time` and a scheduled app missing from the home screen under Troubleshooting.
+- docs: the App spec page covers the `calendar` and `map` blocks, Phone apps covers the Secrets screen in Settings, and Test your build covers opening a build from a `build_url`. Troubleshooting entries added for the new blocks.
+- docs: The agents page explains the hosted watch link (`watch_url`): how to open it, how to take over, and what to do when it does not load.
+- Migration: none.
+- Docs: the spec gallery list now names all five example specs, and the Secrets screen steps in Settings cover the Revoke button.
+- Migration: none.
+- docs: App spec page covers data source `refresh` and the example specs; `shipvo run` page notes faster rebuilds after a save.
+- Migration: none.
+- Docs: troubleshooting and next steps for "Moving to a new machine", positive "How Shipvo differs from CodePush" section, layout warnings in Phone apps, four new glossary terms.
+- docs: "Moving to a new machine" and "Test your app with an assistant" now have troubleshooting from the real error messages and next steps; the glossary explains the signing seed.
+- Migration: none.
+- Docs: "Room log and notes" in the Agents guide (`room_log`, `room_note`, cursors, errors, troubleshooting), plus a glossary link.
+- Docs: the Secrets screen steps in Settings cover the Rotate button and its one-time link.
+- Migration: none.
+- Docs: new "Key rotation" page (`shipvo keys root`, `keys rotate sign` and `upload`, troubleshooting) and "Device permissions per app" in the phone apps guide.
+- docs: the self-hosting and OTA-updates-on-the-phone pages now open with who they are for and end with Troubleshooting and Next steps.
+- Docs: troubleshooting and next steps for self-hosting and OTA updates on the phone.
+- Migration: none.
+- docs: Troubleshooting and Next steps for "Taking real orders" and "Migrate from EAS Update".
+- docs: new Playground page (shipvo.dev/docs/playground/) with the bar controls, the feature sidebar, the Many phones link parameters, troubleshooting and next steps.
+- docs: assistant-testing page explains the ChatGPT "couldn't complete MCP setup" message.
+- Docs: the adapters page has troubleshooting and next steps, and states which Capacitor rules are implemented.
+- Docs: the shop tutorial and getting-started explain the `[shop]` price warning, with a Troubleshooting table; the CodePush guide gets a Troubleshooting section.
+- Docs: the Use log button on the phone's Secrets screen, and the shop tutorial now explains the price-unit message with a Troubleshooting section.
+- Docs: the record page lists the `lumi` and `lumi_voice` options in its table, has a "Lumi in recordings" section before Next steps, and says how to find the recorded file.
+- Migration: none.
+- Docs: the Capacitor page and the test-your-build page have more troubleshooting entries, each with the message you see and the fix.
+- Docs: the README lists safe rollbacks with stored data, key rotation and the browser playground.
+- docs: the "Check every pull request" page has numbered setup steps with the real `--dry-run` output and the exact workflow; the glossary explains the Secrets screen and the Use log.
+- docs: the agent gate results and OTA spike pages say who they are for, and the gate page links to `shipvo eval`, agents and typed tests.
+- docs: Describe an app lists what `app_activity`, `refresh_app` and `export_phone_apps` return, in text and `structuredContent`.
+- Docs: "Simulator cost" and "Lumi benchmark" pages have numbered steps, options, expected output, troubleshooting and next steps, and appear in the sidebar under Measured results.
+- Migration: none.
+- Hosted simulator: when a new version is deployed, each sandbox's phones move into a sandbox of the new version (apps, data, settings, room, clipboard and the app's mock backend orders) before the old one is deleted.
+- `@shipvo/sim`: `POST /phones/export` and `POST /phones/import` move every phone of a simulator to another one. `@shipvo/mcp --http` exposes them only after the hosting service claims the server with `POST /phones/claim` and a token, and only to that token.
+- Migration: none. Sandboxes started before this change cannot export, so their phones start empty once more on the first deploy after it.
+- Hosted simulator: an idle sandbox pauses instead of being deleted, and the next call resumes it with its phones, open apps and their data.
+- Hosted simulator: one sandbox per GitHub account, so every assistant you sign in (ChatGPT, Gemini, Claude) sees the same phones. A key with no account keeps its own sandbox.
+- OAuth sign-in replaces only the keys the same assistant made before; other assistants stay signed in.
+- Migration: none. A sandbox started per key before this change carries over to the account on its next call.
+- The Assistant Inbox view also uses ChatGPT's own widget bridge when it is there: it shows the first result at once, refreshes through it, and posts new messages into the chat with it.
+- An assistant that connects as "Google" is named `gemini` in the Assistant Inbox, like other Gemini clients.
+- The Assistant Inbox view also loads its script from `https://sim.shipvo.dev/widgets/inbox.js`, declared in the view's resource domains, so it runs in hosts whose page policy blocks inline scripts (ChatGPT). The script runs once either way.
+- New tool `inbox_view`: the whole Assistant Inbox (messages, tasks, who you are, what waits for you) without marking anything read. It works the same on the Android and iOS phone.
+- `inbox_view` comes with an MCP Apps view, `ui://shipvo/inbox.html` (`text/html;profile=mcp-app`). In a chat that shows MCP Apps views it draws the inbox live and, with Auto-continue on, posts each new message or task for the assistant into the chat, at most 20 times an hour.
+- The MCP server now declares the `resources` capability. The hosted service lists and reads the view without a key, like `tools/list`.
+- `@shipvo/mcp`: `open_app` takes `model` (for example `"iPhone 16 Pro"`), `screenshot` takes `frame: true` for the phone in its frame, and the new `phone_models` tool lists the phones a headless session can be. An unknown model answers `bad_model`.
+- `@shipvo/sim`: `POST /models` returns the phone models and the default for each platform.
+- `@shipvo/cli`: `shipvo session errors` lists what the app threw and scripts that did not load.
+- The Shipvo skill has the full `shipvo session` workflow, with a new `references/session.md`.
+- `apps/bug-bench`: `bench/speed.mjs` times opening a phone, screen reads, taps, typing and screenshots on an Android and an iOS phone model, and measures a screen as a tree against the same screen as a picture. Results are in `docs/bug-bench.md`.
+- Migration: none; new tool, new options and a new command.
+- Hosted MCP: sign-in with OAuth (dynamic client registration at `/register`, then `/authorize` and `/token`) works. The tables it uses are now created by the migrations the deploy applies, so clients that register themselves, such as Gemini custom MCP servers, connect.
+- Migration: none for callers. Two additive tables (`oauth_clients`, `oauth_codes`, `CREATE TABLE IF NOT EXISTS`) in `services/control-plane/migrations`.
+- Hosted MCP: the GitHub client ID and secret are trimmed when read, so values pasted with spaces or a newline at the ends still sign in.
+- Migration: none.
+- `@shipvo/sim`: a session can be a real phone model. `POST /session` takes `model` (15 models: Pixel 7 to Pixel 9 Pro XL, Galaxy S24, Galaxy A55, iPhone 15 to iPhone 17 Pro Max) and the session gets that phone's screen size, pixel ratio, user agent and platform. An unknown name answers `bad_model`. `/sessions` reports each session's `model`.
+- `@shipvo/sim`: the status bar shows its icons in the platform's order: Wi-Fi, signal, battery on Android; signal, Wi-Fi, battery on iOS.
+- `@shipvo/sim`: the phone frame no longer prints a "Simulated" badge under the screen, and its bezel is the same on every side. This applies to `shipvo run`, the watch page, screenshots and recordings.
+- `@shipvo/sim`: `POST /session` takes `root_mount: true` for apps with a router that reads the address (expo-router). The app sees its own routes and no longer starts on its "not found" screen. A page load of an address the simulator does not know now redirects to the app under `/app/`.
+- `@shipvo/sim`: in framed screenshots and recordings the status bar and the bottom bar take the colour of the app's screen, with light marks on a dark screen.
+- `@shipvo/cli`: `shipvo session start` opens an app that depends on `expo-router` with `root_mount`.
+- `@shipvo/sim`: a local build made with a base path (Expo `experiments.baseUrl`, for example `/static`) gets its files under that path, so the app no longer stays blank.
+- `@shipvo/sim`: a session opens once the app has loaded and waits up to 5 seconds more for the network to go quiet (`SHIPVO_SIM_NET_QUIET_MS`), so an app that polls or streams still opens.
+- `@shipvo/sim`: the `errors` action lists scripts that did not load, and apps may play sound without a tap first.
+- `@shipvo/cli`: `shipvo session start` also uses `root_mount` for apps that depend on `@react-navigation/native`, accepts a web package that another dependency installs, and asks for `@expo/metro-runtime` only from Expo 49.
+- `@shipvo/cli`: a failed web build says why: the Node version the app needs, the `"web": { "bundler": "metro" }` setting an older app has to add, or the compile error and its file.
+- `@shipvo/sim`: security fix. The simulator no longer serves files from outside the build folder. Before, an address such as `/_expo/..%2F..%2Ffile` or `/assets/..%2F..%2Ffile` returned any file the simulator could read. Update if your simulator is reachable from other machines.
+- `@shipvo/sim`: `--host <address>` chooses where the simulator listens; `--host 127.0.0.1` is this machine only. `shipvo session` starts its simulator that way.
+- `@shipvo/cli`: `shipvo run` opens apps that use expo-router or React Navigation on their own first screen, and serves a build made with a base path.
+- `@shipvo/cli`: `shipvo session clean` removes the folders of stopped sessions.
+- `@shipvo/cli`: `shipvo session start --device "<model>"` starts that model, and `shipvo session devices` lists the models. `session start android` is a Pixel 8 and `session start ios` is an iPhone 16.
+- Migration: the frame has no `simulated-label` part, and `outerHeight` is 14 pixels smaller. `statusParts(status, skin?)` in `@shipvo/sim/frame.mjs` takes an optional second argument. Sessions started without `model` are unchanged.
+- `@shipvo/sim`: the simulator listens on this machine only (`127.0.0.1`) by default. Migration: to serve other machines, start the server with `--host 0.0.0.0` or set `SHIPVO_SIM_HOST=0.0.0.0`.
+- `@shipvo/sim`: `POST /session` for an A2UI session answers with `applied` and `errors`, so a refused first message is seen when the session opens.
+- `@shipvo/mcp`, `@shipvo/mcp-tools`: new tools `a2ui_open`, `a2ui_send` and `a2ui_actions` draw A2UI messages on a phone, change the screen and read the actions a person sent. Migration: none; new tools.
+- `@shipvo/cli`: a failed web build reports its first error (the file and the message) however long the stack trace under it is. `shipvo session start --a2ui` says how many messages were refused and lists them under `data.a2ui_errors`.
+- Hosted and local MCP: the key guard scans tool inputs up to 64 levels deep instead of 8, so `create_app` accepts the first-party app specs (Assistant Inbox, Contacts, Messages, Clock, Shop, Wallet, Files and Photos), which nest 9 to 11 levels. A key anywhere in that depth is still refused.
+- Migration: none.
+- `@shipvo/cli`: `shipvo session start [android|ios] [--max-duration-minutes n]` opens any Expo app on a headless Shipvo Phone with no `shipvo.json`, and stops it on its own. `session screen`, `tap`, `type`, `scroll`, `back` and `screenshot` drive it from the shell; `session get`, `list` and `stop` manage it. See `docs/session.md`.
+- `@shipvo/cli`: `shipvo session screenshot` saves the whole phone, the app in its Android or iPhone frame with the status bar; `--no-frame` saves the app alone. `shipvo session record start` and `record stop [--out file]` save an MP4 of the framed phone in the session folder.
+- `@shipvo/sim`: the `screenshot` action takes `frame: true`, `POST /session` takes `fit_frame: true` (the app gets the app area of its frame: 412x855 on Android, 393x764 on iOS), and the new `record_start` and `record_stop` actions record the framed phone to an MP4. `record_stop` needs ffmpeg.
+- Migration: none; new command, new options and new actions. Existing screenshots and sessions are unchanged.
+- `open_app` with a session id that is already open reuses that session: the phone switches to the app and keeps its other apps and data. Before, it started the session over, so one assistant opening a shared session wiped what another had installed (for example the Assistant Inbox). New `restart: true` starts a session over. An open session without the app returns `not_installed` instead of resetting it.
+- Hosted MCP: tool calls are named after the assistant that signed in (ChatGPT, Gemini), so Assistant Inbox messages show the real sender instead of `unknown`.
+- Migration: a caller that relied on `open_app` resetting an open session passes `restart: true`.
+- Docs: new tutorial "Describe an app and watch it appear on a phone" in the Learn section.
+- Migration: none.
+
 ## 2026-11-09 (release)
 
 - **@shipvo/cli 0.1.8**: ci: a fix that turns a failing flow green publishes to the first band; sim: /watch shows the agent's steps and Take over; shipvo sim opens it; init: point next-step text at the local MCP entry; cli: shipvo agents setup --hosted writes the remote MCP config per agent; cli: shipvo eval run and report score agents on app tasks

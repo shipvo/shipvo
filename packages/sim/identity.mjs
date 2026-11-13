@@ -4,7 +4,7 @@ const KNOWN = [
   [/claude|anthropic/i, "claude"],
   [/chatgpt|openai|\bgpt(?:-?\d|\b)/i, "chatgpt"],
   [/cursor/i, "cursor"],
-  [/gemini/i, "gemini"],
+  [/gemini|^google$/i, "gemini"],
   [/copilot/i, "copilot"],
   [/mistral|le-?chat/i, "mistral"],
 ];

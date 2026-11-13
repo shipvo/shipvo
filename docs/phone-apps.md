@@ -118,6 +118,28 @@ Any spec app can turn a collection into CSV with the `csv()` function. Return it
 
 The first line holds the column names. Fields with commas, quotes or line breaks are quoted, and lists such as tags are joined with `; `. Leave the column list out to export every field. Spreadsheets treat a cell that starts with `=`, `+`, `-` or `@` as a formula. For text that other people typed, map the field first, for example `data.entries.map(r, {'note': has(r.note) && r.note.startsWith('=') ? "'" + r.note : (has(r.note) ? r.note : '')})`, then pass that list to `csv()`.
 
+## Save data into a collection
+
+The object form of `saveFile` stores text as a file in one of the app's collections. Pair it with `csv()` to save an export the person can find later. The step needs the `files` device permission, and works the same on Android and iOS.
+
+```json
+{ "do": [ { "saveFile": { "to": "files", "name": "diary.csv", "mime": "text/csv", "content": "{{ csv(data.entries) }}" } } ] }
+```
+
+This form adds a new record each time, even with the same name. The string form in "Save as a file" below replaces the file with the same name. Use the collection form to keep a history or list files in the app; use the string form for one named file.
+
+Declare the `to` collection under `data` with the fields `id`, `name`, `kind`, `mime`, `size`, `content` and `added`.
+
+Each file gets the next `id` and the fields `name`, `kind` (`file`), `mime` (default `text/plain`), `size` in bytes, `content` and `added`. Read the content back with `parseCsv()` to import it.
+
+## Save as a file
+
+A `saveFile` step keeps text as a named file on the phone. It needs the `files` device permission, on Android and iOS alike. Saving again with the same name replaces the file.
+
+```json
+{ "actions": { "save_diary": { "description": "Save the diary as diary.csv.", "input": {}, "do": [ { "saveFile": "diary.csv", "content": "{{ csv(data.entries, ['date', 'title']) }}", "mime": "text/csv" }, { "toast": "Saved diary.csv" } ] } } }
+```
+
 ## Import data from CSV
 
 `parseCsv(text)` is the other direction. It reads CSV text into a list of maps keyed by the header row, on Android and iOS alike. Quoted fields, CRLF or LF line ends and a leading byte order mark are read, and blank lines are skipped. Every value is text. A row with fewer cells than the header gets empty values.
@@ -201,6 +223,81 @@ uninstall_app { session, id: "notes" } -> back on the home screen
 device_log { session }                 -> install_app (source "real" for marketplace apps, with the bundle sha256), switch_app, uninstall_app
 ```
 
+## See the permission log
+
+`permission_log` lists every device permission decision on the phone, oldest first, on Android and iOS:
+
+- `granted` and `denied`: from install, import, an update or the Settings switch (`by` says which).
+- `removed`: an update dropped the permission, or the app was uninstalled.
+- `used` and `blocked`: an app action needed the permission and ran, or stopped because the person denied it. `by` is the action and `caller` the assistant that called it.
+
+```json
+{ "session": "demo", "app": "remind", "event": "blocked" }
+```
+
+Filter by `app`, `permission` or `event`. `limit` is 1 to 500 (default 100). Nothing is changed.
+## Share sheet and clipboard
+
+Share text from one app into another, and copy and paste, on Android and iOS.
+
+- `share_targets` lists the apps that take shared text: app id, action and the input that receives it. Notes and Tasks takes text as a new note (`add_note`) or a new task (`add_task`).
+- `share` sends text into one of them, as picking it in the share sheet does. A title input that is not the share input gets `title`, or the first line of the text. Each share is in `app_activity` as `share`, with `from` when you give it.
+- `get_clipboard` and `set_clipboard` read and write the phone's clipboard, the same one apps copy to and paste from. It stays when you switch apps.
+
+```json
+{ "session": "demo", "to": "notes", "action": "add_note", "text": "Harbour list\nrope, hooks", "from": "browser" }
+```
+
+To make an action of your own app a share target, add `"share"` with the name of one of its text inputs:
+
+```json
+"save_link": { "description": "Save a link", "input": { "url": { "type": "text" } }, "share": "url", "do": [ ... ] }
+```
+## Back up and restore the whole phone
+
+`backup_phone` returns the whole phone as one JSON object, on Android and iOS:
+
+- every app you built, with its spec, data, settings, home-screen place and permission answers;
+- every Store app, with its listing and permission answers;
+- the system settings (dark mode, font size, bold text, reduce motion, language, right-to-left);
+- the clipboard.
+
+Saved keys in the vault are never in a backup.
+
+`restore_phone` puts a backup on this phone or another one. Every part is checked first, and a bad backup changes nothing. Apps you built that are already on the phone need `"replace": true`; a Store app that is already installed is skipped and listed in `skipped`.
+
+```json
+{ "session": "new-phone", "backup": { "format": "shipvo.phone-backup/v0", "...": "..." } }
+```
+
+## Search across the phone
+
+`search_phone` finds text anywhere on the phone in one call: rows in every app's data (Notes and Tasks, Calendar, Files and Photos, Wallet, Shop, Assistant Inbox and any app you built) and notifications. It works the same on Android and iOS.
+
+```json
+{ "session": "demo", "query": "marigold", "limit": 10 }
+```
+
+Each result has the app, the collection, the row id, the field that matched, a short snippet and the full row. The match is not case sensitive and a row gives one result. Set `app` to an app id to look in one app, or to `notifications`. `limit` is 1 to 100 (default 20) and `truncated` says when more matched. Nothing is changed.
+
+## Wi-Fi, mobile data and airplane mode
+
+`set_connectivity` turns Wi-Fi, mobile data or airplane mode on or off for the whole phone, as quick settings do on Android and iOS. `get_connectivity` reads the switches and the network every app sees.
+
+```json
+{ "session": "demo", "airplane": true }
+```
+
+- Airplane mode turns Wi-Fi and mobile data off. Wi-Fi can come back on during it, and the phone is online again over Wi-Fi. Leaving airplane mode brings the radios back as they were.
+- Apps you built read the network in expressions as `network.online` and `network.type` (`wifi`, `cellular` or `none`). The open app's screen is drawn again when it changes.
+- While the phone is offline, apps' web data does not load: scheduled refreshes wait, and `refresh_app` says the phone is offline.
+- The Wi-Fi, mobile data and airplane tiles in the shade and Control Center, and `set_network_profile` with `offline`, change the same network.
+- Each change is in `device_log` as `connectivity`.
+
+```json
+{ "type": "text", "value": "{{ network.online ? 'Synced' : 'Offline: changes stay on the phone' }}" }
+```
+
 ## First-party apps
 
 | App | What it does | Actions (MCP tools) | Spec |
@@ -211,6 +308,9 @@ device_log { session }                 -> install_app (source "real" for marketp
 | Wallet | Keeps tickets, receipts and passes, grouped by kind, with an expiring-soon list. | `save_pass`, `find_pass`, `show_matches`, `delete_pass` | [`templates/wallet/app.json`](../templates/wallet/app.json) |
 | Shop | Lists products, takes orders and shows them in one place; the currency is a setting. | `add_product`, `find_products`, `place_order`, `list_orders`, `set_currency`, `show_matches`, `pick_product` | [`templates/shop/app.json`](../templates/shop/app.json) |
 | Assistant Inbox | Lets ChatGPT, Claude and other assistants on the same phone message each other and hand over tasks. Android and iOS. | `send_message`, `check_inbox`, `mark_read`, `read_thread`, `hand_off`, `my_tasks`, `start_task`, `finish_task`, `sent_tasks`, `share_report`, `get_reports` | [`templates/assistant-inbox/app.json`](../templates/assistant-inbox/app.json) |
+| Contacts | Keeps people with phone numbers, emails and notes, with favourites and search. | `add_contact`, `find_contacts`, `update_contact`, `set_favorite`, `delete_contact`, `show_matches` | [`templates/contacts/app.json`](../templates/contacts/app.json) |
+| Messages | Text conversations, one thread for each person, with unread counts. | `send_text`, `receive_text`, `list_conversations`, `read_conversation`, `delete_conversation` | [`templates/messages/app.json`](../templates/messages/app.json) |
+| Clock | Alarms, timers and a world clock. | `add_alarm`, `list_alarms`, `set_alarm`, `delete_alarm`, `start_timer`, `stop_timer`, `list_timers`, `add_place`, `delete_place` | [`templates/clock/app.json`](../templates/clock/app.json) |
 
 The spec validates with `@shipvo/spec`, and `toolsFromSpec` turns each action into a tool. Two assistants on the same phone read and write the same tasks and notes. Copy the folder to start your own app. The screen tree names every control: tabs `Tasks` and `Notes`, lists `Open tasks`, `Done tasks` and `Notes`, forms `Complete task form`, `New task form` and `New note form`. Test: `pnpm --filter @shipvo/spec test`.
 
@@ -222,7 +322,7 @@ Connect ChatGPT and Claude to the same phone and install the Assistant Inbox. Th
 2. Claude calls `check_inbox` with no input, answers with `send_message`, and calls `mark_read`.
 3. To pass work, `hand_off` creates a task for the other assistant. They list theirs with `my_tasks`, call `start_task`, then `finish_task` with the result. The sender reads the status and reply with `sent_tasks`.
 
-A message to `anyone` reaches whichever assistant checks first. The Messages and Tasks tabs show the same data, so you can follow the exchange on the phone. An explicit `from` still works when you want to send as someone else.
+Both assistants use the same session id. `open_app` with a session that is already open reuses it: the phone switches to the app and keeps every other app and its data, so one assistant never wipes what the other installed. Pass `restart: true` to start a session over. On the hosted phone, the assistant you signed in with OAuth is named from its sign-in, so messages show who sent them. A message to `anyone` reaches whichever assistant checks first. The Messages and Tasks tabs show the same data, so you can follow the exchange on the phone. An explicit `from` still works when you want to send as someone else.
 
 `mark_read`, `start_task` and `finish_task` only act on what was sent to the caller (or to `anyone`). When nothing matched they return `updated: false` with the reason, so an assistant is never told it worked when it did not. A finished task keeps its first reply. Two clients of the same assistant, such as claude.ai and Claude Code, share the name `claude` and so share one inbox. A client that connects with no name has no caller, and these actions then match any row, as they do when a person taps the screen.
 
@@ -230,9 +330,21 @@ A message to `anyone` reaches whichever assistant checks first. The Messages and
 
 When the Assistant Inbox is installed, every phone tool result for a session starts with one line about the calling assistant, for example `Inbox: 2 unread for chatgpt, 1 task open`. An assistant sees it on its next call of any phone tool, so nobody has to say "check your inbox". When nothing is waiting, no line is added. This works the same on the Android and iOS phone.
 
+### Reminders
+
+Call `set_reminder` with a `title` and either `at` (a time on the phone's clock, such as `2026-11-14T09:00`) or `in_minutes`. At that time a notification arrives on the phone, whether or not an app is open. `repeat` can be `daily` or `weekly`. `list_reminders` shows what is waiting and what has fired, and `cancel_reminder` removes one.
+
+The phone's clock is the one `set_phone_time` sets, so a test can jump to the time and read the notification with `notifications`. With Do Not Disturb (Android) or Focus (iPhone) on, the reminder goes to the notification shade without a banner. A reminder is the phone's own notification, so it does not need an app's notification permission. If the clock jumps past a repeating reminder several times, it fires once and moves to the next time after the clock. It works the same on the Android and iPhone phone.
+
 ### Waiting for the other assistant
 
 Call `wait_for_event` to listen for the next message or task. It returns as soon as a message or task you have not been told about yet is waiting for you, or says `nothing yet` after up to 25 seconds (`timeout_ms` sets a shorter wait). The result lists the new message and task ids. Read them with `check_inbox` or `my_tasks`, act on them, and call `wait_for_event` again: anything already returned does not wake you a second time, so a task you are still working on does not end the wait. Use it inside a turn to hold a live back-and-forth, or when a task says "wait for the reviewer's answer". It works the same on the Android and iOS phone.
+
+### Watching the inbox live in the chat
+
+Call `inbox_view` with the session. The result lists every message and task between the assistants, who you are, and how many unread messages and open tasks wait for you. Viewing marks nothing as read.
+
+In a chat that shows MCP Apps views, `inbox_view` also draws the inbox in the chat (`ui://shipvo/inbox.html`), with Messages and Tasks tabs and a count of what waits for you. The view refreshes every 4 seconds. With **Auto-continue** on (the default), each new message or task for you is posted into the chat as a message, so the assistant reads it, acts and replies without anyone typing. What was already there when the view opened is not posted, nor are your own messages or messages to another assistant. Auto-continue posts at most 20 times an hour, and says so in the view when it stops. Untick it to only watch. The view makes no network requests of its own: it gets fresh data by calling `inbox_view` through the chat. It works the same on the Android and iOS phone.
 
 ### Waking an assistant that is not in a turn
 
@@ -248,6 +360,7 @@ Which mechanism fits which assistant:
 | --- | --- |
 | An assistant that calls any phone tool to see what is waiting | The `Inbox:` line at the start of every tool result |
 | An assistant in the middle of a turn to listen for the other one | `wait_for_event` |
+| A chat that shows MCP Apps views to watch the inbox and answer each new message on its own | `inbox_view` with Auto-continue on |
 | An assistant outside a turn to start work when a message arrives | `register_wakeup` with a URL that starts it |
 | A chat that no URL can start | `register_wakeup` with `format: "text"` or `"slack"`, so you get a notification and open the chat |
 
