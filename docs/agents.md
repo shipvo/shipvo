@@ -41,6 +41,7 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `list_sessions` | Open sessions on this server, to resume after a reconnect. Each row shows app, platform, room, who opened it (the MCP client name), start time and current screen title |
 | `room_log(room, since?)` | Read-only. What every session in a room did, oldest first, plus the notes agents posted. See [Room log and notes](#room-log-and-notes) |
 | `room_note(room, text)` | Post a plain-text note (up to 500 characters) for the other agents in the room |
+| `room_report(room)` | Read-only. One summary per session in a room: agent, steps, seconds, errors, last screen title and notes. See [Room log and notes](#room-log-and-notes) |
 | `open_app(app, session?, seed_cart?, dark?, attach?, platform?, show?, room?)` | A phone-sized session; returns the first screen. If `shipvo run` is up for this app (`.shipvo/run.json` in the working directory or a parent, up to the git root), the session drives that phone instead and the result says `attached to the live shipvo run phone`; otherwise it says `headless session`. `attach`: `auto` (default), `never` (always headless), `always` (error with no live run). `show: true` opens the phone in your browser and starts `shipvo run <platform>` when none is up; by default that happens only on a desktop machine whose project has `shipvo` installed. A server over HTTP never starts a run. `platform` applies only when a phone is started; with `show: false`, `attach: never` or a live run attached as it is, the result says it was ignored. Attached sessions support screen, tap, type, scroll, back and screenshot; other tools return `not_supported_attached`. Attach needs Node 22+; if attach fails in `auto` mode the headless result says why. `app@release` still attaches to the local run. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
 | `upload_build(dir?, app?, skip_build?)` | Build this project, upload it for your key and return a build id. Open it on the hosted phone with `open_app("<app>@build:<id>")`. Local (stdio) server only. See [Test your build](test-your-build.md) |
 | `publish_preview(...)` · `job_status(job, wait_ms?)` | Slow tools (`publish_preview`, `upload_build`) wait up to `wait_ms` (default 20000) and return the result, or `{ status: "running", job }`. Call `job_status` with that `job` to read `running`, `done` or `failed` (`wait_ms` up to 55000 waits for it). See [the CLI guide](cli.md) |
@@ -99,6 +100,17 @@ cursor: 2
 | --- | --- | --- |
 | `room_log` | `room`, `since?` (a cursor from an earlier `room_log` or `room_note`) | `entries` (each with `at`, `kind` of `action` or `note`, `session`, `agent`, `tool`, `target`, `change` or `text`) and the next `cursor`. Without `since`, you get the whole log |
 | `room_note` | `room`, `text` (1 to 500 characters) | The new `cursor` |
+
+`room_report` reads the same log and gives one row per session, so a lead agent can collect every sub-agent's result in one call.
+
+```text
+s1 (claude-code): 12 steps in 48s, 1 errors, notes: Checkout fails when the cart has 3 items
+s2 (cursor): 7 steps in 31s, 0 errors
+```
+
+| Tool | Arguments | Result |
+| --- | --- | --- |
+| `room_report` | `room` | `sessions`, each with `session`, `agent`, `steps`, `seconds` (first to last entry), `errors` (actions that returned an error), `last_screen_title` and `notes`. Error code: `no_room` |
 
 The log keeps the latest 1000 entries. Reading it changes nothing, so a lead can poll it as often as it likes.
 

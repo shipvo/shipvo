@@ -1,0 +1,1 @@
+- docs: `room_report` is documented in the agents guide with its result fields and error code.
