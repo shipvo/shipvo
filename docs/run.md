@@ -18,7 +18,7 @@ You need the app folder from [Build your first app](getting-started.md) and a te
 
    Use `ios` instead of `android` for an iPhone-style phone.
 2. Wait while Shipvo builds a web copy of your app. It does not need an account or a phone.
-3. Your browser opens on a page with a phone in the middle. A label says **Simulated**, because this is a copy of a phone and not a real one.
+3. Your browser opens on a page with a phone in the middle, in its Android or iPhone frame.
 4. Click around in the phone like you would tap. When you are done, go back to the terminal and press **Ctrl+C**.
 
 **If it fails:**
@@ -50,6 +50,10 @@ Measured on 2026-11-07 on a GitHub-hosted `ubuntu-latest` runner:
 | first tap done | 10.73 | 10.19 |
 
 Run: [CI run 42355471525](https://github.com/shipvo/shipvo/actions/runs/42355471525) (job `shipvo run android (time to first tap)`, artifact `run-time`). The script is `scripts/first-run/run-time.mjs`.
+
+## Apps with a router or a base path
+
+An app that uses expo-router or React Navigation opens on its own first screen: `shipvo run` sees the router in `package.json` and gives the app its own addresses, so `/feed/1` is `/feed/1` and a reload stays on that screen. An app built with Expo's `experiments.baseUrl` (for example `/static`) gets its files under that path.
 
 ## Edit and save, the phone updates
 

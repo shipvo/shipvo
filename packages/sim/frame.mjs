@@ -16,7 +16,6 @@ export const SKINS = {
   ios: { label: "iPhone", width: 393, height: 852, radius: 55, bezel: 12, status: 54, bar: 34, pad: 36, indicator: 134, part: "dynamic-island", bottom: "home-indicator" },
 };
 
-const FOOT = 14; // extra bezel under the screen, holds the "Simulated" label
 const clean = (s) => String(s).replace(/[<>&"'\\]/g, "").slice(0, 12);
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 
@@ -54,9 +53,9 @@ export function isDarkBackground(color) {
 }
 
 /** The parts of the status bar that change: the clock text and the icons markup. */
-export function statusParts(status) {
+export function statusParts(status, skin = "ios") {
   const st = normalizeStatus(status);
-  return { time: st.time, icons: icons(st) };
+  return { time: st.time, icons: icons(st, skin) };
 }
 
 /**
@@ -70,7 +69,7 @@ var statusParts=${statusParts.toString()},normalizeStatus=${normalizeStatus.toSt
 var clean=${clean.toString()},clamp=${clamp.toString()};
 var dev={online:true,airplane:false,battery:{level:100,charging:false}};
 function root(){return document.querySelector('[data-part="phone-body"]')}
-function draw(){var r=root();if(!r)return;var p=statusParts(statusFromDevice(dev,new Date()));
+function draw(){var r=root();if(!r)return;var p=statusParts(statusFromDevice(dev,new Date()),${JSON.stringify(skin === "ios" ? "ios" : "android")});
 r.querySelector('[data-part="time"]').textContent=p.time;var lt=r.querySelector('[data-part="lock-time"]');if(lt)lt.textContent=p.time;r.querySelector(".sf-icons").innerHTML=p.icons}
 function topColor(w){try{var d=w.document,e=d.elementFromPoint(Math.floor(w.innerWidth/2),1);
 while(e){var c=w.getComputedStyle(e).backgroundColor;if(c&&c!=="transparent"&&!/rgba\\(.*,\\s*0\\)$/.test(c))return c;e=e.parentElement}var b=d.body&&w.getComputedStyle(d.body).backgroundColor;if(b&&!/rgba\\(.*,\\s*0\\)$/.test(b)&&b!=="transparent")return b}catch(x){}return"#fff"}
@@ -161,7 +160,8 @@ setInterval(function(){if(document.hidden)return;var f=document.getElementById($
 
 const svg = (w, h, body, extra = "") => `<svg class="sf-ico" ${extra} width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${body}</svg>`;
 
-function icons(st) {
+// Android shows Wi-Fi, then signal, then battery. iOS shows signal, then Wi-Fi, then battery.
+function icons(st, skin = "ios") {
   if (st.airplane) {
     return svg(16, 16, `<path d="M8 1.5 9.4 6.5 15 9.5v1.4l-5.6-1.5-.4 3 1.6 1.2v1L8 14.7 5.4 15.6v-1L7 13.4l-.4-3L1 10.9V9.5l5.6-3z" fill="currentColor"/>`, 'data-part="airplane"');
   }
@@ -171,7 +171,7 @@ function icons(st) {
   const wifi = st.wifi
     ? svg(16, 12, `<path d="M1 4.5a10 10 0 0 1 14 0M3.5 7.2a6.4 6.4 0 0 1 9 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="10" r="1.4" fill="currentColor"/>`, 'data-part="wifi"')
     : "";
-  return signal + wifi + battery(st.battery);
+  return (skin === "android" ? wifi + signal : signal + wifi) + battery(st.battery);
 }
 
 function battery(b) {
@@ -194,20 +194,20 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
   const k = SKINS[skin];
   if (!k) throw new Error(`Unknown skin "${skin}". Use "android" or "ios".`);
   const st = normalizeStatus(status);
-  const outerWidth = k.width + k.bezel * 2, outerHeight = k.height + k.bezel + k.bezel + FOOT;
+  const outerWidth = k.width + k.bezel * 2, outerHeight = k.height + k.bezel * 2;
   const shape = skin === "ios"
     ? `<span class="sf-cut sf-island" data-part="dynamic-island"></span>`
     : `<span class="sf-cut sf-hole" data-part="punch-hole"></span>`;
   const html = `<div class="sf-body" data-skin="${skin}" data-theme="${dark ? "dark" : "light"}" data-part="phone-body">`
-    + `<div class="sf-screen"><div class="sf-status" data-part="status-bar"><span class="sf-time" data-part="time">${st.time}</span>${shape}${lumi ? lumiHtml() : ""}<span class="sf-icons">${icons(st)}</span></div>`
+    + `<div class="sf-screen"><div class="sf-status" data-part="status-bar"><span class="sf-time" data-part="time">${st.time}</span>${shape}${lumi ? lumiHtml() : ""}<span class="sf-icons">${icons(st, skin)}</span></div>`
     + `<div class="sf-content">${screen}</div>` + (lumi ? lumiCaptionHtml() : "") + updateBannerHtml()
     + shadeHtml(skin) + `<span class="sf-edge" data-part="edge-swipe"></span>` + homeScreenHtml().replace(/<\/div>$/, settingsIconHtml() + storeIconHtml() + "</div>") + settingsHtml() + storeScreenHtml() + recentsHtml() + lockScreenHtml(st.time) + bootScreenHtml() + offScreenHtml() + (lumi && guide ? guideHtml() : "")
     + `<div class="sf-vol" data-part="volume-overlay" role="status" aria-live="polite" hidden><span data-part="volume-level">50</span><i class="sf-vbar" data-part="volume-bar"><b style="width:50%"></b></i></div><div class="sf-menu" data-part="power-menu" role="menu" aria-label="Power menu" hidden><button role="menuitem" data-act="restart">Restart</button><button role="menuitem" data-act="poweroff">Power off</button>${skin === "android" ? `<button role="menuitem" data-act="navstyle" data-part="nav-style-toggle">3-button navigation</button>` : ""}<button role="menuitem" data-act="cancel">Cancel</button></div>`
     + `<div class="sf-bar" data-part="${k.bottom}"><i></i>${skin === "android" ? navButtonsHtml() : ""}</div></div>`
     + `<button class="sf-btn sf-power" data-part="power-button" aria-label="Power"></button><button class="sf-btn sf-volup" data-part="volume-up-button" aria-label="Volume up"></button><button class="sf-btn sf-voldown" data-part="volume-down-button" aria-label="Volume down"></button>`
-    + `<span class="sf-label" data-part="simulated-label">Simulated</span></div>`;
+    + `</div>`;
   const css = [
-    `.sf-body{--sf-bg:${dark ? "#000" : "#fff"};--sf-fg:${dark ? "#fff" : "#111"};position:relative;box-sizing:border-box;width:${outerWidth}px;height:${outerHeight}px;padding:${k.bezel}px ${k.bezel}px ${k.bezel + FOOT}px;`
+    `.sf-body{--sf-bg:${dark ? "#000" : "#fff"};--sf-fg:${dark ? "#fff" : "#111"};position:relative;box-sizing:border-box;width:${outerWidth}px;height:${outerHeight}px;padding:${k.bezel}px ${k.bezel}px ${k.bezel}px;`
       + `border-radius:${k.radius + k.bezel}px;background:linear-gradient(145deg,#3a3d42,#15171a);box-shadow:0 0 0 1px #000,0 10px 34px #0007;touch-action:manipulation;user-select:none;-webkit-user-select:none}`,
     `.sf-screen{width:${k.width}px;height:${k.height}px;border-radius:${k.radius}px;background:var(--sf-bg);color:var(--sf-fg);overflow:hidden;display:flex;flex-direction:column;position:relative}`,
     `.sf-status{flex:none;height:${k.status}px;display:flex;justify-content:space-between;align-items:center;padding:0 ${k.pad}px;font:600 14px system-ui,sans-serif;position:relative;z-index:2;color:var(--sf-status-fg,var(--sf-fg));background:var(--sf-status-bg,transparent)}`,
@@ -234,7 +234,6 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     `.sf-edge{position:absolute;left:0;top:${k.status}px;bottom:${k.bar}px;width:14px;z-index:3}.sf-home[hidden],.sf-recents[hidden],.sf-navbtns[hidden]{display:none}`,
     navScreensCss(),
     `.sf-bar{position:relative}.sf-navbtns{position:absolute;inset:0;display:flex;justify-content:space-around;align-items:center;background:var(--sf-bg)}.sf-navbtns button{border:0;background:none;color:var(--sf-fg);font-size:16px;padding:2px 24px;cursor:pointer}.sf-body[data-nav="buttons"] .sf-bar i{display:none}`,
-    `.sf-label{position:absolute;left:0;right:0;bottom:3px;text-align:center;font:600 9px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9aa0a6}`,
   ].join("\n");
   return { skin, width: k.width, height: k.height, outerWidth, outerHeight, html, css };
 }

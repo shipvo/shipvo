@@ -5,8 +5,8 @@
 //   shipvo sim  (or: node packages/sim/server.mjs) [--port 4545] [--dir /tmp/pn-ui] [--dist ./sim-dist] [--app <id>]
 // Reads shipvo.json in the current directory (appId, name, controlPlane) when present.
 import http from "node:http";
-import { readFileSync, existsSync, writeFileSync, appendFileSync, mkdirSync, statSync, rmSync } from "node:fs";
-import { join, extname, dirname, sep } from "node:path";
+import { readFileSync, existsSync, writeFileSync, appendFileSync, mkdirSync, statSync, rmSync, realpathSync } from "node:fs";
+import { join, extname, dirname, sep, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { openBuild } from "./build-open.mjs";
@@ -48,6 +48,7 @@ import { searchPhone, SearchError } from "./search.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 import { statusFromDevice } from "./frame.mjs";
+import { MODELS, findModel, modelContext } from "./models.mjs";
 import { capturePage, contentSize, showShot, shotArgs, encodeFrames, CaptureError } from "./capture.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
@@ -95,12 +96,19 @@ const browserReady = new Promise((resolve, reject) => { launchBrowser = () => {
   let opts;
   try { opts = resolveBrowser({ pw, executablePath: arg("chromium", undefined) }); } catch (e) { reject(e); return; }
   const timer = setTimeout(() => reject(new Error(`Chromium did not start within ${LAUNCH_TIMEOUT_MS / 1000} s`)), LAUNCH_TIMEOUT_MS);
-  chromium.launch(opts).then(resolve, reject).finally(() => clearTimeout(timer));
+  // A phone app may play sound without a tap first. A browser blocks that unless told otherwise.
+  chromium.launch({ ...opts, args: [...(opts.args ?? []), "--autoplay-policy=no-user-gesture-required"] }).then(resolve, reject).finally(() => clearTimeout(timer));
 }; });
 browserReady.catch((e) => { console.error(`sim: ${launchErrorMessage(e.message, pwVersion)}`); process.exit(1); });
 const sessions = new Map();
 
 const phone = { ...devices["Pixel 5"], viewport: { width: 393, height: 851 } };
+// An app page is ready when it has loaded. The simulator also waits for the network to go quiet, but only for a while:
+// an app that polls, streams or keeps loading still opens.
+const NET_QUIET_MS = Number(process.env.SHIPVO_SIM_NET_QUIET_MS) || 5000;
+const networkQuiet = (page) => page.waitForLoadState("networkidle", { timeout: NET_QUIET_MS }).catch(() => {});
+async function gotoSettled(page, url) { await page.goto(url, { waitUntil: "load" }); await networkQuiet(page); }
+async function reloadSettled(page) { await page.reload({ waitUntil: "load" }); await networkQuiet(page); }
 
 // The phone's Browser app. Chromium starts on the first open. Pages that link to the app's own scheme hand the link to the app.
 // The instance is shared through s.browserP, so two opens at once make one Chromium context.
@@ -168,7 +176,7 @@ async function framed(s, buf, mime, jpeg) {
       s.framePage = await s.frameCtx.newPage(); await s.framePage.setContent(cp.html);
     }
     const c = s.conn ?? initialConnectivity();
-    await s.framePage.evaluate(showShot, shotArgs(buf, mime, statusFromDevice({ online: networkOf(c, s.netProfile ?? "online").online, airplane: c.airplane, wifi: c.wifi, mobileData: c.mobile_data }, nowOf(s))));
+    await s.framePage.evaluate(showShot, shotArgs(buf, mime, s.skin, statusFromDevice({ online: networkOf(c, s.netProfile ?? "online").online, airplane: c.airplane, wifi: c.wifi, mobileData: c.mobile_data }, nowOf(s))));
     return s.framePage.screenshot(jpeg ? { type: "jpeg", quality: 85 } : { omitBackground: true });
   });
   s.frameQueue = job; return job;
@@ -179,6 +187,36 @@ async function stopRecording(s) {
   s.rec = null; rec.on = false; await rec.loop;
   try { return await encodeFrames({ dir: rec.dir, times: rec.times, end: Date.now(), out: rec.out }); }
   catch (e) { if (e instanceof CaptureError) throw new SimError(e.code, e.message); throw e; }
+}
+/**
+ * The file in the local build that a request path names, or null. null when the path leaves the build folder (with ".."
+ * in any spelling, or through a link inside the build), names a folder or nothing, or is not valid.
+ */
+function distFile(requestPath) {
+  try {
+    const root = realpathSync(resolvePath(DIST));
+    const p = resolvePath(root, "." + sep + decodeURIComponent(String(requestPath)).replace(/^[/\\]+/, ""));
+    if (!p.startsWith(root + sep) || !existsSync(p) || statSync(p).isDirectory()) return null;
+    const real = realpathSync(p);
+    return real.startsWith(root + sep) ? real : null;
+  } catch { return null; }
+}
+// The base path the local build was made with: what stands before /_expo/ in the script address of its index.html. "" when there is none.
+let appBaseCache = { at: -1, base: "" };
+function appBase() {
+  try {
+    const file = join(DIST, "index.html"), at = statSync(file).mtimeMs;
+    if (at !== appBaseCache.at) appBaseCache = { at, base: /<script[^>]+src="(\/[^"]*?)\/_expo\/static\//.exec(readFileSync(file, "utf8"))?.[1] ?? "" };
+  } catch { appBaseCache = { at: -1, base: "" }; }
+  return appBaseCache.base;
+}
+// Pages of this server that are not the local app: other apps, builds, releases, the session backend and the simulator's own pages.
+const NOT_THE_APP = /^\/(?:app|spec|b|w|s|phone|browser|watch|_expo|assets)(?:\/|$)/;
+/** The address a session's page is at, for comparing with an app's address. In a root_mount session the local app's screens are at /, /feed/1 and so on: all of them are the app at /app/. */
+function whereOf(s, pageUrl) {
+  if (!s.rootMount) return pageUrl;
+  try { const u = new URL(pageUrl); if (u.origin === `http://localhost:${PORT}` && !NOT_THE_APP.test(u.pathname)) return `http://localhost:${PORT}/app/`; } catch {}
+  return pageUrl;
 }
 async function endSession(id) {
   const s = sessions.get(id); if (!s) return false;
@@ -192,6 +230,9 @@ async function newSession(id, opts = {}) {
   const room = opts.room == null ? undefined : String(opts.room);
   if (room !== undefined && !/^[\w-]{1,64}$/.test(room)) throw new SimError("bad_room", "room must be 1 to 64 letters, digits, _ or -");
   if (sessions.has(id)) { specHost.dropSession(id); const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); old.inbox?.close(); old.wakeups?.close(); clearInterval(old.reminderTimer); sessions.delete(id); leaveRoom(old, id); }
+  const model = opts.model == null ? null : findModel(opts.model);
+  if (opts.model != null && !model) throw new SimError("bad_model", `unknown phone model "${String(opts.model).slice(0, 40)}". Models: ${MODELS.map((m) => m.name).join(", ")}`);
+  if (model) opts = { ...opts, skin: model.platform, device: { ...(opts.device ?? {}), platform: opts.device?.platform ?? model.platform } };
   let target, buildId;
   if (opts.build_url != null) {
     // Fetch the build before anything else is created, so a bad URL leaves no session behind.
@@ -211,7 +252,8 @@ async function newSession(id, opts = {}) {
   const size = Number.isInteger(opts.width) && Number.isInteger(opts.height) && opts.width > 0 && opts.height > 0 ? { viewport: { width: Math.round(opts.width / (opts.scale || 1)), height: Math.round(opts.height / (opts.scale || 1)) }, deviceScaleFactor: opts.scale || 1 } : {};
   // fit_frame: the app gets exactly the app area of its Android or iOS frame, so framed screenshots and recordings show the phone at its real size.
   const fit = opts.fit_frame === true ? { viewport: contentSize(opts.skin), deviceScaleFactor: 2 } : {};
-  ctx = await browser.newContext({ ...phone, ...fit, ...size, colorScheme: opts.dark ? "dark" : "light" });
+  // model: the session is a real phone model, with that phone's screen size, pixel ratio and user agent.
+  ctx = await browser.newContext({ ...phone, ...fit, ...(model ? modelContext(model) : {}), ...size, colorScheme: opts.dark ? "dark" : "light" });
   // The app's Linking.openURL for a web page lands here (see @shipvo/device): it opens in the Browser app, not in the app.
   await ctx.exposeFunction("__pnOpenBrowser", (url) => openInBrowserApp(id, String(url)));
   // The app's Linking.openURL for another installed app's scheme lands here: the phone switches to that app and hands it the link once.
@@ -230,18 +272,23 @@ async function newSession(id, opts = {}) {
   });
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${bk}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   await ctx.addInitScript(installNetGate);
+  // root_mount: for apps with a router that reads the address (expo-router). The app is served under /app/, and the router
+  // would take "app" as a screen name, so the address loses that prefix before the app starts: /app/ is / and /app/feed/1 is /feed/1.
+  if (opts.root_mount === true) await ctx.addInitScript(() => { const p = location.pathname; if (p === "/app" || p.startsWith("/app/")) history.replaceState(history.state, "", (p.slice(4) || "/") + location.search + location.hash); });
   const page = await ctx.newPage();
   const errors = [];
   // phone.json: the apps and settings this phone starts with. The same profile gives the same phone every run.
   let apps; try { if (PROFILE_ERR && opts.phone === undefined) throw new AppsError("bad_profile", PROFILE_ERR); apps = loadProfile(opts.phone ?? PROFILE ?? {}); } catch (e) { await ctx.close(); throw e instanceof AppsError ? new SimError(e.code, e.message) : e; }
   const pageErrors = { n: 0 };
   page.on("pageerror", (e) => { pageErrors.n++; errors.push(String(e?.message ?? e).split("\n")[0]); });
-  await page.goto(target.url, { waitUntil: "networkidle" });
+  // A script that does not load leaves a blank app with nothing thrown: record it, so the cause is in the errors.
+  page.on("response", (r) => { try { if (r.status() >= 400 && r.request().resourceType() === "script") errors.push(`a script did not load (${r.status()}): ${new URL(r.url()).pathname}`); } catch {} });
+  await gotoSettled(page, target.url);
   await page.waitForTimeout(300);
   const patch = profilePatch(apps);
   if (Object.keys(patch).length) { await page.evaluate((p) => globalThis.__pnDevice?.set?.(p), patch); await syncMedia(page); }
   if (apps.network) { try { getProfile(apps.network); } catch (e) { await ctx.close(); throw new SimError("bad_profile", `phone.json: ${e.message}`); } }
-  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, room, skin: opts.skin === "ios" ? "ios" : "android", startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav(), inbox: createInbox() });
+  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, room, skin: opts.skin === "ios" ? "ios" : "android", model: model?.name ?? null, rootMount: opts.root_mount === true, startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav(), inbox: createInbox() });
   await ensureNetworkRoute(sessions.get(id), page);   // the mail sink answers from the first page load
   if (buildId) sessions.get(id).build = buildId;
   if (apps.network && apps.network !== "online") await setNetworkProfile(sessions.get(id), page, apps.network);
@@ -275,11 +322,11 @@ async function showBanner(s) {
 // on a new release send the phone back to the release it had.
 async function boot(s, url) {
   const before = s.pageErrors.n;
-  if (url) await s.page.goto(url, { waitUntil: "networkidle" }); else await s.page.reload({ waitUntil: "networkidle" });
+  if (url) await gotoSettled(s.page, url); else await reloadSettled(s.page);
   await s.page.waitForTimeout(300);
   await reapplyNetProfile(s, s.page);
   const r = bootDone(s.update, s.pageErrors.n > before);
-  if (r.revert) { await s.page.goto(r.url, { waitUntil: "networkidle" }); await s.page.waitForTimeout(300); }
+  if (r.revert) { await gotoSettled(s.page, r.url); await s.page.waitForTimeout(300); }
   await showBanner(s);
 }
 // A new page load starts with a fresh device state, so the session's network profile is set on it again.
@@ -294,7 +341,7 @@ async function syncNetwork(s, page) {
   const now = specHost.setNetwork(sid, networkOf(s.conn ?? initialConnectivity(), s.netProfile ?? "online"));
   const open = s.nav.where === "app" && s.apps.installed_apps.some((a) => a.id === s.apps.current_app && a.kind === "spec");
   // A spec app page has no device layer, so no panel can be open over it; the reset keeps the record right if that ever changes.
-  if (open && JSON.stringify(now) !== before) { s.shade.open = "none"; await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
+  if (open && JSON.stringify(now) !== before) { s.shade.open = "none"; await reloadSettled(page); await reapplyNetProfile(s, page); }
 }
 const specHost = new SpecHost();
 // The session's permission log (grants, denials, removals, uses, blocks). See permission-log.mjs.
@@ -338,7 +385,7 @@ async function switchToApp(s, page, id, fresh = false) {
     catch (e) { if (e instanceof BrowserError) throw new SimError(e.code, e.message); throw e; }
   }
   switchApp(s.apps, id, s.nav);
-  if (dest && (fresh || page.url() !== dest)) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
+  if (dest && (fresh || whereOf(s, page.url()) !== dest)) { await gotoSettled(page, dest); await page.waitForTimeout(300); }
   await reapplyNetProfile(s, page);
   await page.evaluate(setVisibilityInPage, "active");
   // A one-shot link belongs to the load it was delivered to: a plain switch never inherits one.
@@ -560,7 +607,7 @@ async function act(id, body) {
       const out = await specHost.refresh(sidOf(s), appId);
       s.apps.log.push({ at: Date.now(), name: "data_refresh", app: appId, sources: out.updated, errors: out.errors.map((e) => e.source), source: "real" });
       const open = s.apps.current_app === appId && s.nav.where === "app";
-      if (out.updated.length && open) { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
+      if (out.updated.length && open) { await reloadSettled(page); await reapplyNetProfile(s, page); }
       return { updated: out.updated, errors: out.errors, ...(open ? { screen: await screen(page) } : {}) };
     }
     case "update_app": {
@@ -577,7 +624,7 @@ async function act(id, body) {
       specHost.syncPermissions(sidOf(s), appId, perms);
       if (typeof body.name === "string" && body.name.trim()) entry.name = body.name.replace(/[<>"'\\]/g, "").slice(0, 40);
       s.apps.log.push({ at: Date.now(), name: "update_app", app: appId, from: String(up.from), version: String(up.version), changes: specHost.history(sidOf(s), appId).at(-1)?.changes ?? [], source: "real" });
-      if (s.apps.current_app === appId && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
+      if (s.apps.current_app === appId && s.nav.where === "app") { await reloadSettled(page); await reapplyNetProfile(s, page); }
       return { version: up.version, installed_apps: s.apps.installed_apps, warnings: up.warnings, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
     }
     // What was built and changed on the phone: for each spec app its versions with what changed, its live sources and its events.
@@ -607,7 +654,7 @@ async function act(id, body) {
       const res = specHost.call(sidOf(s), appId, String(body.action_name ?? ""), body.input && typeof body.input === "object" ? body.input : {}, { caller: assistantName(body.agent) });
       logUses(s, appId, String(body.action_name ?? ""), res, assistantName(body.agent));
       s.apps.log.push({ at: Date.now(), name: "app_action", app: appId, action: String(body.action_name ?? ""), source: "real", ...(body.agent ? { caller: assistantName(body.agent) } : {}) });
-      if (s.apps.current_app === appId && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
+      if (s.apps.current_app === appId && s.nav.where === "app") { await reloadSettled(page); await reapplyNetProfile(s, page); }
       if (res.ok === false && /^permission_denied:/.test(res.error)) throw new SimError("permission_denied", res.error.replace(/^permission_denied:\s*/, ""));
       if (res.ok === false) throw new SimError("action_failed", res.error);
       return { value: res.value ?? null, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
@@ -641,7 +688,7 @@ async function act(id, body) {
       let made; try { made = shareInput(shareTargets(apps), { to, action: body.action_name, text: body.text, title: body.title }); } catch (e) { if (e instanceof ShareError) throw new SimError(e.code, e.message); throw e; }
       const res = specHost.call(sidOf(s), to, made.target.action, made.input, { caller: assistantName(body.agent) });
       s.apps.log.push({ at: Date.now(), name: "share", app: to, action: made.target.action, source: "real", ...(body.from ? { from: String(body.from) } : {}), ...(body.agent ? { caller: assistantName(body.agent) } : {}) });
-      if (s.apps.current_app === to && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
+      if (s.apps.current_app === to && s.nav.where === "app") { await reloadSettled(page); await reapplyNetProfile(s, page); }
       if (res.ok === false) throw new SimError("action_failed", res.error);
       return { shared: { app: to, action: made.target.action }, value: res.value ?? null };
     }
@@ -990,8 +1037,14 @@ const server = http.createServer(async (req, res) => {
     if (isVaultUiPath(url.pathname)) return await secretsForward(req, res, url);   // no CORS headers: same-origin loopback only
     if (req.method === "OPTIONS") return send(204, "", "text/plain");
     // the app's static web build
+    // An app built with a base path (Expo's experiments.baseUrl, for example /static) asks for its files under that path.
+    { const base = appBase();
+      if (base && url.pathname.startsWith(base + "/")) {
+        const p = distFile(url.pathname.slice(base.length));
+        if (p) return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
+      } }
     if (url.pathname.startsWith("/_expo/") || url.pathname.startsWith("/assets/") || url.pathname === "/favicon.ico") {
-      const p = join(DIST, decodeURIComponent(url.pathname)); if (existsSync(p)) return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
+      const p = distFile(url.pathname); if (p) return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
     }
     // released web artifacts, proxied from the control plane and cached (immutable per release)
     if (url.pathname.startsWith("/w/")) {
@@ -1014,7 +1067,7 @@ const server = http.createServer(async (req, res) => {
         return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
       } }
     if (url.pathname.startsWith("/app/")) {
-      let p = join(DIST, url.pathname.slice(5) || "index.html"); if (!existsSync(p) || statSync(p).isDirectory()) p = join(DIST, "index.html");
+      const p = distFile(url.pathname.slice(5)) ?? join(DIST, "index.html");   // any other path is a screen of the app: serve the app
       if (extname(p) === ".html") return send(200, withAppName(readFileSync(p, "utf8"), APP_NAME), MIME[".html"]);
       return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
     }
@@ -1048,11 +1101,14 @@ const server = http.createServer(async (req, res) => {
         if (!isOp && req.method === "GET") { const html = specHost.page(key, app); return html ? send(200, html, MIME[".html"]) : send(404, { error: "no_app" }); }
         if (isOp && req.method === "POST") { let b = ""; for await (const ch of req) { b += ch; if (b.length > 65536) return send(413, { error: "too_large" }); } let j; try { j = JSON.parse(b || "{}"); } catch { return send(400, { error: "bad_json" }); } return send(200, specHost.op(key, app, j)); }
       } }
+    // A page load of an address this server does not know is a screen of the local app (a reload or a deep link in an app
+    // with a router): send it to the app under /app/, which serves the app for any path.
+    if (req.method === "GET" && req.headers["sec-fetch-dest"] === "document" && existsSync(join(DIST, "index.html"))) { res.writeHead(302, { location: `/app${url.pathname}${url.search}`, ...CORS }); return res.end(); }
     // agent API
     if (req.method !== "POST") return send(404, { error: "not found" });
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
     if (url.pathname === "/apps") return send(200, { ok: true, apps: [{ id: DEFAULT_APP, name: APP_NAME }] });
-    if (url.pathname === "/sessions") return send(200, { ok: true, sessions: await Promise.all([...sessions.entries()].map(async ([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, skin: s.skin, streaming: isWatched(s) || !!s.browser?.screencast, url: s.page.url(), room: s.room ?? null, title: await s.page.title().catch(() => "") }))) });
+    if (url.pathname === "/sessions") return send(200, { ok: true, sessions: await Promise.all([...sessions.entries()].map(async ([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, skin: s.skin, model: s.model ?? null, streaming: isWatched(s) || !!s.browser?.screencast, url: s.page.url(), room: s.room ?? null, title: await s.page.title().catch(() => "") }))) });
     if (url.pathname === "/room_log" || url.pathname === "/room_note") {
       const room = String(body.room ?? "");
       if (!rooms.has(room)) return send(200, { ok: false, code: "no_room", error: `no open room "${room}"` });
@@ -1096,7 +1152,7 @@ const server = http.createServer(async (req, res) => {
       for (const s of skipped) failed.push({ session: s.session, error: s.error });
       return send(200, { ok: true, imported, ...(failed.length ? { failed } : {}) });
     }
-    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof BuildCacheError || (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_room" || e.code === "bad_app"))) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, ...(s.build ? { build: s.build } : {}), screen: await screen(s.page) }); }
+    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof BuildCacheError || (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_model" || e.code === "bad_room" || e.code === "bad_app"))) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, ...(s.build ? { build: s.build } : {}), ...(s.model ? { model: s.model, skin: s.skin } : {}), screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const s0 = sessions.get(body.session); const prevScreen = s0?.lastScreen; const r = await act(body.session, body);
         if (s0 && typeof r.screen === "string") { s0.lastScreen = r.screen; watch.step(body.session, describeStep(body, prevScreen), changeLine(prevScreen, r.screen)); }
@@ -1147,5 +1203,7 @@ server.on("upgrade", (req, socket) => {
 });
 // Agents and parity runs pause between actions; keep idle connections open well beyond Node's 5 s default.
 server.keepAliveTimeout = 300_000; server.headersTimeout = 310_000; server.requestTimeout = 0;
-server.listen(PORT, () => console.log(`Shipvo UI simulator on http://localhost:${PORT} (sessions in ${DIR})`));
+// --host limits who can reach the simulator: 127.0.0.1 is this machine only. Without it the server listens on every interface.
+const HOST = arg("host", undefined);
+server.listen(PORT, ...(HOST ? [HOST] : []), () => console.log(`Shipvo UI simulator on http://${HOST ?? "localhost"}:${PORT} (sessions in ${DIR})`));
 launchBrowser();

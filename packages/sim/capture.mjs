@@ -37,11 +37,20 @@ export const showShot = async ([src, time, icons]) => {
   img.src = src; await img.decode();
   const t = document.querySelector('[data-part="time"]'); if (t) t.textContent = time;
   const i = document.querySelector(".sf-icons"); if (i) i.innerHTML = icons;
+  // On a phone the app draws behind the status bar and the bottom bar. Give each the colour of the picture's edge next to it,
+  // and light or dark marks to match, so a dark screen has a dark status bar with light icons.
+  const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+  const edge = (y) => { const d = g.getImageData(Math.floor(c.width / 2), y, 1, 1).data; return { css: `rgb(${d[0]},${d[1]},${d[2]})`, dark: 0.2126 * d[0] + 0.7152 * d[1] + 0.0722 * d[2] < 128 }; };
+  const top = edge(1), bottom = edge(c.height - 2);
+  const body = document.querySelector('[data-part="phone-body"]'), bar = document.querySelector(".sf-bar");
+  if (body) { body.style.setProperty("--sf-status-bg", top.css); body.style.setProperty("--sf-status-fg", top.dark ? "#fff" : "#111"); }
+  if (bar) { bar.style.setProperty("--sf-bg", bottom.css); bar.style.setProperty("--sf-fg", bottom.dark ? "#fff" : "#111"); }
 };
 
-/** The arguments for `showShot`: the app picture as a data URL and the status bar for `status`. */
-export function shotArgs(buf, mime, status) {
-  const { time, icons } = statusParts(status);
+/** The arguments for `showShot`: the app picture as a data URL and the status bar for `status`, drawn as `skin` draws it. */
+export function shotArgs(buf, mime, skin, status) {
+  const { time, icons } = statusParts(status, skin);
   return [`data:${mime};base64,${buf.toString("base64")}`, time, icons];
 }
 

@@ -33,6 +33,7 @@ shipvo sim --watch       # rebuild on file changes
 
 ```bash
 shipvo session start android --max-duration-minutes 20 --json   # or ios; no shipvo.json needed
+shipvo session start --device "iPhone 16 Pro"   # a named phone model; `shipvo session devices` lists them
 shipvo session screen            # tree with [ref=eN]
 shipvo session tap e6            # also: type <ref> <text>, scroll <dir>, back
 shipvo session screenshot --out shots/home.png        # the phone in its frame

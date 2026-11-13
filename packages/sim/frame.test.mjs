@@ -12,10 +12,11 @@ test("each skin has its own markup and screen size", () => {
   assert.match(a.css, /width:412px;height:915px/); assert.match(i.css, /width:393px;height:852px/);
   assert.ok(a.outerWidth > a.width && a.outerHeight > a.height);
 });
-test("has a Simulated label and the status bar parts", () => {
+test("has the status bar parts, an even bezel and no badge on the phone", () => {
   for (const skin of ["android", "ios"]) {
     const f = renderFrame({ skin });
-    assert.match(f.html, /data-part="simulated-label">Simulated</);
+    assert.doesNotMatch(f.html, /simulated-label|>Simulated</);
+    assert.equal(f.outerHeight - f.height, f.outerWidth - f.width, "the bezel is the same on every side");
     for (const p of ["time", "signal", "wifi", "battery"]) assert.ok(f.html.includes(`data-part="${p}"`), p);
     assert.ok(f.html.indexOf('data-part="time"') < f.html.indexOf('data-part="signal"'));
   }
