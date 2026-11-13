@@ -1,1 +1,0 @@
-- spec: a data source can set `refresh` (seconds, 30 or more). The sim re-runs it on that interval while the app is installed, within the runner's cost limits, and the open screen and its labelled tree update. Existing specs are unchanged.

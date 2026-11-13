@@ -1,2 +1,0 @@
-- mcp: new `room_log(room, since?)` tool reads what every session in a room did (time, session, agent, tool, target, change line) and the notes agents post, with a cursor for newer entries.
-- mcp: new `room_note(room, text)` tool posts a plain-text note of up to 500 characters; a longer note fails with `note_too_long`. Both tools are new, so nothing needs migrating.

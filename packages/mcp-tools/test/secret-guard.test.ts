@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { containsKeyShapedText, inputHasKey, KEY_REFUSAL } from "../src/index.js";
 
 // Built at run time so no key-shaped literal sits in the repo.
@@ -38,7 +39,16 @@ describe("key-shaped text", () => {
   it.each(negatives)("passes %s", (_n, s) => expect(containsKeyShapedText(s)).toBe(false));
   it("scans object keys and fails closed past the depth limit", () => {
     expect(inputHasKey({ [positives[0][1]]: 1 })).toBe(true);
-    expect(inputHasKey({ a: { b: { c: { d: { e: { f: { g: { h: { i: "x" } } } } } } } } })).toBe(true);
+    const nest = (n: number, leaf: unknown): unknown => (n === 0 ? leaf : { a: nest(n - 1, leaf) });
+    expect(inputHasKey(nest(70, "x"))).toBe(true);                      // deeper than any real input: refused
+    expect(inputHasKey(nest(20, "x"))).toBe(false);                     // as deep as an app spec: scanned
+    expect(inputHasKey(nest(20, positives[0][1]))).toBe(true);          // and a key down there is still found
+  });
+  it("passes every first-party app spec, so create_app can install them", () => {
+    const dir = new URL("../../../templates/", import.meta.url);
+    const specs = readdirSync(dir).filter((d) => existsSync(new URL(`${d}/app.json`, dir)));
+    expect(specs.length).toBeGreaterThanOrEqual(9);
+    for (const d of specs) expect([d, inputHasKey({ id: d, spec: JSON.parse(readFileSync(new URL(`${d}/app.json`, dir), "utf8")) })]).toEqual([d, false]);
   });
   it("looks inside nested inputs", () => {
     expect(inputHasKey({ a: [{ b: positives[0][1] }] })).toBe(true);

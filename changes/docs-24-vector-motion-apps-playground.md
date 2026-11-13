@@ -1,1 +1,0 @@
-- docs: the app spec guide gains `vector` drawings, `motion`, translations and right-to-left; the phone apps page lists Calendar, Files and Photos, Wallet and Shop; getting started points to the playground. No migration.

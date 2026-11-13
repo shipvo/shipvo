@@ -1,2 +1,0 @@
-- docs: new page "Describe an app and it appears" with steps for founders, the tools and errors for developers, a validated example spec and troubleshooting.
-- Migration: none.

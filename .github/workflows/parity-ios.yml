@@ -21,6 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @shipvo/spec build   # the simulator imports @shipvo/spec/dist
       - name: Boot an iPhone simulator and install the app
         run: |
           xcrun simctl list devices available | grep -E "iPhone" | head -5

@@ -238,14 +238,17 @@ async function token(req: Request, env: Db): Promise<Response> {
   if (f.get("client_id") !== row.client_id) return tokenError("invalid_grant", "Code was issued to a different client.");
   if (f.get("redirect_uri") !== row.redirect_uri) return tokenError("invalid_grant", "redirect_uri does not match the authorization request.");
   if (!/^[A-Za-z0-9._~-]{43,128}$/.test(verifier) || b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))) !== row.code_challenge) return tokenError("invalid_grant", "PKCE verification failed.");
-  // Same key as `shipvo login`: sv_test_…, hash stored, 30 days, same quota, revocable. A new sign-in replaces every live test key of the account, as `shipvo login` does.
+  // Same key as `shipvo login`: sv_test_…, hash stored, 30 days, same quota, revocable. A new sign-in replaces only the
+  // keys the same assistant made before (same client name, or same client when it has no name), so ChatGPT, Gemini and
+  // Claude can each stay signed in. They share the account's phones (see phones.ts).
   const key = `sv_test_${rand(24).replace(/[-_]/g, "a")}`;
-  const label = `shipvo oauth (${row.client_id})`;
+  const named = row.client_id.startsWith("https://") ? null : await env.DB.prepare("SELECT client_name FROM oauth_clients WHERE client_id = ?").bind(row.client_id).first<{ client_name: string | null }>();
+  const label = `shipvo oauth: ${(named?.client_name ?? "").trim() || row.client_id}`;
   const keyHash = await sha256(key);
   const expires = iso(Date.now() + KEY_TTL_DAYS * 86400_000);
   // One batch, so a spent code always knows the key it made.
   await env.DB.batch([
-    env.DB.prepare(`UPDATE api_keys SET revoked_at = ${NOW} WHERE account_id = ? AND scope = 'test' AND revoked_at IS NULL`).bind(row.account_id),
+    env.DB.prepare(`UPDATE api_keys SET revoked_at = ${NOW} WHERE account_id = ? AND scope = 'test' AND label = ? AND revoked_at IS NULL`).bind(row.account_id, label),
     env.DB.prepare("INSERT INTO api_keys (app_id, key_hash, prefix, scope, label, account_id, quota_minutes, expires_at) VALUES (?,?,?,?,?,?,?,?)")
       .bind(BETA_APP, keyHash, key.slice(0, 12), "test", label, row.account_id, QUOTA_MIN, expires),
     env.DB.prepare("UPDATE oauth_codes SET key_id = (SELECT id FROM api_keys WHERE key_hash = ?) WHERE hash = ?").bind(keyHash, h),

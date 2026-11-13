@@ -72,7 +72,9 @@ export class Phone {
 
   /** @internal */
   async call(path: string, body: Record<string, unknown>): Promise<Reply> {
-    const r = await fetch(this.sim + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    let r: Response;
+    try { r = await fetch(this.sim + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); }
+    catch { throw new Error(`Cannot reach the simulator at ${this.sim}. Start it with: npx shipvo sim`); }
     if (!r.ok) throw new Error(`simulator ${path} answered ${r.status}. Is it running at ${this.sim}? Start it with: npx shipvo sim`);
     return (await r.json()) as Reply;
   }

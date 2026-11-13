@@ -9,7 +9,7 @@ vi.mock("node:child_process", async (orig) => {
   return { ...m, spawnSync: vi.fn((...a: Parameters<typeof m.spawnSync>) => (process.env.RUN_TEST_FAKE_NATIVE ? ({ status: 0 } as never) : m.spawnSync(...a))) };
 });
 import { renderFrame } from "../../sim/frame.mjs";
-import { parseRunArgs, nativeCommand, runFramePage, loadFrameRenderer, startRunServer, describeWebBuildFailure, buildWeb, run, lanAddress, isFirstBuild } from "../src/run";
+import { parseRunArgs, nativeCommand, runFramePage, loadFrameRenderer, startRunServer, hasRouter, buildBase, describeWebBuildFailure, buildWeb, run, lanAddress, isFirstBuild } from "../src/run";
 
 describe("parseRunArgs", () => {
   it("parses platform and flags", () => {
@@ -84,11 +84,32 @@ describe("frame page, live status bar", () => {
   });
 });
 
+describe("describeWebBuildFailure, npm refusals", () => {
+  it("says which Node version the app needs when npm refuses to run the build", () => {
+    const out = 'npm error code EBADDEVENGINES\nnpm error EBADDEVENGINES Invalid devEngines.runtime\nnpm error EBADDEVENGINES Invalid semver version "^24.22.1" does not match "v22.23.4" for "runtime"\nnpm error A complete log of this run can be found in: /root/.npm/_logs/x-debug-0.log';
+    expect(describeWebBuildFailure(out)).toBe("The app needs Node ^24.22.1 and this machine runs Node 22.23.4. Switch to that Node version, then start again.");
+  });
+  it("says what to add when the app is not set up to build for web with Metro", () => {
+    const msg = describeWebBuildFailure('CommandError: Platform "web" is not configured to use the Metro bundler in the project Expo config.');
+    expect(msg).toContain('"web": { "bundler": "metro" }');
+    expect(msg).not.toContain("--native");
+  });
+  it("quotes a compile error and its file, not a line from the stack trace", () => {
+    const out = "Bundling\nSyntaxError: node_modules/react-native-reanimated/lib/index.web.js: /home/me/app/node_modules/react-native-reanimated/lib/index.web.js: Export namespace should be first transformed by `@babel/plugin-proposal-export-namespace-from`.\n    at File.buildCodeFrameError (/home/me/app/node_modules/@babel/core/lib/transformation/file/file.js:205:12)\n    at emit (node:internal/child_process:949:14)";
+    expect(describeWebBuildFailure(out)).toBe("The app cannot build for web (in node_modules/react-native-reanimated/lib/index.web.js): Export namespace should be first transformed by `@babel/plugin-proposal-export-namespace-from`.");
+  });
+  it("quotes the line that says what went wrong, not npm's pointer to its log file", () => {
+    const msg = describeWebBuildFailure("npm error code E404\nnpm error 404 Not Found - GET https://registry.example/expo\nnpm error A complete log of this run can be found in: /root/.npm/_logs/x-debug-0.log");
+    expect(msg).toContain("404 Not Found");
+    expect(msg).not.toContain("complete log");
+  });
+});
+
 describe("frame page, shared renderer", () => {
-  it("uses the sim frame body, with light and dark status text and a Simulated label", () => {
+  it("uses the sim frame body, with light and dark status text and no badge on the phone", () => {
     for (const p of ["android", "ios"] as const) {
       const l = runFramePage(p, "Tide", renderFrame), d = runFramePage(p, "Tide", renderFrame, true);
-      expect(l).toContain('data-part="phone-body"'); expect(l).toContain('data-part="simulated-label"');
+      expect(l).toContain('data-part="phone-body"'); expect(l).not.toContain("simulated-label");
       expect(l).toContain("--sf-fg:#111"); expect(d).toContain("--sf-fg:#fff");
       expect(l).toContain('<iframe id="app" src="/app/"'); expect(l).toContain("scale(");
     }
@@ -130,6 +151,54 @@ describe("server", () => {
     expect(js.headers.get("content-type")).toContain("javascript");
     expect((await fetch(base + "/nope")).status).toBe(404);
     expect((await fetch(base + "/..%2f..%2fetc/passwd")).status).toBeGreaterThanOrEqual(403);
+  });
+  it("an app with a router sees its own routes, and the frame's page loads go back to the app", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "run-"));
+    writeFileSync(join(dir, "index.html"), "<html><head><title>x</title></head><body>the app</body></html>");
+    const project = mkdtempSync(join(tmpdir(), "run-proj-"));
+    writeFileSync(join(project, "package.json"), JSON.stringify({ dependencies: { expo: "55", "expo-router": "6" } }));
+    expect(hasRouter(project)).toBe(true);
+    const s = await startRunServer({ dir, platform: "ios", name: "Shop", render: renderFrame, projectDir: project });
+    close = s.close;
+    const base = `http://127.0.0.1:${s.port}`;
+    const shell = await (await fetch(base + "/app/")).text();
+    expect(shell).toContain("history.replaceState");
+    expect(shell.indexOf("history.replaceState")).toBeLessThan(shell.indexOf("<title>"));
+    expect(await (await fetch(base + "/app/feed/1")).text()).toContain("the app");
+    const fromFrame = (path: string) => fetch(base + path, { redirect: "manual", headers: { "sec-fetch-dest": "iframe" } });
+    const deep = await fromFrame("/feed/1?tab=new");
+    expect(deep.status).toBe(302); expect(deep.headers.get("location")).toBe("/app/feed/1?tab=new");
+    const home = await fromFrame("/");
+    expect(home.status).toBe(302); expect(home.headers.get("location")).toBe("/app/");
+    expect((await fromFrame("/app/feed/1")).status).toBe(200);
+    expect(await (await fetch(base + "/")).text()).toContain("dynamic-island");
+  });
+  it("a build made with a base path gets its files under that path", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "run-"));
+    mkdirSync(join(dir, "_expo", "static", "js", "web"), { recursive: true });
+    writeFileSync(join(dir, "_expo", "static", "js", "web", "app.js"), "bundle");
+    writeFileSync(join(dir, "index.html"), '<html><head></head><body><script src="/static/_expo/static/js/web/app.js" defer></script></body></html>');
+    expect(buildBase(dir)).toBe("/static");
+    const s = await startRunServer({ dir, platform: "ios", name: "Social", render: renderFrame });
+    close = s.close;
+    const base = `http://127.0.0.1:${s.port}`;
+    expect(await (await fetch(base + "/static/_expo/static/js/web/app.js")).text()).toBe("bundle");
+    expect((await fetch(base + "/other/_expo/static/js/web/app.js")).status).toBe(404);
+    expect((await fetch(base + "/static/..%2f..%2fetc/passwd")).status).toBeGreaterThanOrEqual(403);
+    expect(buildBase(mkdtempSync(join(tmpdir(), "run-empty-")))).toBe("");
+  });
+  it("an app without a router is served as before", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "run-"));
+    writeFileSync(join(dir, "index.html"), "<html><head><title>x</title></head><body>the app</body></html>");
+    const project = mkdtempSync(join(tmpdir(), "run-proj-"));
+    writeFileSync(join(project, "package.json"), JSON.stringify({ dependencies: { expo: "55" } }));
+    expect(hasRouter(project)).toBe(false); expect(hasRouter(undefined)).toBe(false); expect(hasRouter(join(project, "missing"))).toBe(false);
+    const s = await startRunServer({ dir, platform: "android", name: "Shop", render: renderFrame, projectDir: project });
+    close = s.close;
+    const base = `http://127.0.0.1:${s.port}`;
+    expect(await (await fetch(base + "/app/")).text()).not.toContain("history.replaceState");
+    const framePage = await fetch(base + "/", { redirect: "manual", headers: { "sec-fetch-dest": "iframe" } });
+    expect(framePage.status).toBe(200);
   });
   it("answers 400 to a malformed escape and keeps serving", async () => {
     const dir = mkdtempSync(join(tmpdir(), "run-"));

@@ -1,3 +1,0 @@
-- `@shipvo/sim`: new `export_apps` and `import_apps` actions copy a phone's spec apps (spec, style, data, settings) out and onto another phone. Import checks every spec first and lists each problem with its path; `invalid_spec` messages now keep all their lines.
-- `@shipvo/mcp`: new tools `export_phone_apps` and `import_phone_apps`.
-- Migration: none; new tools.
