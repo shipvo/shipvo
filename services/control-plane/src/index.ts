@@ -17,6 +17,7 @@ import { phoneNetRoutes, pruneDeviceLog } from "./phone-net";
 import { forbidden, type Action } from "./roles";
 import { REVERT_EVENTS, sendRevertAlert } from "./alerts";
 import { apps, publisher } from "./apps";
+import { HEALTH_SQL, buildHealth, type Platform, type Row } from "./release-health";
 import { exportTelemetry } from "./export";
 import { recordAudit } from "./audit";
 import { decideOffer, type OfferResult } from "./offer";
@@ -386,6 +387,33 @@ app.get("/t/:app/summary", async (c) => {
   const cfgRaw = c.env.POINTERS ? await c.env.POINTERS.get(`halt-config/${appId}`) : null;
   if (cfgRaw) { try { const v = JSON.parse(cfgRaw); if (v && typeof v.threshold === "number" && v.threshold > 0 && v.threshold <= 1) auto_halt = { threshold: v.threshold, min_reports: typeof v.min_reports === "number" ? v.min_reports : DEFAULT_MIN_REPORTS, min_installs: typeof v.min_installs === "number" ? v.min_installs : DEFAULT_MIN_INSTALLS }; } catch { /* corrupt: off */ } }
   return c.json({ releases, halted, auto_halt });
+});
+
+/** Per-release health for the 20 newest releases: applied, healthy, reverted and failed counts per platform, and the bands serving each release. Read-only. */
+app.get("/health/:app/releases", async (c) => {
+  const appId = c.req.param("app");
+  if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
+  if (!(await owner(c, appId)) && !(await publisher(c, appId))) return c.json({ error: "unauthorized" }, 401);
+  const no = await roleDenied(c, appId, "read_summary"); if (no) return no;
+  const rows = (await c.env.DB.prepare(HEALTH_SQL).bind(appId, appId).all<Row>()).results ?? [];
+  const live: Record<Platform, Record<string, number>> = { android: {}, ios: {} };
+  const majors: Record<Platform, Record<string, number>> = { android: {}, ios: {} }; // highest shell major seen per band wins
+  let haltedRelease: number | null = null;
+  if (c.env.POINTERS) {
+    let cursor: string | undefined;
+    do {
+      const page: any = await c.env.POINTERS.list({ prefix: `p/${appId}/`, cursor });
+      for (const k of page.keys) {
+        const parts = String(k.name).split("/"); // p/<app>/<major>/[ios/]<band>
+        const ios = parts.length === 5 && parts[3] === "ios";
+        if (!ios && parts.length !== 4) continue;
+        try { const env = JSON.parse((await c.env.POINTERS.get(k.name)) ?? "null"); const rel = JSON.parse(env.body).release; if (Number.isInteger(rel)) { const slot = live[ios ? "ios" : "android"], band = parts[parts.length - 1]!; if (slot[band] === undefined || Number(parts[2]) >= (majors[ios ? "ios" : "android"][band] ?? 0)) { slot[band] = rel; majors[ios ? "ios" : "android"][band] = Number(parts[2]); } } } catch { /* skip a bad pointer */ }
+      }
+      cursor = page.list_complete ? undefined : page.cursor;
+    } while (cursor);
+    try { const h = JSON.parse((await c.env.POINTERS.get(`halt/${appId}`)) ?? "null"); if (Number.isInteger(h?.release)) haltedRelease = h.release; } catch { /* corrupt: not halted */ }
+  }
+  return c.json({ app: appId, releases: buildHealth(rows, live, haltedRelease) });
 });
 
 app.get("/band/:cohort", (c) => {

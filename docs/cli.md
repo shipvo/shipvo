@@ -250,6 +250,102 @@ The agent's "what next" command. It prints one JSON line:
 | 1 | action needed: no project, no signing key, or a halted release |
 | 2 | error: shipvo.json is invalid or the control plane could not be reached |
 
+## Release health route
+
+`GET /health/<app>/releases` answers "is this release healthy?" for the 20 newest releases of an app. It is read-only. Send an owner session or a publish token whose role may read the summary (viewer and above). Without credentials it returns 401, and with a role that may not read it returns 403.
+
+For each release it returns, for Android and iOS side by side (plus `unknown` for reports that name neither):
+
+- `applied` and `healthy`: verified `applied` and `content_applied` reports.
+- `reverted`: `crash_loop_revert` reports.
+- `failed`: all failure reports (`crash_loop_revert`, `rolled_back`, `verify_failed`, `download_failed`).
+- `bands`: the bands (`b0`, `b1`, `b2`) whose live pointer serves the release on that platform.
+- `halted_bands`: those bands, when the release is the halted one. Empty otherwise.
+
+Counts come from the verified rows in the `telemetry` table. A report counts as Android when it carries an Android API level, and as iOS when its device model is an iPhone, iPad or iPod. A report with neither is counted under `unknown`, not guessed. Example response from the route run over seeded SQLite telemetry (`services/control-plane/test/release-health.test.ts`, the same `HEALTH_SQL` the route runs; unverified rows are left out):
+
+```json
+{
+  "app": "tide",
+  "releases": [
+    {
+      "release": 7,
+      "halted": true,
+      "platforms": {
+        "android": {
+          "applied": 4,
+          "healthy": 4,
+          "reverted": 1,
+          "failed": 1,
+          "bands": [
+            "b0",
+            "b1"
+          ],
+          "halted_bands": [
+            "b0",
+            "b1"
+          ]
+        },
+        "ios": {
+          "applied": 3,
+          "healthy": 3,
+          "reverted": 0,
+          "failed": 0,
+          "bands": [
+            "b0"
+          ],
+          "halted_bands": [
+            "b0"
+          ]
+        },
+        "unknown": {
+          "applied": 2,
+          "healthy": 2,
+          "reverted": 0,
+          "failed": 0,
+          "bands": [],
+          "halted_bands": []
+        }
+      }
+    },
+    {
+      "release": 6,
+      "halted": false,
+      "platforms": {
+        "android": {
+          "applied": 0,
+          "healthy": 0,
+          "reverted": 0,
+          "failed": 0,
+          "bands": [
+            "b2"
+          ],
+          "halted_bands": []
+        },
+        "ios": {
+          "applied": 0,
+          "healthy": 0,
+          "reverted": 0,
+          "failed": 0,
+          "bands": [
+            "b2"
+          ],
+          "halted_bands": []
+        },
+        "unknown": {
+          "applied": 0,
+          "healthy": 0,
+          "reverted": 0,
+          "failed": 0,
+          "bands": [],
+          "halted_bands": []
+        }
+      }
+    }
+  ]
+}
+```
+
 ## `shipvo approvals`
 
 With `policy.requireApprovalAbove` set, a promote above that band waits for a second owner. These commands show and release the holds.
