@@ -1,2 +1,0 @@
-- Docs: new page "Rollbacks and stored data" (`stateVersion`, `--allow-state-downgrade`) with troubleshooting and a glossary entry.
-- Migration: none.

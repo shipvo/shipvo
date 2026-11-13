@@ -1,1 +1,0 @@
-- docs: the Lumi benchmark and simulator cost pages now say who they are for, give numbered steps and expected output, and end with troubleshooting and next steps.

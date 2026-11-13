@@ -13,7 +13,9 @@ let out = ""; let fake: http.Server; let port = 0;
 // Tools that take no session, so an unknown session id does not apply. Every other registered tool must.
 const NO_SESSION: Record<string, string> = {
   list_apps: "lists apps, takes no session",
+  phone_models: "lists the phone models a session can be, takes no session",
   open_app: "creates a session",
+  a2ui_open: "creates a session",
   attach_session: "creates a session",
   upload_build: "builds the project folder, takes no session",
   job_status: "reads a slow job by id, takes no session",

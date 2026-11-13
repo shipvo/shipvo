@@ -1,2 +1,0 @@
-- `@shipvo/spec`: new first-party Wallet spec app in `templates/wallet` with `save_pass`, `find_pass` and `delete_pass`, passes grouped by kind and an expiring-soon list.
-- Migration: none; new template.

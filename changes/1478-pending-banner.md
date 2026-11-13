@@ -1,3 +1,0 @@
-- `@shipvo/mcp`: every phone tool result that carries a `session` now starts with a line such as `Inbox: 2 unread for chatgpt, 1 task open` when the Assistant Inbox has something waiting for the calling assistant. Nothing is added when nothing waits.
-- `@shipvo/sim`: new `pending_banner` action returns that line for the calling assistant.
-- Migration: a client that parses a tool result as JSON should skip a first line that starts with `Inbox:`.

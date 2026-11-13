@@ -141,4 +141,166 @@ describe("wake-up tools", () => {
     expect(JSON.parse(k.content[0].text)).toEqual({ cleared: true });
     await c.close(); srv.close();
   }, 30000);
+
+  it("search_phone passes the query on and returns the hits", async () => {
+    const seen: any[] = [];
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      res.end(JSON.stringify({ ok: true, query: body.query, count: 1, truncated: false, results: [{ kind: "row", app: "contacts", collection: "people", id: "p1", field: "name", snippet: "Amina Diallo" }] }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    expect((await c.listTools()).tools.map((t) => t.name)).toContain("search_phone");
+    const r: any = await c.callTool({ name: "search_phone", arguments: { session: "s", query: "amina", app: "contacts", limit: 5 } });
+    expect(seen.at(-1)).toMatchObject({ action: "search_phone", session: "s", query: "amina", app: "contacts", limit: 5 });
+    const out2 = JSON.parse(r.content[0].text);
+    expect(out2.count).toBe(1); expect(out2.results[0].snippet).toBe("Amina Diallo");
+    await c.close(); srv.close();
+  }, 30000);
+  it("backup_phone returns the backup and restore_phone sends it back with replace", async () => {
+    const seen: any[] = [];
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      if (body.action === "backup_phone") return res.end(JSON.stringify({ ok: true, backup: { format: "shipvo.phone-backup/v0", apps: [], store_apps: [], settings: {}, clipboard: "" } }));
+      if (body.backup?.format !== "shipvo.phone-backup/v0") return res.end(JSON.stringify({ ok: false, code: "bad_backup", error: "format" }));
+      res.end(JSON.stringify({ ok: true, restored: { apps: ["notes"], store_apps: [], settings: [], clipboard: true }, skipped: ["tide"] }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const b: any = await c.callTool({ name: "backup_phone", arguments: { session: "s" } });
+    const backup = JSON.parse(b.content[0].text);
+    expect(backup.format).toBe("shipvo.phone-backup/v0");
+    const r: any = await c.callTool({ name: "restore_phone", arguments: { session: "s2", backup, replace: true } });
+    expect(seen.at(-1)).toMatchObject({ action: "restore_phone", session: "s2", replace: true, backup: { format: "shipvo.phone-backup/v0" } });
+    expect(JSON.parse(r.content[0].text)).toEqual({ restored: { apps: ["notes"], store_apps: [], settings: [], clipboard: true }, skipped: ["tide"] });
+    const bad: any = await c.callTool({ name: "restore_phone", arguments: { session: "s2", backup: { format: "x" } } });
+    expect(bad.isError).toBe(true); expect(bad.content[0].text).toContain("bad_backup");
+    await c.close(); srv.close();
+  }, 30000);
+});
+
+describe("reminder tools", () => {
+  it("pass the reminder to the simulator and return its id and next time", async () => {
+    const seen: any[] = [];
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      if (body.action === "set_reminder") return res.end(JSON.stringify(body.title ? { ok: true, reminder: { id: "r1", title: body.title, body: "", at: "2026-11-14T09:10", repeat: body.repeat ?? "none" } } : { ok: false, code: "bad_title", error: "a reminder needs a title" }));
+      if (body.action === "list_reminders") return res.end(JSON.stringify({ ok: true, reminders: [{ id: "r1", title: "Call Ada", at: "2026-11-14T09:10" }], fired: [] }));
+      res.end(JSON.stringify({ ok: true, cancelled: true }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const names = (await c.listTools()).tools.map((t) => t.name);
+    for (const n of ["set_reminder", "list_reminders", "cancel_reminder"]) expect(names).toContain(n);
+    const ok: any = await c.callTool({ name: "set_reminder", arguments: { session: "s", title: "Call Ada", in_minutes: 10, repeat: "daily" } });
+    expect(JSON.parse(ok.content[0].text)).toMatchObject({ id: "r1", title: "Call Ada", repeat: "daily" });
+    expect(seen.at(-1)).toMatchObject({ action: "set_reminder", session: "s", title: "Call Ada", in_minutes: 10, repeat: "daily" });
+    const bad: any = await c.callTool({ name: "set_reminder", arguments: { session: "s", title: "" } });
+    expect(bad.isError).toBe(true); expect(bad.content[0].text).toContain("bad_title");
+    const l: any = await c.callTool({ name: "list_reminders", arguments: { session: "s" } });
+    expect(JSON.parse(l.content[0].text).reminders[0].id).toBe("r1");
+    const k: any = await c.callTool({ name: "cancel_reminder", arguments: { session: "s", id: "r1" } });
+    expect(JSON.parse(k.content[0].text)).toEqual({ cancelled: true });
+    await c.close(); srv.close();
+  }, 30000);
+  it("share, share_targets and the clipboard tools pass their input on", async () => {
+    const seen: any[] = [];
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      if (body.action === "share_targets") return res.end(JSON.stringify({ ok: true, targets: [{ app: "notes", action: "add_note", field: "body" }] }));
+      if (body.action === "share") return res.end(JSON.stringify(body.to === "shop" ? { ok: false, code: "not_a_share_target", error: "'shop' takes no shared text" } : { ok: true, shared: { app: body.to, action: "add_note" }, value: { id: "n1" } }));
+      res.end(JSON.stringify({ ok: true, text: body.text ?? "copied" }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const names = (await c.listTools()).tools.map((t) => t.name);
+    for (const n of ["share", "share_targets", "get_clipboard", "set_clipboard"]) expect(names).toContain(n);
+    const tg: any = await c.callTool({ name: "share_targets", arguments: { session: "s" } });
+    expect(JSON.parse(tg.content[0].text).targets[0].app).toBe("notes");
+    const sh: any = await c.callTool({ name: "share", arguments: { session: "s", to: "notes", text: "Buy rope", title: "Trip", from: "browser" } });
+    expect(seen.at(-1)).toMatchObject({ action: "share", session: "s", to: "notes", text: "Buy rope", title: "Trip", from: "browser" });
+    expect(JSON.parse(sh.content[0].text)).toEqual({ shared: { app: "notes", action: "add_note" }, value: { id: "n1" } });
+    const bad: any = await c.callTool({ name: "share", arguments: { session: "s", to: "shop", text: "x" } });
+    expect(bad.isError).toBe(true); expect(bad.content[0].text).toContain("not_a_share_target");
+    await c.callTool({ name: "set_clipboard", arguments: { session: "s", text: "paste me" } });
+    expect(seen.at(-1)).toMatchObject({ action: "set_clipboard", text: "paste me" });
+    const g: any = await c.callTool({ name: "get_clipboard", arguments: { session: "s" } });
+    expect(JSON.parse(g.content[0].text)).toEqual({ text: "copied" });
+    await c.close(); srv.close();
+  }, 30000);
+  it("get_connectivity and set_connectivity pass the switches on and return the network", async () => {
+    const seen: any[] = [];
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      if (body.action === "set_connectivity" && body.mobile_data === true) return res.end(JSON.stringify({ ok: false, code: "airplane_on", error: "mobile data stays off in airplane mode" }));
+      res.end(JSON.stringify({ ok: true, connectivity: { wifi: false, mobile_data: false, airplane: true, online: false, type: "none" } }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const s: any = await c.callTool({ name: "set_connectivity", arguments: { session: "s", airplane: true } });
+    expect(seen.at(-1)).toMatchObject({ action: "set_connectivity", session: "s", airplane: true });
+    expect(JSON.parse(s.content[0].text)).toEqual({ wifi: false, mobile_data: false, airplane: true, online: false, type: "none" });
+    const g: any = await c.callTool({ name: "get_connectivity", arguments: { session: "s" } });
+    expect(JSON.parse(g.content[0].text).online).toBe(false);
+    const bad: any = await c.callTool({ name: "set_connectivity", arguments: { session: "s", mobile_data: true } });
+    expect(bad.isError).toBe(true); expect(bad.content[0].text).toContain("airplane_on");
+    await c.close(); srv.close();
+  }, 30000);
+  it("permission_log passes its filters on and returns the entries", async () => {
+    const seen: any[] = [];
+    const srv = http.createServer(async (req, res) => {
+      let raw = ""; for await (const c of req) raw += c;
+      const body = raw ? JSON.parse(raw) : {};
+      res.writeHead(200, { "content-type": "application/json" });
+      if (body.action === "pending_banner") return res.end(JSON.stringify({ ok: true, banner: "" }));
+      seen.push(body);
+      res.end(JSON.stringify({ ok: true, entries: [{ at: 1, app: "remind", permission: "camera", event: "blocked", by: "scan" }] }));
+    });
+    await new Promise<void>((r) => srv.listen(0, r));
+    const p = (srv.address() as { port: number }).port;
+    const env: Record<string, string> = { ...(process.env as Record<string, string>), PN_SIM: `http://localhost:${p}`, PN_CONTROL: "http://127.0.0.1:1" };
+    const c = new Client({ name: "claude-ai", version: "0" });
+    await c.connect(new StdioClientTransport({ command: process.execPath, args: [join(out, "server.js")], env }));
+    const r: any = await c.callTool({ name: "permission_log", arguments: { session: "s", app: "remind", event: "blocked", limit: 10 } });
+    expect(seen.at(-1)).toMatchObject({ action: "permission_log", session: "s", app: "remind", event: "blocked", limit: 10 });
+    expect(JSON.parse(r.content[0].text).entries[0].event).toBe("blocked");
+    const bad: any = await c.callTool({ name: "permission_log", arguments: { session: "s", event: "maybe" } });
+    expect(bad.isError).toBe(true);
+    await c.close(); srv.close();
+  }, 30000);
 });

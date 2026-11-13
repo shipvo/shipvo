@@ -2,11 +2,11 @@
 // Shipvo UI simulator: runs the real app UI (React Native Web build) in a phone-sized headless browser,
 // and lets an agent see the screen as an accessibility tree and act on it: tap, type, scroll, back.
 // No emulator, no device. Each session also gets a mock control plane that records orders for grading.
-//   shipvo sim  (or: node packages/sim/server.mjs) [--port 4545] [--dir /tmp/pn-ui] [--dist ./sim-dist] [--app <id>]
+//   shipvo sim  (or: node packages/sim/server.mjs) [--port 4545] [--dir /tmp/pn-ui] [--dist ./sim-dist] [--app <id>] [--host 127.0.0.1]
 // Reads shipvo.json in the current directory (appId, name, controlPlane) when present.
 import http from "node:http";
-import { readFileSync, existsSync, writeFileSync, appendFileSync, mkdirSync, statSync, rmSync } from "node:fs";
-import { join, extname, dirname, sep } from "node:path";
+import { readFileSync, existsSync, writeFileSync, appendFileSync, mkdirSync, statSync, rmSync, realpathSync } from "node:fs";
+import { join, extname, dirname, sep, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { openBuild } from "./build-open.mjs";
@@ -37,8 +37,21 @@ import { createNav, pressHome, openRecents, resume, killApp, assertForeground, s
 import { assistantName } from "./identity.mjs";
 import { pendingBanner, waitForNew } from "./banner.mjs";
 import { createWakeups, WakeupError } from "./wakeup.mjs";
+import { PHONES_FORMAT, appSpecOf, checkPhones, CarryoverError } from "./carryover.mjs";
+import { createPermissionLog, PermissionLogError } from "./permission-log.mjs";
+import { actionDeviceNeeds } from "@shipvo/spec";
+import { initialConnectivity, applyConnectivity, networkOf, describeConnectivity, ConnectivityError } from "./connectivity.mjs";
+import { shareTargets, shareInput, ShareError } from "./share.mjs";
+import { createReminders, ReminderError } from "./reminders.mjs";
+import { makeBackup, checkBackup, BackupError } from "./backup.mjs";
+import { searchPhone, SearchError } from "./search.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
+import { statusFromDevice } from "./frame.mjs";
+import { MODELS, DEFAULT_MODEL, findModel, modelContext } from "./models.mjs";
+import { createA2ui, catalogDocument } from "./a2ui.mjs";
+import { a2uiPage } from "./a2ui-page.mjs";
+import { capturePage, contentSize, showShot, shotArgs, encodeFrames, CaptureError } from "./capture.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
 let pw, pwVersion;
@@ -85,12 +98,21 @@ const browserReady = new Promise((resolve, reject) => { launchBrowser = () => {
   let opts;
   try { opts = resolveBrowser({ pw, executablePath: arg("chromium", undefined) }); } catch (e) { reject(e); return; }
   const timer = setTimeout(() => reject(new Error(`Chromium did not start within ${LAUNCH_TIMEOUT_MS / 1000} s`)), LAUNCH_TIMEOUT_MS);
-  chromium.launch(opts).then(resolve, reject).finally(() => clearTimeout(timer));
+  // A phone app may play sound without a tap first. A browser blocks that unless told otherwise.
+  chromium.launch({ ...opts, args: [...(opts.args ?? []), "--autoplay-policy=no-user-gesture-required"] }).then(resolve, reject).finally(() => clearTimeout(timer));
 }; });
 browserReady.catch((e) => { console.error(`sim: ${launchErrorMessage(e.message, pwVersion)}`); process.exit(1); });
 const sessions = new Map();
+// A2UI sessions: the surfaces of each session, by session id. The session's page draws them and reports what the person does.
+const a2uiHosts = new Map();
 
 const phone = { ...devices["Pixel 5"], viewport: { width: 393, height: 851 } };
+// An app page is ready when it has loaded. The simulator also waits for the network to go quiet, but only for a while:
+// an app that polls, streams or keeps loading still opens.
+const NET_QUIET_MS = Number(process.env.SHIPVO_SIM_NET_QUIET_MS) || 5000;
+const networkQuiet = (page) => page.waitForLoadState("networkidle", { timeout: NET_QUIET_MS }).catch(() => {});
+async function gotoSettled(page, url) { await page.goto(url, { waitUntil: "load" }); await networkQuiet(page); }
+async function reloadSettled(page) { await page.reload({ waitUntil: "load" }); await networkQuiet(page); }
 
 // The phone's Browser app. Chromium starts on the first open. Pages that link to the app's own scheme hand the link to the app.
 // The instance is shared through s.browserP, so two opens at once make one Chromium context.
@@ -148,17 +170,73 @@ function leaveRoom(s, id) {
   const set = rooms.get(s.room); set?.delete(id);
   if (!set?.size) { rooms.delete(s.room); roomLogs.delete(s.room); try { rmSync(join(DIR, `${backendOf(id, s.room)}.json`), { force: true }); rmSync(join(DIR, `${backendOf(id, s.room)}.json.log`), { force: true }); } catch {} }
 }
+// Framed captures: one hidden page per session holds the phone frame; each app picture is shown in it and the whole phone is captured.
+// Calls are queued so a screenshot and a running recording never swap the picture under each other.
+async function framed(s, buf, mime, jpeg) {
+  const job = (s.frameQueue ?? Promise.resolve()).catch(() => {}).then(async () => {
+    if (!s.framePage) {
+      const vp = s.page.viewportSize(); const cp = capturePage({ skin: s.skin, width: vp.width, height: vp.height });
+      s.frameCtx = await (await browserReady).newContext({ viewport: { width: cp.width, height: cp.height }, deviceScaleFactor: 2 });
+      s.framePage = await s.frameCtx.newPage(); await s.framePage.setContent(cp.html);
+    }
+    const c = s.conn ?? initialConnectivity();
+    await s.framePage.evaluate(showShot, shotArgs(buf, mime, s.skin, statusFromDevice({ online: networkOf(c, s.netProfile ?? "online").online, airplane: c.airplane, wifi: c.wifi, mobileData: c.mobile_data }, nowOf(s))));
+    return s.framePage.screenshot(jpeg ? { type: "jpeg", quality: 85 } : { omitBackground: true });
+  });
+  s.frameQueue = job; return job;
+}
+/** Stops a running recording and encodes it. Resolves the video, or null when nothing was recording. */
+async function stopRecording(s) {
+  const rec = s.rec; if (!rec) return null;
+  s.rec = null; rec.on = false; await rec.loop;
+  try { return await encodeFrames({ dir: rec.dir, times: rec.times, end: Date.now(), out: rec.out }); }
+  catch (e) { if (e instanceof CaptureError) throw new SimError(e.code, e.message); throw e; }
+}
+/**
+ * The file in the local build that a request path names, or null. null when the path leaves the build folder (with ".."
+ * in any spelling, or through a link inside the build), names a folder or nothing, or is not valid.
+ */
+function distFile(requestPath) {
+  try {
+    const root = realpathSync(resolvePath(DIST));
+    const p = resolvePath(root, "." + sep + decodeURIComponent(String(requestPath)).replace(/^[/\\]+/, ""));
+    if (!p.startsWith(root + sep) || !existsSync(p) || statSync(p).isDirectory()) return null;
+    const real = realpathSync(p);
+    return real.startsWith(root + sep) ? real : null;
+  } catch { return null; }
+}
+// The base path the local build was made with: what stands before /_expo/ in the script address of its index.html. "" when there is none.
+let appBaseCache = { at: -1, base: "" };
+function appBase() {
+  try {
+    const file = join(DIST, "index.html"), at = statSync(file).mtimeMs;
+    if (at !== appBaseCache.at) appBaseCache = { at, base: /<script[^>]+src="(\/[^"]*?)\/_expo\/static\//.exec(readFileSync(file, "utf8"))?.[1] ?? "" };
+  } catch { appBaseCache = { at: -1, base: "" }; }
+  return appBaseCache.base;
+}
+// Pages of this server that are not the local app: other apps, builds, releases, the session backend and the simulator's own pages.
+const NOT_THE_APP = /^\/(?:app|spec|a2ui|b|w|s|phone|browser|watch|_expo|assets)(?:\/|$)/;
+/** The address a session's page is at, for comparing with an app's address. In a root_mount session the local app's screens are at /, /feed/1 and so on: all of them are the app at /app/. */
+function whereOf(s, pageUrl) {
+  if (!s.rootMount) return pageUrl;
+  try { const u = new URL(pageUrl); if (u.origin === `http://localhost:${PORT}` && !NOT_THE_APP.test(u.pathname)) return `http://localhost:${PORT}/app/`; } catch {}
+  return pageUrl;
+}
 async function endSession(id) {
   const s = sessions.get(id); if (!s) return false;
-  specHost.dropSession(id);
+  specHost.dropSession(id); a2uiHosts.delete(id);
+  await stopRecording(s).catch(() => {}); await s.frameCtx?.close().catch(() => {});
   for (const p of s.peers ?? []) p.close(); closeWatchers(s);
   await (await s.browserP?.catch(() => undefined))?.close(); await s.ctx.close().catch(() => {});
-  s.inbox?.close(); s.wakeups?.close(); sessions.delete(id); leaveRoom(s, id); return true;
+  s.inbox?.close(); s.wakeups?.close(); clearInterval(s.reminderTimer); sessions.delete(id); leaveRoom(s, id); return true;
 }
 async function newSession(id, opts = {}) {
   const room = opts.room == null ? undefined : String(opts.room);
   if (room !== undefined && !/^[\w-]{1,64}$/.test(room)) throw new SimError("bad_room", "room must be 1 to 64 letters, digits, _ or -");
-  if (sessions.has(id)) { specHost.dropSession(id); const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); old.inbox?.close(); old.wakeups?.close(); sessions.delete(id); leaveRoom(old, id); }
+  if (sessions.has(id)) { specHost.dropSession(id); const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); old.inbox?.close(); old.wakeups?.close(); clearInterval(old.reminderTimer); sessions.delete(id); leaveRoom(old, id); }
+  const model = opts.model == null ? null : findModel(opts.model);
+  if (opts.model != null && !model) throw new SimError("bad_model", `unknown phone model "${String(opts.model).slice(0, 40)}". Models: ${MODELS.map((m) => m.name).join(", ")}`);
+  if (model) opts = { ...opts, skin: model.platform, device: { ...(opts.device ?? {}), platform: opts.device?.platform ?? model.platform } };
   let target, buildId;
   if (opts.build_url != null) {
     // Fetch the build before anything else is created, so a bad URL leaves no session behind.
@@ -167,6 +245,12 @@ async function newSession(id, opts = {}) {
     BUILDS.set(b.id, b.root);
     buildId = typeof opts.build === "string" && /^[\w-]{1,64}$/.test(opts.build) ? opts.build : b.id;
     target = { app: spec[1], url: `http://localhost:${PORT}/b/${b.id}/index.html`, release: `build:${buildId}` };
+  } else if (opts.a2ui === true) {
+    // An A2UI session shows surfaces an agent describes, not an app build. Messages given here are applied before the page opens.
+    const host = createA2ui(); a2uiHosts.set(id, host);
+    // What the first messages did is part of the answer, so a refused message is seen at once.
+    if (opts.a2ui_messages !== undefined) host.opened = host.applyAll(opts.a2ui_messages);
+    target = { app: "a2ui", url: `http://localhost:${PORT}/a2ui/${encodeURIComponent(id)}/`, release: "a2ui" };
   } else target = await resolveApp(opts.app);
   const bk = backendOf(id, room);
   if (!room || !rooms.has(room)) { writeFileSync(join(DIR, `${bk}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${bk}.json.log`), ""); }
@@ -176,7 +260,10 @@ async function newSession(id, opts = {}) {
   const browser = await browserReady;
   // Optional width, height (output pixels) and scale (device pixel ratio) make a session render at a store screenshot size.
   const size = Number.isInteger(opts.width) && Number.isInteger(opts.height) && opts.width > 0 && opts.height > 0 ? { viewport: { width: Math.round(opts.width / (opts.scale || 1)), height: Math.round(opts.height / (opts.scale || 1)) }, deviceScaleFactor: opts.scale || 1 } : {};
-  ctx = await browser.newContext({ ...phone, ...size, colorScheme: opts.dark ? "dark" : "light" });
+  // fit_frame: the app gets exactly the app area of its Android or iOS frame, so framed screenshots and recordings show the phone at its real size.
+  const fit = opts.fit_frame === true ? { viewport: contentSize(opts.skin), deviceScaleFactor: 2 } : {};
+  // model: the session is a real phone model, with that phone's screen size, pixel ratio and user agent.
+  ctx = await browser.newContext({ ...phone, ...fit, ...(model ? modelContext(model) : {}), ...size, colorScheme: opts.dark ? "dark" : "light" });
   // The app's Linking.openURL for a web page lands here (see @shipvo/device): it opens in the Browser app, not in the app.
   await ctx.exposeFunction("__pnOpenBrowser", (url) => openInBrowserApp(id, String(url)));
   // The app's Linking.openURL for another installed app's scheme lands here: the phone switches to that app and hands it the link once.
@@ -195,18 +282,23 @@ async function newSession(id, opts = {}) {
   });
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${bk}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   await ctx.addInitScript(installNetGate);
+  // root_mount: for apps with a router that reads the address (expo-router). The app is served under /app/, and the router
+  // would take "app" as a screen name, so the address loses that prefix before the app starts: /app/ is / and /app/feed/1 is /feed/1.
+  if (opts.root_mount === true) await ctx.addInitScript(() => { const p = location.pathname; if (p === "/app" || p.startsWith("/app/")) history.replaceState(history.state, "", (p.slice(4) || "/") + location.search + location.hash); });
   const page = await ctx.newPage();
   const errors = [];
   // phone.json: the apps and settings this phone starts with. The same profile gives the same phone every run.
   let apps; try { if (PROFILE_ERR && opts.phone === undefined) throw new AppsError("bad_profile", PROFILE_ERR); apps = loadProfile(opts.phone ?? PROFILE ?? {}); } catch (e) { await ctx.close(); throw e instanceof AppsError ? new SimError(e.code, e.message) : e; }
   const pageErrors = { n: 0 };
   page.on("pageerror", (e) => { pageErrors.n++; errors.push(String(e?.message ?? e).split("\n")[0]); });
-  await page.goto(target.url, { waitUntil: "networkidle" });
+  // A script that does not load leaves a blank app with nothing thrown: record it, so the cause is in the errors.
+  page.on("response", (r) => { try { if (r.status() >= 400 && r.request().resourceType() === "script") errors.push(`a script did not load (${r.status()}): ${new URL(r.url()).pathname}`); } catch {} });
+  await gotoSettled(page, target.url);
   await page.waitForTimeout(300);
   const patch = profilePatch(apps);
   if (Object.keys(patch).length) { await page.evaluate((p) => globalThis.__pnDevice?.set?.(p), patch); await syncMedia(page); }
   if (apps.network) { try { getProfile(apps.network); } catch (e) { await ctx.close(); throw new SimError("bad_profile", `phone.json: ${e.message}`); } }
-  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, room, skin: opts.skin === "ios" ? "ios" : "android", startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav(), inbox: createInbox() });
+  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, room, skin: opts.skin === "ios" ? "ios" : "android", model: model?.name ?? null, rootMount: opts.root_mount === true, startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav(), inbox: createInbox() });
   await ensureNetworkRoute(sessions.get(id), page);   // the mail sink answers from the first page load
   if (buildId) sessions.get(id).build = buildId;
   if (apps.network && apps.network !== "online") await setNetworkProfile(sessions.get(id), page, apps.network);
@@ -240,18 +332,40 @@ async function showBanner(s) {
 // on a new release send the phone back to the release it had.
 async function boot(s, url) {
   const before = s.pageErrors.n;
-  if (url) await s.page.goto(url, { waitUntil: "networkidle" }); else await s.page.reload({ waitUntil: "networkidle" });
+  if (url) await gotoSettled(s.page, url); else await reloadSettled(s.page);
   await s.page.waitForTimeout(300);
   await reapplyNetProfile(s, s.page);
   const r = bootDone(s.update, s.pageErrors.n > before);
-  if (r.revert) { await s.page.goto(r.url, { waitUntil: "networkidle" }); await s.page.waitForTimeout(300); }
+  if (r.revert) { await gotoSettled(s.page, r.url); await s.page.waitForTimeout(300); }
   await showBanner(s);
 }
 // A new page load starts with a fresh device state, so the session's network profile is set on it again.
 async function reapplyNetProfile(s, page) {
   if (s.netProfile) await page.evaluate((n) => globalThis.__pnDevice?.set?.({ networkProfile: n }), s.netProfile).catch(() => {});
+  if (s.conn) await page.evaluate((c) => globalThis.__pnDevice?.set?.({ wifi: c.wifi, mobileData: c.mobile_data, airplane: c.airplane }), s.conn).catch(() => {});
+}
+// Spec apps read the phone's network as `network`; it follows Wi-Fi, mobile data, airplane mode and an "offline" network profile.
+// When it changes and a spec app is open, its screen is drawn again so it shows the new state.
+async function syncNetwork(s, page) {
+  const sid = sidOf(s), before = JSON.stringify(specHost.network(sid));
+  const now = specHost.setNetwork(sid, networkOf(s.conn ?? initialConnectivity(), s.netProfile ?? "online"));
+  const open = s.nav.where === "app" && s.apps.installed_apps.some((a) => a.id === s.apps.current_app && a.kind === "spec");
+  // A spec app page has no device layer, so no panel can be open over it; the reset keeps the record right if that ever changes.
+  if (open && JSON.stringify(now) !== before) { s.shade.open = "none"; await reloadSettled(page); await reapplyNetProfile(s, page); }
 }
 const specHost = new SpecHost();
+// The session's permission log (grants, denials, removals, uses, blocks). See permission-log.mjs.
+const permLog = (s) => (s.permLog ??= createPermissionLog());
+/** After a spec app action: each device permission it needs is "used", or "blocked" when the person denied it. */
+function logUses(s, appId, action, res, caller) {
+  const spec = specHost.snapshot(sidOf(s), appId)?.spec;
+  const needs = spec ? actionDeviceNeeds(spec, action) : [];
+  const denied = res?.ok === false && /^permission_denied:/.test(res.error ?? "") ? (/"([a-z_]+)" permission/.exec(res.error)?.[1] ?? null) : null;
+  for (const p of needs) {
+    if (denied && p !== denied) continue;   // the action stopped at the first denied permission
+    permLog(s).add({ app: appId, permission: p, event: denied ? "blocked" : "used", by: action, caller });
+  }
+}
 /** One answer per device permission a spec declares: the person's (`given`), or allowed when none was given. */
 const declaredAnswers = (spec, given) => Object.fromEntries((Array.isArray(spec?.permissions?.device) ? spec.permissions.device : []).filter((p) => DEVICE_PERMISSIONS.includes(p)).map((p) => [p, typeof given?.[p] === "boolean" ? given[p] : true]));
 // The phone's clock: the real time, or the time a test set with set_time.
@@ -281,7 +395,7 @@ async function switchToApp(s, page, id, fresh = false) {
     catch (e) { if (e instanceof BrowserError) throw new SimError(e.code, e.message); throw e; }
   }
   switchApp(s.apps, id, s.nav);
-  if (dest && (fresh || page.url() !== dest)) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
+  if (dest && (fresh || whereOf(s, page.url()) !== dest)) { await gotoSettled(page, dest); await page.waitForTimeout(300); }
   await reapplyNetProfile(s, page);
   await page.evaluate(setVisibilityInPage, "active");
   // A one-shot link belongs to the load it was delivered to: a plain switch never inherits one.
@@ -430,6 +544,7 @@ async function act(id, body) {
       const nm = String(body.name ?? body.spec?.app?.name ?? appId).replace(/[<>"'\\]/g, "").slice(0, 40);
       s.apps.installed_apps.push({ id: appId, name: nm, url: `spec://${appId}`, version: "1", kind: "spec", ...(Object.keys(perms).length ? { permissions: perms } : {}) });
       s.apps.log.push({ at: Date.now(), name: "create_app", app: appId, source: "real", version: "1" });
+      permLog(s).answers(appId, null, perms, "install");
       if (body.open !== false) {
         // If opening fails, the app is not left installed or running.
         try { await switchToApp(s, page, appId, true); }
@@ -449,6 +564,7 @@ async function act(id, body) {
     case "set_time": {
       if (body.at == null) s.clockMs = null;
       else { const t = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?/.test(String(body.at)) ? Date.parse(String(body.at)) : NaN; if (Number.isNaN(t)) throw new SimError("bad_time", "at must be a time like 2026-11-14T09:00:00, or null"); s.clockMs = t; }
+      if (s.reminders) await s.reminders.tick();
       return { now: nowOf(s).toString(), home: `Home screen\n${describeApps(s.apps, nowOf(s))}`, screen: s.nav.where === "app" ? await screen(page) : `Home screen\n${describeApps(s.apps, nowOf(s))}` };
     }
     // Copy every spec app out of the phone: spec, style, collection data and settings. Vault values are never held by the phone, so none can appear.
@@ -483,6 +599,7 @@ async function act(id, body) {
         const ex = s.apps.installed_apps.find((x) => x.id === a.id);
         if (ex) { uninstallApp(s.apps, a.id, s.nav); specHost.drop(sidOf(s), a.id); }
         const perms = declaredAnswers(a.spec, a.permissions);
+        permLog(s).answers(a.id, ex?.permissions ?? null, perms, "import");
         const made = specHost.create(sidOf(s), a.id, a.spec, { style: a.style === "ios" ? "ios" : "android", data: a.data ?? undefined, state: a.settings ?? undefined, permissions: perms });
         const nm = String(a.name ?? a.spec?.app?.name ?? a.id).replace(/[<>"'\\]/g, "").slice(0, 40);
         const placement = a.placement == null ? null : cleanPlacement(a.placement);
@@ -500,7 +617,7 @@ async function act(id, body) {
       const out = await specHost.refresh(sidOf(s), appId);
       s.apps.log.push({ at: Date.now(), name: "data_refresh", app: appId, sources: out.updated, errors: out.errors.map((e) => e.source), source: "real" });
       const open = s.apps.current_app === appId && s.nav.where === "app";
-      if (out.updated.length && open) { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
+      if (out.updated.length && open) { await reloadSettled(page); await reapplyNetProfile(s, page); }
       return { updated: out.updated, errors: out.errors, ...(open ? { screen: await screen(page) } : {}) };
     }
     case "update_app": {
@@ -512,11 +629,12 @@ async function act(id, body) {
       entry.version = String(up.version);
       // A new version may ask for other device permissions: new ones start allowed (as on install), kept ones keep the person's answer, dropped ones go.
       const perms = declaredAnswers(body.spec, entry.permissions);
+      permLog(s).answers(appId, entry.permissions ?? null, perms, "update");
       if (Object.keys(perms).length) entry.permissions = perms; else delete entry.permissions;
       specHost.syncPermissions(sidOf(s), appId, perms);
       if (typeof body.name === "string" && body.name.trim()) entry.name = body.name.replace(/[<>"'\\]/g, "").slice(0, 40);
       s.apps.log.push({ at: Date.now(), name: "update_app", app: appId, from: String(up.from), version: String(up.version), changes: specHost.history(sidOf(s), appId).at(-1)?.changes ?? [], source: "real" });
-      if (s.apps.current_app === appId && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
+      if (s.apps.current_app === appId && s.nav.where === "app") { await reloadSettled(page); await reapplyNetProfile(s, page); }
       return { version: up.version, installed_apps: s.apps.installed_apps, warnings: up.warnings, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
     }
     // What was built and changed on the phone: for each spec app its versions with what changed, its live sources and its events.
@@ -544,11 +662,90 @@ async function act(id, body) {
       const appId = String(body.id ?? "");
       if (!specHost.has(sidOf(s), appId)) throw new SimError("not_installed", `'${appId}' is not a spec app running on this phone`);
       const res = specHost.call(sidOf(s), appId, String(body.action_name ?? ""), body.input && typeof body.input === "object" ? body.input : {}, { caller: assistantName(body.agent) });
+      logUses(s, appId, String(body.action_name ?? ""), res, assistantName(body.agent));
       s.apps.log.push({ at: Date.now(), name: "app_action", app: appId, action: String(body.action_name ?? ""), source: "real", ...(body.agent ? { caller: assistantName(body.agent) } : {}) });
-      if (s.apps.current_app === appId && s.nav.where === "app") { await page.reload({ waitUntil: "networkidle" }); await reapplyNetProfile(s, page); }
+      if (s.apps.current_app === appId && s.nav.where === "app") { await reloadSettled(page); await reapplyNetProfile(s, page); }
       if (res.ok === false && /^permission_denied:/.test(res.error)) throw new SimError("permission_denied", res.error.replace(/^permission_denied:\s*/, ""));
       if (res.ok === false) throw new SimError("action_failed", res.error);
       return { value: res.value ?? null, screen: s.apps.current_app === appId && s.nav.where === "app" ? await screen(page) : undefined };
+    }
+    // The permission log: every grant, denial, removal, use and block, per app. Changes nothing.
+    case "permission_log": {
+      try { return { entries: permLog(s).list({ app: body.app, permission: body.permission, event: body.event, limit: body.limit }) }; }
+      catch (e) { if (e instanceof PermissionLogError) throw new SimError(e.code, e.message); throw e; }
+    }
+    // Connectivity: Wi-Fi, mobile data and airplane mode for the whole phone. Every app reads the result (spec apps as `network`,
+    // apps with a bundle through the device layer), and spec apps' http data does not load while the phone is offline.
+    case "get_connectivity": return { connectivity: describeConnectivity(s.conn ?? initialConnectivity(), s.netProfile ?? "online") };
+    case "set_connectivity": {
+      const from = describeConnectivity(s.conn ?? initialConnectivity(), s.netProfile ?? "online");
+      try { s.conn = applyConnectivity(s.conn ?? initialConnectivity(), { wifi: body.wifi, mobile_data: body.mobile_data, airplane: body.airplane }); } catch (e) { if (e instanceof ConnectivityError) throw new SimError(e.code, e.message); throw e; }
+      await page.evaluate((c) => globalThis.__pnDevice?.set?.({ wifi: c.wifi, mobileData: c.mobile_data, airplane: c.airplane }), s.conn).catch(() => {});
+      await syncNetwork(s, page);
+      const now = describeConnectivity(s.conn, s.netProfile ?? "online");
+      (s.netLog ??= []).push({ at: Date.now(), name: "connectivity", from, to: now, source: "simulated" });
+      return { connectivity: now };
+    }
+    // Share sheet: the apps and actions that take shared text, and sending text into one. Logged in the app activity as "share".
+    case "share_targets": {
+      const apps = s.apps.installed_apps.filter((x) => x.kind === "spec").map((x) => ({ id: x.id, name: x.name, spec: specHost.snapshot(sidOf(s), x.id)?.spec }));
+      return { targets: shareTargets(apps) };
+    }
+    case "share": {
+      const to = String(body.to ?? "");
+      const apps = s.apps.installed_apps.filter((x) => x.kind === "spec").map((x) => ({ id: x.id, name: x.name, spec: specHost.snapshot(sidOf(s), x.id)?.spec }));
+      if (!apps.some((a) => a.id === to)) throw new SimError("not_installed", `'${to}' is not an app on this phone`);
+      let made; try { made = shareInput(shareTargets(apps), { to, action: body.action_name, text: body.text, title: body.title }); } catch (e) { if (e instanceof ShareError) throw new SimError(e.code, e.message); throw e; }
+      const res = specHost.call(sidOf(s), to, made.target.action, made.input, { caller: assistantName(body.agent) });
+      s.apps.log.push({ at: Date.now(), name: "share", app: to, action: made.target.action, source: "real", ...(body.from ? { from: String(body.from) } : {}), ...(body.agent ? { caller: assistantName(body.agent) } : {}) });
+      if (s.apps.current_app === to && s.nav.where === "app") { await reloadSettled(page); await reapplyNetProfile(s, page); }
+      if (res.ok === false) throw new SimError("action_failed", res.error);
+      return { shared: { app: to, action: made.target.action }, value: res.value ?? null };
+    }
+    // The phone's clipboard, the same one apps read and write with copy and paste.
+    case "get_clipboard": {
+      const v = await page.evaluate(() => { if (globalThis.__pnDevice) return globalThis.__pnDevice.state.clipboard; try { return globalThis.sessionStorage.getItem("pn.clipboard"); } catch { return null; } }).catch(() => null);
+      return { text: v ?? s.clipboard ?? "" };
+    }
+    case "set_clipboard": {
+      const text = typeof body.text === "string" ? body.text : null;
+      if (text == null || text.length > 20000) throw new SimError("bad_text", "text: a string up to 20000 characters");
+      s.clipboard = text;
+      // Pages without the device layer (spec apps) still share the tab's sessionStorage, which the device layer reads on its next load.
+      await page.evaluate((v) => { if (globalThis.__pnDevice) return globalThis.__pnDevice.set({ clipboard: v }); try { globalThis.sessionStorage.setItem("pn.clipboard", v); } catch {} }, text).catch(() => {});
+      return { text };
+    }
+    // Whole-phone backup: spec apps (spec, data, settings, layout, permission answers), store apps (listing and permission answers),
+    // system settings and the clipboard. Changes nothing. Secrets in the vault are never in it.
+    case "backup_phone": {
+      const exported = await act(sidOf(s), { action: "export_apps" });
+      const storeApps = s.apps.installed_apps.filter((a) => a.kind !== "spec").map(({ sha256, bytes, ...rest }) => structuredClone(rest));
+      let settings; try { settings = (await settingsAction(page, { action: "get_settings" })).settings; } catch { settings = { ...(s.apps.settings ?? {}) }; }
+      const clipboard = await page.evaluate(() => { if (globalThis.__pnDevice) return globalThis.__pnDevice.state.clipboard; try { return globalThis.sessionStorage.getItem("pn.clipboard"); } catch { return null; } }).catch(() => null);
+      s.apps.log.push({ at: Date.now(), name: "backup_phone", apps: exported.apps.length, store_apps: storeApps.length, source: "real" });
+      return { backup: makeBackup({ apps: exported.apps, storeApps, settings, clipboard: clipboard ?? s.clipboard ?? "" }) };
+    }
+    // Put a backup on this phone. Every part is checked first; a bad backup changes nothing. Spec apps already on the phone need replace: true.
+    // A store app that is already installed is skipped and listed.
+    case "restore_phone": {
+      let b; try { b = checkBackup(body.backup); } catch (e) { if (e instanceof BackupError) throw new SimError(e.code, e.message); throw e; }
+      const imported = b.apps.length ? (await act(sidOf(s), { action: "import_apps", apps: b.apps, replace: body.replace === true })) : { imported: [] };
+      const installed = [], skipped = [], failed = [];
+      for (const a of b.storeApps) {
+        if (s.apps.installed_apps.some((x) => x.id === a.id)) { skipped.push(a.id); continue; }
+        try { await act(sidOf(s), { action: "install_app", id: a.id, catalog: [a], permissions: a.permissions }); installed.push(a.id); }
+        catch (e) { failed.push({ id: a.id, error: String(e?.message ?? e) }); }
+      }
+      const settings = [];
+      for (const [key, value] of Object.entries(b.settings)) {
+        try { await settingsAction(page, { action: "set_setting", key, value }); settings.push(key); } catch { s.apps.settings = { ...(s.apps.settings ?? {}), [key]: value }; settings.push(key); }
+      }
+      if (b.clipboard != null) {
+        s.clipboard = b.clipboard;
+        await page.evaluate((v) => { if (globalThis.__pnDevice) return globalThis.__pnDevice.set({ clipboard: v }); try { globalThis.sessionStorage.setItem("pn.clipboard", v); } catch {} }, b.clipboard).catch(() => {});
+      }
+      s.apps.log.push({ at: Date.now(), name: "restore_phone", apps: imported.imported.length, store_apps: installed.length, source: "real" });
+      return { restored: { apps: imported.imported, store_apps: installed, settings, clipboard: b.clipboard != null }, ...(skipped.length ? { skipped } : {}), ...(failed.length ? { failed } : {}), ...(imported.warnings ? { warnings: imported.warnings } : {}), installed_apps: s.apps.installed_apps };
     }
     // Installed apps. Errors are typed: unknown_app, already_installed, not_installed. Logged in device_log: source "real" (with the bundle sha256) for a fetched bundle, "simulated" for a fixture app.
     // One toggle per app and permission, the same as the Settings screen.
@@ -556,6 +753,7 @@ async function act(id, body) {
       const id = String(body.id ?? "");
       try { setPermission(s.apps, id, String(body.permission ?? ""), body.allowed); } catch (e) { if (e instanceof AppsError) throw new SimError(e.code, e.message); throw e; }
       specHost.setPermission(sidOf(s), id, String(body.permission), body.allowed);
+      permLog(s).add({ app: id, permission: String(body.permission), event: body.allowed ? "granted" : "denied", by: "settings" });
       // `profile` is the phone.json form of the phone with these answers: save it and start a new session with it (phone) to keep them.
       // A Store app (not a spec app) has no running host, so its answer is stored and enforces nothing until it runs.
       return { id, permissions: s.apps.installed_apps.find((a) => a.id === id).permissions, installed_apps: s.apps.installed_apps, profile: exportProfile(s.apps) };
@@ -572,8 +770,9 @@ async function act(id, body) {
           const real = found && !/^fixture:/i.test(String(found.url ?? "")) ? await fetchAppBundle(found) : undefined;
           installApp(s.apps, id, catalog, real, body.permissions);
           installed = s.apps.installed_apps.find((a) => a.id === id);
+          permLog(s).answers(id, null, installed?.permissions ?? {}, "install");
         }
-        else if (body.action === "uninstall_app") { uninstallApp(s.apps, id, s.nav); specHost.drop(sidOf(s), id); }
+        else if (body.action === "uninstall_app") { const was = s.apps.installed_apps.find((a) => a.id === id)?.permissions ?? null; uninstallApp(s.apps, id, s.nav); specHost.drop(sidOf(s), id); permLog(s).answers(id, was, null, "uninstall"); }
         else {
           await switchToApp(s, page, id);
         }
@@ -653,13 +852,25 @@ async function act(id, body) {
     // Simulated device: what the phone "has" and what happens to it. See @shipvo/device.
     case "set_device": await page.evaluate((d) => globalThis.__pnDevice?.set(d), body.device ?? {}); await syncMedia(page); break;
     case "open_notifications": case "open_control_center": case "close_panels": case "toggle_tile": case "dismiss_notification": {
-      try { return { ...(await shadeAction(page, s.shade, body)) }; } catch (e) { if (e instanceof ShadeError) throw new SimError(e.code, e.message); throw e; }
+      // A reminder the phone kept itself (no app page took it) is swiped away here.
+      if (body.action === "dismiss_notification" && /^sys\d+$/.test(String(body.id ?? ""))) {
+        const i = (s.sysNotes ?? []).findIndex((n) => n.id === body.id);
+        if (i < 0) throw new SimError("not_found", `no notification '${body.id}'`);
+        s.sysNotes.splice(i, 1); return { dismissed: body.id };
+      }
+      let out; try { out = { ...(await shadeAction(page, s.shade, body)) }; } catch (e) { if (e instanceof ShadeError) throw new SimError(e.code, e.message); throw e; }
+      // A Wi-Fi, mobile data or airplane tile changes what every app on the phone sees.
+      if (body.action === "toggle_tile") {
+        const d = await page.evaluate(() => globalThis.__pnDevice ? { wifi: globalThis.__pnDevice.state.wifi, mobile_data: globalThis.__pnDevice.state.mobileData, airplane: globalThis.__pnDevice.state.airplane } : null).catch(() => null);
+        if (d) { s.conn = { ...(s.conn ?? initialConnectivity()), ...d }; await syncNetwork(s, page); }
+      }
+      return out;
     }
     case "get_settings": case "set_setting": {
       try { return { ...(await settingsAction(page, body)) }; } catch (e) { if (e instanceof SettingsError) throw new SimError(e.code, e.message); throw e; }
     }
     case "push_notification": return { ...(await pushNotification(page, body)), screen: await screen(page) };
-    case "notifications": return { notifications: await page.evaluate(() => globalThis.__pnDevice?.notifications() ?? []), screen: await screen(page) };
+    case "notifications": return { notifications: [...(await page.evaluate(() => globalThis.__pnDevice?.notifications() ?? [])), ...(s.sysNotes ?? [])], screen: await screen(page) };
     case "open_notification": { s.shade.open = "none"; const ok = await page.evaluate((nid) => globalThis.__pnDevice?.openNotification(nid), body.id); if (!ok) throw new Error("no such notification"); await page.waitForTimeout(400); break; }
     case "open_url": {
       if (typeof body.url !== "string" || !body.url) throw new SimError("bad_url", "open_url needs a url, such as myapp://item/3");
@@ -682,6 +893,16 @@ async function act(id, body) {
       break;
     }
     // The line MCP puts at the start of every tool result: what waits for the calling assistant in the Assistant Inbox app. Changes nothing.
+    // The Assistant Inbox as a live view: who is asking, every message and task (newest last), and what waits for them.
+    case "inbox_view": {
+      const data = specHost.dataOf(sidOf(s), "inbox");
+      if (!data) throw new SimError("no_inbox", "the Assistant Inbox is not installed on this phone: install it with create_app (id inbox) from templates/assistant-inbox");
+      const me = assistantName(body.agent);
+      const mine = (to) => !!me && (to === me || to === "anyone");
+      const messages = (data.messages ?? []).slice(-50).map((m) => ({ id: m.id, from: m.from, to: m.to, body: m.body, sent_on: m.sent_on, read: !!m.read }));
+      const tasks = (data.handoffs ?? []).slice(-50).map((h) => ({ id: h.id, from: h.from, to: h.to, title: h.title, detail: h.detail, status: h.status, reply: h.reply ?? "", created_on: h.created_on }));
+      return { me: me || null, messages, tasks, unread_for_me: messages.filter((m) => !m.read && mine(m.to)).length, open_for_me: tasks.filter((h) => h.status !== "done" && mine(h.to)).length };
+    }
     case "pending_banner": return { banner: pendingBanner(specHost.dataOf(sidOf(s), "inbox"), assistantName(body.agent)) };
     // Blocks until something waits for the calling assistant in the Assistant Inbox app, or the time is up. Changes nothing.
     case "wait_for_event": {
@@ -694,6 +915,23 @@ async function act(id, body) {
       const fresh = await waitForNew(() => specHost.dataOf(sidOf(s), "inbox"), me, seen, ms);
       return fresh ? { event: true, pending: fresh } : { event: false };
     }
+    // Reminders: a notification at a time on the phone's clock, fired by the phone itself (app open or not). Do Not Disturb keeps it in the shade without a banner.
+    case "set_reminder": case "list_reminders": case "cancel_reminder": {
+      s.reminders ??= createReminders(() => nowOf(s).getTime(), async (r) => {
+        const note = { title: r.title, body: r.body, data: { reminder: r.id } };
+        // The app page takes it when it has a device layer (banner, shade, DND). With no app page the phone keeps it itself, so it is never lost.
+        const got = await pushNotification(s.page, note, { system: true }).catch(() => ({ delivered: false }));
+        if (got.delivered) return got;
+        (s.sysNotes ??= []).push({ id: `sys${(s.sysSeq = (s.sysSeq ?? 0) + 1)}`, at: nowOf(s).getTime(), app: "Reminders", ...note });
+        return { delivered: true };
+      });
+      if (!s.reminderTimer) { s.reminderTimer = setInterval(() => { s.reminders.tick().catch(() => {}); }, 1000); s.reminderTimer.unref?.(); }
+      try {
+        if (body.action === "set_reminder") return { reminder: s.reminders.add({ title: body.title, body: body.body, at: body.at, in_minutes: body.in_minutes, repeat: body.repeat }) };
+        if (body.action === "cancel_reminder") return { cancelled: s.reminders.cancel(body.id) };
+        return s.reminders.list();
+      } catch (e) { if (e instanceof ReminderError) throw new SimError(e.code, e.message); throw e; }
+    }
     // Webhook wake-ups: POST a signed note to a URL when something new arrives for an assistant name. Every delivery is in device_log.
     case "register_wakeup": {
       s.wakeups ??= createWakeups(() => specHost.dataOf(sidOf(s), "inbox"), (e) => { (s.wakeLog ??= []).push({ at: Date.now(), ...e }); if (s.wakeLog.length > 200) s.wakeLog.splice(0, s.wakeLog.length - 200); });
@@ -702,6 +940,13 @@ async function act(id, body) {
     }
     case "list_wakeups": return { wakeups: s.wakeups?.list() ?? [] };
     case "clear_wakeup": return { cleared: s.wakeups?.clear(body.name) ?? false };
+    // Search across the phone: rows in every spec app's collections, and notifications. Changes nothing.
+    case "search_phone": {
+      const apps = s.apps.installed_apps.filter((x) => x.kind === "spec").map((x) => ({ id: x.id, name: x.name, data: specHost.snapshot(sidOf(s), x.id)?.data ?? {} }));
+      const notes = [...(await page.evaluate(() => globalThis.__pnDevice?.notifications() ?? [])), ...(s.sysNotes ?? [])];
+      try { return searchPhone(apps, notes, { query: body.query, app: body.app, limit: body.limit }); }
+      catch (e) { if (e instanceof SearchError) throw new SimError(e.code, e.message); throw e; }
+    }
     // The session's private inbox. Reads change nothing.
     case "inbox_read": return { address: s.inbox.address, messages: s.inbox.read({ subject: body.subject, from: body.from }) };
     case "inbox_wait": {
@@ -711,7 +956,7 @@ async function act(id, body) {
       catch (e) { if (e instanceof InboxError) throw new SimError(e.code, e.message); throw e; }
     }
     case "inbox_clear": return { address: s.inbox.address, cleared: s.inbox.clear() };
-    case "set_network_profile": { await setNetworkProfile(s, page, body.profile); break; }
+    case "set_network_profile": { await setNetworkProfile(s, page, body.profile); await syncNetwork(s, page); break; }
     case "get_network_profile": return { profile: s.netProfile ?? "online", screen: await screen(page) };
     // The phone's Chromium (isolated from the app page). Page text is untrusted: results carry source "web".
     case "browser_open": case "browser_snapshot": case "browser_click": case "browser_type": case "browser_back": case "browser_screenshot": case "browser_tabs": case "browser_close_tab": case "browser_scroll": case "browser_wait_for": {
@@ -743,7 +988,7 @@ async function act(id, body) {
       });
       return { diag: r, screen: await screen(page) };
     }
-    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await syncMedia(page); s.shade.open = "none"; break;
+    case "device_reset": await page.evaluate((d) => globalThis.__pnDevice?.reset(d), body.device ?? {}); await syncMedia(page); s.shade.open = "none"; s.sysNotes = []; s.clipboard = ""; await page.evaluate(() => { try { globalThis.sessionStorage.removeItem("pn.clipboard"); } catch {} }).catch(() => {}); break;
     // Uncaught page errors since the last call to this action. Reading them clears the list.
     case "errors": return { errors: s.errors.splice(0), screen: await screen(page) };
     // Rendered size in CSS px of each ref on the current screen: { sizes: { ref: [width, height] } }. Refs that are gone are left out.
@@ -764,9 +1009,37 @@ async function act(id, body) {
       const away = s.nav.where !== "app";
       if (away) await page.evaluate((h) => { const d = document.createElement("div"); d.id = "__pn_away"; d.innerHTML = h; document.body.appendChild(d); }, awayScreenHtml(s.nav.where, APP_NAME) + (s.nav.where === "home" ? `<style>${storeCss}</style><div class="sf-apps" style="position:fixed;z-index:2147483647;color:#fff;font-family:system-ui,sans-serif">${installedIconsHtml(s.apps, nowOf(s))}</div>` : ""));
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
+      // frame: true saves the whole phone: the picture inside its Android or iOS frame, with the status bar.
+      if (body.frame === true) { buf = await framed(s, buf, jpeg ? "image/jpeg" : "image/png", jpeg); writeFileSync(p, buf); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for`);
+    case "a2ui_send": case "a2ui_actions": {
+      const host = a2uiHosts.get(id);
+      if (!host) throw new SimError("not_agent_ui", "this session is not an A2UI session: open it with a2ui: true");
+      if (body.action === "a2ui_actions") return { ...host.take(body.since), effects: host.effects, surfaces: host.surfaceIds() };
+      const input = body.jsonl ?? body.messages;
+      if (input === undefined) throw new SimError("bad_message", "a2ui_send needs messages (a list) or jsonl (one message per line)");
+      const r = host.applyAll(input);
+      // The page asks for changes every 250 ms: give it time to draw this one before the screen is read.
+      await page.waitForFunction((rev) => globalThis.__a2uiRev === undefined || globalThis.__a2uiRev >= rev, host.rev, { timeout: 3000 }).catch(() => {}); await page.waitForTimeout(350);
+      return { ...r, surfaces: host.surfaceIds(), screen: await screen(page) };
+    }
+    case "record_start": {
+      if (s.rec) throw new SimError("recording_active", "a recording is already running: call record_stop first");
+      const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+      const rec = s.rec = { on: true, times: [], dir: join(DIR, `${id}-rec-${stamp}.frames`), out: join(DIR, `${id}-rec-${stamp}.mp4`) };
+      mkdirSync(rec.dir, { recursive: true });
+      const grab = async () => { const b = await framed(s, await page.screenshot({ type: "jpeg", quality: 80 }), "image/jpeg", true); writeFileSync(join(rec.dir, `${rec.times.length}.jpg`), b); rec.times.push(Date.now()); };
+      await grab();
+      rec.loop = (async () => { while (rec.on) { try { await grab(); } catch { await new Promise((r) => setTimeout(r, 100)); } } })();
+      return { recording: true, path: rec.out, screen: await screen(page) };
+    }
+    case "record_stop": {
+      const video = await stopRecording(s);
+      if (!video) throw new SimError("no_recording", "no recording is running: call record_start first");
+      return { ...video, screen: await screen(page) };
+    }
+    default: throw new Error(`unknown action '${body.action}'. Actions: a2ui_send, a2ui_actions, record_start, record_stop, permission_log, screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for, search_phone, share_targets, share, get_clipboard, set_clipboard, set_reminder, list_reminders, cancel_reminder, backup_phone, restore_phone, get_connectivity, set_connectivity`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
@@ -785,8 +1058,14 @@ const server = http.createServer(async (req, res) => {
     if (isVaultUiPath(url.pathname)) return await secretsForward(req, res, url);   // no CORS headers: same-origin loopback only
     if (req.method === "OPTIONS") return send(204, "", "text/plain");
     // the app's static web build
+    // An app built with a base path (Expo's experiments.baseUrl, for example /static) asks for its files under that path.
+    { const base = appBase();
+      if (base && url.pathname.startsWith(base + "/")) {
+        const p = distFile(url.pathname.slice(base.length));
+        if (p) return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
+      } }
     if (url.pathname.startsWith("/_expo/") || url.pathname.startsWith("/assets/") || url.pathname === "/favicon.ico") {
-      const p = join(DIST, decodeURIComponent(url.pathname)); if (existsSync(p)) return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
+      const p = distFile(url.pathname); if (p) return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
     }
     // released web artifacts, proxied from the control plane and cached (immutable per release)
     if (url.pathname.startsWith("/w/")) {
@@ -809,7 +1088,7 @@ const server = http.createServer(async (req, res) => {
         return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
       } }
     if (url.pathname.startsWith("/app/")) {
-      let p = join(DIST, url.pathname.slice(5) || "index.html"); if (!existsSync(p) || statSync(p).isDirectory()) p = join(DIST, "index.html");
+      const p = distFile(url.pathname.slice(5)) ?? join(DIST, "index.html");   // any other path is a screen of the app: serve the app
       if (extname(p) === ".html") return send(200, withAppName(readFileSync(p, "utf8"), APP_NAME), MIME[".html"]);
       return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
     }
@@ -836,6 +1115,18 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/phone") { const id = url.searchParams.get("session") ?? ""; return send(200, phonePage(url.searchParams.get("skin") === "ios" ? "ios" : url.searchParams.get("skin") === "android" ? "android" : sessions.get(id)?.skin, id), MIME[".html"]); }
     if (req.method === "GET" && url.pathname === "/phone/apps") { const id = url.searchParams.get("session") ?? ""; if (!sessions.has(id)) return send(404, { ok: false, code: "no_session", error: "no such session" }); try { const { screen: _s, ...r } = await act(id, { action: "phone_apps" }); return send(200, { ok: true, ...r }); } catch (e) { return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}) }); } }
     if (req.method === "GET" && url.pathname === "/watch") { const list = watchList(sessions); const want = url.searchParams.get("skin"); return send(200, watchPage(want ?? (url.searchParams.get("session") ? sessions.get(url.searchParams.get("session"))?.skin : null) ?? list[0]?.skin, url.searchParams.get("session") ?? "", { hosted: url.searchParams.get("hosted") === "1", takeOver: url.searchParams.get("takeover") === "1", signin: url.searchParams.get("signin") ?? "" }), MIME[".html"]); }
+    // A2UI: the Shipvo catalog, the page of an A2UI session, its surfaces as HTML, and what the person did on it.
+    if (req.method === "GET" && url.pathname === "/a2ui/catalog.json") return send(200, catalogDocument());
+    { const am = url.pathname.match(/^\/a2ui\/([^/]+)\/(html|op)?$/);
+      if (am) {
+        const key = decodeURIComponent(am[1]), host = a2uiHosts.get(key);
+        if (!host) return send(404, { ok: false, code: "no_session", error: "no A2UI session with that id" });
+        if (!am[2] && req.method === "GET") return send(200, a2uiPage(key), MIME[".html"]);
+        // The page asks with the rev it has: nothing new means no HTML is sent.
+        if (am[2] === "html" && req.method === "GET") return send(200, Number(url.searchParams.get("rev")) === host.rev ? { rev: host.rev } : { rev: host.rev, html: host.html() });
+        if (am[2] === "op" && req.method === "POST") { let b = ""; for await (const ch of req) { b += ch; if (b.length > 65536) return send(413, { error: "too_large" }); } let j; try { j = JSON.parse(b || "{}"); } catch { return send(400, { error: "bad_json" }); } const r = host.op(j); return send(200, { ok: r.ok, ...(r.code ? { code: r.code } : {}), rev: host.rev }); }
+        return send(404, { error: "not found" });
+      } }
     // Spec apps: the page for an app's current screen, and the control events the page sends back.
     { const sp = url.pathname.match(/^\/spec\/([^/]+)\/([a-z0-9-]+)\/(op)?$/);
       if (sp) {
@@ -843,11 +1134,15 @@ const server = http.createServer(async (req, res) => {
         if (!isOp && req.method === "GET") { const html = specHost.page(key, app); return html ? send(200, html, MIME[".html"]) : send(404, { error: "no_app" }); }
         if (isOp && req.method === "POST") { let b = ""; for await (const ch of req) { b += ch; if (b.length > 65536) return send(413, { error: "too_large" }); } let j; try { j = JSON.parse(b || "{}"); } catch { return send(400, { error: "bad_json" }); } return send(200, specHost.op(key, app, j)); }
       } }
+    // A page load of an address this server does not know is a screen of the local app (a reload or a deep link in an app
+    // with a router): send it to the app under /app/, which serves the app for any path.
+    if (req.method === "GET" && req.headers["sec-fetch-dest"] === "document" && existsSync(join(DIST, "index.html"))) { res.writeHead(302, { location: `/app${url.pathname}${url.search}`, ...CORS }); return res.end(); }
     // agent API
     if (req.method !== "POST") return send(404, { error: "not found" });
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
     if (url.pathname === "/apps") return send(200, { ok: true, apps: [{ id: DEFAULT_APP, name: APP_NAME }] });
-    if (url.pathname === "/sessions") return send(200, { ok: true, sessions: await Promise.all([...sessions.entries()].map(async ([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, skin: s.skin, streaming: isWatched(s) || !!s.browser?.screencast, url: s.page.url(), room: s.room ?? null, title: await s.page.title().catch(() => "") }))) });
+    if (url.pathname === "/models") return send(200, { ok: true, models: MODELS.map(({ name, platform, width, height, scale }) => ({ name, platform, width, height, scale })), defaults: DEFAULT_MODEL });
+    if (url.pathname === "/sessions") return send(200, { ok: true, sessions: await Promise.all([...sessions.entries()].map(async ([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, skin: s.skin, model: s.model ?? null, streaming: isWatched(s) || !!s.browser?.screencast, url: s.page.url(), room: s.room ?? null, title: await s.page.title().catch(() => "") }))) });
     if (url.pathname === "/room_log" || url.pathname === "/room_note") {
       const room = String(body.room ?? "");
       if (!rooms.has(room)) return send(200, { ok: false, code: "no_room", error: `no open room "${room}"` });
@@ -864,7 +1159,34 @@ const server = http.createServer(async (req, res) => {
       return send(200, { ok: true, entries: l.entries.filter((e) => e.n > since), cursor: String(l.n) });
     }
     if (url.pathname === "/end") return send(200, { ok: true, ended: await endSession(String(body.session)) });
-    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof BuildCacheError || (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_room" || e.code === "bad_app"))) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, ...(s.build ? { build: s.build } : {}), screen: await screen(s.page) }); }
+    // Every phone on this simulator, to move them to another one (the hosted service does this when it deploys a new version).
+    if (url.pathname === "/phones/export") {
+      const phones = [];
+      for (const [id, s] of sessions) {
+        const bk = backendOf(id, s.room);
+        const read = (f) => { try { return readFileSync(join(DIR, f), "utf8"); } catch { return null; } };
+        let backup = null; try { backup = (await act(id, { action: "backup_phone" })).backup; } catch {}
+        phones.push({ session: id, app: s.app, release: s.release ?? null, skin: s.skin, room: s.room ?? null, backend: read(`${bk}.json`) == null ? null : { store: read(`${bk}.json`), log: read(`${bk}.json.log`) ?? "" }, backup });
+      }
+      return send(200, { ok: true, format: PHONES_FORMAT, at: new Date().toISOString(), phones });
+    }
+    // Recreates the phones of an export: same session id, app release, skin and room, then the backup and the app's mock backend.
+    if (url.pathname === "/phones/import") {
+      let phones, skipped; try { ({ phones, skipped } = checkPhones(body)); } catch (e) { if (e instanceof CarryoverError) return send(200, { ok: false, code: e.code, error: e.message }); throw e; }
+      const imported = [], failed = [], done = new Set();
+      for (const p of phones) {
+        try {
+          await newSession(p.session, { app: appSpecOf(p.app, p.release), skin: p.skin, ...(p.room ? { room: p.room } : {}) });
+          const bk = backendOf(p.session, p.room ?? undefined);
+          if (p.backend && !done.has(bk)) { writeFileSync(join(DIR, `${bk}.json`), p.backend.store); writeFileSync(join(DIR, `${bk}.json.log`), p.backend.log ?? ""); done.add(bk); }
+          if (p.backup) { const r = await act(p.session, { action: "restore_phone", backup: p.backup, replace: true }); if (r.failed?.length) failed.push({ session: p.session, error: `store apps not restored: ${r.failed.map((f) => f.id).join(", ")}` }); }
+          imported.push(p.session);
+        } catch (e) { failed.push({ session: p.session, error: String(e?.message ?? e).split("\n")[0] }); }
+      }
+      for (const s of skipped) failed.push({ session: s.session, error: s.error });
+      return send(200, { ok: true, imported, ...(failed.length ? { failed } : {}) });
+    }
+    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof BuildCacheError || (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_model" || e.code === "bad_room" || e.code === "bad_app"))) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, ...(s.build ? { build: s.build } : {}), ...(s.model ? { model: s.model, skin: s.skin } : {}), ...(a2uiHosts.get(body.session)?.opened ?? {}), screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const s0 = sessions.get(body.session); const prevScreen = s0?.lastScreen; const r = await act(body.session, body);
         if (s0 && typeof r.screen === "string") { s0.lastScreen = r.screen; watch.step(body.session, describeStep(body, prevScreen), changeLine(prevScreen, r.screen)); }
@@ -915,5 +1237,8 @@ server.on("upgrade", (req, socket) => {
 });
 // Agents and parity runs pause between actions; keep idle connections open well beyond Node's 5 s default.
 server.keepAliveTimeout = 300_000; server.headersTimeout = 310_000; server.requestTimeout = 0;
-server.listen(PORT, () => console.log(`Shipvo UI simulator on http://localhost:${PORT} (sessions in ${DIR})`));
+// The simulator listens on this machine only (127.0.0.1): a phone session can read app data, so nothing else on the
+// network reaches it by default. --host (or SHIPVO_SIM_HOST) names another address, for example 0.0.0.0 for every interface.
+const HOST = arg("host", process.env.SHIPVO_SIM_HOST || "127.0.0.1");
+server.listen(PORT, HOST, () => console.log(`Shipvo UI simulator on http://${HOST === "127.0.0.1" ? "localhost" : HOST}:${PORT} (sessions in ${DIR})`));
 launchBrowser();

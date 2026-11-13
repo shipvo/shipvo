@@ -1,2 +1,0 @@
-- docs: Self-hosting now documents the saved-key (vault) routes, the simulator's `/vault-ui/*` forward and the `rotations` array in the pointer response. Getting started documents the playground Many phones link parameters. The glossary has a Vault entry.
-- Migration: none.
