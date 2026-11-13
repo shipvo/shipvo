@@ -1,0 +1,5 @@
+- `@shipvo/sim`: Shipvo Phone reads A2UI version 1.0. `POST /session` with `a2ui: true` opens a session that draws A2UI surfaces: every component of the A2UI basic catalog, data bindings, list templates, checks and function calls. The `a2ui_send` action applies more messages one piece at a time, and `a2ui_actions` returns the A2UI `action` messages the screen sent to the agent. The engine is exported as `@shipvo/sim/a2ui.mjs`.
+- `@shipvo/sim`: the Shipvo Phone catalog (Stat, Badge, Progress) is an A2UI catalog document, served at `/a2ui/catalog.json`.
+- `@shipvo/sim`: a function that needs a person's tap (`openUrl`) runs only from a tap, never from a binding or from the agent's `callRendererFunction`.
+- `@shipvo/cli`: `shipvo session start --a2ui <file>` opens A2UI messages on a phone with no app folder; `shipvo session a2ui send <file>` and `shipvo session a2ui actions` send more messages and read the actions. See `docs/a2ui.md`.
+- Migration: none; new session kind, new actions and new commands.

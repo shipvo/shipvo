@@ -49,6 +49,8 @@ import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError 
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 import { statusFromDevice } from "./frame.mjs";
 import { MODELS, DEFAULT_MODEL, findModel, modelContext } from "./models.mjs";
+import { createA2ui, catalogDocument } from "./a2ui.mjs";
+import { a2uiPage } from "./a2ui-page.mjs";
 import { capturePage, contentSize, showShot, shotArgs, encodeFrames, CaptureError } from "./capture.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
@@ -101,6 +103,8 @@ const browserReady = new Promise((resolve, reject) => { launchBrowser = () => {
 }; });
 browserReady.catch((e) => { console.error(`sim: ${launchErrorMessage(e.message, pwVersion)}`); process.exit(1); });
 const sessions = new Map();
+// A2UI sessions: the surfaces of each session, by session id. The session's page draws them and reports what the person does.
+const a2uiHosts = new Map();
 
 const phone = { ...devices["Pixel 5"], viewport: { width: 393, height: 851 } };
 // An app page is ready when it has loaded. The simulator also waits for the network to go quiet, but only for a while:
@@ -211,7 +215,7 @@ function appBase() {
   return appBaseCache.base;
 }
 // Pages of this server that are not the local app: other apps, builds, releases, the session backend and the simulator's own pages.
-const NOT_THE_APP = /^\/(?:app|spec|b|w|s|phone|browser|watch|_expo|assets)(?:\/|$)/;
+const NOT_THE_APP = /^\/(?:app|spec|a2ui|b|w|s|phone|browser|watch|_expo|assets)(?:\/|$)/;
 /** The address a session's page is at, for comparing with an app's address. In a root_mount session the local app's screens are at /, /feed/1 and so on: all of them are the app at /app/. */
 function whereOf(s, pageUrl) {
   if (!s.rootMount) return pageUrl;
@@ -220,7 +224,7 @@ function whereOf(s, pageUrl) {
 }
 async function endSession(id) {
   const s = sessions.get(id); if (!s) return false;
-  specHost.dropSession(id);
+  specHost.dropSession(id); a2uiHosts.delete(id);
   await stopRecording(s).catch(() => {}); await s.frameCtx?.close().catch(() => {});
   for (const p of s.peers ?? []) p.close(); closeWatchers(s);
   await (await s.browserP?.catch(() => undefined))?.close(); await s.ctx.close().catch(() => {});
@@ -241,6 +245,11 @@ async function newSession(id, opts = {}) {
     BUILDS.set(b.id, b.root);
     buildId = typeof opts.build === "string" && /^[\w-]{1,64}$/.test(opts.build) ? opts.build : b.id;
     target = { app: spec[1], url: `http://localhost:${PORT}/b/${b.id}/index.html`, release: `build:${buildId}` };
+  } else if (opts.a2ui === true) {
+    // An A2UI session shows surfaces an agent describes, not an app build. Messages given here are applied before the page opens.
+    const host = createA2ui(); a2uiHosts.set(id, host);
+    if (opts.a2ui_messages !== undefined) host.applyAll(opts.a2ui_messages);
+    target = { app: "a2ui", url: `http://localhost:${PORT}/a2ui/${encodeURIComponent(id)}/`, release: "a2ui" };
   } else target = await resolveApp(opts.app);
   const bk = backendOf(id, room);
   if (!room || !rooms.has(room)) { writeFileSync(join(DIR, `${bk}.json`), JSON.stringify({ orders: [] })); writeFileSync(join(DIR, `${bk}.json.log`), ""); }
@@ -1003,6 +1012,17 @@ async function act(id, body) {
       if (body.frame === true) { buf = await framed(s, buf, jpeg ? "image/jpeg" : "image/png", jpeg); writeFileSync(p, buf); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
+    case "a2ui_send": case "a2ui_actions": {
+      const host = a2uiHosts.get(id);
+      if (!host) throw new SimError("not_a2ui", "this session is not an A2UI session: open it with a2ui: true");
+      if (body.action === "a2ui_actions") return { ...host.take(body.since), effects: host.effects, surfaces: host.surfaceIds() };
+      const input = body.jsonl ?? body.messages;
+      if (input === undefined) throw new SimError("bad_message", "a2ui_send needs messages (a list) or jsonl (one message per line)");
+      const r = host.applyAll(input);
+      // The page asks for changes every 250 ms: give it time to draw this one before the screen is read.
+      await page.waitForFunction((rev) => globalThis.__a2uiRev === undefined || globalThis.__a2uiRev >= rev, host.rev, { timeout: 3000 }).catch(() => {}); await page.waitForTimeout(350);
+      return { ...r, surfaces: host.surfaceIds(), screen: await screen(page) };
+    }
     case "record_start": {
       if (s.rec) throw new SimError("recording_active", "a recording is already running: call record_stop first");
       const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
@@ -1018,7 +1038,7 @@ async function act(id, body) {
       if (!video) throw new SimError("no_recording", "no recording is running: call record_start first");
       return { ...video, screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: record_start, record_stop, permission_log, screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for, search_phone, share_targets, share, get_clipboard, set_clipboard, set_reminder, list_reminders, cancel_reminder, backup_phone, restore_phone, get_connectivity, set_connectivity`);
+    default: throw new Error(`unknown action '${body.action}'. Actions: a2ui_send, a2ui_actions, record_start, record_stop, permission_log, screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for, search_phone, share_targets, share, get_clipboard, set_clipboard, set_reminder, list_reminders, cancel_reminder, backup_phone, restore_phone, get_connectivity, set_connectivity`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }
@@ -1094,6 +1114,18 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/phone") { const id = url.searchParams.get("session") ?? ""; return send(200, phonePage(url.searchParams.get("skin") === "ios" ? "ios" : url.searchParams.get("skin") === "android" ? "android" : sessions.get(id)?.skin, id), MIME[".html"]); }
     if (req.method === "GET" && url.pathname === "/phone/apps") { const id = url.searchParams.get("session") ?? ""; if (!sessions.has(id)) return send(404, { ok: false, code: "no_session", error: "no such session" }); try { const { screen: _s, ...r } = await act(id, { action: "phone_apps" }); return send(200, { ok: true, ...r }); } catch (e) { return send(200, { ok: false, error: String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}) }); } }
     if (req.method === "GET" && url.pathname === "/watch") { const list = watchList(sessions); const want = url.searchParams.get("skin"); return send(200, watchPage(want ?? (url.searchParams.get("session") ? sessions.get(url.searchParams.get("session"))?.skin : null) ?? list[0]?.skin, url.searchParams.get("session") ?? "", { hosted: url.searchParams.get("hosted") === "1", takeOver: url.searchParams.get("takeover") === "1", signin: url.searchParams.get("signin") ?? "" }), MIME[".html"]); }
+    // A2UI: the Shipvo catalog, the page of an A2UI session, its surfaces as HTML, and what the person did on it.
+    if (req.method === "GET" && url.pathname === "/a2ui/catalog.json") return send(200, catalogDocument());
+    { const am = url.pathname.match(/^\/a2ui\/([^/]+)\/(html|op)?$/);
+      if (am) {
+        const key = decodeURIComponent(am[1]), host = a2uiHosts.get(key);
+        if (!host) return send(404, { ok: false, code: "no_session", error: "no A2UI session with that id" });
+        if (!am[2] && req.method === "GET") return send(200, a2uiPage(key), MIME[".html"]);
+        // The page asks with the rev it has: nothing new means no HTML is sent.
+        if (am[2] === "html" && req.method === "GET") return send(200, Number(url.searchParams.get("rev")) === host.rev ? { rev: host.rev } : { rev: host.rev, html: host.html() });
+        if (am[2] === "op" && req.method === "POST") { let b = ""; for await (const ch of req) { b += ch; if (b.length > 65536) return send(413, { error: "too_large" }); } let j; try { j = JSON.parse(b || "{}"); } catch { return send(400, { error: "bad_json" }); } const r = host.op(j); return send(200, { ok: r.ok, ...(r.code ? { code: r.code } : {}), rev: host.rev }); }
+        return send(404, { error: "not found" });
+      } }
     // Spec apps: the page for an app's current screen, and the control events the page sends back.
     { const sp = url.pathname.match(/^\/spec\/([^/]+)\/([a-z0-9-]+)\/(op)?$/);
       if (sp) {

@@ -54,6 +54,16 @@ How to work:
 
 When a command fails, `code` says what to do: `web_deps_missing` (run the command in `next`), `build_failed` (the summary names the cause), `bad_model` (use a name from `shipvo session devices`), `stale_ref` (read the screen again), `covered` (something is on top of that element: close it or tap the one on top), `no_session` or `session_stopped` (start a session). Full workflow and what the phone does for real apps: `references/session.md`.
 
+## Open an A2UI screen on a phone
+
+```bash
+shipvo session start --a2ui booking.jsonl --device "iPhone 16 Pro" --json   # A2UI 1.0 messages; no app folder needed
+shipvo session a2ui send update.jsonl     # change the open screen one message at a time
+shipvo session a2ui actions               # the action messages the screen sent to the agent
+```
+
+`screen`, `tap`, `type`, `screenshot` and `record` work as in any session. Details: `docs/a2ui.md`.
+
 ## Test it through @shipvo/mcp
 
 Add the server to your MCP config (`shipvo mcp` prints it):

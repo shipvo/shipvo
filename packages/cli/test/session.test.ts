@@ -106,6 +106,53 @@ describe("shipvo session", () => {
     expect("root_mount" in plain.state.posts[0].body).toBe(false);
   });
 
+  it("start --a2ui opens A2UI messages on a phone from a folder that is not an app", async () => {
+    const { deps, state, root } = setup({ name: "not-an-app" });
+    const lines = [{ version: "1.0", createSurface: { surfaceId: "s", components: [{ id: "root", component: "Text", text: "Hi" }] } }].map((x) => JSON.stringify(x)).join("\n");
+    writeFileSync(join(root, "ui.jsonl"), lines);
+    const { doc, exit } = await run(deps, ["start", "--a2ui", "ui.jsonl", "--device", "iPhone 16 Pro"]);
+    expect(exit).toBe(0); expect(doc.code).toBe("started");
+    expect(doc.data).toMatchObject({ app: "a2ui", name: "A2UI ui.jsonl", device: "iPhone 16 Pro", platform: "ios" });
+    expect(state.builds).toBe(0);
+    expect(state.posts[0].body).toEqual({ session: doc.data.id, a2ui: true, a2ui_messages: lines, model: "iPhone 16 Pro" });
+    writeFileSync(join(root, "ui.json"), JSON.stringify([{ version: "1.0", deleteSurface: { surfaceId: "s" } }]));
+    await run(deps, ["start", "--a2ui", "ui.json"]);
+    expect(state.posts.at(-1)!.body.a2ui_messages).toEqual([{ version: "1.0", deleteSurface: { surfaceId: "s" } }]);
+  });
+
+  it("a2ui send streams more messages and a2ui actions reads what the screen sent to the agent", async () => {
+    const { deps, state, root } = setup({ name: "x" });
+    writeFileSync(join(root, "ui.jsonl"), JSON.stringify({ version: "1.0", createSurface: { surfaceId: "s" } }));
+    const id = (await run(deps, ["start", "--a2ui", "ui.jsonl"])).doc.data.id;
+    writeFileSync(join(root, "more.jsonl"), JSON.stringify({ version: "1.0", updateDataModel: { surfaceId: "s", path: "/n", value: 2 } }));
+    state.reply.a2ui_send = { ok: true, applied: 1, errors: [], surfaces: ["s"], screen: "- paragraph: two" };
+    const sent = await run(deps, ["a2ui", "send", "more.jsonl"]);
+    expect(sent.doc.code).toBe("sent"); expect(sent.doc.data).toMatchObject({ applied: 1, errors: [], surfaces: ["s"] });
+    expect(state.posts.at(-1)!.body).toEqual({ session: id, action: "a2ui_send", jsonl: JSON.stringify({ version: "1.0", updateDataModel: { surfaceId: "s", path: "/n", value: 2 } }) });
+    state.reply.a2ui_send = { ok: true, applied: 0, errors: [{ code: "VALIDATION_FAILED", message: "no surface" }], surfaces: ["s"], screen: "" };
+    expect((await run(deps, ["a2ui", "send", "more.jsonl"])).doc.code).toBe("a2ui_errors");
+    const action = { version: "1.0", action: { name: "confirm", surfaceId: "s", sourceComponentId: "go", timestamp: "2026-11-13T10:00:00.000Z", context: {} } };
+    state.reply.a2ui_actions = { ok: true, messages: [action], next: 1, effects: [], surfaces: ["s"] };
+    const got = await run(deps, ["a2ui", "actions", "--since", "0"]);
+    expect(got.doc.code).toBe("actions"); expect(got.doc.data.messages).toEqual([action]); expect(got.doc.data.next).toBe(1);
+    expect(state.posts.at(-1)!.body).toEqual({ session: id, action: "a2ui_actions", since: 0 });
+  });
+
+  it("a missing or empty A2UI file, and a bad a2ui command, are usage errors", async () => {
+    const { deps, root, state } = setup({ name: "x" });
+    const missing = await run(deps, ["start", "--a2ui", "nope.jsonl"]);
+    expect(missing.exit).toBe(2); expect(missing.doc.code).toBe("no_file");
+    writeFileSync(join(root, "empty.jsonl"), "  \n");
+    expect((await run(deps, ["start", "--a2ui", "empty.jsonl"])).doc.code).toBe("no_file");
+    writeFileSync(join(root, "bad.json"), "[not json");
+    expect((await run(deps, ["start", "--a2ui", "bad.json"])).doc.code).toBe("bad_message");
+    expect(state.posts).toEqual([]);
+    writeFileSync(join(root, "ok.jsonl"), JSON.stringify({ version: "1.0", createSurface: { surfaceId: "s" } }));
+    await run(deps, ["start", "--a2ui", "ok.jsonl"]);
+    expect((await run(deps, ["a2ui"])).exit).toBe(2);
+    expect((await run(deps, ["a2ui", "send"])).exit).toBe(2);
+  });
+
   it("devices lists the phone models with their screen size and the defaults", async () => {
     const { deps } = setup();
     const { doc, exit } = await run(deps, ["devices"]);

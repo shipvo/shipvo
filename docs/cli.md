@@ -192,10 +192,12 @@ shipvo session screen | tap <ref> | type <ref> <text> | scroll <up|down|left|rig
 shipvo session screenshot [--out <file>] [--no-frame]
 shipvo session record start | record stop [--out <file>]
 shipvo session errors
+shipvo session start --a2ui <file> [--device "<model>"]
+shipvo session a2ui send <file> | a2ui actions [--since <n>]
 shipvo session get | list | stop | clean
 ```
 
-Commands after `start` act on the newest running session; `--id <id>` names one. The session stops on its own after `--max-duration-minutes`. Screenshots and recordings show the phone in its Android or iPhone frame with the status bar. Steps, JSON fields and error codes: [Test any Expo app from the terminal](session.md).
+Commands after `start` act on the newest running session; `--id <id>` names one. The session stops on its own after `--max-duration-minutes`. Screenshots and recordings show the phone in its Android or iPhone frame with the status bar. `--a2ui` opens A2UI messages on the phone with no app folder: see [A2UI on Shipvo Phone](a2ui.md). Steps, JSON fields and error codes: [Test any Expo app from the terminal](session.md).
 
 ## `shipvo smoke`
 
