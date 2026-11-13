@@ -13,8 +13,8 @@ Order of priority when choosing work: **correctness and safety of updates > reli
 ## Themes
 
 ### 1. Update safety and reach
-- Shells declare the Hermes bytecode version they run, and mismatched releases are refused (epic #14).
-- bsdiff patches on iOS (issue #2); measure OTA apply time on the iOS Simulator in CI (issue #1).
+- Shells declare the Hermes bytecode version they run, and mismatched releases are refused (epic #14, done). bsdiff patches and measured apply time on Android and iOS (epic #15, done).
+- Release health at a glance: one per-release view in the API, `shipvo status --json` and `/admin`, then rollouts stated as a percentage (epic #1614).
 - Stronger rollback: rollback by cohort, automatic rollback on crash-rate thresholds from telemetry.
 - Docker self-hosting target for the control plane.
 - Resumable and delta downloads on slow networks; measure on low-end Android.
@@ -44,6 +44,11 @@ Order of priority when choosing work: **correctness and safety of updates > reli
 ## Now
 
 The planner keeps this list current: the epics in flight, newest owner direction first. Each line links its epic; open the epic for its slices.
+
+The three bets of the 2026-11-10 strategy review come first, because they move adoption and trust ([strategy](product/strategy.md)):
+- Adopt mode proven on Expo managed, Expo prebuilt and bare React Native apps, to a first healthy update on the Android emulator and the iOS Simulator (#1613)
+- Release health at a glance: applied, healthy, reverted and halted per release in the API, CLI and `/admin` (#1614)
+- The Shipvo release format as an open spec with conformance vectors (#1615)
 
 **Lumi (owner direction, 6 Nov 2026):**
 - Lumi in every Shipvo Phone: the assistant that shows each step live, reacts to results, appears in recordings and guides new users (#872)
@@ -77,9 +82,8 @@ The planner keeps this list current: the epics in flight, newest owner direction
 - Enterprise access and hosting: single sign-on, roles, private deployment, LTS (#296)
 
 **Finishing:**
-- A bundle never reaches a shell that cannot run it (#14)
-- iOS reaches Android update quality (#15)
-- First run in under 10 minutes, and measured (#16)
+- Releases declare a state version, and rollbacks refuse code that cannot read stored data (#1414)
+- A patch that runs out of memory falls back to the full download (#1444)
 
 ## Shipped
 
