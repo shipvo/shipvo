@@ -56,7 +56,7 @@ describe("shipvo session", () => {
     expect(state.builds).toBe(1);
     expect(state.watchdog).toBe(20 * 60_000);
     expect(state.watched).toEqual({ port: 5123, id: doc.data.id });
-    expect(state.posts[0]).toEqual({ path: "/session", body: { session: doc.data.id, app: "my-shop", skin: "ios", fit_frame: true } });
+    expect(state.posts[0]).toEqual({ path: "/session", body: { session: doc.data.id, app: "my-shop", skin: "ios", device: { platform: "ios" }, fit_frame: true } });
     expect(readFileSync(join(root, ".gitignore"), "utf8")).toContain(".shipvo/");
   });
 

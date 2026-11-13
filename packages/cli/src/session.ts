@@ -137,7 +137,7 @@ export async function startSession(d: SessionDeps, o: { platform: Platform; name
   mkdirSync(join(dirOf(d.root), id), { recursive: true });
   const pid = await d.startServer({ server, port, app: info.app, dir: join(dirOf(d.root), id), root: d.root });
   let opened: any;
-  try { opened = await post(d, port, "/session", { session: id, app: info.app, skin: o.platform, fit_frame: true }); }
+  try { opened = await post(d, port, "/session", { session: id, app: info.app, skin: o.platform, device: { platform: o.platform }, fit_frame: true }); }
   catch (e) { d.kill(pid); throw e; }
   if (!opened?.ok) { d.kill(pid); throw new CliFailure(`The app did not open: ${opened?.error ?? "unknown error"}`, opened?.code ?? "open_failed", 1); }
   const started = d.now();
