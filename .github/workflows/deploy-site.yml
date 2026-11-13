@@ -27,8 +27,15 @@ jobs:
       - name: Say when the chess snapshot was served
         if: steps.chess.outcome == 'failure'
         run: echo "::warning::Chess demo build failed; serving the committed snapshot."
+      # The playground OTA panel signs and verifies with the built CLI and reads the built schema (services/site/playground-ota.mjs).
+      - name: Build the CLI and schema
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile --filter "@shipvo/cli..." --filter "@shipvo/site..."
+          pnpm --filter "@shipvo/cli..." build
+          test -f packages/cli/dist/index.js && test -f packages/schema/dist/index.js
       - name: Build docs from the repo Markdown
-        run: npm i --no-audit --no-fund --no-save marked@14 && node services/site/build.mjs
+        run: node services/site/build.mjs
       - name: Media bucket (R2)
         working-directory: services/site
         env:

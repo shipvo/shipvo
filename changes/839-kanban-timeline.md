@@ -1,3 +1,0 @@
-- `@shipvo/spec`: new `kanban` block (columns, cards with title and detail, `onMove` action) and `timeline` block (dated entries grouped by day). Both appear in the labelled screen tree on the Android and iPhone skins, and the validator checks columns and dates with a path and a fix.
-- `@shipvo/spec`: `App.move(card, column)` moves a kanban card and runs its `onMove` action.
-- Migration: none; new block types and a new method.

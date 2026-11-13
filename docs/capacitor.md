@@ -1,6 +1,10 @@
 # Build a Capacitor app in your own GitHub Actions
 
-Shipvo gives you a workflow that builds signed Android and iOS binaries in your own repository. You do not need EAS.
+This page is for developers with a Capacitor project who want signed Android and iOS builds from their own GitHub repository. You will see your app in the simulator, add one workflow, set the signing secrets, and get a signed `.aab` and `.ipa` as run artifacts. You do not need EAS.
+
+## See it in the simulator
+
+From a Capacitor project, after `npx cap sync` or your web build, run `shipvo sim` or `shipvo preview`. Shipvo opens the built web folder (`webDir` in `capacitor.config.*`) on the Android and iOS skins. Expo apps build as before.
 
 ## Add the workflow
 
@@ -56,8 +60,6 @@ The output is a signed `.ipa` in the `ios-release` artifact.
 
 ## Upload to the stores
 
-The iOS job has not been run on a macOS runner in this repo yet; the template is checked by a parse test only. Your first run is the check.
-
 The template stops at the signed files. Download them from the run's artifacts and upload them with Play Console and Transporter, or add your own upload step. It uses the certificate and profile route, not an App Store Connect API key.
 
 ---
@@ -102,4 +104,17 @@ npx eas-cli build:version:set -p ios
 
 Then `npx eas-cli submit -p ios --profile shipvo-ios` (or `-p android`) after a build finishes.
 
-The generated YAML has not been run against a live Expo account in this repo yet. Treat the first build as the check, and edit the YAML if a step name differs in your EAS CLI version.
+## Troubleshooting
+
+- **`eas-cli submit` asks for a profile.** Pass the profile the template creates: `--profile shipvo-ios` or `--profile shipvo-android`.
+- **iOS says the build number was already used.** Set it with `npx eas-cli build:version:set -p ios`, then build again.
+- **`shipvo sim` says `No index.html in <folder>. Build your web app first`.** The `webDir` folder in `capacitor.config.*` is empty or missing. Run `npm run build`, then `npx cap copy`, and start `shipvo sim` again.
+- **`capacitor.config webDir "<path>" is outside the project`.** `webDir` must point inside the project folder. Change it to a folder under the project root, for example `dist`.
+- **`This is not a Capacitor project`.** Run the command in the folder that holds `capacitor.config.*` and an `android/` or `ios/App/App.xcodeproj` folder.
+- **An Expo app in the same repo opens as Expo.** A project with `app.json` or `app.config.*` is treated as an Expo app and builds with `expo export`, as before.
+
+## Next steps
+
+- [Store path](store.md): take the signed builds to Google Play and the App Store.
+- [Adapters](adapters.md): what a runtime port covers for Capacitor web bundles.
+- [Getting started](getting-started.md): create an app and run it in the simulator.

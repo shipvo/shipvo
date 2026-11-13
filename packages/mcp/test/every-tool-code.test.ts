@@ -13,9 +13,12 @@ let out = ""; let fake: http.Server; let port = 0;
 // Tools that take no session, so an unknown session id does not apply. Every other registered tool must.
 const NO_SESSION: Record<string, string> = {
   list_apps: "lists apps, takes no session",
+  phone_models: "lists the phone models a session can be, takes no session",
   open_app: "creates a session",
+  a2ui_open: "creates a session",
   attach_session: "creates a session",
   upload_build: "builds the project folder, takes no session",
+  job_status: "reads a slow job by id, takes no session",
   publish_preview: "builds the app folder, takes no session",
   owner_describe: "owner tool, works on an app",
   owner_command: "owner tool, works on an app",
@@ -27,6 +30,8 @@ const NO_SESSION: Record<string, string> = {
   request_app_install: "works on the person's phone, takes no session",
   list_installed_apps: "works on the person's phone, takes no session",
   list_store_apps: "lists the marketplace, takes no session",
+  room_log: "reads a room, takes no session id",
+  room_note: "posts to a room, takes no session id",
   list_sessions: "lists all sessions, takes no session id",
   record_start: "records the phone frame page, takes no session id",
   record_marker: "adds a chapter to the running recording, takes no session id",

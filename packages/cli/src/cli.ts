@@ -20,6 +20,7 @@ import { signingKey } from "./signing.js";
 import { keysJson } from "./keys-json.js";
 import { appCmd } from "./app.js";
 import { status } from "./status.js";
+import { session } from "./session.js";
 import { agentsCmd } from "./agents.js";
 import { doctor } from "./doctor.js";
 import { audit } from "./audit.js";
@@ -39,6 +40,7 @@ try {
 switch (cmd) {
   case "init": await init(rest); break;
   case "sim": await sim(rest); break;
+  case "session": process.exitCode = await session(rest); break;
   case "explore": process.exitCode = await explore(rest); break;
   case "lumi": process.exitCode = await lumi(rest); break;
   case "smoke": process.exitCode = await smoke(rest); break;
@@ -62,7 +64,7 @@ switch (cmd) {
   case "ci": process.exitCode = await ci(rest); break;
   case "eas": process.exitCode = await easCmd(rest); break;
   case "app": await appCmd(rest); break;
-  case "keys": if (rest.includes("--json")) await keysJson(rest); else if (rest[0] === "export" || rest[0] === "import" || rest[0] === "rotate") await signingKey(rest); else await keys(); break;
+  case "keys": if (rest.includes("--json")) await keysJson(rest); else if (rest[0] === "export" || rest[0] === "import" || rest[0] === "rotate" || rest[0] === "root") await signingKey(rest); else await keys(); break;
   case "mcp": mcp(); break;
   case "keygen": {
     const s = b64(randomBytes(32)); const out = rest[rest.indexOf("--out") + 1];

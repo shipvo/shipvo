@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import { createServer, connect } from "node:net";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { args as parse, loadConfig } from "./config.js";
+import { isCapacitorWeb, copyCapacitorWeb } from "./capacitor-web.js";
 import { openBrowser } from "./run.js";
 import { CliFailure, runJson, takeJson, type Done } from "./json-out.js";
 
@@ -79,13 +80,20 @@ export function watchAndRebuild(opts: { dir: string; build: () => Promise<void>;
   return stop;
 }
 
+/** Arguments for `npx`: the web export. The first build clears the Metro cache; warm rebuilds keep it. */
+export function expoExportArgs(outDir: string, warm = false): string[] {
+  return ["expo", "export", "--platform", "web", ...(warm ? [] : ["--clear"]), "--output-dir", outDir];
+}
+
 /**
  * Builds into `<root>/.shipvo/sim-next` and swaps it into `<root>/sim-dist` only if the build succeeds.
  * The old build is moved aside first and moved back if the swap fails.
  * `command` is the shell command; it gets the output dir as its last argument.
- * A failed build rejects with an Error whose `output` property holds the last 4000 characters of stdout and stderr.
+ * With `warm` the default command keeps the Metro cache, so a small edit only re-transforms the changed file.
+ * A failed build rejects with an Error whose `output` property holds the first and the last 4000 characters of stdout and stderr:
+ * the first error of a build is near the top, and a long stack trace under it must not push it out.
  */
-export function rebuildInto(opts: { root?: string; command?: string; echo?: boolean } = {}): Promise<void> {
+export function rebuildInto(opts: { root?: string; command?: string; echo?: boolean; warm?: boolean } = {}): Promise<void> {
   const root = opts.root ?? process.cwd();
   const next = join(root, ".shipvo", "sim-next"), live = join(root, "sim-dist"), prev = join(root, ".shipvo", "sim-prev");
   return new Promise((resolve, reject) => {
@@ -94,19 +102,20 @@ export function rebuildInto(opts: { root?: string; command?: string; echo?: bool
     // A custom command is a shell string. The default goes through spawnBin so Windows runs npx.cmd.
     const call = opts.command
       ? { command: `${opts.command} "${next}"`, args: [] as string[], shell: true }
-      : spawnBin("npx", ["expo", "export", "--platform", "web", "--clear", "--output-dir", next]);
+      : spawnBin("npx", expoExportArgs(next, opts.warm));
     const p = spawn(call.command, call.args, { cwd: root, shell: call.shell, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "pipe", "pipe"] });
-    let tail = "";
+    let head = "", tail = "";
     // Metro and Expo print resolve errors to either stream, so keep both. `echo` also shows them.
     for (const [stream, out] of [[p.stdout!, process.stdout], [p.stderr!, process.stderr]] as const) {
-      stream.on("data", (d) => { if (opts.echo) out.write(d); tail = (tail + d).slice(-4000); });
+      stream.on("data", (d) => { if (opts.echo) out.write(d); if (head.length < 4000) head = (head + d).slice(0, 4000); else tail = (tail + d).slice(-4000); });
     }
     p.on("error", (e) => { rmSync(next, { recursive: true, force: true }); reject(e); });
     p.on("close", (code) => {
       if (code !== 0) {
         rmSync(next, { recursive: true, force: true });
-        const err = new Error(tail.trim().split("\n").slice(-5).join("\n") || `build exited with code ${code}`);
-        return reject(Object.assign(err, { output: tail }));
+        const output = head + (tail ? `\n${tail}` : "");
+        const err = new Error(output.trim().split("\n").slice(-5).join("\n") || `build exited with code ${code}`);
+        return reject(Object.assign(err, { output }));
       }
       let moved = false;
       try {
@@ -161,7 +170,7 @@ async function simRun(argv: string[], json: boolean): Promise<Done | void> {
   const stdio: "inherit" | ("ignore" | number)[] = json ? ["ignore", 2, 2] : "inherit";
   if (a["skip-build"] !== "true" || !existsSync("sim-dist/index.html")) {
     console.error(`Building ${cfg.name} for the simulator…`);
-    try { execSync("npx expo export --platform web --output-dir sim-dist --clear", { stdio, env: { ...process.env, PN_SIM: "1" } }); }
+    try { if (isCapacitorWeb(process.cwd())) copyCapacitorWeb(process.cwd(), "sim-dist"); else execSync("npx expo export --platform web --output-dir sim-dist --clear", { stdio, env: { ...process.env, PN_SIM: "1" } }); }
     catch (e) { if (!json) throw e; die(`The simulator build failed: ${(e as Error).message.split("\n")[0]}`, 1, "build_failed"); }
   }
   try { ensurePlaywright({ cwd: process.cwd() }); }
@@ -178,7 +187,7 @@ async function simRun(argv: string[], json: boolean): Promise<Done | void> {
     console.error(`Watch the agent: ${watchUrl}`);
     if (shouldOpenWatch({ noOpen: a["no-open"] === "true", json })) openBrowser(watchUrl);
     if (a.watch === "true") {
-      watchAndRebuild({ dir: process.cwd(), build: () => rebuildInto(), verbose: a.verbose === "true" });
+      watchAndRebuild({ dir: process.cwd(), build: () => rebuildInto({ warm: true }), verbose: a.verbose === "true" });
       console.error("Watching for changes (ignoring node_modules, sim-dist, .shipvo, .expo, dist, dist-ota, web-build, ios, android)");
     }
     if (json) return { code: "listening", summary: `Simulator on http://localhost:${port}/app/`, data: { url: `http://localhost:${port}/app/`, port: Number(port), app_id: cfg.appId, watch_url: watchUrl, watch: a.watch === "true" }, next: [{ command: `shipvo explore --json --sim http://localhost:${port}`, why: "Walk the app in the running simulator." }, { command: "shipvo test --json", why: "Run the app's tests." }] };

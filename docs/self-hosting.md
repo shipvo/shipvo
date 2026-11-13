@@ -1,6 +1,6 @@
 # Self-hosting the control plane
 
-The control plane is one Cloudflare Worker (Hono) with a KV namespace and a D1 database. It serves signed release pointers and bundles from the edge, stores content, orders and telemetry, and hosts the per-app admin and owner API. Free-tier Cloudflare is enough to start.
+The control plane is one Cloudflare Worker (Hono) with a KV namespace and a D1 database. It serves signed release pointers and bundles from the edge, stores content, orders and telemetry, and hosts the per-app admin and owner API. This page is for anyone who wants to run their own control plane. You get a working update server on your own Cloudflare account, or on your machine with Docker.
 
 ## Deploy
 
@@ -37,11 +37,11 @@ node ../../scripts/selfhost-smoke.mjs   # in another terminal; prints PASS
 
 On start, the container applies the files in `migrations/` to a local D1 database and adds a local developer key (`SHIPVO_LOCAL_DEV_KEY`, default `sv_test_localdev`). The smoke script uses that key to create an app, publish a signed pointer and read it back. Set the variable to something else if other people can reach your machine, and pass the same value to the script. The value may only contain letters, digits, `_` and `-`. When you change it, the container revokes the earlier local developer key on the next start. The smoke script needs Node 18 or later on the host.
 
-Not covered:
-- No public URL and no TLS. The port is bound to `127.0.0.1` only.
+What the local setup gives you:
+- The port is bound to `127.0.0.1`, so only your machine can reach it.
 - Data lives in the Docker volume `control-plane-data` (`/data` in the container). `docker compose down -v` deletes it.
-- `ADMIN_PASSWORD` and `OWNER_TOKEN` are not set, and GitHub login does not work offline, so only the routes the smoke script uses are exercised.
-- This is not a production setup.
+- The routes the smoke script uses: create an app, publish a signed pointer, read it back. `ADMIN_PASSWORD` and `OWNER_TOKEN` are not set, and GitHub login needs the network.
+- For a public URL with TLS, use the Cloudflare deploy above.
 
 ## D1 Free plan limits
 
@@ -126,6 +126,25 @@ In each app's `shipvo.json` and `app.json` (`@shipvo/runtime` plugin props): `co
 
 `GET /p/:app/:major/:band` pointer · `GET /b/:app/:file` bundle · `GET /w/:app/releases.json`, `GET /w/:app/:rel/*` web artifact · `GET /c/:app/content.json` live content · `POST /o/:app` orders · `POST /t` telemetry, `GET /t/:app` summary · `GET /app/:id/admin` admin · `GET /app/:id/api/describe`, `POST /app/:id/api/command` owner API (bearer `OWNER_TOKEN` or admin session).
 
+### Pointer response and key rotations
+
+`GET /p/:app/:major/:band` returns the signed pointer. When the app has stored key rotations, the response also has a `rotations` array: up to 8 entries, oldest first, each `{ body, signature }`. The rotations are not part of the signed pointer body. The `ETag` changes when a rotation is added (`"<release>-r<sequence>"`), so phones that cached the pointer fetch the new one. A response without rotations is unchanged. Clients that ignore unknown fields keep working. To create a rotation, see `shipvo keys rotate` in the [CLI guide](cli.md).
+
+### Saved-key routes (vault)
+
+The secret vault keeps keys that you or your assistant saved for an app. These routes list and manage them. They need the owner token (`Authorization: Bearer <OWNER_TOKEN>`) or an admin session, and only return the calling owner's keys. No route returns a key's value.
+
+| Route | What it does | Answer |
+| --- | --- | --- |
+| `GET /vault/keys?app=<app>` | Lists saved keys, not revoked ones. | `{ keys: [{ app, name, domain, access, last_used_at }] }` |
+| `POST /vault/keys/:app/:name/rotate` | Starts a replacement: returns a one-time link where the new value is pasted. | `201 { ticket, url, expires_in, app, name, domain, access }` |
+| `DELETE /vault/keys/:app/:name` | Revokes a key. | `{ revoked: true, app, name }` |
+| `GET /vault/keys/:app/:name/uses` | Use log: when the key was used, for which host, and the outcome. | `{ uses: [{ at, app, host, outcome }] }` |
+
+After a revoke, `GET /vault/status/:app/:name` returns `saved: false`. Errors: `bad_request` (400), `unauthorized` (401), `not_found` (404, no saved key with that name).
+
+The simulator (`shipvo sim`, `shipvo run`) forwards these four routes to the Settings app on the phone as `/vault-ui/keys`, `/vault-ui/keys/:app/:name/rotate`, `/vault-ui/keys/:app/:name` and `/vault-ui/keys/:app/:name/uses`. It adds the owner token itself, so the token never reaches the page. It answers only on loopback addresses (`localhost`, `127.0.0.1`, `[::1]`) and to same-origin pages: other hosts get `forbidden_host` (403) and other origins `cross_origin` (403). Without credentials it answers `no_credentials` (503).
+
 ## Roles
 
 The control plane defines four roles, and **publish tokens are checked against them**. A token with no role acts as `admin`, so tokens made before roles existed work as before. The owner token and the admin session are not role-limited. A token with an unknown role is denied everything. A denied call returns `403` with `{"error":"forbidden","action":"<action>","role":"<role>"}`.
@@ -155,7 +174,7 @@ Send an empty `url` to remove it. `http://` URLs and URLs with a user name or pa
 
 ## The hosted simulator (optional)
 
-`services/sim` is a second Worker that gives agents the simulator over HTTPS without a laptop: it checks an API key (D1 `api_keys`, created with the owner command `create_api_key`), starts or reuses an [E2B](https://e2b.dev) sandbox per key from the `shipvo-sim` template (`services/sim/Dockerfile`: Playwright + `@shipvo/sim` + `@shipvo/mcp --http`), and proxies `/mcp`. Deploy with the `deploy-sim` workflow; it needs `E2B_API_KEY`, `SIM_OWNER_TOKEN` and `SIM_SMOKE_KEY` secrets. A Cloudflare Containers backend is kept in `wrangler.containers.jsonc` for accounts with Workers Paid.
+`services/sim` is a second Worker that gives agents the simulator over HTTPS without a laptop: it checks an API key (D1 `api_keys`, created with the owner command `create_api_key`), starts, reuses or resumes an [E2B](https://e2b.dev) sandbox per GitHub account (per key for a key with no account) from the `shipvo-sim` template; an idle sandbox pauses, keeping its phones and their data, (`services/sim/Dockerfile`: Playwright + `@shipvo/sim` + `@shipvo/mcp --http`), and proxies `/mcp`. Deploy with the `deploy-sim` workflow; it needs `E2B_API_KEY`, `SIM_OWNER_TOKEN` and `SIM_SMOKE_KEY` secrets. For OAuth sign-in (ChatGPT, Gemini and other clients that register themselves), create a GitHub OAuth app with the callback URL `https://<your sim host>/` and set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` as Worker secrets. A Cloudflare Containers backend is kept in `wrangler.containers.jsonc` for accounts with Workers Paid.
 
 ## Hermes bytecode version
 
@@ -167,10 +186,35 @@ To stop a mismatched bundle at publish time, set `hermesBytecodeVersion` in `shi
 
 `shipvo publish` lists the dependencies in `package.json` that have native code (an `android/` or `ios/` folder, a podspec, or an Expo or React Native config file in `node_modules`) and writes them to the signed release as `required_native_modules`, a map of package name to semver range. `--dry-run` prints the list. A shell may declare `native_modules` (package name to version) and send them as `?nm=name@1.2.3,other@2.0.0` on the pointer request. When both sides are known, the control plane does not offer the release and answers 404 with `native_module_missing` (the shell lacks the module) or `native_module_version` (its version is outside the range), plus the `module` name. If either side is absent, the release is offered. The runtime does not send `?nm=` yet.
 
-Limits. The recorded range is the one in `package.json`, not the installed version. `react-native` and `expo` have native code too, so they are recorded: a shell that sends `?nm=` must list them in `native_modules`, or every release is refused. Ranges that are not plain numeric semver (tags, git, `workspace:`, pre-release such as `^1.0.0-beta.1`) are not recorded, and `shipvo publish` prints a note naming them. An empty `?nm=` means the shell has no native modules.
+The recorded range is the one in `package.json`, not the installed version. `react-native` and `expo` have native code too, so they are recorded: a shell that sends `?nm=` must list them in `native_modules`, or every release is refused. Ranges that are not plain numeric semver (tags, git, `workspace:`, pre-release such as `^1.0.0-beta.1`) are not recorded, and `shipvo publish` prints a note naming them. An empty `?nm=` means the shell has no native modules.
 
 ## Trust model, in one paragraph
 
 The full threat table, with the code and test behind each row and a list of gaps, is in [docs/threat-model.md](threat-model.md).
 
 The shell carries the Ed25519 public key and the control plane URL as native manifest meta-data. Pointers are signed with the matching seed, which lives only in your CI secrets; the control plane never has it, so a compromised control plane can serve stale or no releases but cannot forge one. Bundles are verified by SHA-256 and size before staging; patches are verified by the hash of the *result*. A release can never add a permission the shell did not declare, because it is JavaScript running on the shell's native modules.
+
+## Troubleshooting
+
+| You see | Why | Fix |
+| --- | --- | --- |
+| `wrangler d1 migrations apply` says the database is not found | `database_id` in `wrangler.toml` is not the id printed by `wrangler d1 create` | Copy the id again into `d1_databases[0].database_id`, then re-run the migration command with `--remote` |
+| `/health` does not answer `{ "ok": true }` after `wrangler deploy` | The Worker is not deployed under the name you opened | Open the URL `wrangler deploy` printed, or check `name` in `wrangler.toml` |
+| `docker compose up` works but the smoke script fails to sign in | The script and the container use different `SHIPVO_LOCAL_DEV_KEY` values | Pass the same value to both. It may only hold letters, digits, `_` and `-` |
+| Data is gone after restarting the container | `docker compose down -v` deletes the `control-plane-data` volume | Use `docker compose down` without `-v`, or restore a backup (see [Restore](#restore)) |
+| Phones keep the current release and the pointer answers 404 `release_halted` | [Auto-halt](auto-halt.md) stopped the live release | Publish a new release; it clears the effect |
+| `restore` refuses to run | The volume already holds data | Run `docker compose down -v` first, then restore into the empty volume |
+| `selfhost-upgrade-check.mjs verify` exits 1 | The earlier pointer is no longer served | Read the message it prints, then follow [Roll back](#roll-back) |
+| A call returns 403 `forbidden` with an `action` and a `role` | The publish token's role does not allow that action | Use a token with a role that does (see [Roles](#roles)), or the owner token |
+| Dashboards show fewer events than expected and `telemetry_dropped_today` in `/health` is above 0 | D1 refused some telemetry writes (see above) | Wait for the daily reset or move to a paid plan. Release pointers keep flowing |
+| `set_alert_webhook` answers `bad_webhook_url` | The URL is `http://` or contains a user name or password | Use an `https://` URL without credentials |
+
+Run `shipvo doctor` from your app folder for a check of the control plane URL and key.
+
+## Next steps
+
+- [Back up and upgrade](#back-up-and-upgrade) before your first real release.
+- [Auto-halt](auto-halt.md): stop a bad release on its own.
+- [Telemetry export](telemetry-export.md): query events with SQL.
+- [Key rotation](key-rotation.md): replace the signing key without a new shell.
+- [CLI guide](cli.md): every command that talks to the control plane.

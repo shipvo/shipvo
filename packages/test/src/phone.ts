@@ -46,10 +46,13 @@ export type Notification = { id: string; title: string; body: string; data?: Rec
 /** An action the simulator refused. `code` is set for typed failures such as `no_url_listener` or `stale_ref`. */
 export class PhoneError extends Error { constructor(message: string, readonly code?: string) { super(redact(message)); this.name = "PhoneError"; } }
 /** What a mocked request answers with. An object `body` is sent as JSON. */
-export type MockResponse = { status: number; body?: string | Record<string, unknown> | unknown[] | null; headers?: Record<string, string>; delayMs?: number };
+export type MockResponse = { /** Delivered to the session's own inbox (`phone.inbox`) when this rule answers a request, as a real server would email it. */ mail?: { from?: string; subject: string; text: string }; status: number; body?: string | Record<string, unknown> | unknown[] | null; headers?: Record<string, string>; delayMs?: number };
 /** A string `url` must equal the full request URL. A RegExp is tested against it. Without `method`, any method matches. The first matching rule wins. */
 export type MockRule = { url: string | RegExp; method?: string } & MockResponse;
-type Reply = { ok: boolean; code?: string; screen?: string | null; error?: string; path?: string; notifications?: Notification[]; log?: unknown[]; capabilities?: unknown; release?: string | number; delivered?: boolean; id?: string };
+export type A11yIssue = { ref: string; role: string; code: "missing_label" | "small_target"; message: string };
+const A11Y_PRESSABLE = ["button", "link", "tab", "checkbox", "switch", "radio", "menuitem", "option"];
+const A11Y_INPUT = ["textbox", "searchbox", "spinbutton", "combobox"];
+type Reply = { ok: boolean; profile?: string; code?: string; screen?: string | null; error?: string; path?: string; notifications?: Notification[]; log?: unknown[]; capabilities?: unknown; release?: string | number; delivered?: boolean; id?: string };
 
 /** A simulated phone running your app. Every action returns once the screen has settled, and updates `screen`. */
 export class Phone {
@@ -58,16 +61,20 @@ export class Phone {
   readonly device: Device;
   /** The simulated address book. */
   readonly contacts: Contacts;
+  /** This session's private inbox: mail the app sends (through `mockNetwork` rules with `mail`, or a POST to `https://inbox.shipvo.test/send`) lands here. No other session can read it. */
+  readonly inbox: Inbox;
   readonly calendar: Calendar;
   /** The notification shade. Call it to list notifications; `receive` and `tap` deliver and open one. */
   readonly notifications: Notifications;
   /** The simulated file picker. */
   readonly files: Files;
-  constructor(readonly session: string, private readonly sim: string, readonly app: string, readonly release: string | number) { this.device = new Device(this); this.contacts = new Contacts(this); this.calendar = new Calendar(this); this.files = new Files(this); this.notifications = makeNotifications(this); }
+  constructor(readonly session: string, private readonly sim: string, readonly app: string, readonly release: string | number) { this.device = new Device(this); this.contacts = new Contacts(this); this.calendar = new Calendar(this); this.files = new Files(this); this.notifications = makeNotifications(this); this.inbox = new Inbox(this); }
 
   /** @internal */
   async call(path: string, body: Record<string, unknown>): Promise<Reply> {
-    const r = await fetch(this.sim + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    let r: Response;
+    try { r = await fetch(this.sim + path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); }
+    catch { throw new Error(`Cannot reach the simulator at ${this.sim}. Start it with: npx shipvo sim`); }
     if (!r.ok) throw new Error(`simulator ${path} answered ${r.status}. Is it running at ${this.sim}? Start it with: npx shipvo sim`);
     return (await r.json()) as Reply;
   }
@@ -107,6 +114,23 @@ export class Phone {
   async back(): Promise<this> { await this.act("back"); return this; }
   async refresh(): Promise<this> { await this.act("screen"); return this; }
 
+  /**
+   * Check the current screen for controls TalkBack and VoiceOver users cannot use: `missing_label` (a control with no
+   * accessible name) and `small_target` (a pressable under 48 dp wide or high on the Android style, 44 pt on the iPhone style).
+   */
+  async a11yAudit(): Promise<{ issues: A11yIssue[] }> {
+    const r = (await this.act("sizes")) as Reply & { sizes?: Record<string, [number, number]>; skin?: string };
+    const min = r.skin === "ios" ? 44 : 48, unit = r.skin === "ios" ? "pt" : "dp";
+    const issues: A11yIssue[] = [];
+    for (const n of this.nodes()) {
+      const pressable = A11Y_PRESSABLE.includes(n.role);
+      if (!pressable && !A11Y_INPUT.includes(n.role)) continue;
+      if (!n.name.trim()) issues.push({ ref: n.ref, role: n.role, code: "missing_label", message: `${n.role} ${n.ref} has no accessible name: give it a label so TalkBack and VoiceOver can read it.` });
+      const z = r.sizes?.[n.ref];
+      if (pressable && z && (z[0] < min || z[1] < min)) issues.push({ ref: n.ref, role: n.role, code: "small_target", message: `${n.role} ${n.ref} is ${z[0]} x ${z[1]} ${unit}; the minimum is ${min} ${unit} wide and high.` });
+    }
+    return { issues };
+  }
   /** Wait until the text appears (default 5 s). On timeout the error carries the last screen. */
   async waitFor(text: string | RegExp, opts: { timeout?: number; interval?: number } = {}): Promise<this> {
     const end = Date.now() + (opts.timeout ?? 5000);
@@ -139,6 +163,10 @@ export class Phone {
   async mockNetwork(rules: MockRule[]): Promise<this> { await this.act("set_network_mocks", { rules: encodeMockRules(rules) }); return this; }
   /** Remove every network mock. */
   async clearNetworkMocks(): Promise<this> { await this.act("set_network_mocks", { rules: [] }); return this; }
+  /** Make the app's network behave like a profile: "online", "offline", "2g", "3g", "slow-4g", "spotty" or "low-end-4g". The numbers are simulation settings. Throws a `PhoneError` with code `unknown_profile` for any other name. */
+  async setNetwork(profile: string): Promise<this> { await this.act("set_network_profile", { profile }); return this; }
+  /** The current network profile name ("online" until set). */
+  async getNetwork(): Promise<string> { return (await this.act("get_network_profile")).profile as string; }
   /** What the app did with the device: permission prompts and answers, location reads, scans, fingerprint checks, payments. */
   async deviceLog(): Promise<unknown[]> { return (await this.act("device_log")).log ?? []; }
   /** A PNG of the screen. Works when the test runs on the same machine as the simulator, as in CI. */
@@ -157,7 +185,8 @@ export function encodeMockRules(rules: MockRule[]): unknown[] {
   if (!Array.isArray(rules)) throw new PhoneError("mockNetwork needs an array of rules", "mock_invalid");
   return rules.map((r, i) => {
     if (!r || typeof r !== "object") throw bad(i, "must be an object");
-    const { url, method, status, body, headers, delayMs } = r;
+    const { url, method, status, body, headers, delayMs, mail } = r;
+    if (mail !== undefined && (!mail || typeof mail !== "object" || typeof mail.subject !== "string" || typeof mail.text !== "string" || (mail.from !== undefined && typeof mail.from !== "string"))) throw bad(i, "mail must be { subject, text } with an optional from, all strings");
     if (!(typeof url === "string" && url) && !(url instanceof RegExp)) throw bad(i, "url must be a non-empty string or a RegExp");
     if (method !== undefined && (typeof method !== "string" || !method)) throw bad(i, "method must be a non-empty string");
     if (!Number.isInteger(status) || status < 100 || status > 599) throw bad(i, "status must be an integer from 100 to 599");
@@ -169,8 +198,33 @@ export function encodeMockRules(rules: MockRule[]): unknown[] {
       text = JSON.stringify(body);
       if (!Object.keys(h).some((k) => k.toLowerCase() === "content-type")) h["content-type"] = "application/json";
     }
-    return { ...(typeof url === "string" ? { url } : { urlRegex: { source: url.source, flags: url.flags } }), method, response: { status, body: text, headers: h, delayMs } };
+    return { ...(typeof url === "string" ? { url } : { urlRegex: { source: url.source, flags: url.flags } }), method, response: { status, body: text, headers: h, delayMs, ...(mail ? { mail } : {}) } };
   });
+}
+
+/** One message in the session's inbox. `codes` are the 4 to 8 digit codes in it, `links` the web links. */
+export type Mail = { id: string; from: string; to: string; subject: string; text: string; codes: string[]; links: string[]; received_at: string };
+export type MailFilter = { subject?: string; from?: string };
+/** The session's private inbox. Reads change nothing: reading twice gives the same result. */
+export class Inbox {
+  constructor(private readonly phone: Phone) {}
+  /** The address to type into the app, for example `s-1a2b3c4d5e6f@inbox.shipvo.test`. Unique to this session. */
+  async address(): Promise<string> { return ((await this.phone.act("inbox_read")) as unknown as { address: string }).address; }
+  /** Every message so far, oldest first. */
+  async list(filter: MailFilter = {}): Promise<Mail[]> { return ((await this.phone.act("inbox_read", { ...filter })) as unknown as { messages: Mail[] }).messages; }
+  /** The first message matching `subject` and/or `from` (case-insensitive contains), already there or arriving within `timeout` ms (default 10000, at most 25000). Throws a `PhoneError` with code `inbox_timeout` when none does. */
+  async waitFor(filter: MailFilter & { timeout?: number } = {}): Promise<Mail> {
+    const { timeout, ...f } = filter;
+    return ((await this.phone.act("inbox_wait", { ...f, ...(timeout !== undefined ? { timeout_ms: timeout } : {}) })) as unknown as { message: Mail }).message;
+  }
+  /** Wait for mail like `waitFor`, then return its first code (4 to 8 digits). Throws `inbox_no_code` if the mail has none. */
+  async code(filter: MailFilter & { timeout?: number } = {}): Promise<string> {
+    const m = await this.waitFor(filter);
+    if (!m.codes.length) throw new PhoneError(`the mail "${m.subject}" has no 4 to 8 digit code`, "inbox_no_code");
+    return m.codes[0];
+  }
+  /** Empty the inbox. */
+  async clear(): Promise<void> { await this.phone.act("inbox_clear"); }
 }
 
 /** The simulated address book. Apps read it with `expo-contacts` or `device.contacts.getAll()`; writing back is not simulated. */

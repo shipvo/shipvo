@@ -14,19 +14,27 @@ export type PressResult =
   | { ok: false; errors: Record<string, string> }
   | { ok: false; error: string };
 
+/** Who is calling. `caller` is the assistant's name (for example "claude" or "chatgpt"); actions read it as `{{ caller }}`. Empty when a person taps the screen. */
+export interface CallContext { caller?: string }
+
+/** A file saved by a `saveFile` step. */
+export interface SavedFile { name: string; mime: string; size: number; content: string }
+
 export interface App {
   /** The screen on top of the history. */
   readonly screen: string;
   readonly state: Record<string, unknown>;
   /** Collection data by name. */
   readonly data: Record<string, unknown>;
+  /** Files the app saved with a `saveFile` step, newest last. */
+  readonly files: SavedFile[];
   render(): RenderResult;
   /** Types a value into a form field. `form` and `field` are the names in the screen tree. */
   setField(form: string, field: string, value: unknown): void;
   /** Validates the form. If every field is fine, runs the submit action with the values as its input. */
   submit(form: string): PressResult;
   /** Runs an action by name, the way a generated MCP tool does. Fills in defaults and refuses missing input. */
-  call(action: string, input?: Record<string, unknown>): PressResult;
+  call(action: string, input?: Record<string, unknown>, context?: CallContext): PressResult;
   /** Presses a button by its label (or id). */
   press(button: string): PressResult;
   /** Turns a toggle on or off, by its label. Writes the state value it is bound to. */
@@ -85,8 +93,47 @@ function coerce(f: FormField, value: unknown): unknown {
   return f.type === "number" ? Number(value) : value;
 }
 
+/** The device permission a block type needs, if any. */
+const BLOCK_DEVICE: Record<string, string> = { camera: "camera", scanner: "camera", file: "files" };
+
+/** Adds the permissions of the blocks in a list, looking inside `children`. */
+function blockNeeds(blocks: unknown, need: Set<string>): void {
+  if (!Array.isArray(blocks)) return;
+  for (const b of blocks) {
+    if (!b || typeof b !== "object") continue;
+    const p = BLOCK_DEVICE[String((b as Obj).type)];
+    if (p) need.add(p);
+    blockNeeds((b as Obj).children, need);
+  }
+}
+
+/** The device permissions an action needs, from its steps: a `notify` step needs notifications, and a `navigate` step to a screen with a camera, scanner or file block needs camera or files. Looks inside `then` and `else`. */
+export function actionDeviceNeeds(spec: unknown, action: string): string[] {
+  const need = new Set<string>();
+  const screens: unknown[] = Array.isArray((spec as Obj)?.screens) ? (spec as Obj).screens : [];
+  const walk = (steps: unknown) => {
+    if (!Array.isArray(steps)) return;
+    for (const st of steps) {
+      if (!st || typeof st !== "object") continue;
+      if ("notify" in st) need.add("notifications");
+      if ("saveFile" in st) need.add("files");
+      if (typeof (st as Obj).navigate === "string") {
+        const target = screens.find((x) => (x as Obj)?.id === (st as Obj).navigate) as Obj | undefined;
+        blockNeeds(target?.body, need);
+      }
+      walk((st as Obj).then);
+      walk((st as Obj).else);
+    }
+  };
+  walk((spec as Obj)?.actions?.[action]?.do);
+  return [...need].sort();
+}
+
+/** `devicePermissions` maps a device permission to the person's answer. `false` denies it. A permission with no answer is allowed. */
+export type CreateAppOptions = RenderOptions & { devicePermissions?: Record<string, boolean> };
+
 /** Starts an app at its first screen (or `options.screen`). Invalid specs are refused with the validator's errors. */
-export function createApp(spec: unknown, options: RenderOptions = {}): { ok: true; app: App } | { ok: false; errors: Issue[] } {
+export function createApp(spec: unknown, options: CreateAppOptions = {}): { ok: true; app: App } | { ok: false; errors: Issue[] } {
   const first = renderInternal(spec, options);
   if (!first.result.ok) return { ok: false, errors: first.result.errors };
   const s = spec as Obj;
@@ -95,6 +142,7 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
   Object.assign(state, options.state);
   const data: Record<string, unknown> = { ...options.data };
   for (const [k, v] of Object.entries<Obj>(s.data ?? {})) if (v.source === "collection" && !(k in data)) data[k] = structuredClone(v.seed ?? []);
+  const files: SavedFile[] = [];
   const history: { screen: string; params: Record<string, unknown>; sheet?: boolean }[] = [{ screen: options.screen ?? s.screens[0].id, params: options.params ?? {} }];
   const drafts: Record<string, Record<string, unknown>> = {};
   const fieldErrors: Record<string, Record<string, string>> = {};
@@ -142,6 +190,27 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
       } else if (typeof st.delete === "string") {
         data[st.delete] = coll(st.delete).filter((item) => !(!st.where || test(st.where, { ...scope, item })));
       } else if (typeof st.set === "string") state[st.set.replace(/^state\./, "")] = ev(st.value, scope);
+      else if ("notify" in st) { /* shown by the phone; the permission was checked before the action ran */ }
+      else if (st.saveFile && typeof st.saveFile === "object") {
+        const f = ev(st.saveFile, scope) as Obj;
+        if (typeof f.to !== "string" || !f.to) throw new Error("saveFile needs \"to\", the collection that holds files.");
+        if (typeof f.name !== "string" || !f.name.trim()) throw new Error("saveFile needs a file name.");
+        if (/[\\/\0]/.test(f.name.trim())) throw new Error("saveFile needs a file name with no slash");
+        if (typeof f.content !== "string") throw new Error("saveFile needs text content.");
+        const mime = typeof f.mime === "string" && f.mime ? f.mime : "text/plain";
+        const list = coll(f.to);
+        const id = list.reduce((m, x) => Math.max(m, typeof x.id === "number" ? x.id : 0), 0) + 1;
+        list.push({ id, name: f.name.trim(), kind: "file", mime, size: new TextEncoder().encode(f.content).length, content: f.content, added: options.now ?? new Date().toISOString() });
+      }
+      else if (typeof st.saveFile === "string") {
+        const name = String(ev(st.saveFile, scope)).trim();
+        if (!name || /[\\/\0]/.test(name)) throw new Error("saveFile needs a file name with no slash");
+        if (st.content === undefined) throw new Error("saveFile needs content");
+        const content = String(ev(st.content, scope));
+        const file = { name, mime: String(ev(st.mime ?? "text/plain", scope)), size: new TextEncoder().encode(content).length, content };
+        const at = files.findIndex((f) => f.name === name);
+        if (at >= 0) files[at] = file; else files.push(file);
+      }
       else if (typeof st.toast === "string") toast = String(ev(st.toast, scope));
       else if (typeof st.navigate === "string") go(st.navigate, ev(st.params ?? {}, scope) as Obj, st.presentation);
       else if (typeof st.if === "string") {
@@ -152,7 +221,7 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
     return { done: false };
   };
 
-  const runAction = (name: string, input: Obj): PressResult => {
+  const runAction = (name: string, input: Obj, callerName = ""): PressResult => {
     const a = s.actions?.[name];
     if (!a) return { ok: false, error: `There is no action "${name}".` };
     for (const [k, def] of Object.entries<Obj>(a.input ?? {})) {
@@ -161,10 +230,12 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
         else return { ok: false, error: `invalid_input: ${k} is required.` };
       }
     }
+    const denied = actionDeviceNeeds(spec, name).find((p) => options.devicePermissions?.[p] === false);
+    if (denied) return { ok: false, error: `permission_denied: the action "${name}" needs the "${denied}" permission, and the person denied it.` };
     try {
       toast = "";
       current();
-      const r = run(a.do ?? [], { ...last.scope(), input });
+      const r = run(a.do ?? [], { ...last.scope(), input, caller: callerName });
       return { ok: true, value: r.done ? r.value : undefined };
     } catch (e) {
       return { ok: false, error: `action_failed: ${e instanceof Error ? e.message : String(e)}` };
@@ -181,6 +252,7 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
     get screen() { return top().screen; },
     state,
     data,
+    files,
     render: () => current().result,
     setField(form, field, value) {
       const f = find("form", form);
@@ -211,7 +283,7 @@ export function createApp(spec: unknown, options: RenderOptions = {}): { ok: tru
       if (r.ok) delete drafts[key];
       return r;
     },
-    call: (action, input = {}) => runAction(action, { ...input }),
+    call: (action, input = {}, context) => runAction(action, { ...input }, context?.caller ?? ""),
     press(button) {
       if ((button === "Back" || (button === "Close" && top().sheet)) && history.length > 1) { toast = ""; return back(); }
       const b = find("button", button);

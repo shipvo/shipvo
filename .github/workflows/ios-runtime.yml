@@ -48,6 +48,11 @@ jobs:
       - name: Summary
         if: always()
         run: grep -E "Executed|error:|failed" "$RUNNER_TEMP/swift-test.log" | tail -20 | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Peak apply memory
+        if: always()
+        # Tests that measure the patch step print lines starting with SHIPVO_APPLY_MEMORY.
+        run: |
+          if grep -q SHIPVO_APPLY_MEMORY "$RUNNER_TEMP/swift-test.log" 2>/dev/null; then { echo "### Peak apply memory (iOS)"; echo '```'; grep -o "SHIPVO_APPLY_MEMORY.*" "$RUNNER_TEMP/swift-test.log"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"; fi
 
   # Escalations #1102 and #1106 (issue #1100). A scene-based (UIApplicationSceneManifest + SceneDelegate) host app
   # proves trial boots under the UIScene lifecycle. The host and its test live in packages/runtime/ios-scene-host/

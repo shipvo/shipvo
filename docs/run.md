@@ -18,7 +18,7 @@ You need the app folder from [Build your first app](getting-started.md) and a te
 
    Use `ios` instead of `android` for an iPhone-style phone.
 2. Wait while Shipvo builds a web copy of your app. It does not need an account or a phone.
-3. Your browser opens on a page with a phone in the middle. A label says **Simulated**, because this is a copy of a phone and not a real one.
+3. Your browser opens on a page with a phone in the middle, in its Android or iPhone frame.
 4. Click around in the phone like you would tap. When you are done, go back to the terminal and press **Ctrl+C**.
 
 **If it fails:**
@@ -51,9 +51,13 @@ Measured on 2026-11-07 on a GitHub-hosted `ubuntu-latest` runner:
 
 Run: [CI run 42355471525](https://github.com/shipvo/shipvo/actions/runs/42355471525) (job `shipvo run android (time to first tap)`, artifact `run-time`). The script is `scripts/first-run/run-time.mjs`.
 
+## Apps with a router or a base path
+
+An app that uses expo-router or React Navigation opens on its own first screen: `shipvo run` sees the router in `package.json` and gives the app its own addresses, so `/feed/1` is `/feed/1` and a reload stays on that screen. An app built with Expo's `experiments.baseUrl` (for example `/static`) gets its files under that path.
+
 ## Edit and save, the phone updates
 
-While `shipvo run` is open it watches your project. When you save a file, it rebuilds the web copy in the background and reloads the app inside the phone. You stay on the same screen address. The terminal prints one line per rebuild, for example `rebuilt in 2.1 s`. As soon as a save is seen, the terminal prints `Rebuilding...` and the page shows a small "Updating…" hint until the new build loads.
+While `shipvo run` is open it watches your project. When you save a file, it rebuilds the web copy in the background and reloads the app inside the phone. You stay on the same screen address. The terminal prints one line per rebuild, for example `rebuilt in 2.1 s`. Rebuilds after a save keep the Metro cache, so they are faster than the first build, which starts clean. As soon as a save is seen, the terminal prints `Rebuilding...` and the page shows a small "Updating…" hint until the new build loads.
 
 If a rebuild fails (a typo in your code, say), the phone keeps your last good version. The terminal prints the error, and a small red bar under the phone shows it too. Save a fix and the bar goes away and the phone reloads.
 
@@ -87,7 +91,7 @@ On Android and iOS, an app calls its backend directly and there is no CORS. In t
 
 While `shipvo run` is up, it writes `.shipvo/run.json` in your project (port, platform, app, a secret session token and the process id) and adds `.shipvo/` to `.gitignore`. The token only works from your own computer.
 
-When an assistant calls the Shipvo MCP tool `open_app` for the same app, it finds that file and drives your live phone. The result says `attached to the live shipvo run phone`. If no live phone is found, it says `headless session` and uses its own hidden phone. Attached sessions support `screen`, `tap`, `type`, `scroll` and `back`; other tools return `not_supported_attached`. Attaching needs Node 22 or newer. Full tool list: [Agents](agents.md).
+When an assistant calls the Shipvo MCP tool `open_app` for the same app, it finds that file and drives your live phone. The result says `attached to the live shipvo run phone`. If no live phone is found, it says `headless session` and uses its own hidden phone. Attached sessions support `screen`, `tap`, `type`, `scroll` and `back`; other tools return `not_supported_attached` with the next step: open the app again with `attach: "never"` and watch it at `/watch`. Attaching needs Node 22 or newer. Full tool list: [Agents](agents.md).
 
 The assistant sees the same list of buttons and text as in the simulator, with `[ref=eN]` numbers it can tap. Refs are numbered differently from the simulator's, and a ref from an earlier page returns `stale_ref` so it never taps the wrong thing.
 

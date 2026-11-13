@@ -1,1 +1,0 @@
-- docs: the chess demo page is in the docs sidebar with a link to the live page and a Troubleshooting section; Device API documents what happens with the network off and the `cancelled` payment result (with the 0.1.5 migration note); the roadmap Now and Shipped lists and the content ledger are current.

@@ -47,6 +47,28 @@ If your coding agent runs the local `@shipvo/mcp` server (`shipvo agents setup` 
 
 `upload_build` reads your project, so it runs only on the local (stdio) server. Add `npx @shipvo/mcp` next to the hosted one. A key with read scope cannot upload.
 
+## Open a build from a link
+
+If your build is already hosted at an http or https address, you can open it without uploading from your machine. Most readers use `shipvo sim --hosted` (see "Upload from the terminal" above) and do not need this. Your own code or script sends `POST /session` to the simulator (start it with `shipvo sim`; it listens on port 4545) with a `session` name, an `app` id and the `build_url` of a `.tar.gz` of your web build:
+
+```bash
+curl -X POST http://localhost:4545/session \
+  -H 'content-type: application/json' \
+  -d '{"session":"demo","app":"tide","build_url":"https://example.com/app.tgz"}'
+```
+
+The simulator downloads the build, unpacks it, opens it as the app and replies with `{ "ok": true, "app": "tide", "build": "<id>", "screen": "..." }`. `build` names the build that opened, and the session runs that build. `open_app("<app>@build:<id>")` is for ids returned by `upload_build`.
+
+A bad address leaves no session behind. The reply carries one of these codes:
+
+| Code | Meaning | What to do |
+| --- | --- | --- |
+| `bad_url` | The address is not a valid address. | Check the link. |
+| `host_not_allowed` | The simulator does not fetch from that host. Private and local addresses (such as `localhost` and `192.168.x.x`) are refused by default. | Host the build somewhere reachable, or upload it from your machine with `shipvo sim --hosted` (see "Upload from the terminal" above). |
+| `too_large` | The download is over the size limit. | Remove unused assets and try again. |
+| `unreachable` | The simulator could not download it. | Open the link in a browser to check that it works without signing in. |
+| `bad_build` | The file is not a `.tar.gz` archive, contains links, has no `index.html` at its top level, or could not be unpacked. | Create the archive again from your web build folder, or upload it from your machine with `shipvo sim --hosted` (see "Upload from the terminal" above). |
+
 ## Who can see a build
 
 A build is private to your account. A key from another account gets `build_not_found`, the same answer as for a build that never existed. A build is deleted when it expires.
@@ -67,6 +89,12 @@ A build is private to your account. A key from another account gets `build_not_f
 ## Troubleshooting
 
 **`shipvo sim --hosted` says `no_api_key`.** The variable is set in another terminal. Export it in this one, or put it in your agent's MCP server `env`.
+
+**`upload_build` says `stdio_only`.** The hosted server cannot read files on your machine. Add the local server with `npx @shipvo/mcp` (or run `shipvo agents setup`), then ask again.
+
+**`build_not_found` for a build I just uploaded.** The key that opens the phone is not the key that uploaded the build. A build is private to one account, so use the same `SHIPVO_API_KEY` for both.
+
+**`build_expired`.** Builds are deleted after they expire. Upload again and use the new id.
 
 **The phone opens the old version of my app.** `open_app("tide")` opens the published release. Use the full `tide@build:<id>` form with the id from your latest upload.
 

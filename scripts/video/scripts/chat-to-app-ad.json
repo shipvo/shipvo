@@ -1,0 +1,66 @@
+{
+ "slug": "chat-to-app-ad",
+ "title": "S1 \u00b7 E1 \u00b7 From a chat to an app",
+ "music": {
+  "id": 26436,
+  "offset": 1.0,
+  "bed": 0.35
+ },
+ "dialogue": "chat-to-app-ad.dialogue.json",
+ "scenes": "scripts/video/story/scenes.mjs",
+ "retention": {
+  "hook": "0 to 3 s: golden street, people walking past the shop with phones, motion from frame one",
+  "promise": "5 to 10 s: Mara at the empty counter says 'Nobody comes in.'",
+  "openLoops": [
+   {
+    "opens": 9.4,
+    "pays": 44,
+    "q": "Can the shop get customers?"
+   },
+   {
+    "opens": 22.4,
+    "pays": 90,
+    "q": "Does 'I can fix that' work?"
+   }
+  ],
+  "rehooks": [
+   14,
+   22,
+   32,
+   44,
+   60,
+   76,
+   90
+  ],
+  "payoff": "76 to 96 s: three real orders in a list, busy shop at sunset",
+  "trailer": "Next-episode trailer is tracked in #871 (E2 is not made yet)"
+ },
+ "vertical": {
+  "slug": "chat-to-app-ad-vertical",
+  "brief": "chat-to-app-ad-vertical.brief.json",
+  "music": {
+   "id": 521021,
+   "offset": 176.5
+  },
+  "segments": "scripts/video/story/vertical.mjs",
+  "retention": {
+   "hook": "0 to 3 s: the golden street, same hook as the main cut",
+   "promise": "4.5 to 7.5 s: Mara, 'Nobody comes in.'",
+   "openLoop": {
+    "opens": 5.3,
+    "pays": 31.8,
+    "q": "Can the shop get customers?"
+   },
+   "rehooks": [
+    4.5,
+    7.3,
+    10.3,
+    14,
+    22,
+    27.8
+   ],
+   "payoff": "31.8 to 37.8 s: busy shop at sunset, end card",
+   "trailer": "Next-episode tease follows with #871"
+  }
+ }
+}

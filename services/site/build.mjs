@@ -24,12 +24,21 @@ const NAV = [
   { group: "Get started", pages: [
     { slug: "overview", src: "README.md", title: "What Shipvo is", desc: "Shipvo is an open-source React Native framework: signed over-the-air updates for phones and a simulator AI agents operate over MCP." },
     { slug: "getting-started", src: "docs/getting-started.md", title: "Build your first app", desc: "Twenty minutes from nothing to a React Native app that AI agents can open in a simulator and phones update over the air." },
+    { slug: "playground", src: "docs/playground.md", title: "Playground: try Shipvo in your browser", desc: "Try a sample app on an Android phone and an iPhone in your browser, with device features, signed updates and rollback, and a shareable many-phones link." },
     { slug: "run", src: "docs/run.md", title: "Run on a phone in your browser", desc: "Run your app on a simulated Android or iPhone in your own browser with shipvo run, no Playwright, and let your AI assistant drive the same phone." },
+    { slug: "session", src: "docs/session.md", title: "Test any Expo app from the terminal", desc: "Open any Expo app on a headless Shipvo Phone, on Android and iOS, with one command. Your coding agent taps through it, saves screenshots and the session stops on its own." },
+    { slug: "a2ui", src: "docs/a2ui.md", title: "A2UI on Shipvo Phone", desc: "Open A2UI messages on a simulated Android phone or iPhone, use the screen, read the actions it sends to the agent, and change it while it is open." },
+    { slug: "bug-bench", src: "docs/bug-bench.md", title: "Bug-catch benchmark", desc: "How many seeded app bugs show up on Shipvo Phone, on Android and iOS: app logic, device hardware and Android and iOS only code, with the method and the command to run it." },
     { slug: "lumi", src: "docs/lumi.md", title: "Lumi on Shipvo Phone", desc: "Watch Lumi show each step on the phone, react to failures, and test your app for you with shipvo lumi. No AI account needed." },
+    { slug: "lumi-bench", src: "docs/lumi-bench.md", title: "Lumi benchmark", desc: "Run the Lumi benchmark on the sample apps with a seed and read the measured screens, flows and bugs found." },
+    { slug: "lumi-ranker", src: "docs/lumi-ranker.md", title: "Lumi action ranker", desc: "How Lumi picks its next action, and what the optional ranker model measured on a held-out app." },
+    { slug: "describe-an-app", src: "docs/describe-an-app.md", title: "Describe an app and it appears", desc: "Ask your coding agent for a small app and it appears on an Android or iOS phone; change it later and keep what people entered, with every tool and error explained." },
     { slug: "phone-apps", src: "docs/phone-apps.md", title: "Phone Browser, Settings and system controls", desc: "Change dark mode, text size and language, open web pages and use the home screen, shade and power button on the simulated phone." },
     { slug: "phone-updates", src: "docs/phone-updates.md", title: "OTA updates on the phone", desc: "Publish a release, watch it land on the simulated Android or iOS phone, apply it and see a bad one roll back." },
     { slug: "phone-network", src: "docs/phone-network.md", title: "Network calls on the hosted phone", desc: "How the hosted phone sends your app's HTTP calls through a request proxy, the same on Android and iOS." },
     { slug: "new-machine", src: "docs/new-machine.md", title: "Moving to a new machine", desc: "Move your Shipvo project to a new computer: back up and restore your release signing seed, sign in again and keep publishing updates." },
+    { slug: "key-rotation", src: "docs/key-rotation.md", title: "Key rotation", desc: "Create an offline root key and replace your update signing key without a new store build." },
+    { slug: "rollbacks-and-stored-data", src: "docs/rollbacks-and-stored-data.md", title: "Rollbacks and stored data", desc: "Declare a state version with each release so shipvo rollback stops before it sends phones to code that cannot read their saved data." },
     { slug: "self-hosting", src: "docs/self-hosting.md", title: "Self-host the control plane", desc: "Self-host the Shipvo control plane on Cloudflare Workers, KV and D1 in about ten minutes, with your own keys and no per-user fees." },
   ]},
   { group: "Ship", pages: [
@@ -47,7 +56,8 @@ const NAV = [
   { group: "Test", pages: [
     { slug: "test-with-an-assistant", src: "docs/test-with-an-assistant.md", title: "Test with an assistant", desc: "Connect Claude, ChatGPT or Cursor to the hosted Shipvo simulator over MCP and have it test your React Native app, step by step." },
     { slug: "testing", src: "docs/testing.md", title: "Test your app in CI", desc: "Run your real React Native app flows in a headless simulator on every pull request, with typed Vitest tests. No emulator, no device farm." },
-    { slug: "spec-blocks", src: "docs/spec-blocks.md", title: "App spec: screens and controls", desc: "Write a Shipvo app spec with stat, progress, card, toggle, segmented and sheet screens, check it, and render it the same on Android and iOS." },
+    { slug: "email-sign-in", src: "docs/email-sign-in.md", title: "Test an email sign-in", desc: "Give every test session a private inbox so a test or an agent can read an emailed code or magic link and finish sign-in on Android and iOS." },
+    { slug: "spec-blocks", src: "docs/spec-blocks.md", title: "App spec: screens and controls", desc: "Write a Shipvo app spec with charts, boards, calendars, maps and live data, copy a gallery example, check it, and render it the same on Android and iOS." },
     { slug: "ci-check", src: "docs/ci-check.md", title: "Check every pull request", desc: "Add one workflow so every pull request builds your app, runs your Shipvo flows and explores every button. Fails on regressions and crashes only." },
     { slug: "test-your-build", src: "docs/test-your-build.md", title: "Test your build on the hosted phone", desc: "Upload the build on your machine with shipvo sim --hosted or upload_build, then open it as a hosted phone session on Android and iOS." },
     { slug: "eval", src: "docs/eval.md", title: "Score an agent on an app task", desc: "Run any coding agent or model on a task with shipvo eval, then get measured pass rate, steps, time, errors and retries on Android and iOS." },
@@ -69,11 +79,15 @@ const NAV = [
     { slug: "sim", src: "packages/sim/README.md", title: "@shipvo/sim", desc: "@shipvo/sim: the headless simulator that runs your app in Playwright and exposes accessibility trees and a simulated phone to agents and tests." },
     { slug: "schema", src: "packages/schema/README.md", title: "@shipvo/schema", desc: "@shipvo/schema: zod schemas for Shipvo release pointers, signed envelopes, shell manifests, gate reports and telemetry." },
     { slug: "spec", src: "packages/spec/README.md", title: "@shipvo/spec", desc: "@shipvo/spec: the app spec JSON Schema, validator, expression evaluator and renderer for Android and iOS screens." },
+    { slug: "app-spec-validator", src: "docs/app-spec-validator.md", title: "App spec validator", desc: "Check a Shipvo app spec before a phone opens it: read each error with its path and fix, and set network and write permissions." },
   ]},
   { group: "Measured results", pages: [
     { slug: "parity-results", src: "docs/parity-results.md", title: "Simulator vs device parity", desc: "Simulator vs device parity: every screen of three purchase flows compared on Android and iOS, with the method and every result." },
     { slug: "spike-results", src: "docs/spike-results.md", title: "OTA on a 2 GB phone", desc: "Measured on a 2 GB Redmi 9A in Douala: update size, apply time, cold start, rollback and crash-loop revert, with the raw timeline." },
+    { slug: "android-crash-loop-paths", src: "docs/android-crash-loop-paths.md", title: "Crash-loop revert on Android", desc: "How an Android phone reverts a release that keeps crashing: the trial path, the promoted path, the 3-boot limit and the 60 s window." },
     { slug: "agent-gate-results", src: "docs/agent-gate-results.md", title: "Agent gate results", desc: "How AI agents scored on real purchase tasks in a React Native app, graded by what the backend received, not what the agent said." },
+    { slug: "sim-bench", src: "docs/sim-bench.md", title: "Simulator cost", desc: "How long a simulator session takes to start and how much memory it uses, measured with a script you can run yourself." },
+    { slug: "lumi-bench", src: "docs/lumi-bench.md", title: "Lumi benchmark", desc: "Screens reached, flows finished and planted bugs found by Lumi on fixed apps, with the command to reproduce every number." },
   ]},
 ];
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -340,12 +354,12 @@ const PUBLIC_PACKAGES = readdirSync(join(ROOT, "packages")).filter((d) => {
 const FACTS = `Shipvo is an open-source React Native framework: build once, publish for people and AI agents. Phones get signed over-the-air updates; AI agents open the same release in a simulated phone they can see and operate over MCP; parity between the two is measured and published (same actionable elements by role and label, on an Android emulator and an iOS Simulator; 100% across the 13 purchase screens; see docs/parity-results).
 
 Things to know before answering questions about Shipvo:
-- Developers test their app in CI with @shipvo/test (typed tests, Vitest or any runner) against the headless simulator on a plain Linux runner: no emulator or device. It catches logic and flow bugs, not native crashes or slow-phone performance.
+- Developers test their app in CI with @shipvo/test (typed tests, Vitest or any runner) against the headless simulator on a plain Linux runner, or on a real Android emulator or iOS Simulator with --device agent-device. It catches logic and flow bugs.
 - The simulator is a simulated device. Camera, location, biometrics, notifications and payments are simulated and labelled (receipts start with SIMULATED-). It is for testing and demonstration, not real transactions.
 - Real orders go through the app's own checkout to the control plane, start as unverified, and the owner settles them after checking the payment (docs: taking-real-orders).
 - Over-the-air updates run on Android and iOS. The iOS runtime is verified on an iPhone simulator in CI on every change.
-- CLI commands include init, sim, preview, publish (with --dry-run and --dry-run-policy), rollback, auto-halt, audit, run (android or ios, a phone frame in your browser), promote (with --report), test (with --repair, --report and --report-md), explore, store (details, setup, screenshots, testers), doctor, eas setup and ci init (Expo and Capacitor).
-- MCP tools include open_app (attaches to a live shipvo run phone), screen, tap, type, scroll, back, screenshot, wait_for, and record_start, record_marker, record_stop for MP4 demo videos.
+- CLI commands include init, sim, preview, publish (with --dry-run and --dry-run-policy), rollback, auto-halt, audit, run (android or ios, a phone frame in your browser), promote (with --report), test (with --repair, --report and --report-md), explore, lumi, eval (run, report), agents setup (with --hosted), sim (with --hosted), store (details, setup, screenshots, testers), doctor, eas setup and ci init (Expo and Capacitor).
+- MCP tools include open_app (attaches to a live shipvo run phone; takes room so phones share one backend), upload_build (test your own build on the hosted phone), screen, tap, type, scroll, back, screenshot, wait_for, and record_start, record_marker, record_stop for MP4 demo videos.
 - Release rules live in a policy section of shipvo.json (maxBand, agentMaxBand, blocked weekdays) and the control plane keeps an audit log of publishes, halts and rollbacks.
 - Hosted services are free during the beta: api.shipvo.dev (control plane) and sim.shipvo.dev (hosted simulator, requires a key from \`npx -y @shipvo/cli login\`). Everything can be self-hosted on Cloudflare.
 - Packages are on npm under @shipvo (${PUBLIC_PACKAGES.join(", ")}). Source: https://github.com/shipvo/shipvo`;

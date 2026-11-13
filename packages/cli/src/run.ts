@@ -63,7 +63,7 @@ export const FRAMES = {
 
 export type RenderFrame = ((o: { skin: "android" | "ios"; dark?: boolean; status?: object; screen?: string; lumi?: boolean; guide?: boolean }) => { width: number; height: number; outerWidth: number; outerHeight: number; html: string; css: string }) & {
   /** Script that keeps the status bar live from the app's `pn:status` events. Absent in older @shipvo/sim. */
-  statusScript?: (iframeId?: string, skin?: string) => string;
+  statusScript?: (iframeId?: string, skin?: string, phone?: Record<string, unknown>) => string;
 };
 
 /** Loads the frame renderer from @shipvo/sim: the app's install first, then the one next to this CLI. */
@@ -109,7 +109,7 @@ ${frame.css}
 .top{position:fixed;left:12px;right:12px;top:10px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;z-index:6;pointer-events:none}
 .top>*{pointer-events:auto}
 .sheetbtn{flex:none;padding:3px 10px;border-radius:12px;border:0;background:#111;color:#fff;font-size:12px;cursor:pointer}
-.banner{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);max-width:min(90vw,640px);box-sizing:border-box;max-height:30vh;overflow:auto;padding:6px 12px;border-radius:8px;background:#b3261e;color:#fff;font-size:12px;white-space:pre-wrap;z-index:9}
+.banner{position:fixed;left:50%;top:10px;transform:translateX(-50%);max-width:min(90vw,640px);box-sizing:border-box;max-height:30vh;overflow:auto;padding:6px 12px;border-radius:8px;background:#b3261e;color:#fff;font-size:12px;white-space:pre-wrap;z-index:9}
 .banner[hidden]{display:none}
 .updating{position:fixed;left:50%;bottom:6px;transform:translateX(-50%);padding:4px 10px;border-radius:999px;background:#1d2530;color:#fff;font-size:12px;z-index:9}
 .updating[hidden]{display:none}
@@ -128,9 +128,10 @@ function sheet(on){sh.classList.toggle("open",on)}
 document.getElementById("sheetbtn").onclick=function(){sheet(!sh.classList.contains("open"))};
 sh.onclick=function(e){if(e.target===sh||e.target.getAttribute("data-act"))sheet(false)};
 addEventListener("message",function(e){var d=e.data;if(d&&d.type==="shipvo:system-sheet")sheet(d.open!==false)});
-function fit(){var pw=window.__runPanelWidth?window.__runPanelWidth():0;var t=document.getElementById("top"),b=document.getElementById("banner");var top=t.offsetHeight+20,bot=b.hidden?10:b.offsetHeight+20;var ah=Math.max(100,innerHeight-top-bot);var s=Math.min(1,(innerWidth-24-pw)/${frame.outerWidth},ah/${frame.outerHeight});var e=document.getElementById("fit");e.style.left="calc(50% - "+pw/2+"px)";e.style.top=(top+ah/2)+"px";e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${frame.outerWidth}px";e.style.height="${frame.outerHeight}px"}
+// The banner centres on the phone area (the window minus the open device panel). With the panel closed it sits below the panel's title so it never covers it. Its top is only set while it is visible.
+function fit(){var pw=window.__runPanelWidth?window.__runPanelWidth():0;var t=document.getElementById("top"),b=document.getElementById("banner");var top=t.offsetHeight+20,bot=10;if(!b.hidden){var P=document.getElementById("dpanel"),bt=top-10;b.style.left="calc(50% - "+pw/2+"px)";b.style.maxWidth=Math.min(640,innerWidth-24-pw)+"px";if(!pw&&P)bt=Math.max(bt,P.getBoundingClientRect().bottom+8);b.style.top=bt+"px";top=bt+b.offsetHeight+10}var ah=Math.max(100,innerHeight-top-bot);var s=Math.min(1,(innerWidth-24-pw)/${frame.outerWidth},ah/${frame.outerHeight});var e=document.getElementById("fit");e.style.left="calc(50% - "+pw/2+"px)";e.style.top=(top+ah/2)+"px";e.style.transform="translate(-50%,-50%) scale("+s+")";e.style.width="${frame.outerWidth}px";e.style.height="${frame.outerHeight}px"}
 addEventListener("resize",fit);fit();
-</script><script>${runPanelScript()}</script><script>${RELOAD_CLIENT}</script>${render.statusScript ? `<script>${render.statusScript("app", platform).replace(/<\/script/gi, "<\\/script")}</script>` : ""}${token ? `<script src="/__shipvo/bridge.js" data-token="${token}"></script>` : ""}</body></html>`;
+</script><script>${runPanelScript()}</script><script>${RELOAD_CLIENT}</script>${render.statusScript ? `<script>${render.statusScript("app", platform, { marketplace: (process.env.PN_CONTROL || "https://api.shipvo.dev").replace(/\/$/, "") }).replace(/<\/script/gi, "<\\/script")}</script>` : ""}${token ? `<script src="/__shipvo/bridge.js" data-token="${token}"></script>` : ""}</body></html>`;
 }
 
 /** True for a phone or tablet browser, by user agent. */
@@ -173,8 +174,26 @@ export function ensureShipvoIgnored(dir: string): void {
  * The agent channel is a WebSocket at `/__shipvo/agent?role=screen|driver&token=...`, loopback only. It relays JSON
  * messages between the `screen` and the `driver`. With `projectDir`, `.shipvo/run.json` describes the session while it runs.
  */
-export async function startRunServer(opts: { dir: string; platform: Platform; name: string; appId?: string; port?: number; projectDir?: string; render?: RenderFrame; lan?: { host: string }; onNet?: (r: NetRecord) => void; fetchImpl?: typeof fetch }): Promise<{ server: Server; port: number; token: string; lanToken?: string; netLog: NetRecord[]; notify: (ev: { type: "reload" } | { type: "error"; message: string } | { type: "building" }) => void; close: () => Promise<void> }> {
+/** The base path a web build was made with: what stands before /_expo/ in the script address of its index.html. "" when there is none. */
+export function buildBase(root: string): string {
+  try { return /<script[^>]+src="(\/[^"]*?)\/_expo\/static\//.exec(readFileSync(join(root, "index.html"), "utf8"))?.[1] ?? ""; }
+  catch { return ""; }
+}
+
+/** True when the app in `dir` has a router that reads the address: expo-router or React Navigation. */
+export function hasRouter(dir?: string): boolean {
+  if (!dir) return false;
+  try { const p = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")); const d = { ...p.dependencies, ...p.devDependencies }; return !!(d["expo-router"] || d["@react-navigation/native"]); }
+  catch { return false; }
+}
+
+// For an app with a router: the app is served under /app/, and the router would take "app" as a screen name. This runs
+// first in the app's page and drops that prefix from the address, so /app/ is / and /app/feed/1 is /feed/1.
+const ROOT_MOUNT_SNIPPET = `<script>(function(){var p=location.pathname;if(p==="/app"||p.indexOf("/app/")===0)history.replaceState(history.state,"",(p.slice(4)||"/")+location.search+location.hash)})()</script>`;
+
+export async function startRunServer(opts: { dir: string; platform: Platform; name: string; appId?: string; port?: number; projectDir?: string; render?: RenderFrame; lan?: { host: string }; onNet?: (r: NetRecord) => void; fetchImpl?: typeof fetch; /** The app has a router that reads the address. Default: read from the project's package.json. */ router?: boolean }): Promise<{ server: Server; port: number; token: string; lanToken?: string; netLog: NetRecord[]; notify: (ev: { type: "reload" } | { type: "error"; message: string } | { type: "building" }) => void; close: () => Promise<void> }> {
   const root = resolve(opts.dir);
+  const router = opts.router ?? hasRouter(opts.projectDir);
   const token = randomBytes(24).toString("hex");
   // The page gets its own credential: random, in memory only, never written to run.json, and valid for `screen` only.
   const pageToken = randomBytes(24).toString("hex");
@@ -201,6 +220,11 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
     try { path = decodeURIComponent((req.url ?? "/").split("?")[0]); }
     catch { res.writeHead(400); return void res.end("Bad request"); }
     if (path === "/app") { res.writeHead(302, { location: "/app/" }); return void res.end(); }
+    // An app with a router shows its screens at /, /feed/1 and so on. When the app's frame loads such an address
+    // (a reload, or a link that leaves the app shell), send it back to the app under /app/.
+    if (router && req.headers["sec-fetch-dest"] === "iframe" && !path.startsWith("/app/") && !path.startsWith("/__shipvo/")) {
+      res.writeHead(302, { location: `/app${(req.url ?? "/")}` }); return void res.end();
+    }
     if (path === "/" || path === "/index.html") {
       const dark = new URL(req.url ?? "/", "http://x").searchParams.get("dark") === "1";
       const bare = isMobileUserAgent(req.headers["user-agent"]);
@@ -216,6 +240,9 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
     if (path === NET_PATH) return void net.handle(req, res);
     if (path === "/__shipvo/bridge.js") { res.writeHead(200, { "content-type": TYPES[".js"], "cache-control": "no-store" }); return void res.end(bridge); }
     let rel = path.startsWith("/app/") ? path.slice(4) : path;
+    // A build made with a base path (Expo's experiments.baseUrl, for example /static) asks for its files under that path.
+    const base = buildBase(root);
+    if (base && rel.startsWith(base + "/")) rel = rel.slice(base.length);
     if (rel.endsWith("/")) rel += "index.html";
     const file = normalize(join(root, rel));
     if (file !== root && !file.startsWith(root + sep)) { res.writeHead(403); return void res.end("Forbidden"); }
@@ -231,7 +258,9 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
     if (extname(target).toLowerCase() === ".html") {
       const html = readFileSync(target, "utf8"); // first script in the page, so it wraps fetch before the app's code runs
       // A real phone (not loopback) cannot use the route, which only serves the local page: leave its requests direct.
-      if (isLoopback(req.socket.remoteAddress) && /<head[^>]*>/i.test(html)) return void res.end(html.replace(/<head[^>]*>/i, (m) => m + netSnippet));
+      const mount = router ? ROOT_MOUNT_SNIPPET : "";
+      if (isLoopback(req.socket.remoteAddress) && /<head[^>]*>/i.test(html)) return void res.end(html.replace(/<head[^>]*>/i, (m) => m + mount + netSnippet));
+      if (mount && /<head[^>]*>/i.test(html)) return void res.end(html.replace(/<head[^>]*>/i, (m) => m + mount));
     }
     res.end(readFileSync(target));
   });
@@ -276,12 +305,21 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
 
 /** Names the module or file a web build failed on, from the build's error output. */
 export function describeWebBuildFailure(output: string): string {
+  // npm refuses to run the build when the app asks for another Node version (devEngines).
+  const eng = /Invalid semver version "([^"]+)" does not match "v?([^"]+)" for "runtime"/.exec(output);
+  if (eng) return `The app needs Node ${eng[1]} and this machine runs Node ${eng[2]}. Switch to that Node version, then start again.`;
+  // Expo builds for web with Metro only when the app's config says so (older apps default to another bundler).
+  if (/Platform "web" is not configured to use the Metro bundler/.test(output)) return `The app is not set up to build for web with Metro. Add "web": { "bundler": "metro" } under "expo" in app.json (or app.config.js), then start again.`;
   const m = /Unable to resolve module ['"]?([^'"\s]+)['"]?(?: from ['"]?([^'":\s]+))?/.exec(output)
     ?? /Module not found: (?:Error: )?Can't resolve '([^']+)'(?: in '([^']+)')?/.exec(output)
     ?? /Cannot find module ['"]([^'"]+)['"]/.exec(output);
   if (m) return `The app cannot build for web: ${m[1]} fails to resolve${m[2] ? ` (from ${m[2]})` : ""}. Fix or stub that module for web, or use \`shipvo run <platform> --native\`.`;
+  // A compile error: quote the error itself, with the file it names, not a line from the stack trace under it.
+  const err = /^\s*(\w*Error): (?:(\S+\.(?:tsx?|jsx?|json)): )?(?:\/\S+: )?(.+)$/m.exec(output);
+  if (err?.[2]) return `The app cannot build for web (in ${err[2]}): ${err[3].trim().slice(0, 240)}`;
   const f = /(?:SyntaxError|Error)[^\n]*\n?[^\n]*?(\S+\.(?:tsx?|jsx?|json))/.exec(output) ?? /(\S+\.(?:tsx?|jsx?|json))/.exec(output);
-  const last = output.trim().split("\n").slice(-1)[0] ?? "";
+  // npm ends with a line that only points at its log file: the line before it says what went wrong.
+  const last = output.trim().split("\n").filter((l) => !/A complete log of this run can be found in/.test(l)).slice(-1)[0] ?? "";
   return `The app cannot build for web${f ? ` (in ${f[1]})` : ""}: ${last || "see the build output above"}. Use \`shipvo run <platform> --native\` to run it natively.`;
 }
 
@@ -334,7 +372,7 @@ export async function run(argv: string[]): Promise<number> {
   if (o.open) openBrowser(url);
   const stopWatching = watchAndRebuild({
     dir: process.cwd(),
-    build: () => rebuildInto({ root: process.cwd() }),
+    build: () => rebuildInto({ root: process.cwd(), warm: true }),
     onStart: () => s.notify({ type: "building" }),
     onResult: (r) => s.notify(r.ok ? { type: "reload" } : { type: "error", message: r.message }),
   });

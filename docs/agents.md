@@ -31,33 +31,85 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 { "mcpServers": { "shipvo": { "url": "https://sim.example.com/mcp", "headers": { "Authorization": "Bearer key1" } } } }
 ```
 
-**3. Hosted**: the Shipvo simulator service runs one sandbox per API key and exposes the same tools at `https://sim.shipvo.dev/mcp` (for clients that cannot send headers, such as ChatGPT's custom MCP connectors, the key goes in the path: `/mcp/<key>`). To sign in with GitHub instead of copying a key, run `claude mcp add --transport http shipvo https://sim.shipvo.dev/mcp` and approve the sign-in in your browser. Sessions persist across reconnects; the sandbox sleeps after 30 idle minutes and comes back on the next call. Get a key with `npx -y @shipvo/cli login` (GitHub sign-in; one test key with a sandbox-minute quota for the beta app and the apps you registered with `shipvo app create`; it expires after 30 days and a new login replaces it, `shipvo keys` shows the date), then `shipvo mcp` prints the config for Claude, Cursor and ChatGPT. To test a build from your machine, see [Test your build on the hosted phone](test-your-build.md).
+**3. Hosted**: the Shipvo simulator service runs one sandbox per GitHub account (every assistant you sign in sees the same phones) and exposes the same tools at `https://sim.shipvo.dev/mcp` (for clients that cannot send headers, such as ChatGPT's custom MCP connectors, the key goes in the path: `/mcp/<key>`). To sign in with GitHub instead of copying a key, run `claude mcp add --transport http shipvo https://sim.shipvo.dev/mcp` and approve the sign-in in your browser. Sessions persist across reconnects. After 30 idle minutes the sandbox pauses, and the next call resumes it with its phones, open apps and their data as they were. When the service is updated, your phones move to the new version with them: apps, data, settings, rooms and the apps' orders. Get a key with `npx -y @shipvo/cli login` (GitHub sign-in; one test key with a sandbox-minute quota for the beta app and the apps you registered with `shipvo app create`; it expires after 30 days and a new login replaces it, `shipvo keys` shows the date), then `shipvo mcp` prints the config for Claude, Cursor and ChatGPT, and `shipvo agents setup --hosted` writes it into each coding agent's config ([CLI guide](cli.md#shipvo-agents-setup)). Clients that sign in with OAuth can find the sign-in details themselves: the server publishes `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server`, accepts both client registration styles (a URL `client_id` that points to a Client ID Metadata Document, which must be https with a path and list the redirect URI, and dynamic client registration at `POST /register` with https or loopback redirect URIs), adds `iss` to every redirect, and answers a tool call without a key with `401` and a `WWW-Authenticate` header that points to the metadata. `initialize` and `tools/list` need no key, and API keys work as before. To test a build from your machine, see [Test your build on the hosted phone](test-your-build.md).
 
 ## The tools
 
 | Tool | What it does |
 | --- | --- |
 | `list_apps(query?)` | Apps this key can open: the sample app, your own, and every public app on [shipvo.dev/apps](https://shipvo.dev/apps); `query` searches name, description and category |
-| `list_sessions` | Open sessions on this server, to resume after a reconnect: app, platform, room, who opened it, start time and screen title |
+| `list_sessions` | Open sessions on this server, to resume after a reconnect. Each row shows app, platform, room, who opened it (the MCP client name), start time and current screen title |
+| `room_log(room, since?)` | Read-only. What every session in a room did, oldest first, plus the notes agents posted. See [Room log and notes](#room-log-and-notes) |
+| `room_note(room, text)` | Post a plain-text note (up to 500 characters) for the other agents in the room |
 | `open_app(app, session?, seed_cart?, dark?, attach?, platform?, show?, room?)` | A phone-sized session; returns the first screen. If `shipvo run` is up for this app (`.shipvo/run.json` in the working directory or a parent, up to the git root), the session drives that phone instead and the result says `attached to the live shipvo run phone`; otherwise it says `headless session`. `attach`: `auto` (default), `never` (always headless), `always` (error with no live run). `show: true` opens the phone in your browser and starts `shipvo run <platform>` when none is up; by default that happens only on a desktop machine whose project has `shipvo` installed. A server over HTTP never starts a run. `platform` applies only when a phone is started; with `show: false`, `attach: never` or a live run attached as it is, the result says it was ignored. Attached sessions support screen, tap, type, scroll, back and screenshot; other tools return `not_supported_attached`. Attach needs Node 22+; if attach fails in `auto` mode the headless result says why. `app@release` still attaches to the local run. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
 | `upload_build(dir?, app?, skip_build?)` | Build this project, upload it for your key and return a build id. Open it on the hosted phone with `open_app("<app>@build:<id>")`. Local (stdio) server only. See [Test your build](test-your-build.md) |
+| `publish_preview(...)` · `job_status(job, wait_ms?)` | Slow tools (`publish_preview`, `upload_build`) wait up to `wait_ms` (default 20000) and return the result, or `{ status: "running", job }`. Call `job_status` with that `job` to read `running`, `done` or `failed` (`wait_ms` up to 55000 waits for it). See [the CLI guide](cli.md) |
 | `attach_session(app?, session?)` | Attach to the live `shipvo run` phone (Android or iOS) from `.shipvo/run.json`, without an app id. Returns `no_live_run` when no run is up (or `app` does not match it) and `attach_failed` when the phone cannot be reached |
 | `screen(session)` | The accessibility tree with refs (`[ref=e12]`) |
-| `tap(session, ref)` · `type(session, ref, text)` · `scroll(session, direction, ref?)` · `back(session)` | Act like a thumb |
+| `tap(session, ref)` · `type(session, ref, text)` · `scroll(session, direction, ref?)` · `back(session)` | Act like a thumb. Refs can carry a prefix, such as `f1e2` (what `screen` returns after a restart) or `p1e5`; pass them back exactly as returned. A ref from before a restart fails with `stale_ref`: call `screen` again for fresh ones |
 | `screenshot(session)` | PNG of the phone |
 | `set_device(...)` · `device_reset(...)` | What the simulated phone has: platform, permissions, location, barcode in view, biometrics, payment outcome, network |
-| `lock` · `unlock` · `restart` | Press the power button (lock screen), swipe up to unlock, or restart the phone (boot screen, the app starts fresh, storage is kept). While locked, tap, type, scroll and back fail with `phone_locked` |
+| `lock` · `unlock` · `restart` | Press the power button (lock screen), swipe up to unlock, or restart the phone (boot screen, the app starts fresh, storage is kept). While locked, tap, type, scroll and back fail with `phone_locked`. After a restart the phone returns refs with a prefix, such as `f1e2` or `p1e5`; `tap`, `type`, `scroll` and `wait_for` accept them as they are |
 | `open_notifications` · `open_control_center` · `toggle_tile` · `dismiss_notification` · `close_panels` | Pull down the notification shade (Android: first call shows a few tiles and notifications, second call all tiles) or Notification Center (iPhone), open Control Center (iPhone only), flip a tile (`wifi`, `mobile_data`, `airplane`, `location`, `dark_mode`, `dnd`, `auto_rotate`, `flashlight`; iPhone: `airplane`, `wifi`, `mobile_data`, `focus`, `orientation_lock`, `brightness`, `dark_mode`), swipe away a notification or clear all. A tile changes the simulated device like `set_device`: Wi-Fi and mobile data both off take the network offline, `dark_mode` sets the app's `prefers-color-scheme`, `dnd` stops heads-up banners. Typed errors: `tile_not_visible`, `unknown_tile`, `no_control_center`, `no_such_notification`, `panel_closed`. While a panel is open, `tap`, `type` and `scroll` fail with `panel_open` (call `close_panels` first), as the panel covers the app. Panel actions need the app in the foreground. `dismiss_notification` without an `id` removes the newest notification. |
 | `press_home` · `open_recents` · `resume_app` · `kill_app` | Home (app gets `AppState` background, home screen shows the app icon), app switcher card, bring the app back (`active`), swipe the card away (next open is a cold start). While away, tap, type, scroll, back, `open_url` and `open_notification` fail with `app_not_foreground`; `screenshot` shows the home screen or switcher |
+| `inbox_wait` · `inbox_read` · `inbox_clear` | The session's private inbox for emailed codes and magic links: its address, wait for mail by subject or sender, read codes and links, empty it. See [Test an email sign-in](email-sign-in.md) |
+| `wait_for_event(session, timeout_ms?)` | Wait up to 25 seconds until a new message or task is waiting for you in the Assistant Inbox, or get `nothing yet`. See [Phone apps](phone-apps.md) |
+| `set_reminder` · `list_reminders` · `cancel_reminder` | A notification at a time on the phone's clock, once or daily or weekly, with the app open or not. See [Phone apps](phone-apps.md) |
+| `inbox_view(session)` | The whole Assistant Inbox and what waits for you. In a chat that shows MCP Apps views it draws the inbox live and can post each new message into the chat. See [Phone apps](phone-apps.md) |
+| `register_wakeup` · `list_wakeups` · `clear_wakeup` | Call a URL (signed, retried, logged in `device_log`) when a new message or task arrives for an assistant name in the Assistant Inbox. See [Phone apps](phone-apps.md) |
 | `push_notification` · `notifications` · `open_notification` | Deliver, list and tap notifications |
 | `get_settings` · `set_setting` · `browser_open` · `browser_snapshot` · `browser_click` · `browser_type` · `browser_scroll` · `browser_back` · `browser_wait_for` · `browser_tabs` · `browser_close_tab` · `browser_screenshot` | Read and change the phone's system settings, and drive its separate web Browser. See [the phone's Browser and Settings](phone-apps.md) |
+| `create_app` · `update_app` · `run_app_action` · `refresh_app` · `app_activity` | Describe an app and it appears on the phone, Android or iOS style: build it from a spec, change it, run one of its actions, fetch its live data now, and read what was built and changed. See [Describe an app and it appears](phone-apps.md#describe-an-app-and-it-appears) |
+| `arrange_apps` · `pin_app` · `hide_app` · `schedule_app` · `clear_schedule` · `set_phone_time` · `export_phone_apps` · `import_phone_apps` | Place apps on the home screen, show them on a time window (in a time zone you name if you like), set the phone's clock, and move a phone's apps and data to another phone. See [Arrange the home screen](phone-apps.md#arrange-the-home-screen) |
 | `device_log(session)` | Every device event, each `simulated: true`, plus capability support levels |
-| `end_session(session)` | Steps taken, duration, and the orders the app posted to its backend during the session |
+| `end_session(session)` | Ends the session. Reports steps taken, duration, the room, and the orders the app posted to its backend during the session. A room ends with its last session |
 | `owner_describe(app)` · `owner_command(app, command, args)` | The app's owner API (content, prices, offers, orders, publish), with an owner token |
 
 ## Rooms: several phones, one backend
 
 Give `open_app` the same `room` on two sessions and both phones share one backend: an order placed on one shows up for the other. Use it to test two people in one app, for example a buyer and a shop owner, on Android and iOS. Without `room`, a session gets its own backend. A room name that is not valid returns `bad_room`. A room ends when its last session ends, and `end_session` names the room and its orders.
+
+```text
+open_app("tide-and-tackle@latest", room: "demo")   // session s1, Android
+open_app("tide-and-tackle@latest", room: "demo", platform: "ios")   // session s2, iOS
+```
+
+`list_sessions` shows the room of every session.
+
+## Room log and notes
+
+When several agents share a room, one of them (the lead) can see what the others did, and any agent can leave a note for the rest. This is for a lead agent that sends other agents to test different parts of one app, and for you when you want to know who tapped what.
+
+The simulator keeps a log for each room, next to the shared backend. Every action by a session in the room is added with the time, the session, the agent name (the name your MCP client reports, such as `claude-code`), the tool, the element it acted on and the change on screen. The log goes away when the room ends.
+
+1. Open two sessions in the same room, as in [Rooms](#rooms-several-phones-one-backend).
+2. Let an agent act, then ask the lead to call `room_log("demo")`.
+3. Post a note with `room_note("demo", "Checkout fails when the cart has 3 items")`.
+4. Call `room_log("demo", since: "<cursor>")` with the `cursor` from your last read to get only what is new.
+
+Example reply from `room_log`:
+
+```text
+2026-11-10T09:14:02.511Z s1 (claude-code) tap e7: Cart shows 1 item
+2026-11-10T09:14:09.020Z claude-code note: Checkout fails when the cart has 3 items
+cursor: 2
+```
+
+| Tool | Arguments | Result |
+| --- | --- | --- |
+| `room_log` | `room`, `since?` (a cursor from an earlier `room_log` or `room_note`) | `entries` (each with `at`, `kind` of `action` or `note`, `session`, `agent`, `tool`, `target`, `change` or `text`) and the next `cursor`. Without `since`, you get the whole log |
+| `room_note` | `room`, `text` (1 to 500 characters) | The new `cursor` |
+
+The log keeps the latest 1000 entries. Reading it changes nothing, so a lead can poll it as often as it likes.
+
+Errors:
+
+| Code | Meaning |
+| --- | --- |
+| `no_room` | No open session is in that room. Open a session with `room` first, or check the spelling |
+| `bad_cursor` | `since` is not a cursor from an earlier read. Leave `since` out to read from the start |
+| `bad_note` | The note is empty |
+| `note_too_long` | The note is over 500 characters. Shorten it |
 
 ## Driving the live phone
 
@@ -67,6 +119,20 @@ When `shipvo run` is up for your app, `open_app` attaches to that phone and the 
 - a step log in plain words, such as `Tapped button "Add to cart"`. Events from the simulated device are marked "(simulated)". **Hide steps** collapses the log so it never covers the app.
 
 The person can stop the agent at any time. Any touch or key press on the phone pauses it, once the agent has made its first request. The next tool call fails with `taken_over` and the text "the person took over". Stop acting and ask the person to press **Hand back** on the banner; then call `screen` and carry on. An action already in flight when the person takes over still finishes, and its step is logged after "You took over".
+
+## Watch the agent's phone
+
+The simulator serves a `/watch` page. Open it in a browser to see the agent's phone live, in its Android or iOS frame. It lists live sessions, follows the newest one unless you pick one, and starts view only; the viewer can turn on **Take over** to drive the phone. For a phone you can touch directly, see [Driving the live phone](#driving-the-live-phone). The video stream runs only while someone is watching. `/sessions` reports `skin` and `streaming` for each session. For a phone you can also touch, use [`shipvo run`](run.md).
+
+### Watch link on the hosted phone
+
+On the hosted phone, `open_app` also returns `watch_url` (in the text and in `structuredContent`) and says "The user can watch at <url>." Open it to see that one session live, in its Android or iOS frame. Pass `platform` to `open_app` to pick the phone.
+
+1. Ask your assistant to open your app on the hosted phone.
+2. Copy the `watch_url` from the reply and open it in your browser. You see the phone and each step as it happens.
+3. To take over, choose **Sign in to take over** and sign in with the GitHub account that owns the key.
+
+The link is read-only and shows one session only. It stops working after one hour and when the key is revoked. No API key is in the URL. A viewer who is not signed in cannot tap, swipe, type or press keys. Ask for a new link by calling `open_app` again.
 
 ## What the tree shows (and hides), on purpose
 
@@ -195,7 +261,7 @@ Owner rules, in `shipvo.json` or (for the control plane) with the `set_agent_pol
 
 ## Grading an agent
 
-`end_session` returns what the app actually sent to its backend, not what the agent says it did. `shipvo eval` scores an agent on a task that way: see [Score an agent on an app task](eval.md). Earlier results: [agent-gate-results.md](agent-gate-results.md).
+`end_session` returns what the app actually sent to its backend, not what the agent says it did. `shipvo eval run` scores any agent or model that way: success per check, steps, time, errors and retries. See [Score an agent on an app task](eval.md). Earlier results: [agent-gate-results.md](agent-gate-results.md).
 
 ## Listing your app for every agent
 
@@ -215,7 +281,19 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 
 **`Error [build_not_supported]`.** The simulator could not load the build you named with `@build:<id>`. Open the app without `@build` to use the published version, or see [Test your own build](test-your-build.md).
 
+**A tool answers `{ "status": "running", "job": … }`.** Nothing failed. The work (a preview or a build upload) takes longer than the wait. Ask the assistant to call `job_status` with that `job`. Calling the same tool again returns the same job, so it never starts a second publish. Another key gets `job_not_found`, and a job is kept for 15 minutes after it finishes.
+
+**A tool refuses a ref the phone gave back after a restart.** Read the screen again with `screen` and use the refs it shows. After a restart they look like `f1e2` or `p1e5`, and `tap`, `type`, `scroll` and `wait_for` accept them as returned. A ref from before the restart still fails with `stale_ref`: call `screen` again.
+
 **The assistant cannot find a button.** The tree only lists what a person could see and touch (see [What the tree shows](#what-the-tree-shows-and-hides-on-purpose)). Ask the assistant to read the screen again after the app finishes loading, and check that the button has a label.
+
+**The `watch_url` shows an error or does not load.** The link is valid for one hour, for one session. Call `open_app` again for a new one. If there is no `watch_url` in the reply, you are on a local simulator; open `/watch` there instead.
+
+**`room_log` or `room_note` returns `no_room`.** The room ends when its last session ends, and its log goes with it. Open a session with `room` again and read the log while a session is still open.
+
+**Two sessions do not see each other's orders.** They were opened without the same `room`. Open both with the same `room` value on the same simulator (see [Rooms](#rooms-several-phones-one-backend)).
+
+**`create_app` answers `invalid_spec`.** Nothing was installed. Each problem in the reply has its path in the spec and a fix. Correct the spec and call `create_app` again ([app spec](design/app-spec.md)).
 
 **Your coding agent does not list the Shipvo tools.** Run `npx shipvo agents setup` in the app folder. It writes the MCP config for each coding agent it finds ([CLI guide](cli.md)). Restart the agent so it reads the new config.
 
@@ -225,4 +303,4 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 - [Turn a session into a test](#turn-a-session-into-a-test) and [Test your app in CI](testing.md).
 - [Score an agent on an app task](eval.md).
 - [Run on a phone](run.md): watch the assistant work in your browser.
-- [Phone apps](phone-apps.md): Settings, Browser, Store and updates on Shipvo Phone.
+- [Phone apps](phone-apps.md): Settings, Browser, Store and updates on Shipvo Phone, and apps your assistant describes into being.

@@ -37,6 +37,19 @@ const { errors, warnings } = validate({
 - `celSyntaxError(source)`: syntax check for one CEL expression.
 - `contrastRatio(a, b)`: WCAG contrast ratio of two hex colours.
 
+## Save a file
+
+`createApp` runs actions, and an action can keep text as a file with a `saveFile` step:
+
+```json
+{ "saveFile": "diary.csv", "content": "{{ csv(data.entries) }}", "mime": "text/csv" }
+```
+
+- `content` is required. `mime` is optional and defaults to `text/plain`.
+- The name may not contain a slash. Saving again with the same name replaces the file.
+- The step needs the `files` device permission, also inside `then` or `else`. A denied permission stops the action.
+- `app.files` lists the saved files as `{ name, mime, size, content }`.
+
 ## Evaluate expressions
 
 ```ts
@@ -52,7 +65,7 @@ evaluateTemplate("{{ count(charges) }}", scope, options); // 2 (a number, not te
 
 `options`: `locale` (default `en-US`), `timeZone` (default `UTC`), `now` and `maxCost`. Numbers are doubles, as in JSON, so `size(x) + 1` and `a / b - 1` work. `evaluate` throws `ExpressionError` for an expression over 2,000 characters, over the cost limit (nested list macros multiply the cost), or that fails to run.
 
-Functions: `sum avg min max count unique sortBy groupBy first last take`; `today startOf endOf addDays diffDays formatDate unix`; `money number percent compact`; `lower upper trim split join`; `orElse`; and CEL's `filter map exists all has contains startsWith endsWith matches`. Dates are ISO 8601 strings. `startOf`/`endOf` units: `day week month year` (weeks start on Monday). `formatDate` patterns: `day month year time datetime iso`.
+Functions: `sum avg min max count unique sortBy groupBy first last take`; `today startOf endOf addDays diffDays formatDate unix`; `money number percent compact`; `lower upper trim split join`; `orElse`; `csv parseCsv`; and CEL's `filter map exists all has contains startsWith endsWith matches`. Dates are ISO 8601 strings. `startOf`/`endOf` units: `day week month year` (weeks start on Monday). `formatDate` patterns: `day month year time datetime iso`.
 
 ## What it checks
 

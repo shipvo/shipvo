@@ -90,6 +90,8 @@ export const ReleasePointer = z.object({
   required_native_modules: z.record(z.string().min(1), z.string().min(1)).optional(),
   /** The agent-facing web build of this same release, served by the control plane at `base` (sim.shipvo.dev opens it). */
   web: z.object({ base: z.string().min(1), entry: z.string().min(1), sha256, files: z.number().int().nonnegative() }).optional(),
+  /** Version of the data format this release reads and writes in AsyncStorage, SQLite or MMKV. Absent = no declaration. A rollback to a lower value needs an explicit choice. */
+  state_version: z.number().int().positive().optional(),
   new_control_plane: z.object({ base_url: z.string().url(), cdn_url: z.string().url() }).optional(),
   signature: b64,
 });
@@ -159,11 +161,13 @@ export type ChangeLogEntry = z.infer<typeof ChangeLogEntry>;
 export const Telemetry = z.object({
   schema_version: z.literal("1.0"),
   app_id: z.string(), release: z.number().int().nonnegative(),
-  event: z.enum(["applied", "rolled_back", "crash_loop_revert", "download_failed", "verify_failed", "content_applied", "hermes_bytecode_mismatch", "native_module_missing", "native_module_version"]),
+  event: z.enum(["applied", "rolled_back", "crash_loop_revert", "download_failed", "verify_failed", "content_applied", "hermes_bytecode_mismatch", "native_module_missing", "native_module_version", "js_crash_cold", "js_crash_reload"]),
   cold_start_ms: z.number().nonnegative().optional(),
   bytes_downloaded: z.number().int().nonnegative().optional(),
   apply_ms: z.number().nonnegative().optional(),
   device_class: z.enum(["low", "mid", "high"]).optional(),
+  /** Set on `crash_loop_revert`: the load the revert happened in. `reload` is an in-place reload after an apply. */
+  load_kind: z.enum(["cold", "reload"]).optional(),
 });
 export type Telemetry = z.infer<typeof Telemetry>;
 

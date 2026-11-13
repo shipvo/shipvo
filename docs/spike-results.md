@@ -1,5 +1,7 @@
 # Spike results
 
+This page is for developers and founders who want to know how Shipvo's over-the-air updates behave on a low-cost phone. You will get update size, apply time, cold start, rollback and crash-loop revert, measured on Android, plus the iOS Simulator numbers from CI.
+
 Measured numbers only. The Android sections come from a real phone, with raw rows from the control plane's `telemetry` table (D1). The iOS section comes from the iOS Simulator in CI, measured on every change to the iOS runtime.
 
 ## Device
@@ -99,6 +101,8 @@ The run's log also prints: "patch 83999 bytes, full bundle 1996082 bytes, embedd
 4. ~~MIUI force-dark repaints the app.~~ Fixed in shell 1.0.1 (system dark mode with dark tokens).
 5. **Polling every 10 s while open** is a spike setting. Production uses check-on-foreground plus an optional push nudge.
 
-## First applied OTA of a scaffolded app (Android emulator)
+## Next steps
 
-Not measured yet. `node scripts/first-run/applied-ota.mjs --control-url <url>` prints init, install, build apk, adb install, publish and publish-to-healthy times. The first value will be recorded here with the CI run link, runner and emulator image once it runs in CI. The script exists but has not been run in CI or on an emulator yet.
+- [Getting started](getting-started.md): ship your first update.
+- [CLI guide](cli.md): staged rollout and rollback.
+- [Self-hosting](self-hosting.md): run the control plane yourself.

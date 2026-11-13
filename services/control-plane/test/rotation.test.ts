@@ -174,3 +174,31 @@ describe("POST /rotation/<app>", () => {
     });
   }
 });
+
+describe("pointer response carries rotations", () => {
+  const h = "a".repeat(64);
+  const pbody = { schema_version: "1.0", app_id: "tide", shell_major: 1, band: "b0", release: 3, issued_at: "2026-10-30T00:00:00Z",
+    core: { version: "1.0.0", sha256: h, size: 10, url: "c" }, min_shell_version: "1.0.0" };
+  const penv = JSON.stringify({ body: JSON.stringify(pbody), signature: "AAAA" });
+  const kv = { get: async (k: string) => (k === "p/tide/1/b0" ? penv : null) };
+  it("lists stored rotations in chain order, at most 8, and changes the etag", async () => {
+    const { e } = setup(); e.POINTERS = kv; await register(e);
+    const bare = await app.request("/p/tide/1/b0.json", {}, e);
+    expect(await bare.text()).toBe(penv);
+    expect(bare.headers.get("etag")).toBe('"3"');
+    for (const x of [1, 2]) await upload(e, signed(x));
+    for (const env of envs(9)) await upload(e, env);
+    const r = await app.request("/p/tide/1/b0.json", {}, e);
+    const out = await j(r);
+    expect(out.body).toBe(JSON.parse(penv).body);
+    expect(out.rotations.map((x: any) => JSON.parse(x.body).sequence)).toEqual([3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(r.headers.get("etag")).toBe('"3-r10"');
+    expect((await app.request("/p/tide/1/b0.json", { headers: { "if-none-match": '"3"' } }, e)).status).toBe(200);
+    expect((await app.request("/p/tide/1/b0.json", { headers: { "if-none-match": '"3-r10"' } }, e)).status).toBe(304);
+  });
+  it("an upload writes an audit row for each statement", async () => {
+    const { e, DB } = setup(); await register(e);
+    await upload(e, signed(1)); await upload(e, signed(2));
+    expect((await listRotationLog(DB, "tide")).map((x) => x.sequence)).toEqual([2, 1]);
+  });
+});

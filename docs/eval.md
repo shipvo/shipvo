@@ -119,6 +119,9 @@ A task is `tasks/<name>.task.json`:
 - **`open_app failed at the start of the run`**: the MCP server is not reachable or the app name is wrong. Check `--mcp` and `--key`.
 - **The run ends with `step_limit` right away**: raise `limits.steps`, or check that the agent is not repeating a failing call (see Retries).
 - **The agent's calls are not counted**: use the session name Shipvo printed in every tool call. Calls for another session are not scored.
+- **The run ends with `time_limit`**: the agent used up `limits.seconds`. Shipvo scores the final screen and the orders as they are. Raise `limits.seconds` if the task needs longer.
+- **Usage text and exit code 2**: `shipvo eval run` needs a task name and `--agent`. Example: `shipvo eval run buy-canvas-tote --agent claude`.
+- **`<file>: <message>` when the run starts**: the task file has a field Shipvo cannot read. The message names it. Fix that field in `tasks/<name>.task.json`.
 - **HTTP 410 from the proxy**: the run is over. Start a new run.
 
 ## Next steps

@@ -7,7 +7,9 @@ import { adminPage, loginPage } from "./admin";
 import { AGENT_ACTOR, describeOwner, listChallenges, resolveChallenge, runOwnerCommand, holdRelease, HOLD_COMMAND, holdDismissedKey } from "./owner";
 import { auth } from "./auth";
 import { sso } from "./sso";
+import { samlRoutes } from "./saml-routes";
 import { rotationRoutes } from "./rotation";
+import { listRotations, listRotationLog } from "./rotation-store";
 import { vaultRoutes } from "./vault";
 import { peopleRoutes } from "./people";
 import { phoneRoutes } from "./phone";
@@ -23,7 +25,7 @@ import { REPORT_TTL_SECONDS, maxReportBytes, reportKey, sanitizeReport, summariz
 import { installs, verifyReport } from "./installs";
 import { FAILED_EVENTS, HEALTHY_EVENTS, DEFAULT_MIN_REPORTS, DEFAULT_MIN_INSTALLS, shouldHalt, tallyVotes, looksLikeAttack, type InstallVote } from "./halt";
 
-type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket; TELEMETRY_SECRET?: string; VAULT_MASTER_KEY?: string; MAIL_WEBHOOK_URL?: string; PEOPLE_LOGIN_URL?: string; PHONE_APP_DATA_MAX_BYTES?: string; MAX_TEST_REPORT_BYTES?: string; SSO_ORGS?: string };
+type Env = { POINTERS: KVNamespace; DB: D1Database; ADMIN_PASSWORD?: string; OWNER_TOKEN?: string; GITHUB_CLIENT_ID?: string; SIM_URL?: string; EXPORT_BUCKET?: R2Bucket; TELEMETRY_SECRET?: string; VAULT_MASTER_KEY?: string; MAIL_WEBHOOK_URL?: string; PEOPLE_LOGIN_URL?: string; PHONE_APP_DATA_MAX_BYTES?: string; MAX_TEST_REPORT_BYTES?: string; SSO_ORGS?: string; SAML_ORGS?: string };
 const app = new Hono<{ Bindings: Env }>();
 
 /* ---------- owner auth: admin session cookie (HMAC) or bearer owner token for agents ---------- */
@@ -81,9 +83,19 @@ async function servePointer(c: any, platform: "android" | "ios") {
     return c.json(json, status, status === 404 ? { "cache-control": "public, max-age=5" } : undefined);
   }
   const release = offer.release;
-  const etag = `"${release}"`;
+  // Stored key rotations ride along (design section 6): at most 8, ascending. They are not part of the signed body.
+  let rotations: { body: string; signature: string }[] = [];
+  let lastSeq = 0;
+  if (c.env.DB) {
+    try {
+      const rows = await listRotations(c.env.DB, appId);
+      rotations = rows.map((x) => ({ body: x.body, signature: x.signature }));
+      lastSeq = rows.length ? rows[rows.length - 1].sequence : 0;
+    } catch { /* no rotation storage: serve the pointer alone */ }
+  }
+  const etag = lastSeq ? `"${release}-r${lastSeq}"` : `"${release}"`;
   if (c.req.header("if-none-match") === etag) return new Response(null, { status: 304, headers: { ETag: etag } });
-  return new Response(raw, { headers: { "content-type": "application/json", ETag: etag, "cache-control": "public, max-age=5" } });
+  return new Response(rotations.length ? JSON.stringify({ ...JSON.parse(raw), rotations }) : raw, { headers: { "content-type": "application/json", ETag: etag, "cache-control": "public, max-age=5" } });
 }
 app.get("/p/:app/:major/ios/:band", (c) => servePointer(c, "ios"));
 app.get("/p/:app/:major/:band", (c) => servePointer(c, "android"));
@@ -602,7 +614,9 @@ app.delete("/app/:id/api/halt-config", async (c) => {
   return c.json({ enabled: false });
 });
 
-/** Audit rows for one app, newest first. ?limit= (default 50, max 200), ?before=<id>. Owner or the app's publish token. */
+/** Audit rows for one app, newest first. ?limit= (default 50, max 200), ?before=<id>. Owner or the app's publish token.
+ *  Key-rotation rows (from key_rotation_log) are merged in by `at` (ties: higher id first) and returned only on the first page (no `before`),
+ *  because `before` is a row id of the audit table. */
 app.get("/audit/:app", async (c) => {
   const appId = c.req.param("app");
   if (!ID.test(appId)) return c.json({ error: "bad_request" }, 400);
@@ -616,7 +630,15 @@ app.get("/audit/:app", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT id, app_id, at, actor, actor_kind, action, release, release_id, before, after FROM audit_log WHERE app_id = ?${bq !== undefined ? " AND id < ?" : ""} ORDER BY id DESC LIMIT ?`,
   ).bind(...(bq !== undefined ? [appId, Number(bq), n] : [appId, n])).all();
-  return c.json({ app: appId, rows: results ?? [] }, 200, { "cache-control": "no-store" });
+  let rows: any[] = results ?? [];
+  if (bq === undefined) {
+    const rot = (await listRotationLog(c.env.DB, appId, n)).filter((r) => typeof r.sequence === "number").map((r) => ({
+      id: r.id, app_id: r.app_id, at: r.at, actor: r.actor, actor_kind: r.actor_kind, action: "key-rotation",
+      release: null, release_id: null, before: null, after: JSON.stringify({ sequence: r.sequence, valid_from: r.valid_from }),
+    }));
+    if (rot.length) rows = [...rows, ...rot].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : b.id - a.id)).slice(0, n);
+  }
+  return c.json({ app: appId, rows }, 200, { "cache-control": "no-store" });
 });
 
 app.route("/auth", auth);
@@ -626,6 +648,7 @@ app.route("/people", peopleRoutes());
 app.route("/phone", phoneRoutes());
 app.route("/phone", phoneNetRoutes());
 app.route("/", sso);
+app.route("/", samlRoutes);
 app.route("/apps", apps);
 
 /** Hourly cron: copy new telemetry to the owner's R2 bucket as Parquet (only when the EXPORT_BUCKET binding is set). */

@@ -183,6 +183,19 @@ it("--template shop shows prices in the currency set in src/data/shop.json", asy
     expect(readFileSync(join(dir, `src/screens/${f}.tsx`), "utf8")).toContain("formatPrice(");
 });
 
+it("--template shop explains prices written in the wrong unit", async () => {
+  const dir = join(tmp, "store-units");
+  await init([dir, "--template", "shop", "--public-key", "AAAA"]);
+  rmSync(join(dir, "tsconfig.json"));
+  const { priceProblems } = await import(join(dir, "src/money.ts"));
+  expect(priceProblems()).toEqual([]);
+  const bad = priceProblems([{ name: "Beanie", price: 24 }, { name: "Mug", price: 12.5 }, { name: "Free", price: 0 }]);
+  expect(bad).toHaveLength(2);
+  expect(bad[0]).toContain("write 2400 for 24");
+  expect(bad[1]).toContain("1250 for 12.5");
+  expect(priceProblems([{ name: "Rice", price: 5 }], 0)).toEqual([]);
+});
+
 it("--template shop sends the payment to the shop name given with --name", async () => {
   const dir = join(tmp, "named-shop");
   await init([dir, "--template", "shop", "--name", "Sandbar Shop", "--public-key", "AAAA"]);
@@ -339,3 +352,24 @@ it("--template shop Cart: wording per reason, offline guard before any charge, 4
   expect(readFileSync(join(dir, "src/cart.tsx"), "utf8")).toContain("restore");
   expect(readFileSync(join(dir, "src/screens/List.tsx"), "utf8")).toContain("formatPrice(p.price)");
 });
+
+it.each(["blank", "content", "shop"])("the %s template's tests/app.test.ts passes tsc --noEmit", async (tpl) => {
+  const { spawnSync } = await import("node:child_process");
+  const dir = join(tmp, `tc-${tpl}`);
+  await init([dir, "--template", tpl, "--public-key", "AAAA"]);
+  const root = join(__dirname, "../../..");
+  const cfg = join(dir, "tsconfig.check.json");
+  writeFileSync(cfg, JSON.stringify({
+    compilerOptions: {
+      strict: true, noEmit: true, skipLibCheck: true, module: "esnext", moduleResolution: "bundler", target: "es2022",
+      resolveJsonModule: true, allowImportingTsExtensions: true, types: [],
+      paths: { "@shipvo/test/vitest": [join(root, "packages/test/dist/vitest.d.ts")] },
+    },
+    files: [join(dir, "tests/app.test.ts")],
+  }));
+  const tsc = join(root, "node_modules/.bin/tsc");
+  const r = spawnSync(tsc, ["-p", cfg], { encoding: "utf8" });
+  // The test file must have no errors of its own (imports of app sources are not resolved here).
+  const own = r.stdout.split("\n").filter((l) => l.includes("tests/app.test.ts(") && !/TS2307|TS7016/.test(l));
+  expect(own).toEqual([]);
+}, 60000);

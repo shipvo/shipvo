@@ -84,6 +84,8 @@ Testers can tap **Comment** (a button that stays visible on phones), tap a point
 
 Agents can call the MCP tool `publish_preview`; it runs `shipvo preview --json` in `PN_APP_DIR` (or the current folder) and returns `{ url, claimUrl, expiresAt }`.
 
+A preview can take longer than some clients wait for one tool call. `publish_preview` (and `upload_build`) take an optional `wait_ms` (default 20000). They wait up to that long and return the result, or `{ status: "running", job }`. Call `job_status { job, wait_ms? }` to read it: it returns `running`, `done` with the result, or `failed` with a typed error `{ code, error }`, and with `wait_ms` it waits for the job to finish. Calling the tool again while the job runs returns the same job, so a retry never starts a second publish. Jobs belong to the key that started them and are kept for 15 minutes after they finish.
+
 `shipvo init` adds `.github/workflows/preview.yml`, which publishes each pull request's web build and comments the link on the pull request. Pull requests from forks are skipped.
 
 ### Device panel
@@ -178,6 +180,24 @@ shipvo agents setup --json       # machine-readable result
 - `--json` adds `agents`: one entry per agent with its `agent` id, `name`, `file`, `action` and, for printed blocks, the `block`.
 - It prints the skill install line.
 - Running it again changes nothing.
+
+## `shipvo session`
+
+Open any Expo app on a headless Shipvo Phone and drive it from the shell, on Android and iOS. It needs no `shipvo.json`.
+
+```bash
+shipvo session start [android|ios] [--device "<model>"] [--name <n>] [--max-duration-minutes 30] [--port <n>] [--skip-build] [--json]
+shipvo session devices
+shipvo session screen | tap <ref> | type <ref> <text> | scroll <up|down|left|right> [<ref>] | back
+shipvo session screenshot [--out <file>] [--no-frame]
+shipvo session record start | record stop [--out <file>]
+shipvo session errors
+shipvo session start --a2ui <file> [--device "<model>"]
+shipvo session a2ui send <file> | a2ui actions [--since <n>]
+shipvo session get | list | stop | clean
+```
+
+Commands after `start` act on the newest running session; `--id <id>` names one. The session stops on its own after `--max-duration-minutes`. Screenshots and recordings show the phone in its Android or iPhone frame with the status bar. `--a2ui` opens A2UI messages on the phone with no app folder: see [A2UI on Shipvo Phone](a2ui.md). Steps, JSON fields and error codes: [Test any Expo app from the terminal](session.md).
 
 ## `shipvo smoke`
 
@@ -277,7 +297,7 @@ Builds the app the way `shipvo sim` does, uploads it for your `SHIPVO_API_KEY` a
 
 ## `shipvo audit`
 
-Exports an app's audit log, newest first, to stdout. Hand the file to an auditor.
+For owners and teams who need a record of what happened to an app's releases. It exports the audit log, newest first, to stdout, so you can hand the file to an auditor. The log shows publishes, rollbacks, halts and key rotations.
 
 ```bash
 shipvo audit shop > audit.json                 # JSON (default)
@@ -286,9 +306,20 @@ shipvo audit shop --limit 100                  # only the newest 100 entries
 ```
 
 - It pages through `GET /audit/<app>` with `?before=<id>`, 200 rows at a time. `--limit` caps the total (default: all).
+- Key rotations appear in the log as rows with `action` `key-rotation`, merged by time with publishes and rollbacks. `release`, `release_id` and `before` are empty; `after` holds `{ "sequence": n, "valid_from": "<ISO time>" }`. They are merged into the first page, which holds the newest rows (up to 200), so an export includes rotations that fall within the newest 200 rows. See [Key rotation](key-rotation.md#see-rotations-in-the-audit-log).
 - CSV has a header row, every field in double quotes, and columns in this order: `id`, `app_id`, `at`, `actor`, `actor_kind`, `action`, `release`, `release_id`, `before`, `after`. Objects are written as JSON text.
 - A value that starts with `=`, `+`, `-` or `@` gets a leading `'` so a spreadsheet does not run it as a formula.
 - It needs `SHIPVO_OWNER_TOKEN`, or the publish token from `shipvo app create`. A non-2xx answer prints the status and exits 1. The token is never printed.
+- Key rotations (`shipvo keys rotate`) appear in the log as rows with `action` `key-rotation`, next to publishes and rollbacks. Their `after` is `{"sequence":n,"valid_from":"..."}`, and `release`, `release_id` and `before` are empty. Rows from both sources are merged by time. Rotation rows come only with the first page of `GET /audit/<app>` (the request with no `before`).
+
+What a row looks like when you rotate the release key (see [Key rotation](key-rotation.md)):
+
+```json
+{ "action": "key-rotation", "release": null, "release_id": null, "before": null, "after": "{\"sequence\":2,\"valid_from\":\"2026-11-10T09:00:00.000Z\"}" }
+```
+
+- `action` is one of `publish`, `rollback`, `halt` or `key-rotation`. A `key-rotation` row has the key sequence number and the time it takes effect in `after`; `release`, `release_id` and `before` are `null`.
+- Rotation rows are merged with the other rows by time. They come with the first page only (the page without `before`), so `shipvo audit` merges them into the newest entries (cut to `--limit`), and a hand-made call to `GET /audit/<app>?before=<id>` does not.
 
 ## shipvo run
 
@@ -352,6 +383,7 @@ These come from fixed issues in this repository.
 - [Test your app in CI](testing.md), including `shipvo test --repair` and `--report`.
 - [Store details and screenshots](store.md).
 - [Self-host the control plane](self-hosting.md).
+- [Rollbacks and stored data](rollbacks-and-stored-data.md): `stateVersion` and `--allow-state-downgrade`.
 - [Glossary](glossary.md) for the words used here.
 
 ## `--json` for `publish`, `promote`, `rollback` and `auto-halt`
@@ -369,7 +401,7 @@ These four commands take `--json` and print the same `{ ok, code, summary, data,
 | `rollback --dry-run` | `dry_run` | the same with `dry_run: true` |
 | `auto-halt` | `auto_halt_show`, `auto_halt_on`, `auto_halt_off`, `dry_run` | `{ enabled, threshold, min_reports, dry_run, changed }` (`threshold` and `min_reports` are `null` when off) |
 
-Failure codes: `usage`, `failed`, `policy_refused`, `no_bundle`, `not_found`, `no_pointer`, `tests_failed`, `blocked`, `report_unreadable`, `no_credentials`, `auth_failed`, `remote_failed`. On failure `data` is `{}` and `summary` is the error message.
+Failure codes: `usage`, `failed`, `policy_refused`, `no_bundle`, `not_found`, `no_pointer`, `tests_failed`, `blocked`, `report_unreadable`, `no_credentials`, `auth_failed`, `remote_failed`, `state_downgrade` (see [Rollbacks and stored data](rollbacks-and-stored-data.md)). On failure `data` is `{}` and `summary` is the error message.
 
 Without `--json`, `publish` and `rollback` print a single plain sentence.
 
@@ -388,6 +420,7 @@ These commands take `--json` and print the same `{ ok, code, summary, data, next
 | `keys` | `ok` | `{ login, prefix, scope, app, expires_at, used_minutes, quota_minutes, last_used_at, mcp_url }` |
 | `keys export --out <file>` | `exported` | `{ app_id, public_key, out }`. `--out` is required, so the seed is never printed. |
 | `keys import` | `imported`, `unchanged` | `{ app_id, public_key, seed_file, gitignore_warning }` |
+| `keys root --out <file>` | `root_created` | `{ public_key, file }`. The seed goes to the file only. See [Key rotation](key-rotation.md). |
 | `keys rotate sign` | `rotation_signed` | `{ app_id, envelope: { body, signature } }` |
 | `keys rotate upload` | `rotation_uploaded` | `{ app_id, response }` |
 

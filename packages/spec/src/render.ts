@@ -7,6 +7,10 @@ import { evaluate, evaluateTemplate } from "./eval.js";
 import type { EvalOptions } from "./eval.js";
 import type { Issue } from "./types.js";
 import { aggregatePoints, chartSvg, chartText } from "./chart.js";
+import { CALENDAR_VIEWS, placePins, validCoords, visibleDays, weekdayColumn } from "./calendar-map.js";
+import type { CalendarView } from "./calendar-map.js";
+import { resolveShapes, vectorSvg } from "./vector.js";
+import type { Shape } from "./vector.js";
 import type { Aggregate, ChartKind, ChartPoint } from "./chart.js";
 
 export type PhoneStyle = "android" | "ios";
@@ -23,6 +27,8 @@ export interface ScreenNode {
 }
 
 export interface RenderOptions extends EvalOptions {
+  /** The person's language, such as "fr". Text that matches a key in `strings[language]` is translated. Default: the language of `locale`, else "en". */
+  language?: string;
   style?: PhoneStyle;
   /** Screen id. Default: the first screen. */
   screen?: string;
@@ -32,6 +38,8 @@ export interface RenderOptions extends EvalOptions {
   state?: Record<string, unknown>;
   /** Route params for the screen. */
   params?: Record<string, unknown>;
+  /** The phone's network, read in expressions as `network.online` and `network.type` ("wifi", "cellular" or "none"). Default: online on Wi-Fi. The object is read on every render, so changing it in place changes what the app sees. */
+  network?: { online: boolean; type?: "wifi" | "cellular" | "none" };
   /** Form values typed so far, by form key (the block's `id`, or its `label`), then field name. Set by {@link createApp}. */
   drafts?: Record<string, Record<string, unknown>>;
   /** Validation messages to show, by form key, then field name. Set by {@link createApp}. */
@@ -42,8 +50,18 @@ export interface RenderOptions extends EvalOptions {
   tab?: string;
   /** Shows the screen as a bottom sheet. Screens with `"presentation": "sheet"` are always shown that way. Set by {@link createApp}. */
   sheet?: boolean;
+  /** The phone's reduce-motion setting. When true, no node carries animation fields. */
+  reduceMotion?: boolean;
   /** A message to show last, such as the result of an action. Set by {@link createApp}. */
   toast?: string;
+}
+
+const RTL = new Set(["ar", "he", "fa", "ur", "yi", "ps", "sd", "ug", "dv", "ckb"]);
+
+/** "rtl" for right-to-left languages such as Arabic and Hebrew, else "ltr". Accepts "ar", "he-IL", "ar_EG". */
+export function textDirection(tag: string): "ltr" | "rtl" {
+  const lang = tag.toLowerCase().split(/[-_]/)[0] ?? "";
+  return RTL.has(lang === "iw" ? "he" : lang) ? "rtl" : "ltr";
 }
 
 export type RenderResult =
@@ -73,6 +91,10 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
   if (errors.length) return fail(errors);
   const s = spec as Obj;
   const style: PhoneStyle = options.style ?? "android";
+  const language = options.language ?? options.locale?.split(/[-_]/)[0] ?? "en";
+  if (!options.locale && options.language) options = { ...options, locale: options.language };
+  const table: Record<string, string> = s.strings && typeof s.strings[language] === "object" && s.strings[language] ? s.strings[language] : {};
+  const translate = (t: string) => (Object.prototype.hasOwnProperty.call(table, t) ? table[t]! : t);
   const screen: Obj | undefined = options.screen ? s.screens.find((x: Obj) => x.id === options.screen) : s.screens[0];
   if (!screen) {
     return fail([{ path: "$.screens", message: `There is no screen "${options.screen}".`, fix: `Use one of: ${s.screens.map((x: Obj) => x.id).join(", ")}.` }]);
@@ -85,7 +107,7 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
   for (const [k, v] of Object.entries<Obj>(s.data ?? {})) {
     if (v.source === "collection" && !(k in data)) data[k] = v.seed ?? [];
   }
-  const base = () => ({ ...data, data, state, route: { params: options.params ?? {} } });
+  const base = () => ({ ...data, data, state, route: { params: options.params ?? {} }, network: { online: options.network?.online !== false, type: options.network?.online === false ? "none" : options.network?.type ?? "wifi" } });
   for (const [k, v] of Object.entries<Obj>(s.data ?? {})) {
     if (v.source === "computed") {
       try { data[k] = evaluateTemplate(String(v.value), base(), options); } catch { data[k] = null; }
@@ -97,13 +119,27 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
     try { return evaluateTemplate(text, scope, options); } catch { return ""; }
   };
   const str = (text: unknown, scope: Record<string, unknown>) => {
+    if (typeof text === "string" && Object.prototype.hasOwnProperty.call(table, text)) return table[text]!;
     const v = tpl(text, scope);
-    return v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+    return v === null || v === undefined ? "" : typeof v === "object" ? translate(JSON.stringify(v)) : translate(String(v));
   };
 
   const bound = (b: Obj): unknown => (typeof b.bind === "string" ? state[b.bind.replace(/^state\./, "")] : undefined);
 
+  const motionOn = (s.theme?.motion ?? "calm") !== "none" && options.reduceMotion !== true;
+  const duration = s.theme?.motion === "lively" ? 400 : 240;
   const build = (b: Obj, scope: Record<string, unknown>): ScreenNode | undefined => {
+    const node = buildBlock(b, scope);
+    if (node && motionOn && b.motion && typeof b.motion === "object" && (b.motion.enter || b.motion.change)) {
+      const m: Record<string, unknown> = { duration };
+      if (b.motion.enter) m.enter = b.motion.enter;
+      if (b.motion.change) { m.change = b.motion.change; m.to = node.props?.value ?? node.name; }
+      node.props = { ...node.props, motion: m };
+    }
+    return node;
+  };
+
+  const buildBlock = (b: Obj, scope: Record<string, unknown>): ScreenNode | undefined => {
     if (typeof b.when === "string") {
       try { if (!evaluate(b.when.replace(/^\{\{\s*|\s*\}\}$/g, ""), scope, options)) return undefined; } catch { return undefined; }
     }
@@ -175,6 +211,17 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
         return buildKanban(b, scope, label);
       case "timeline":
         return buildTimeline(b, scope, label);
+      case "calendar":
+        return buildCalendar(b, scope, label);
+      case "map":
+        return buildMap(b, scope, label);
+      case "vector": {
+        const width = Number(b.width) > 0 ? Number(b.width) : 100, height = Number(b.height) > 0 ? Number(b.height) : 100;
+        const shapes = resolveShapes(b.shapes, (v) => (typeof v === "string" && v.includes("{{") ? tpl(v, scope) : v));
+        const value = b.value === undefined ? undefined : tpl(b.value, scope);
+        const name = value === undefined || value === null ? label : `${label}: ${text(value)}`;
+        return { role: "img", name, block: "vector", children: [], props: { width, height, value, shapes } };
+      }
       case "button": {
         const key = String(b.id ?? b.label);
         registry.set(`button:${key}`, { kind: "button", block: b, scope });
@@ -232,6 +279,46 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
     }));
     const empty = str(b.empty?.message, scope);
     return { role: "list", name: label || "Timeline", block: "timeline", children: children.length || !empty ? children : [{ role: "status", name: empty, block: "empty", children: [] }] };
+  };
+
+  /** Registers a tappable event or pin: `app.press(title)` runs the block's `onSelect`. */
+  const tappable = (b: Obj, title: string, sc: Record<string, unknown>) => {
+    if (b.onSelect && title) registry.set(`button:${title}`, { kind: "button", block: { label: title, onPress: b.onSelect }, scope: sc });
+  };
+
+  const buildCalendar = (b: Obj, scope: Record<string, unknown>, label: string): ScreenNode => {
+    const view: CalendarView = (CALENDAR_VIEWS as readonly string[]).includes(b.view) ? b.view : "month";
+    const events = itemsOf(b, scope).map((item) => {
+      const sc = { ...scope, item };
+      const date = text(each(b.date, sc));
+      return { sc, date, day: date.slice(0, 10), title: str(b.title, sc), detail: str(b.detail, sc) };
+    }).filter((e) => /^\d{4}-\d{2}-\d{2}/.test(e.date)).sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0));
+    const at = (typeof b.at === "string" ? text(b.at.includes("{{") ? tpl(b.at, scope) : b.at).slice(0, 10) : "") || events[0]?.day || "";
+    const shown = /^\d{4}-\d{2}-\d{2}$/.test(at) ? visibleDays(view, at) : [];
+    const days = view === "agenda" ? [...new Set(events.map((e) => e.day))] : shown.filter((d) => events.some((e) => e.day === d));
+    const children = days.map((day): ScreenNode => ({
+      role: "group", name: day, block: "day", props: { day },
+      children: events.filter((e) => e.day === day).map((e): ScreenNode => {
+        tappable(b, e.title, e.sc);
+        return { role: b.onSelect ? "button" : "listitem", name: [e.title, e.detail].filter(Boolean).join(", "), block: "event", children: [], props: { title: e.title, detail: e.detail, time: e.date.length > 10 ? e.date.slice(11, 16) : "", key: e.title } };
+      })
+    }));
+    const empty = str(b.empty?.message, scope);
+    return { role: view === "agenda" ? "list" : "grid", name: label || "Calendar", block: "calendar", children: children.length || !empty ? children : [{ role: "status", name: empty, block: "empty", children: [] }], props: { view, days: shown, offset: shown[0] ? weekdayColumn(shown[0]) : 0 } };
+  };
+
+  const buildMap = (b: Obj, scope: Record<string, unknown>, label: string): ScreenNode => {
+    const raw = itemsOf(b, scope).map((item) => {
+      const sc = { ...scope, item };
+      return { sc, title: str(b.title, sc), lat: Number(each(b.lat, sc)), lng: Number(each(b.lng, sc)) };
+    }).filter((p) => validCoords(p.lat, p.lng));
+    const placed = placePins(raw);
+    const children = placed.map((p, i): ScreenNode => {
+      tappable(b, p.title, raw[i]!.sc);
+      return { role: b.onSelect ? "button" : "listitem", name: p.title, block: "pin", children: [], props: { title: p.title, lat: p.lat, lng: p.lng, x: p.x, y: p.y, key: p.title } };
+    });
+    const empty = str(b.empty?.message, scope);
+    return { role: "group", name: label || "Map", block: "map", children: children.length || !empty ? children : [{ role: "status", name: empty, block: "empty", children: [] }], props: { pins: children.length } };
   };
 
   const buildChart = (b: Obj, scope: Record<string, unknown>, label: string): ScreenNode => {
@@ -318,9 +405,10 @@ export function renderInternal(spec: unknown, options: RenderOptions): Internal 
   }
   if (options.toast) children.push({ role: "status", name: options.toast, block: "toast", children: [] });
   const title = str(screen.title ?? s.app?.name ?? "", base());
-  const tree: ScreenNode = { role: "main", name: title || s.app?.name || "Screen", block: "screen", children };
+  const dir = textDirection(options.locale ?? language);
+  const tree: ScreenNode = { role: "main", name: title || s.app?.name || "Screen", block: "screen", children, props: { dir, language } };
   const tokens = themeTokens(s.theme ?? {}, style);
-  const result: RenderResult = { ok: true, style, title: tree.name, tree, html: toHtml(tree, tokens, style, String(s.app?.name ?? "")), warnings };
+  const result: RenderResult = { ok: true, style, title: tree.name, tree, html: toHtml(tree, tokens, style, String(s.app?.name ?? ""), language, dir), warnings };
   return { result, scope: base, registry };
 }
 
@@ -391,10 +479,17 @@ function themeTokens(theme: Obj, style: PhoneStyle): Tokens {
 const esc = (t: unknown) => String(t).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const safeSrc = (u: string) => (/^(https:\/\/|data:image\/)/i.test(u) ? u : "");
 
-function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string): string {
+function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string, language = "en", dir = "ltr"): string {
   const gap = (g: unknown) => Math.round((GAPS[String(g ?? "md")] ?? GAPS.md!) * t.unit);
   const ios = style === "ios";
   const node = (n: ScreenNode): string => {
+    const m = n.props?.motion as Record<string, unknown> | undefined;
+    const html = plain(n);
+    if (!m) return html;
+    const anim = [m.enter ? `sv-${esc(m.enter)} ${m.duration}ms ease-out both` : "", m.change === "pulse" ? `sv-pulse ${m.duration}ms ease-out` : ""].filter(Boolean).join(",");
+    return `<div${m.change ? ` data-change="${esc(m.change)}" data-to="${esc(m.to)}"` : ""} style="${anim ? `animation:${anim}` : ""}">${html}</div>`;
+  };
+  const plain = (n: ScreenNode): string => {
     const a = `role="${n.role}"${n.name ? ` aria-label="${esc(n.name)}"` : ""}`;
     const pr = n.props ?? {};
     const inner = n.children.map(node).join("");
@@ -491,6 +586,20 @@ function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string)
         return `<div ${a} style="display:flex;flex-direction:column;gap:4px"><div style="font:600 ${Math.round(13 * t.scale)}px ${t.font};color:${t.p.muted}">${esc(n.name)}</div>${inner}</div>`;
       case "entry":
         return `<div ${a} style="padding:8px 0 8px 12px;border-left:2px solid ${t.p.primary};font:500 ${Math.round(15 * t.scale)}px ${t.font};color:${t.p.text}">${pr.time ? `<span style="color:${t.p.muted};margin-right:8px">${esc(pr.time)}</span>` : ""}${esc(pr.title)}${pr.detail ? `<div style="font:400 ${Math.round(13 * t.scale)}px ${t.font};color:${t.p.muted}">${esc(pr.detail)}</div>` : ""}</div>`;
+      case "calendar": {
+        const days = (pr.days as string[]) ?? [];
+        if (pr.view === "agenda" || !days.length) return `<div ${a} style="display:flex;flex-direction:column;gap:${gap("md")}px">${inner}</div>`;
+        const by = new Map(n.children.map((c) => [c.name, c]));
+        const cell = (d: string) => `<div style="min-height:${ios ? 56 : 64}px;padding:4px;background:${t.p.surface};border-radius:${Math.round(t.radius / 2)}px;font:400 ${Math.round(12 * t.scale)}px ${t.font};color:${t.p.muted}">${Number(d.slice(8))}${by.get(d) ? by.get(d)!.children.map(node).join("") : ""}</div>`;
+        const pad = pr.view === "month" ? `<div></div>`.repeat(Number(pr.offset)) : "";
+        return `<div ${a} style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">${pad}${days.map(cell).join("")}</div>`;
+      }
+      case "event":
+        return `<${n.role === "button" ? 'button type="button"' : "div"} ${a} style="display:block;width:100%;text-align:left;box-sizing:border-box;margin-top:2px;padding:${ios ? 4 : 6}px 8px;border:0;border-radius:${Math.round(t.radius / 2)}px;background:${t.p.primary};color:${t.p.background};font:500 ${Math.round(13 * t.scale)}px ${t.font}">${pr.time ? `${esc(pr.time)} ` : ""}${esc(pr.title)}${pr.detail ? ` <span style="font-weight:400">${esc(pr.detail)}</span>` : ""}</${n.role === "button" ? "button" : "div"}>`;
+      case "map":
+        return `<div ${a} style="position:relative;height:${Math.round(220 * t.scale)}px;background:${t.p.surface};border-radius:${t.radius}px;overflow:hidden;background-image:linear-gradient(${t.p.muted}22 1px,transparent 1px),linear-gradient(90deg,${t.p.muted}22 1px,transparent 1px);background-size:25% 25%">${inner}</div>`;
+      case "pin":
+        return `<${n.role === "button" ? 'button type="button"' : "div"} ${a} style="position:absolute;left:${Number(pr.x)}%;top:${Number(pr.y)}%;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;border:0;background:none;padding:0;font:500 ${Math.round(12 * t.scale)}px ${t.font};color:${t.p.text}"><span style="display:block;width:14px;height:14px;border-radius:${ios ? "50%" : "50% 50% 50% 0"};background:${t.p.danger};${ios ? "" : "transform:rotate(-45deg);"}"></span>${esc(pr.title)}</${n.role === "button" ? "button" : "div"}>`;
       case "list": {
         const ios = style === "ios";
         const wrap = ios ? `background:${t.p.surface};border-radius:${t.radius}px;overflow:hidden` : "";
@@ -521,6 +630,8 @@ function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string)
       }
       case "option":
         return `<label style="display:flex;align-items:center;gap:8px;min-height:44px;font:400 ${Math.round(16 * t.scale)}px ${t.font};color:${t.p.text}"><input type="radio" aria-label="${esc(n.name)}"${pr.checked ? " checked" : ""}>${esc(n.name)}</label>`;
+      case "vector":
+        return vectorSvg(Number(pr.width), Number(pr.height), pr.shapes as Shape[], n.name);
       case "error":
       case "toast":
         return `<p ${a} style="margin:0;font:500 ${Math.round(14 * t.scale)}px ${t.font};color:${n.block === "error" ? t.p.danger : t.p.success}">${esc(n.name)}</p>`;
@@ -537,6 +648,6 @@ function toHtml(root: ScreenNode, t: Tokens, style: PhoneStyle, appName: string)
   const bar = ios
     ? `<header style="padding:54px 16px 10px;text-align:center;font:600 17px ${t.font};color:${t.p.text}">${esc(root.name)}</header>`
     : `<header style="padding:40px 16px 14px;font:500 22px ${t.font};color:${t.p.text};background:${t.p.surface};box-shadow:${t.shadow}">${esc(root.name)}</header>`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(appName || root.name)}</title><style>[tabindex]:focus-visible{outline:2px solid ${t.p.primary};outline-offset:2px}</style></head>
+  return `<!doctype html><html lang="${esc(language)}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(appName || root.name)}</title><style>@keyframes sv-fade{from{opacity:0}}@keyframes sv-slide{from{transform:translateY(16px);opacity:0}}@keyframes sv-scale{from{transform:scale(.9);opacity:0}}@keyframes sv-pulse{50%{transform:scale(1.06)}}[tabindex]:focus-visible{outline:2px solid ${t.p.primary};outline-offset:2px}</style></head>
 <body data-style="${style}" style="margin:0;background:${t.p.background}"><main role="main" aria-label="${esc(root.name)}" style="min-height:100vh;box-sizing:border-box;background:${t.p.background}">${bar}<div style="padding:16px;display:flex;flex-direction:column;gap:${gap("md")}px">${root.children.map(node).join("")}</div></main></body></html>`;
 }

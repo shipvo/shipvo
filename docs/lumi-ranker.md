@@ -1,5 +1,7 @@
 # Lumi action ranker
 
+This page is for developers who want to know how Lumi chooses what to tap next, and what the optional ranker model measured. You will see the benchmark numbers, how the model is trained and the commands to repeat it. If you only want Lumi to test your app, read [Lumi on Shipvo Phone](lumi.md) instead.
+
 Lumi's walker picks actions with its own algorithm. The ranker is an optional model that scores each action. The walker multiplies its order score by the model's prediction. With no model, the walker does exactly what it did before. This is covered by a test (`packages/cli/test/ranker.test.ts`).
 
 ## Result: the algorithm stays on its own
@@ -38,3 +40,16 @@ node scripts/lumi/bench.mjs --budgets 40,50,60,80,100,150 --seed 1 --ranker on -
 ```
 
 `--ranker on` needs a trained model in the build. Commit a trained weights file only when the held-out numbers with the model on are better than with it off.
+
+## Troubleshooting
+
+- **`--ranker on: no trained model in this build`**: the weights file in the package is empty. Run `node scripts/lumi/train.mjs`, then `pnpm --filter @shipvo/cli build`, then run the benchmark again.
+- **`--ranker must be on or off`**: pass exactly `on` or `off`.
+- **`Cannot find module` for the CLI**: run `pnpm --filter @shipvo/cli build` first.
+- **Numbers differ from the table**: use the same `--seed` and budgets. The same seed gives the same output.
+
+## Next steps
+
+- [Lumi on Shipvo Phone](lumi.md): run `shipvo lumi` on your app.
+- [Lumi benchmark](lumi-bench.md): the numbers for Lumi across sample apps, and how to repeat them.
+- [Explore feature log](explore-features.md): the features the model reads.

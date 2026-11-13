@@ -24,7 +24,7 @@ The public key is written into the app at build time as native manifest meta-dat
 Assets:
 
 - **Publisher seed.** The Ed25519 private key. Only the seed can create a release that phones accept. It lives in your CI secrets or `.shipvo/seed.txt` (`packages/cli/src/config.ts`, `packages/cli/src/signing.ts`).
-- **Pinned public key.** In every installed app. It cannot be rotated for apps already installed. Losing the seed means shipping a new store build.
+- **Pinned public key.** In every installed app. Apps built with `rootKey` pin an offline root key. A root-signed statement replaces a lost or leaked release key without a new store build (see "Lost or leaked release key").
 - **Users' phones.** They run whatever JavaScript bundle passes the checks above, with the native permissions of the installed shell.
 
 Actors and what each holds:
@@ -63,15 +63,39 @@ Trust boundaries, from least to most trusted:
 | **A signed release that crashes the app** | Not an attack, but the same blast radius. The device counts trial boots, drops a release that never reports healthy, and reverts one that dies shortly after. | `BootRules.kt`, `Store.swift` | `StabilityTest.kt` `releaseThatDiesAfterMarkHealthyIsReverted`; `RuntimeTests.swift` `testUnhealthyReleaseIsDroppedAfterThreeLoads`, `testReleaseThatDiesAfterMarkHealthyIsReverted`. |
 | **Agent with a scoped token** | An agent that holds only the owner token or a publish token cannot sign. It cannot create a release phones accept. The control plane gates its destructive calls behind a server-issued, one-time owner approval (the agent cannot approve its own; `confirm: true` alone does nothing), applies the owner's `agentMaxBand` limit, and the owner can set approval so that a second person must approve a wide release. | `services/control-plane/src/index.ts`, `apps.ts` | `agent-confirm.test.ts` "one-time challenges" (replay, tampered arguments, expiry, denial), `approval-route.test.ts` "the owner token (an agent) cannot approve or deny", "the deny list blocks any command, confirm or not", "agents cannot change the policy; the admin can"; `release-policy.test.ts` "refuses an agent beyond agentMaxBand; a human at the same band succeeds"; `approval.test.ts` "the proposer cannot approve". An agent given the seed has the same power as a stolen seed. |
 
+## Lost or leaked release key
+
+The release key is the seed that `shipvo publish` signs with. Apps built with `rootKey` on Android and iOS also pin a second key, the root key. The root key stays offline and only signs rotation statements. It never signs releases. The design is in [design/key-rotation.md](design/key-rotation.md); the steps are in [key-rotation.md](key-rotation.md).
+
+To replace a lost or leaked release key:
+
+1. Run `shipvo keygen --out new-seed.txt`. It writes the new seed and prints its public key.
+2. Sign a statement with the root key. `--sequence` must be above every statement you signed before (1 for the first). `--valid-from` defaults to now, which is what an emergency needs. `sign` prints to stdout, so save the output:
+
+   ```bash
+   npx -y @shipvo/cli keys rotate sign \
+     --root-seed-file root-seed.txt \
+     --new-key <the public key> \
+     --sequence 1 > rotation.json
+   ```
+
+   The statement is signed by the root key and names the new release key, the `sequence` and a `validFrom` time.
+3. Upload the file as a signed-in owner (`upload` refuses tokens): `npx -y @shipvo/cli keys rotate upload rotation.json`. The control plane checks the root signature and hands the statement out with the pointer. It only passes the statement on. Each phone checks it again.
+4. The Android and iOS runtimes check the root signature, the app id, and that the `sequence` is higher than the one they hold. When the phone's clock reaches `validFrom`, they switch to the new release key. From then on the leaked release key signs nothing the phone accepts.
+
+What a thief with only the release key can do: sign releases until each phone has the statement and has reached `validFrom`. A publish token or an agent token cannot make a statement, because phones check the root signature.
+
+CLI commands: `keys root`, `keys rotate sign` and `keys rotate upload` ([cli.md](cli.md)).
+
 ## What we do not defend against
 
-- **A stolen or leaked seed.** There is no second factor on signing and no key rotation for installed apps. Release policy and approval slow a release down. They do not make a signed release invalid.
+- **A stolen or leaked seed.** There is no second factor on signing. A leaked release key stops working once a root-signed rotation statement reaches a phone and its `validFrom` has passed (see "Lost or leaked release key"). Release policy and approval slow a release down. They do not make a signed release invalid.
 - **A malicious publisher or a compromised CI.** Whatever your CI signs is accepted.
 - **A downgrade by an attacker who controls the network path or control plane**, for a device that has not yet reached the replayed release number. The device checks the release number only against its own state, not against a signed expiry or a signed "latest".
 - **Withholding.** A compromised control plane, CDN or network can serve nothing, or serve a stale pointer. Devices then keep running what they have. There is no signed freshness proof, so a device cannot tell "no update" from "update hidden".
 - **Native code changes.** An update is JavaScript on the shell's existing native modules. It cannot add permissions or native modules, but it can use any that the shell already has.
 - **A compromised phone or a rooted device.** The staged bundle sits in the app's own storage. We do not defend against code that can already write there.
-- **Telemetry integrity.** Reports are signed by an install key registered with the control plane (`services/control-plane/src/installs.ts`). Auto-halt counts only verified reports, one vote per install, and needs failures from at least 3 networks (`halt.ts`, tests in `halt.test.ts`). Registration is rate limited. Revert alerts keep separate slots for verified and unverified reports, so forged rollbacks cannot use up the slots for real ones (`alerts.ts`, `alerts.test.ts` "forged rollbacks do not use up the alert slots for real ones"). Not covered: an anomaly guard, a rate limit on `POST /t`, one stolen install key filling the verified alert slots, and an attacker who registers many installs across 3 or more networks. See [auto-halt.md](auto-halt.md).
+- **Telemetry integrity.** Reports are signed by an install key registered with the control plane (`services/control-plane/src/installs.ts`). Auto-halt counts only verified reports, one vote per install, and needs failures from at least 3 networks (`halt.ts`, tests in `halt.test.ts`). Registration is rate limited. Revert alerts keep separate slots for verified and unverified reports, so forged rollbacks cannot use up the slots for real ones (`alerts.ts`, `alerts.test.ts` "forged rollbacks do not use up the alert slots for real ones"). Not covered: a rate limit on `POST /t`, one stolen install key filling the verified alert slots, and an attacker who registers many installs across 3 or more networks. See [auto-halt.md](auto-halt.md#when-the-failures-look-like-an-attack) for held releases.
 - **Denial of service** against the control plane.
 - **Android device-side platform check.** See the platform row: not covered.
 - **Anything in the hosted simulator or the sample app.** This page is about signed updates only.
@@ -127,6 +151,17 @@ A person signs in with an email magic link and gets one phone: an installed-apps
 | One app filling storage | Each app's data has a size cap set in configuration. | "caps per-app data by configuration" |
 | Data left behind or inherited | Taking an app off the phone deletes its data. Installing it again starts empty. | "removing an app removes its data" |
 
+## Secret vault, list, rotate, revoke and use log (slice 4a of #841)
+
+Routes in `services/control-plane/src/vault.ts`: `GET /vault/keys?app=`, `POST /vault/keys/:app/:name/rotate`, `DELETE /vault/keys/:app/:name`, `GET /vault/keys/:app/:name/uses`. Tests: `services/control-plane/test/vault.test.ts`.
+
+| Threat | What stops it | Test |
+|---|---|---|
+| A list or log shows a value | The list picks app, name, domain, access and last-used time field by field. The log returns time, app, host and outcome. | "lists metadata only" |
+| A revoked key still works | Revoke writes `vault_revoked` first, then blanks `wrapped_key` and `ciphertext`. Status returns `saved: false`, and use is refused with the "revoked" error that asks for a new key. Saving again clears the row. | "revoke blanks the value..." |
+| Rotate widens a key | The new ticket copies app, name, domain and access from the saved key. The old key stays until the new one is saved. | "rotate issues a ticket..." |
+| Someone reads another owner's keys or log | Every query filters by the caller's owner identity; others get 401 or an empty list. | "the use log is owner-scoped" |
+
 ## Secret vault, MCP tools (slice 2)
 
 Two tools let an assistant start and follow the flow without seeing a key. Code: `request_secret` and `secret_status` in `packages/mcp-tools/src/index.ts` (one registry for the stdio and remote servers), handlers in `packages/mcp/src/server.ts`, and `GET /vault/status/:app/:name` in `services/control-plane/src/vault.ts`.
@@ -174,6 +209,19 @@ A person may paste an API key into the chat. The model would then pass it to a t
 
 The model has already seen the key by the time the check runs, so the advice is to rotate it.
 
+## Per-app spend limit (slice 5a of #843)
+
+The person sets a monthly limit for each installed app. Code: `services/control-plane/src/spend.ts`, `phone.ts`, migration `0025_spend_limit.sql`. Tests: `services/control-plane/test/spend-limit.test.ts`.
+
+The source of `spent` is the `phone_spend` ledger. `authorizeSpend` is the only writer, so the number shown to the person is the sum of money actions that were allowed. The check and the record are one SQL statement, so two calls at once cannot pass the limit together.
+
+| Threat | What stops it | Test |
+|---|---|---|
+| An app or assistant moves money without the person's say | The limit is 0 until the person sets it. `authorizeSpend` refuses an amount over the limit with `spend_limit` (with `limit` and `spent`). | "defaults to 0 and refuses a money action"; "passes under the limit and refuses the call that would pass it" |
+| The assistant raises its own limit | The limit routes refuse an assistant token with 403. Only a signed-in person session can read or set a limit. | "an assistant token gets 403, the person can set it" |
+| A change or refusal goes unseen | Each change and each refusal writes a row to `phone_spend_audit` (person, app, action, detail, time). | "writes audit rows for set and refuse" |
+| Old spending hides the budget, or one currency pays another | Spend is summed for the current month only, in the limit's currency. Another currency is refused, and spend in an old currency does not count against a new limit. Check and record are atomic. | "does not count last month and refuses another currency"; "old-currency spend does not count against a new currency limit"; "two calls at once cannot pass the limit together" |
+
 ## How to check these claims
 
 Every path and test name above can be found with `rg`, for example:
@@ -185,3 +233,13 @@ rg -n "aReleaseAlreadyPendingCurrentOrBlockedIsNotStagedAgain" packages/runtime/
 ```
 
 Host-side tests run with `pnpm -r test`. The iOS and Android runtime tests run in CI on a simulator and an emulator.
+
+## Software bill of materials
+
+`pnpm sbom` writes one CycloneDX 1.5 JSON file for each published `@shipvo/*` package to `dist-sbom/<name>-<version>.cdx.json`. Each file lists the package itself (name, version, purl, license) and every production dependency it ships, with name, version and purl, sorted by purl with no duplicates. Dev dependencies are not included.
+
+```bash
+pnpm install --frozen-lockfile
+pnpm sbom
+ls dist-sbom
+```

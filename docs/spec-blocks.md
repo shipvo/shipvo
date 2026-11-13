@@ -112,12 +112,153 @@ app.select("Period", "year");          // { ok: false, error: '"year" is not one
 | `divider` | A line between groups | none |
 | `toggle` | On or off | `label`, `bind` to a `bool` state value |
 | `segmented` | One choice from a few | `label`, `bind` to an `enum` state value, `options` |
+| `kanban` | Cards in columns | `label`, `from`, `columns`, `column`, `title`, `detail`, `onMove` |
+| `timeline` | Dated entries, newest day first | `label`, `from`, `date`, `title`, `detail` |
+| `calendar` | Events as a month, week or agenda | `label`, `from`, `date`, `title`, `detail`, `view`, `at`, `onSelect`, `empty` |
+| `map` | Pins on a canvas | `label`, `from`, `lat`, `lng`, `title`, `onSelect`, `empty` |
+| `vector` | A small drawing that follows your data | `label`, `value`, `width`, `height`, `shapes`, `motion` |
 
 In the screen tree, a toggle reads `Failed payment alerts: off` or `: on`, a segmented control reads `Period: week`, and a progress block reads `Monthly goal: 40%`. Assistants and `@shipvo/test` find them by those names.
+
+## Boards and timelines
+
+A `kanban` block shows the rows of a data source as cards in columns. A `timeline` block shows them grouped by day. Both need a `label` and a `from` (the name of a source in `data`); the rest are expressions that run once per row as `item`.
+
+```json
+{ "type": "kanban", "label": "Task board", "from": "tasks", "columns": ["todo", "doing", "done"],
+  "column": "{{ item.status }}", "title": "{{ item.title }}", "detail": "{{ item.note }}",
+  "onMove": { "action": "move_task", "input": { "id": "{{ item.id }}", "status": "{{ column }}" } } }
+{ "type": "timeline", "label": "History", "from": "tasks", "date": "{{ item.at }}", "title": "{{ item.title }}", "detail": "{{ item.note }}" }
+```
+
+- `columns` is a list of unique names. Every row's `column` value must be one of them.
+- `onMove` names an action from `actions`. It runs when a card moves, and `{{ column }}` is the new column.
+- `date` is `2026-11-07` or `2026-11-07T09:30`. The timeline groups by the date part.
+- In the screen tree a column reads `todo, 2 cards` and a card reads `Buy bait, Worms` (title, then detail), on the Android and iPhone skins.
+- `app.move("Buy bait", "done")` moves a card by its title and runs `onMove`. It answers `ok: false` if the card or the column does not exist.
+
+The validator reports a bad column list, a card in a column the board does not have, a missing or invalid date, and an undeclared `onMove` action, each with a path and a fix.
+
+## Calendars and maps
+
+A `calendar` block shows the rows of a data source as events. A `map` block shows rows as pins. Both work the same on Android and iOS. Both need a `label` and a `from` (the name of a source in `data`); the other options are expressions that run once per row as `item`.
+
+```json
+{ "blocks": [
+{ "type": "calendar", "label": "Plans", "from": "events", "view": "week", "at": "2026-11-10",
+  "date": "{{ item.at }}", "title": "{{ item.name }}",
+  "onSelect": { "action": "pick", "input": { "id": "{{ item.id }}" } } },
+{ "type": "map", "label": "Places", "from": "places",
+  "lat": "{{ item.lat }}", "lng": "{{ item.lng }}", "title": "{{ item.name }}",
+  "onSelect": { "action": "pick", "input": { "id": "{{ item.id }}" } } }
+] }
+```
+
+| Option | Block | Meaning |
+| --- | --- | --- |
+| `date` | calendar | `2026-11-07` or `2026-11-07T09:30`. Rows without a valid date are left out. |
+| `view` | calendar | `month` (default), `week` (Monday first) or `agenda` (a list of the days that have events). |
+| `at` | calendar | A day (`2026-11-07`) or an expression. The month or week shown is the one that contains it. Default: the day of the first event. |
+| `detail` | calendar | Optional second line for each event. |
+| `lat`, `lng` | map | Numbers. Latitude from -90 to 90, longitude from -180 to 180. Rows with other values are left out. |
+| `title` | both | The name of the event or pin. |
+| `onSelect` | both | An action to run when someone taps an event or pin. |
+| `empty` | both | `{ "message": "..." }`, shown when there is nothing to draw. |
+
+The map is a canvas of pins fitted to their bounds. It makes no network calls and loads no map tiles, so it works offline and in tests.
+
+In the screen tree each event or pin is a node named by its title (an event with `detail` reads `Dinner, Table for two`). With `onSelect` it is a button, so `press` by title runs the action. The validator reports a bad `view`, a bad `at`, a seed date that is not a date and a seed latitude or longitude out of range, each with a path and a fix.
+
+## Vector drawings
+
+A `vector` block draws shapes whose numbers and colours come from expressions, so a gauge or a mini chart follows your state. It needs a `label` (what a screen reader says). `value` is the short text added to its name in the screen tree.
+
+```json
+{ "type": "vector", "label": "Battery", "value": "{{ state.level }}%", "width": 120, "height": 40,
+  "shapes": [
+    { "shape": "rect", "x": 0, "y": 0, "width": "{{ state.level }}", "height": 20, "rx": 4, "fill": "#0B5FFF" },
+    { "shape": "text", "x": 0, "y": 38, "text": "{{ state.level }}%", "fontSize": 10 }
+  ] }
+```
+
+| Shape | Options |
+| --- | --- |
+| `rect` | `x`, `y`, `width`, `height`, `rx`, `fill`, `stroke`, `strokeWidth`, `opacity` |
+| `circle` | `cx`, `cy`, `r`, `fill`, `stroke`, `strokeWidth`, `opacity` |
+| `path` | `d` (path commands such as `M 0 30 L 100 30`), `fill`, `stroke`, `strokeWidth`, `opacity` |
+| `text` | `x`, `y`, `text`, `fontSize`, `fill`, `anchor` (`start`, `middle`, `end`), `opacity` |
+| `linearGradient` | `id`, `x1`, `y1`, `x2`, `y2`, `stops` (each `offset` from 0 to 1 and `color`). Use it as `fill: "url(#id)"`. |
+
+Each option can be a number, a colour or an expression. Colours that are not a hex value, a colour name or `url(#id)` draw as `none`. In the screen tree the block is an image named `Battery: 40%` on the Android and iPhone skins. An unknown shape is a validation error with its JSON path and the list of shapes.
+
+## Motion
+
+Any block can carry `motion`:
+
+```json
+{ "type": "stat", "label": "Revenue", "value": "{{ state.total }}", "motion": { "enter": "fade", "change": "countUp" } }
+```
+
+- `enter` is `fade`, `slide` or `scale`. It plays when the block appears.
+- `change` is `countUp` or `pulse`. It plays when the block's value changes.
+
+Set the theme `motion` to `"none"`, or pass `reduceMotion: true` to `renderScreen`, and no node carries animation fields. The simulated phone passes its reduce-motion setting through, so a test can check both modes.
+
+## Translations and right-to-left
+
+Add `strings` to the spec: a map from language to `{ "original text": "translated text" }`.
+
+```json
+{ "strings": { "fr": { "Battery level": "Niveau de batterie" } } }
+```
+
+`renderScreen(spec, { language: "fr", locale: "fr-FR" })` replaces any text that matches a key. Text with no match stays as written. `money(...)` and `formatDate(...)` use the `locale`. Right-to-left languages such as Arabic and Hebrew set `dir: "rtl"` on the screen tree and on the HTML; other languages set `dir: "ltr"`. `validate` warns about a `strings` key that no text in the spec uses.
 
 ## Sheets
 
 Add `"presentation": "sheet"` to a screen and to the `navigate` action that opens it. The screen appears as a bottom sheet (a `dialog` in the tree). `{ "back": true }` closes it.
+
+## Keep a data source fresh
+
+Add `refresh` to an `http` data source to run it again on a timer while the app is installed. The value is a number of seconds, 30 or more. The open screen updates when new data arrives, so a price or a score stays current without a tap.
+
+```json
+"data": {
+  "price": {
+    "source": "http",
+    "get": "https://api.example.com/price",
+    "refresh": 60
+  }
+}
+```
+
+- Each refresh calls the service again. It does not read `cache`, and refreshed values are not written to it.
+- If a refresh fails, the screen keeps the last value and the next tick tries again.
+- Only public `http` and `https` hosts are called, and redirects are not followed.
+- Call `refresh_app` with the app id to run every `http` source now and skip the cache. See [phone apps](phone-apps.md).
+- The timer stops when the app is removed or replaced.
+
+| Error path | Meaning | Fix |
+| --- | --- | --- |
+| `$.data.<name>.refresh` below 30 | The interval is too short. | Use 30 or more. |
+| `$.data.<name>.refresh` is not a number | Seconds must be a number, not text. | Write `60`, not `"60"`. |
+| `$.data.<name>.refresh` on a non-`http` source | Only `http` sources refresh. | Remove `refresh`, or change the source to `http`. |
+
+## Export data as CSV
+
+Who it is for: anyone whose app keeps a list (a diary, an expense log, a stock sheet) and wants to hand it to a spreadsheet or an agent.
+
+`csv(rows)` turns a list into CSV text. `csv(rows, ['date', 'title'])` writes only those columns, in that order.
+
+1. Keep the list in a data source or in state, for example `data.entries`.
+2. Add an action that returns the text: `{ "return": "{{ csv(data.entries, ['date', 'title']) }}" }`.
+3. Call the action. The first line holds the column names, one row follows per item, lines end with CRLF, and a list such as tags is joined with `; `.
+
+Fields with commas, quotes or line breaks are quoted, and a missing value is empty. The full action, and a way to protect cells that start with `=`, are in [phone apps](phone-apps.md#export-data-as-csv).
+
+## Example specs
+
+`packages/spec/gallery/` holds example specs to copy and change: a habit tracker, a workout log, an expense splitter, a trip checklist and flashcards. Three more show the board, calendar and map blocks: a reading board (`kanban` with `move_book`), a meal planner (`calendar`, week view) and favourite places (`map`). Each one passes `validate`, renders on the Android and iOS skins, and runs its action in a test. See the [gallery README](../packages/spec/gallery/README.md) for what each one uses.
 
 ## Data sources that use a saved key
 
@@ -163,6 +304,16 @@ A data source can call a service with a key you saved once in the secret form. T
 
 - **`createApp` returns `ok: false`.** The spec has validation errors. Print `made.errors`; each has a path and a fix.
 - **`toggle` or `select` answers `ok: false`.** The label does not match a control on the current screen, or the option is not in `options`. Labels are case-sensitive.
+- **`Card column "later" is not a board column.`** A row has a column value that is not in `columns`. Use one of the listed names or add the column.
+- **`Entry date "tomorrow" is not a date.`** Use `2026-11-07` or `2026-11-07T09:30`.
+- **`Calendar view "year" is not supported.`** Use `month`, `week` or `agenda`.
+- **`Event date "soon" is not a date.`** Use `2026-11-07` or `2026-11-07T09:30` in the source's seed rows.
+- **`Pin latitude 95 is not valid.`** Latitude runs from -90 to 90 and longitude from -180 to 180.
+- **A week or month view shows no events.** The view only lists events inside the days it shows. Set `at` to a day in the period you want, or use `agenda`.
+- **A translation does not show.** The key must match the text exactly, including capitals and spaces, and `language` must be the same code you used in `strings` (`fr`, not `fr-FR`). Pass `locale` separately for money and dates.
+- **A vector shape is missing.** An unknown `shape` is an error; a colour that is not hex, a name or `url(#id)` draws as `none`; a path with other characters draws nothing.
+- **A refreshed value never changes.** Check that `refresh` is 30 or more and the source is `http`. A failed refresh keeps the last value, so check the domain is in `permissions.network`.
+- **`csv()` shows `=` or `+` at the start of a cell in a spreadsheet.** Spreadsheets read those as formulas. Map the field first, as shown in [phone apps](phone-apps.md#export-data-as-csv).
 - **State is empty before the first change.** Declare a `default` for each `state` value. Declared defaults are present from the start.
 
 ## Next steps

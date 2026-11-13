@@ -148,12 +148,49 @@ describe("rebuildInto", () => {
     expect(existsSync(join(root, ".shipvo", "sim-prev"))).toBe(false);
   });
 
+  it("a failed build keeps its first error, however long the stack trace under it", async () => {
+    const { rebuildInto } = await import("../src/sim");
+    const root = project();
+    const cmd = node("console.error('SyntaxError: src/App.js: Unexpected token');console.error(('    at frame\\n').repeat(2000));process.exit(1)") + " --";
+    const err = await rebuildInto({ root, command: cmd }).catch((e) => e);
+    expect(err.output).toContain("SyntaxError: src/App.js: Unexpected token");
+    expect(err.output.length).toBeLessThan(8100);
+  });
+
   it("does not fail on build output larger than 1 MB", async () => {
     const { rebuildInto } = await import("../src/sim");
     const root = project();
     const cmd = node("const d=process.argv[1];require('fs').mkdirSync(d,{recursive:true});require('fs').writeFileSync(d+'/index.html','big');console.error('x'.repeat(3e6))") + " --";
     await rebuildInto({ root, command: cmd });
     expect(readFileSync(join(root, "sim-dist", "index.html"), "utf8")).toBe("big");
+  });
+
+  it("passes --clear to npx for a cold build and leaves it out for a warm rebuild", async () => {
+    const { rebuildInto } = await import("../src/sim");
+    const root = project();
+    const bin = mkdtempSync(join(tmpdir(), "fake-npx-"));
+    const log = join(bin, "args.log");
+    // A fake npx records its arguments and writes the output dir (the last argument).
+    writeFileSync(join(bin, "npx"), `#!/bin/sh\necho "$@" >> "${log}"\nfor last; do :; done\nmkdir -p "$last"\necho new > "$last/index.html"\n`, { mode: 0o755 });
+    const oldPath = process.env.PATH;
+    process.env.PATH = `${bin}:${oldPath}`;
+    try {
+      await rebuildInto({ root });
+      await rebuildInto({ root, warm: true });
+    } finally { process.env.PATH = oldPath; }
+    const [cold, warm] = readFileSync(log, "utf8").trim().split("\n");
+    expect(cold).toContain("--clear");
+    expect(warm).not.toContain("--clear");
+    expect(warm).toContain("expo export --platform web");
+  });
+});
+
+describe("expoExportArgs", () => {
+  it("clears the Metro cache on the first build and keeps it for warm rebuilds", async () => {
+    const { expoExportArgs } = await import("../src/sim");
+    expect(expoExportArgs("out")).toContain("--clear");
+    expect(expoExportArgs("out", true)).not.toContain("--clear");
+    expect(expoExportArgs("out", true).slice(-2)).toEqual(["--output-dir", "out"]);
   });
 });
 

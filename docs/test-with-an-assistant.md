@@ -2,13 +2,13 @@
 
 Ask Claude, ChatGPT or Cursor to use your app the way a customer would, and tell you where it breaks. The assistant connects to Shipvo over MCP, opens your app in a simulated phone and works through it screen by screen. There is no emulator to install and no phone to plug in.
 
-This page is the shortest path from nothing to your assistant tapping through your app. For scripted tests that run on every pull request, see [Test your app in CI](testing.md).
+This page is for founders and developers who want an AI assistant to try their app. You will end with the assistant tapping through your app and reporting what broke. For scripted tests that run on every pull request, see [Test your app in CI](testing.md).
 
 ## The two ways to connect
 
 | | Local | Remote (hosted) |
 | --- | --- | --- |
-| Runs on | Your machine (`shipvo sim`) | `sim.shipvo.dev`, one sandbox per key |
+| Runs on | Your machine (`shipvo sim`) | `sim.shipvo.dev`, one sandbox per account |
 | Needs | Node 22, Chromium | A key from `shipvo login` |
 | Works with | Claude Desktop, Claude Code, Cursor, PiPilot | The same, plus ChatGPT custom connectors and any client that speaks Streamable HTTP |
 | Your app | The build in your working directory | Any app your key can open, including a published release |
@@ -101,21 +101,29 @@ Open myshop@r13 and run through checkout.
 
 It sees the screen as an accessibility tree: roles, names and references such as `button "Place order" [ref=e44]`, the way a screen reader would. It taps by reference and never by coordinates. So if the assistant cannot find your button, a person using a screen reader probably cannot either. Name your buttons.
 
-The simulator is not a phone. It renders your app on the web and simulates the device, so it does not catch native crashes, real camera or GPU behaviour, or slow-phone performance. Everything simulated is labelled: receipts say `SIMULATED-` and `device_log` marks each event `simulated: true`. Keep a short pass on a real device before a store release, and see the [parity results](parity-results.md) for where the simulator and real devices differ.
+The simulator renders your app on the web and simulates the device. Everything simulated is labelled: receipts say `SIMULATED-` and `device_log` marks each event `simulated: true`. The [parity results](parity-results.md) show what was measured against Android emulators and the iOS Simulator in CI.
 
-## Check it works
+## Troubleshooting
 
-If the assistant says it has no Shipvo tools, check these in order:
+**The assistant says it has no Shipvo tools.** Check these in order:
 
 - The key has not expired (`shipvo keys`).
 - The URL ends in `/mcp` for header clients and `/mcp/<key>` for ChatGPT.
 - You restarted the client after editing its config.
 - The app id is one your key can open: ask for `list_apps`.
 
-A sandbox sleeps after 30 idle minutes and wakes on the next call, so a slow first reply after a break is normal. Sessions survive reconnects: `list_sessions` shows what is still open.
+**ChatGPT says "The server couldn't complete MCP setup".** ChatGPT's connector names a newer MCP protocol version than older servers know. The hosted phone accepts it and answers with the newest version it speaks, so add the connector again with the `/mcp/<key>` URL from `shipvo mcp`. If it still fails, check the key has not expired (`shipvo keys`).
 
-## Next
+**The first reply after a break is slow.** A sandbox pauses after 30 idle minutes and resumes on the next call with its phones, open apps and their data, so a slow first reply after a break is normal. Sessions survive reconnects: `list_sessions` shows what is still open.
+
+**The assistant tapped the wrong thing or says it cannot find a button.** Ask it to read the screen first and list what it sees. If a button has no name there, give it an accessible label in your app.
+
+**The assistant stops answering after a few weeks.** The key expires after 30 days. Run `shipvo login` again, then `shipvo mcp`, and put the new key in your client config.
+
+## Next steps
 
 - Write the same flows as typed tests that run on every pull request: [Test your app in CI](testing.md).
 - Every tool the assistant can call: [Agents and Shipvo apps](agents.md#the-tools).
 - Let any agent open your app: [list it](agents.md#listing-your-app-for-every-agent).
+- Follow a worked example: [Test your app with an assistant](tutorials/test-with-an-assistant.md).
+- Look up a word: the [glossary](glossary.md).

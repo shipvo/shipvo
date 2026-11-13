@@ -33,10 +33,10 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
       val pending = s.pendingPath
       if (pending != null) {
         if (s.trialBoots >= MAX_BOOTS || !File(pending).exists()) {
-          s.addEvent("crash_loop_revert:${s.pendingRelease}")
+          s.addEvent("crash_loop_revert:${s.pendingRelease}:${if (Store.loadsInProcess <= 1) "cold" else "reload"}")
           s.block(s.pendingRelease)
           File(pending).delete()
-          s.pendingPath = null; s.pendingRelease = 0; s.trialBoots = 0
+          s.pendingPath = null; s.pendingRelease = 0; s.trialBoots = 0; StateVersion.dropPending(s)
         } else {
           Store.gate.selectTrial(s, visible)
           Store.runningRelease = s.pendingRelease
@@ -47,7 +47,7 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
       val current = s.currentPath
       if (current != null && File(current).exists()) {
         if (Store.gate.selectCurrent(s, visible, s.now(), MAX_BOOTS, WINDOW_MS)) {
-          s.addEvent("crash_loop_revert:${s.currentRelease}")
+          s.addEvent("crash_loop_revert:${s.currentRelease}:${if (Store.loadsInProcess <= 1) "cold" else "reload"}")
           s.block(s.currentRelease)
           revertToPrevious(s)
           return selectCurrentOrEmbedded(s)
@@ -113,6 +113,7 @@ class ShipvoHostHandler(private val ctx: Context) : ReactNativeHostHandler {
 
     internal fun revertToPrevious(s: Store) {
       s.currentPath?.let { if (it != s.previousPath) File(it).delete() }
+      StateVersion.revert(s)
       s.currentPath = s.previousPath; s.currentRelease = s.previousRelease; s.currentSha = null
       s.previousPath = null; s.previousRelease = 0
       BootRules.clear(s)

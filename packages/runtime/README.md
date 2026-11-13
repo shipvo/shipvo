@@ -4,8 +4,9 @@ The native half of Shipvo's over-the-air updates, as an Expo module.
 
 - Verifies every release pointer (Ed25519) and bundle (SHA-256 + size) against a public key built into the shell.
 - Downloads bsdiff patches when it has the previous release, full bundles otherwise; stages atomically.
+- On Android, a patch that would not fit in memory falls back to the full download; see [Patches on small heaps](#patches-on-small-heaps-android).
 - Applies without restart, marks the release healthy when the app says so, and discards a release that fails to boot 3 times.
-- Android and iOS. iOS applies patches from the bundle it is running (not yet from the app's embedded bundle) and downloads the full bundle otherwise. It is verified on the iOS Simulator in CI; in the web simulator the app runs the same release as the web build.
+- Android and iOS. iOS applies patches from the bundle it is running and downloads the full bundle otherwise. It is verified on the iOS Simulator in CI; in the web simulator the app runs the same release as the web build.
 
 ```json
 { "expo": { "plugins": [["@shipvo/runtime", { "baseUrl": "https://<your control plane>", "publicKey": "<base64 Ed25519 public key>", "appId": "myshop" }]] } }
@@ -28,6 +29,10 @@ Runtime.markHealthy();                   // call once the first screen rendered
 
 `shipvo init` wires all of this for you.
 
+## Patches on small heaps (Android)
+
+A patch needs the base, the patch and the output in memory together. If the phone runs out of memory while applying one, or those three together are more than a share of the app's heap limit, the runtime downloads the full bundle instead. The update still installs and is verified the same way. `patchError` in the state reports `out_of_memory` or `over_memory_budget`, so you can see how often it happens.
+
 ## Events
 
 The runtime reports refused and reverted releases for you. `Runtime.markHealthy()` and every `Runtime.checkForUpdate()` drain the device's event queue and send each event to `POST {baseUrl}/t`, using `baseUrl` and `appId` from `expo.extra.shipvo`. A refusal found during a background check is reported in the same session, without a restart.
@@ -42,7 +47,7 @@ onRuntimeEvents((events) => console.log(events)); // see the drained strings, fo
 
 To turn the automatic report off, pass `reportEvents: false` to the config plugin (it lands in `expo.extra.shipvo`), and call `reportRuntimeEvents()` yourself. `forwardRuntimeEvents(events, send)` and `FORWARDED_EVENTS` are also exported for custom senders. If you call `Runtime.consumeEvents()` yourself, you take events away from the report.
 
-The runtime does not emit `download_failed` yet. The control plane accepts it.
+The control plane accepts `download_failed` events.
 
 ## Signed telemetry
 

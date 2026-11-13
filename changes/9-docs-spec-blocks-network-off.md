@@ -1,2 +1,0 @@
-- docs: `@shipvo/spec` README lists the new blocks (`stat`, `progress`, `card`, `section`, `divider`, `toggle`, `segmented`) and sheet navigation; the Device API guide says what happens to the app's requests when the network is off.
-- Migration: none.

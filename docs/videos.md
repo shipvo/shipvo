@@ -2,6 +2,130 @@
 
 Short videos for people who are new to Shipvo. Each one has captions and a written transcript.
 
+## Watch the story
+
+### S1 · E1 · From a chat to an app
+
+<video controls preload="metadata" playsinline tabindex="0" data-title="S1 · E1 · From a chat to an app" data-length="1 min 40 s" poster="/videos/chat-to-app-ad.jpg" src="/media/videos/chat-to-app-ad-93cc13ad.mp4"><track kind="captions" src="/videos/chat-to-app-ad.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+
+1 minute 40 seconds. Mara runs a small shop and nobody comes in. Jun asks an assistant to make the shop an app. Dana's assistant finds it and orders. Then three orders arrive in a row. Every Shipvo screen in the film is a real recording of the Tide & Tackle sample app on the Shipvo simulator: order TT-1001 is 2 800 FCFA, TT-1002 is 3 900 FCFA and TT-1003 is 4 200 FCFA.
+
+[Captions (.vtt)](/videos/chat-to-app-ad.vtt)
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Awakening" by Celestial Aeon Project (<a href="https://www.jamendo.com">Jamendo</a>, <a href="http://creativecommons.org/licenses/by-nc-sa/2.5/">CC BY-NC-SA 2.5</a>). Source: <a href="https://www.jamendo.com/track/26436">https://www.jamendo.com/track/26436</a></details>
+
+#### Short cut for phones (9:16)
+
+<video controls preload="metadata" playsinline tabindex="0" data-title="S1 · E1 · From a chat to an app (vertical)" data-length="38 s" poster="/videos/chat-to-app-ad-vertical.jpg" src="/media/videos/chat-to-app-ad-vertical-63d5ddf7.mp4"><track kind="captions" src="/videos/chat-to-app-ad-vertical.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+
+38 seconds, 1080 by 1920, cut from the main film for phone feeds: the shop with no customers, the ask in a chat, the assistant's order on the real app, the orders list and the busy shop at sunset.
+
+[Captions (.vtt)](/videos/chat-to-app-ad-vertical.vtt)
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Something Sacred" by Kellee Maize (<a href="https://www.jamendo.com">Jamendo</a>, <a href="https://creativecommons.org/licenses/by-nc-nd/3.0/">CC BY-NC-ND 3.0</a>). Source: <a href="https://www.jamendo.com/track/521021">https://www.jamendo.com/track/521021</a></details>
+
+<details>
+<summary>Transcript (short cut)</summary>
+
+Mara: Nobody comes in.
+
+Jun: Wait, I can fix that.
+
+Pip: Found it. Ordering now.
+
+Mara: Another one?
+
+Mara: Three orders!
+
+Every assistant can use your app. shipvo.dev
+
+</details>
+
+<details>
+<summary>Transcript</summary>
+
+Mara: Nobody comes in.
+
+Jun: Wait, I can fix that.
+
+Pip: Found it. Ordering now.
+
+Dana: Whoa, that was quick.
+
+Mara: Another one?
+
+Mara: Three orders!
+
+Pip: All done.
+
+Every assistant can use your app. shipvo.dev
+
+</details>
+
+## Try Shipvo in your browser
+
+### Try Shipvo in your browser: a phone, device features and a rollback
+
+<video controls preload="metadata" playsinline tabindex="0" data-title="Try Shipvo in your browser: a phone, device features and a rollback" data-length="1 min 32 s" poster="/videos/try-in-your-browser.jpg" src="/media/videos/try-in-your-browser-b9bd7bc6.mp4"><track kind="captions" src="/videos/try-in-your-browser.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+
+1 minute 32 seconds. Open the playground and tap a shop on a phone that runs in your browser. Switch between Android and iOS, turn on dark mode and large text, choose a location, a payment result and airplane mode, then publish a signed update, crash it and watch the phone go back to version 1 by itself. You install nothing and make no account. It follows the [Try Shipvo in your browser](tutorials/try-shipvo-in-your-browser.md) tutorial.
+
+[Captions (.vtt)](/videos/try-in-your-browser.vtt)
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Revelation" by Giac &amp; Juan (<a href="https://www.jamendo.com">Jamendo</a>, <a href="http://creativecommons.org/licenses/by-nc-sa/2.0/fr/">CC BY-NC-SA 2.0</a>). Source: <a href="https://www.jamendo.com/track/116970">https://www.jamendo.com/track/116970</a></details>
+
+<details>
+<summary>Transcript</summary>
+
+This phone runs in your browser. You installed nothing. By the end, you will have tapped a shop on Android and iOS, tested a payment, and watched a bad update roll back.
+
+Open shipvo.dev/playground. A shop called Tide and Tackle appears. Tap Add on two products. The cart says two items.
+
+Select iOS, and the same app shows on an iPhone. Select Android to go back. Now try dark mode and large text. The app stays readable.
+
+Real phones know where they are, and can pay. You choose the answer. Pick Lisbon for the location. Approve the payment. Turn airplane mode on. The app shows each choice.
+
+Now the hard part. Publish a signed update. Shipvo checks the signature. It goes to a tenth of cohorts, then to all of them. Now crash it. Three starts in a row fail. On the fourth, the phone goes back to version one, by itself.
+
+Last, add more phones. Pick up to twelve, Android, iOS or both. Copy the link, and whoever opens it sees your setup.
+
+That is a phone, a payment and a rollback, with no install. Try it at shipvo.dev/playground. Next, see your own app on a phone with shipvo run.
+
+</details>
+
+## Make an app by describing it
+
+### Describe an app and watch it appear on a phone
+
+<video controls preload="metadata" playsinline tabindex="0" data-title="Describe an app and watch it appear on a phone" data-length="1 min 44 s" poster="/videos/describe-an-app.jpg" src="/media/videos/describe-an-app-0af0307b.mp4"><track kind="captions" src="/videos/describe-an-app.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+
+1 minute 44 seconds. Start the simulator, connect your assistant, and say what you want in plain words. Shipvo checks the description, the app opens on a phone with its own icon, and you use it. Ask for a change and what you typed stays in the list. Ask again with the iOS look and you have an Android app and an iOS app from one description. It follows the [Describe an app](tutorials/describe-an-app.md) tutorial.
+
+[Captions (.vtt)](/videos/describe-an-app.vtt)
+
+<details class="credits"><summary>ⓘ Copyright credits</summary>Music: "Calling for the Blue Dusk" by Régis V. Gronoff (<a href="https://www.jamendo.com">Jamendo</a>, <a href="http://creativecommons.org/licenses/by-nc-sa/3.0/">CC BY-NC-SA 3.0</a>). Source: <a href="https://www.jamendo.com/track/343780">https://www.jamendo.com/track/343780</a></details>
+
+<details>
+<summary>Transcript</summary>
+
+One sentence, and an app appears on a phone. By the end, you will have made one, changed it, and seen it on Android and iOS. You write no code.
+
+First, start the simulator. It is a phone that runs in your browser. Type npm run sim, and leave it open.
+
+Next, connect your assistant. Type npx shipvo agents setup, then restart the assistant. Now it has Shipvo tools, like create_app and update_app.
+
+Now ask, in your own words. Make a gift ideas app. I want to write who each idea is for, and the idea. Shipvo checks the description first. Then the app opens, with its own icon.
+
+Use it. Ask the assistant to add an idea, Mum, garden gloves. It shows in the list. Keep an eye on this idea. It matters in a moment.
+
+Now ask for a change. Add an About screen, and a button to open it. The app changes at once. And Mum's idea is still there. Shipvo keeps what people typed.
+
+Want the iPhone look? Ask again with the iOS look. The same description gives you an Android app and an iOS app, side by side.
+
+That is an app from one sentence. Try it in your own folder. The step by step guide is at shipvo.dev/learn. Next, see your own app on a phone with shipvo run.
+
+</details>
+
 ## Test your app
 
 ### Have Lumi test your app while you watch

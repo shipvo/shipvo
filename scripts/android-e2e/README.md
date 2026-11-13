@@ -10,7 +10,7 @@ Pieces:
 - `release.mjs`: signs and publishes one release (bundle, bsdiff patches, pointer per band), with `--tamper signature|hash|size`.
 - `run.mjs`: starts the server in-process, runs the scenarios, and writes the report.
 
-Run (needs `pnpm --filter @shipvo/cli build` (patches come from the built CLI, no Python needed), and `adb` with one emulator):
+Run (needs `pnpm --filter @shipvo/store build` and `pnpm --filter @shipvo/cli build` (the CLI imports the store package; patches come from the built CLI, no Python needed), and `adb` with one emulator):
 
 ```bash
 node scripts/ios-e2e/keygen.mjs > key.json
@@ -30,6 +30,10 @@ Run time: a full run takes about 18 minutes (the crash-loop scenarios alone take
 ## Rollback scenario
 
 `on-device Runtime.rollback(): previous release restored and kept after a restart` publishes release A, then B (both healthy), taps the sample app's "Roll back to previous release" button (found with `uiautomator dump`), and times the call until the server receives `applied` telemetry for A (`rollbackToGoodActiveMs`). It then waits for two or more check-ins while the pointer still names B, force-stops and relaunches, and checks that A runs, B is blocked and was not downloaded again, and `rolled_back` telemetry arrived. The app reports that event under the release that is running when it is sent, so the scenario looks for it under A. If B comes back after the relaunch, the scenario fails and the row says so. The `rolled_back` event is sent when the app next mounts.
+
+## First update after install
+
+`--first-trials` (default 3) fresh installs: each trial uninstalls, installs, starts the shell, waits for the bundled release to report healthy, deletes the pointers of earlier releases (a new install would otherwise apply them before the trial publishes), then publishes a patch against the APK's own bundle. The cohort is drawn again on each install, so the band is read again each time. The report has `phaseMedianMs.pointerToPatchMs`.
 
 ## Patch update timeline
 

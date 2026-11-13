@@ -523,6 +523,20 @@ const SHOP_CONFIG = (name: string) => JSON.stringify({ name, currency: "$", code
 const SHOP_MONEY = `// Prices are whole minor units (cents) in src/data/products.json. This is the one place that turns them into text.
 // To change the currency, edit src/data/shop.json. "code" is the ISO 4217 code sent to the payment provider ("$" is only a symbol). For FCFA: { "currency": "FCFA", "code": "XAF", "position": "after", "decimals": 0, "locale": "fr-FR" }
 import shop from "./data/shop.json";
+import products from "./data/products.json";
+
+// Plain messages for prices that look like they are in the wrong unit. Prices are whole minor units: 2400 is $24.00.
+export const priceProblems = (list: { id?: string; name?: string; price: number }[] = products, decimals: number = (shop as { decimals?: number }).decimals ?? 2) => {
+  const unit = 10 ** decimals;
+  const out: string[] = [];
+  for (const p of list) {
+    const who = p.name ?? p.id ?? "A product";
+    if (!Number.isInteger(p.price)) out.push(who + ": price " + p.price + " is not a whole number. Write prices in the smallest unit, for example " + Math.round(p.price * unit) + " for " + p.price + ".");
+    else if (p.price > 0 && p.price < unit) out.push(who + ": price " + p.price + " is less than one whole unit. Prices are in the smallest unit, so write " + p.price * unit + " for " + p.price + ".");
+  }
+  return out;
+};
+for (const m of priceProblems()) console.warn("[shop] " + m);
 
 export const formatPrice = (minor: number) => {
   const { currency, position, decimals, locale } = shop as { currency: string; position?: string; decimals?: number; locale?: string };
@@ -811,7 +825,11 @@ const SHOP_TEST = `// Runs the app in the Shipvo simulator. Start it first: npm 
 // The total is computed with formatPrice from the app, so this test does not check that function.
 import { test, expect } from "@shipvo/test/vitest";
 import products from "../src/data/products.json";
-import { formatPrice } from "../src/money";
+import { formatPrice, priceProblems } from "../src/money";
+
+test("every price is in the smallest unit (2400 for 24.00)", () => {
+  expect(priceProblems()).toEqual([]);
+});
 
 test("the list shows every product", async ({ phone }) => {
   for (const p of products) expect(phone).toSee(p.name);
@@ -857,11 +875,11 @@ test("a declined payment says why and keeps the cart", async ({ phone }) => {
 });
 
 test("each payment failure is explained in plain words, and a new attempt clears the old message", async ({ phone }) => {
-  const words = { decline: "Your payment was declined. Try another method.", timeout: "The payment took too long. Try again.", insufficient_funds: "Not enough funds.", cancel: "Payment cancelled." };
+  const words: Record<"decline" | "timeout" | "insufficient_funds" | "cancel", string> = { decline: "Your payment was declined. Try another method.", timeout: "The payment took too long. Try again.", insufficient_funds: "Not enough funds.", cancel: "Payment cancelled." };
   await phone.tap(products[0].name);
   await phone.tap("Add to cart");
   await phone.tap("Cart");
-  for (const [result, text] of Object.entries(words)) {
+  for (const [result, text] of Object.entries(words) as [keyof typeof words, string][]) {
     await phone.device.set({ payment: { nextResult: result, pin: "1234" } });
     await phone.tap("Pay");
     await phone.waitFor(text);

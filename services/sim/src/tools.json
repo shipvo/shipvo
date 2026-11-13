@@ -1,5 +1,166 @@
 [
   {
+    "name": "a11y_audit",
+    "description": "Check the current screen for controls TalkBack and VoiceOver users cannot use. Lists every button, link, field or other control with no accessible name (missing_label) and every tap target under the platform minimum (small_target: 48 dp wide or high on the Android style, 44 pt on the iPhone style). Each issue has ref, role, code and message. Fails with sizes_unavailable when the simulator cannot report sizes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "a2ui_actions",
+    "description": "What an A2UI session sent to the agent: the action messages from buttons the person pressed, with their context read from the data model. Pass `since` (the `next` of the last call) to get only newer ones.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "since": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Return messages after this position (the `next` of an earlier call)"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "a2ui_open",
+    "description": "Open A2UI v1.0 messages as a screen on a phone and return it as a tree. The messages are the agent's own: createSurface, updateComponents, updateDataModel, deleteSurface. Needs no app. Then use screen, tap, type and screenshot on the session like any app, a2ui_send to change the screen and a2ui_actions to read what the person did.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "description": "A2UI messages, each { version: \"1.0\", createSurface | updateComponents | updateDataModel | deleteSurface: {...} }"
+        },
+        "session": {
+          "type": "string",
+          "description": "Session name (default: generated)"
+        },
+        "model": {
+          "type": "string",
+          "description": "Phone model from phone_models, for example 'iPhone 16 Pro' (default: Pixel 8)"
+        }
+      },
+      "required": [
+        "messages"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "a2ui_send",
+    "description": "Send more A2UI messages to a session from a2ui_open and return the screen after them. The result says how many were applied and lists each refused message with the reason.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "description": "A2UI messages to apply in order"
+        }
+      },
+      "required": [
+        "session",
+        "messages"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "app_activity",
+    "description": "What was built and changed on the phone: for each app made with create_app, its versions with a plain line for what changed in each (added, removed or changed screens, actions and data), its http data sources and how often each refreshes, and its events (create, update, action, data refresh). Pass id for one app. Fails with not_installed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id; omit for every app"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "description": "Most recent events per app (default 50)"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "apply_update",
     "description": "Apply the ready release: the app restarts on the new bundle, like restart. After 3 boots that throw, the phone goes back to the old release and the state is reverted with reason crash_loop. Fails with not_ready unless the state is ready. Simulated; logged in device_log.",
     "inputSchema": {
@@ -71,6 +232,93 @@
     },
     "annotations": {
       "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "arrange_apps",
+    "description": "Lay out an installed app on the home screen: pinned (first), hidden (not on the home screen, still opens with switch_app), position (0 first) and schedule (days, from, to: the app shows only then, e.g. a weekly planner Monday to Friday 08:00-18:00 and weekend plans on Saturday). Leave days out or pass an empty list for every day. Add timezone (an IANA name such as Europe/Berlin) to read the window in that zone. Pass schedule: null to always show. Fails with not_installed, bad_placement or bad_timezone. The home screen text says which apps are showing and why one is not. Logged in device_log.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id"
+        },
+        "pinned": {
+          "type": "boolean"
+        },
+        "hidden": {
+          "type": "boolean"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 99
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schedule": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "days": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "sun",
+                      "mon",
+                      "tue",
+                      "wed",
+                      "thu",
+                      "fri",
+                      "sat"
+                    ]
+                  }
+                },
+                "from": {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                "to": {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                "timezone": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "session",
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
       "destructiveHint": false
     },
     "execution": {
@@ -154,7 +402,7 @@
           "properties": {
             "ref": {
               "type": "string",
-              "pattern": "^e\\d+$"
+              "pattern": "^(?:p\\d+|f\\d+)?e\\d+$"
             },
             "text": {
               "type": "string"
@@ -191,6 +439,31 @@
     },
     "annotations": {
       "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "backup_phone",
+    "description": "Back up the whole phone as one JSON object, on Android and iOS: every app you built with its spec, data, settings, home-screen place and permission answers; every Store app with its listing and permission answers; the system settings; and the clipboard. Saved keys in the vault are never in it. Pass the object to restore_phone on this phone or another. Changes nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
       "destructiveHint": false
     },
     "execution": {
@@ -518,6 +791,35 @@
     }
   },
   {
+    "name": "cancel_reminder",
+    "description": "Cancel a reminder by id. Returns whether it existed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "check_for_update",
     "description": "Ask the update source for a newer release: checks its signature and hash and downloads it. Ends in ready, or idle with reason verify_failed or download_failed (the release is never applied). Fails with no_update when nothing newer exists or no source is set. Simulated; each state change is logged in device_log.",
     "inputSchema": {
@@ -543,6 +845,65 @@
     }
   },
   {
+    "name": "clear_schedule",
+    "description": "Remove an app's schedule so pin and hide decide again whether it shows. Fails with not_installed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id"
+        }
+      },
+      "required": [
+        "session",
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "clear_wakeup",
+    "description": "Stop waking an assistant by webhook. Returns whether one was registered.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session",
+        "name"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "close_panels",
     "description": "Close the notification shade, Notification Center or Control Center (swipe up).",
     "inputSchema": {
@@ -555,6 +916,58 @@
       },
       "required": [
         "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "create_app",
+    "description": "Describe an app and it appears on the phone. Pass an app spec (JSON, shipvo.app/v0: data, actions, screens). The spec is checked first: every problem comes back with its path and a fix, and nothing is installed until it is valid. A valid spec is started, gets an icon on the home screen, and opens (pass open: false to stay where you are). Every control is labelled, so tap, type, scroll and screen work on it like any app, and each action can be run by name with run_app_action. Fails with invalid_spec, bad_app_id or already_installed. Logged in device_log as a real create.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id: lowercase letters, digits and dashes, up to 40"
+        },
+        "spec": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The app spec (shipvo.app/v0)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name under the icon. Default: app.name in the spec"
+        },
+        "style": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Look of the app. Default android"
+        },
+        "open": {
+          "type": "boolean",
+          "description": "Open the app right away (default true)"
+        }
+      },
+      "required": [
+        "session",
+        "id",
+        "spec"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
@@ -684,8 +1097,163 @@
     }
   },
   {
+    "name": "export_phone_apps",
+    "description": "Copy the spec apps (made with create_app) out of the phone. Returns JSON with, per app, id, name, style (android or ios), spec, data (what was entered into its collections), settings and its home-screen layout (placement: pinned, hidden, position, schedule) when it has one. Pass ids to export only some. Vault secrets and keys are never included. Give the result to import_phone_apps on another phone to recreate the apps. Fails with not_installed (an id is not a spec app).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "App ids to export. Default: every spec app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "export_test",
     "description": "Turn the steps taken in this session (tap, type, scroll, back, set_device) into a @shipvo/test script and return its source. Read-only. Targets are named by their visible text; ambiguous ones become TODO comments and password fields use an environment variable instead of the typed value.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "find_apps",
+    "description": "Search the Store by need, for example \"split bills\". Matches the query against app name, description and tags (case-insensitive, word based) and filters by country, language and currency when an app declares them; apps that declare nothing for a filter still match. Returns up to limit apps (default 10, max 25) with id, name, one-line description, version and whether it is installed, best match first. An empty list means nothing matched. Fails with store_unreachable when the marketplace cannot be reached (nothing is guessed). Install a result on the simulator with install_app, or on the person's own phone with request_app_install. Logged in device_log as simulated.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "query": {
+          "type": "string",
+          "description": "What the person needs, for example \"split bills\""
+        },
+        "country": {
+          "type": "string",
+          "description": "Country code, for example FR"
+        },
+        "language": {
+          "type": "string",
+          "description": "Language code, for example fr"
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code, for example EUR"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 25,
+          "description": "Most results to return (default 10, max 25)"
+        }
+      },
+      "required": [
+        "session",
+        "query"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_clipboard",
+    "description": "The text on the phone's clipboard, the same one apps copy to and paste from on Android and iOS.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_connectivity",
+    "description": "The phone's Wi-Fi, mobile data and airplane mode switches, and the network every app sees from them: online and type (wifi, cellular or none). Android and iOS.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "get_network_profile",
+    "description": "Read the phone's current network profile name (online until set_network_profile or phone.json changes it).",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -759,6 +1327,211 @@
     }
   },
   {
+    "name": "hide_app",
+    "description": "Hide an installed app from the home screen and the app list, or show it again with hidden: false. The app keeps its data and still opens with switch_app and run_app_action. Works for Store apps and apps made with create_app, and survives update_app. Fails with not_installed. Logged in device_log.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "Installed app id"
+        },
+        "hidden": {
+          "type": "boolean",
+          "description": "true to hide, false to show"
+        }
+      },
+      "required": [
+        "session",
+        "id",
+        "hidden"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "import_phone_apps",
+    "description": "Put apps from export_phone_apps on this phone, with their data, settings and home-screen layout. Every spec is checked first: all problems come back with their path (for example apps[1].spec.screens) and nothing is installed unless all are valid. An id that is already installed fails with already_installed unless replace is true. Android and iOS styles are kept. Fails with invalid_spec or already_installed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "apps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "description": "The apps array from export_phone_apps"
+        },
+        "replace": {
+          "type": "boolean",
+          "description": "Overwrite apps with the same id (default false)"
+        }
+      },
+      "required": [
+        "session",
+        "apps"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "inbox_clear",
+    "description": "Empty this session's private inbox. Returns how many messages were removed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "inbox_read",
+    "description": "Read this session's private inbox: its address and every message, oldest first, each with from, subject, text, codes (4 to 8 digits) and links. Reading changes nothing: a second call returns the same result.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Only mail whose subject contains this"
+        },
+        "from": {
+          "type": "string",
+          "description": "Only mail whose sender contains this"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "inbox_view",
+    "description": "Show the Assistant Inbox of this phone live in the chat: every message and task between assistants, who you are, and what waits for you. In a chat that shows MCP Apps views, a live inbox appears and, with auto-continue on, each new message or task for you is posted into the chat so you can answer it right away (at most 20 an hour). Install the Assistant Inbox first (create_app, id inbox). Changes nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    },
+    "_meta": {
+      "ui": {
+        "resourceUri": "ui://shipvo/inbox.html"
+      },
+      "ui/resourceUri": "ui://shipvo/inbox.html",
+      "openai/outputTemplate": "ui://shipvo/inbox.html",
+      "openai/widgetAccessible": true,
+      "openai/toolInvocation/invoking": "Opening the inbox",
+      "openai/toolInvocation/invoked": "Inbox open"
+    }
+  },
+  {
+    "name": "inbox_wait",
+    "description": "Wait for mail in this session's private inbox (its address is in the result; type it into the app's email field). Returns the first message that matches, already there or arriving within timeout_ms: from, subject, text, the 4 to 8 digit codes and the links in it. Use it to finish an emailed code or magic-link sign-in. Fails with inbox_timeout when nothing matches in time. Only this session can read this inbox; mail is kept in memory and removed when the session ends.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "subject": {
+          "type": "string",
+          "description": "Only mail whose subject contains this (not case sensitive)"
+        },
+        "from": {
+          "type": "string",
+          "description": "Only mail whose sender contains this"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 25000,
+          "description": "How long to wait, in ms (default 10000)"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "install_app",
     "description": "Install a Store app on the phone, as tapping Install in the Store screen does. The app icon appears on the home screen. Fails with unknown_app (not in the Store) or already_installed. If the marketplace is unreachable the phone's own Store list is used. Logged in device_log as simulated: nothing real is installed.",
     "inputSchema": {
@@ -782,6 +1555,37 @@
     },
     "annotations": {
       "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "job_status",
+    "description": "Read a slow job started by publish_preview or upload_build. Returns { status: running | done | failed, job } with the result when done or a typed error { code, error } when failed. Pass wait_ms to wait for it (long poll, default 0, max 55000). A job id from another key is not found. Jobs are kept for 15 minutes after they finish.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "job": {
+          "type": "string",
+          "description": "Job id from a tool that returned status running"
+        },
+        "wait_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 55000,
+          "description": "How long to wait while it is still running (default 0)"
+        }
+      },
+      "required": [
+        "job"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
       "destructiveHint": false
     },
     "execution": {
@@ -851,6 +1655,31 @@
     }
   },
   {
+    "name": "list_reminders",
+    "description": "The reminders waiting on the phone (id, title, next time, repeat) and the last ones that fired with whether each was delivered.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "list_sessions",
     "description": "Open simulator sessions (phones) on this server: id, app, platform, room, who opened it (the MCP client name), start time and current screen title. Use to resume after a reconnect or to see who shares a room.",
     "inputSchema": {
@@ -872,6 +1701,31 @@
     "inputSchema": {
       "type": "object",
       "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "list_wakeups",
+    "description": "The wake-up URLs registered on this phone: assistant name, URL and events (never the secret).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -946,6 +1800,10 @@
           "type": "string",
           "description": "Session name (default: generated). One session is one phone."
         },
+        "restart": {
+          "type": "boolean",
+          "description": "Only with a session id that is already open: true starts that session over, empty, with this app. By default the open session is reused: the phone switches to this app and keeps its other apps and data."
+        },
         "room": {
           "type": "string",
           "description": "Room name. Every session opened with the same room on the same simulator shares one backend (orders, content, telemetry), read and written through the same store. Without room, each session has its own. 1 to 64 letters, digits, _ or -."
@@ -985,6 +1843,10 @@
             "ios"
           ],
           "description": "Which phone to show: 'android' or 'ios' (default: the live run's, else android). Ignored when no phone is started (show false, attach never, or a live run is attached as it is)"
+        },
+        "model": {
+          "type": "string",
+          "description": "Phone model for a headless session, from phone_models, for example 'iPhone 16 Pro' or 'Galaxy S24'. The session gets that phone's screen size, pixel ratio, user agent and platform. Ignored when a live run is attached."
         },
         "show": {
           "type": "boolean",
@@ -1215,6 +2077,106 @@
     }
   },
   {
+    "name": "permission_log",
+    "description": "Every device permission decision on the phone, oldest first, on Android and iOS: when an app was granted or denied a permission (by install, import, update or the Settings switch), when a permission was removed, and each time an app action used a permission or was blocked by a denial, with the assistant that called it. Filter by app, permission or event. Changes nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "app": {
+          "type": "string",
+          "description": "Only this app id"
+        },
+        "permission": {
+          "type": "string",
+          "description": "Only this permission, such as camera or notifications"
+        },
+        "event": {
+          "type": "string",
+          "enum": [
+            "granted",
+            "denied",
+            "removed",
+            "used",
+            "blocked"
+          ]
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500,
+          "description": "Most recent entries to return (default 100)"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "phone_models",
+    "description": "The phone models a headless session can be, each with its platform, screen size in CSS pixels and pixel ratio, and the default model for android and ios. Pass a name to open_app as `model`.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "pin_app",
+    "description": "Pin an installed app to the top of the home screen (Android and iOS style), after any apps pinned before it, or unpin it with pinned: false. Works for Store apps and apps made with create_app, and survives update_app. Fails with not_installed. Logged in device_log.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "Installed app id"
+        },
+        "pinned": {
+          "type": "boolean",
+          "description": "true to pin, false to unpin"
+        }
+      },
+      "required": [
+        "session",
+        "id",
+        "pinned"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "press_home",
     "description": "Press Home: the app goes to the background (it receives AppState \"background\") and the phone shows the home screen with the app icon. While there, tap, type, scroll and back fail with app_not_foreground. Call resume_app to bring the app back (AppState \"active\"). Logged as simulated.",
     "inputSchema": {
@@ -1241,10 +2203,18 @@
   },
   {
     "name": "publish_preview",
-    "description": "Build the app in PN_APP_DIR (or the current folder) with the simulated device and publish a shareable web preview to here.now, no account. The link is PUBLIC and expires in 24 hours; claimUrl keeps it. Returns { url, claimUrl, expiresAt }. Needs @shipvo/cli (npx).",
+    "description": "Build the app in PN_APP_DIR (or the current folder) with the simulated device and publish a shareable web preview to here.now, no account. The link is PUBLIC and expires in 24 hours; claimUrl keeps it. Returns { url, claimUrl, expiresAt }. Needs @shipvo/cli (npx). Slow: waits up to wait_ms (default 20000), then returns { status: \"running\", job }; call job_status with that job. Calling again while it runs returns the same job.",
     "inputSchema": {
       "type": "object",
-      "properties": {},
+      "properties": {
+        "wait_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 55000,
+          "description": "How long to wait for the result before returning { status: \"running\", job } (default 20000). Read it later with job_status."
+        }
+      },
+      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1403,6 +2373,99 @@
     }
   },
   {
+    "name": "refresh_app",
+    "description": "Fetch the data of a spec app now (its http data sources) and redraw the open screen if anything changed. Apps with a refresh interval in the spec also refresh by themselves. The result lists the sources that changed and any errors; a source that fails keeps its last good data. Fails with not_installed. Logged in device_log as data_refresh.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id"
+        }
+      },
+      "required": [
+        "session",
+        "id"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "register_wakeup",
+    "description": "Wake an assistant that is not in a turn: when a new message or task arrives for `name` in the Assistant Inbox app, the phone POSTs a small signed JSON note to `url` (who it is for, whether it is a message or a task, a one-line summary and the ids; never the message text). The URL can be a Claude Code scheduled task, a GitHub repository_dispatch, an OpenAI background run, Slack or Zapier. Only arrivals after this call wake it. A failed call is retried twice, and every delivery is in device_log. The signature is in the x-shipvo-signature header as `t=<unix seconds>,v1=<hex hmac-sha256 of \"<t>.<body>\">` using the secret; leave `secret` out and one is generated and returned once. Private and local addresses are refused unless allow_private is true. To tell the person instead of an assistant (for a chat that cannot be started by a URL), point the URL at a push or chat service and set format to text or slack: it sends one line such as \"ChatGPT has 1 new message on the phone. Open your chat with ChatGPT to pick it up.\" Calling it again for the same name replaces the URL.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "name": {
+          "type": "string",
+          "description": "The assistant to wake, such as chatgpt or claude (the same names check_inbox uses)"
+        },
+        "url": {
+          "type": "string",
+          "description": "http or https URL that receives the POST"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "message",
+              "task"
+            ]
+          },
+          "description": "What wakes it (default: both)"
+        },
+        "secret": {
+          "type": "string",
+          "description": "Shared secret, at least 16 characters (default: generated and returned once)"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "json",
+            "text",
+            "slack"
+          ],
+          "description": "What is sent (default json). text: one plain line for a push service such as ntfy, so the person is told to open their chat. slack: {\"text\": line} for a Slack-style incoming webhook"
+        },
+        "allow_private": {
+          "type": "boolean",
+          "description": "Allow a private or local address (for a service you run yourself)"
+        }
+      },
+      "required": [
+        "session",
+        "name",
+        "url"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "request_app_install",
     "description": "Ask to add an app to the person's own persistent phone (not the simulator). Returns a consent card: app name, publisher, the permissions it asks for, and approve_url and decline_url. Show the card to the person and tell them to open a link themselves: you cannot approve, and nothing is installed until they do. A card expires after 15 minutes. Fails with unknown_app, already_installed or unauthorized. Needs PN_ASSISTANT_TOKEN.",
     "inputSchema": {
@@ -1502,6 +2565,41 @@
     }
   },
   {
+    "name": "restore_phone",
+    "description": "Put a backup from backup_phone on this phone: apps with their data and layout, Store apps with their permission answers, system settings and the clipboard. Every part is checked first, and a bad backup changes nothing. Apps you built that are already on the phone need replace: true. A Store app that is already installed is skipped and listed in skipped.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "backup": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The backup object from backup_phone"
+        },
+        "replace": {
+          "type": "boolean",
+          "description": "Replace apps already on the phone (default false)"
+        }
+      },
+      "required": [
+        "session",
+        "backup"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "resume_app",
     "description": "Tap the app icon on the home screen, or its card in the app switcher: the app comes back (AppState \"active\") with its screen kept. Fails with app_in_foreground if it is already in front.",
     "inputSchema": {
@@ -1514,6 +2612,162 @@
       },
       "required": [
         "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "room_log",
+    "description": "What the sessions in one room did, oldest first: time, session, agent, tool, target and the change line, plus notes from room_note. Pass since (the cursor from the last call) to get only newer entries. Returns the entries and the next cursor.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "room": {
+          "type": "string",
+          "description": "Room name used in open_app"
+        },
+        "since": {
+          "type": "string",
+          "description": "Cursor from an earlier room_log; only newer entries come back"
+        }
+      },
+      "required": [
+        "room"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "room_note",
+    "description": "Post a short plain-text note (up to 500 characters) to a room so the other agents see it in room_log.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "room": {
+          "type": "string",
+          "description": "Room name used in open_app"
+        },
+        "text": {
+          "type": "string",
+          "description": "The note, plain text, up to 500 characters"
+        }
+      },
+      "required": [
+        "room",
+        "text"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "run_app_action",
+    "description": "Run one action of an app made with create_app, by name, with its input (for example add_task with { title }). The action changes the app's data the same way tapping its form does, and the open screen shows the result. Fails with not_installed (no such spec app) or action_failed (the action refused the input, with the reason).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action name from the spec"
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The action's input"
+        }
+      },
+      "required": [
+        "session",
+        "id",
+        "action"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "schedule_app",
+    "description": "Show an installed app only in a daily time window, by the phone's clock (see set_phone_time) or in the time zone you give, for example your Tasks app from 08:00 to 10:00 on weekdays. from and to are HH:MM (default 00:00 and 23:59); a window that crosses midnight belongs to the day it starts. Leave days out for every day. timezone is an optional IANA name such as Europe/Berlin or America/New_York: from, to and days are then read in that zone, whatever the phone clock is. Pin and hide still apply. Same schedule as arrange_apps. Fails with not_installed, bad_placement or bad_timezone.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id"
+        },
+        "timezone": {
+          "type": "string",
+          "description": "IANA time zone name, for example Europe/Berlin"
+        },
+        "from": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "to": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "sun",
+              "mon",
+              "tue",
+              "wed",
+              "thu",
+              "fri",
+              "sat"
+            ]
+          }
+        }
+      },
+      "required": [
+        "session",
+        "id"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
@@ -1560,6 +2814,10 @@
         "session": {
           "type": "string",
           "description": "Session from open_app"
+        },
+        "frame": {
+          "type": "boolean",
+          "description": "true: the whole phone, the app inside its Android or iPhone frame with the status bar, for showing a person. Headless sessions only. Default false: the app's screen alone."
         }
       },
       "required": [
@@ -1597,7 +2855,7 @@
         },
         "ref": {
           "type": "string",
-          "pattern": "^e\\d+$",
+          "pattern": "^(?:p\\d+|f\\d+)?e\\d+$",
           "description": "Scroll inside this element (a rail or list); omit for the page"
         },
         "compact": {
@@ -1609,7 +2867,7 @@
           "properties": {
             "ref": {
               "type": "string",
-              "pattern": "^e\\d+$"
+              "pattern": "^(?:p\\d+|f\\d+)?e\\d+$"
             },
             "text": {
               "type": "string"
@@ -1654,6 +2912,46 @@
     }
   },
   {
+    "name": "search_phone",
+    "description": "Find text anywhere on the phone in one call: rows in every app's data (contacts, messages, alarms, notes, tasks and any app you built) and notifications. Not case sensitive. Each hit says the app, the collection, the row id, the field that matched and a short snippet, with the full row. Use app to look in one app, or 'notifications'. Changes nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "query": {
+          "type": "string",
+          "description": "Text to look for, up to 200 characters"
+        },
+        "app": {
+          "type": "string",
+          "description": "Only this app id, or 'notifications'"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Most results to return (default 20)"
+        }
+      },
+      "required": [
+        "session",
+        "query"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "secret_status",
     "description": "Whether a key is saved in the vault, as { saved, valid, access }. Never returns the key. valid is null when it was not checked. Needs an owner token.",
     "inputSchema": {
@@ -1675,6 +2973,70 @@
     },
     "annotations": {
       "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "set_clipboard",
+    "description": "Put text on the phone's clipboard so the next paste in any app gets it. It stays when you switch apps.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "text": {
+          "type": "string",
+          "description": "Up to 20000 characters"
+        }
+      },
+      "required": [
+        "session",
+        "text"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "set_connectivity",
+    "description": "Turn Wi-Fi, mobile data or airplane mode on or off for the whole phone, as in quick settings on Android and iOS. Airplane mode turns both radios off; Wi-Fi can come back on during it, and leaving it restores the radios as they were. Every app sees the result: apps you built read it as {{ network.online }} and {{ network.type }}, and their web data does not load while the phone is offline. The open app's screen is drawn again. Logged in device_log as \"connectivity\".",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "wifi": {
+          "type": "boolean"
+        },
+        "mobile_data": {
+          "type": "boolean"
+        },
+        "airplane": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
       "destructiveHint": false
     },
     "execution": {
@@ -1992,6 +3354,119 @@
     }
   },
   {
+    "name": "set_network_profile",
+    "description": "Make the phone's network behave like a named profile: online, offline, 2g, 3g, slow-4g, spotty or low-end-4g. The app's fetch and XHR calls wait and fail as the profile says (offline rejects every call). The numbers are simulation settings, not measurements of a real network. Mock rules from set_network_mocks still win. Fails with unknown_profile for a name that does not exist. Logged in device_log as simulated.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "profile": {
+          "type": "string",
+          "description": "online, offline, 2g, 3g, slow-4g, spotty or low-end-4g"
+        }
+      },
+      "required": [
+        "session",
+        "profile"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "set_phone_time",
+    "description": "Set the phone's clock to a time like 2026-11-14T09:00:00 so scheduled apps show or hide as they would then, or pass null to go back to the real time. The clock stays at the time you set; it does not tick. Fails with bad_time.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "ISO time without a zone, or null for the real time"
+        }
+      },
+      "required": [
+        "session",
+        "at"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "set_reminder",
+    "description": "Set a reminder on the phone: at the time you give (on the phone's clock, see set_phone_time) a notification with the title and body arrives, whether or not an app is open. Give at (a time like 2026-11-14T09:00) or in_minutes, not both. repeat is none, daily or weekly. With Do Not Disturb or Focus on, it is kept in the notification shade without a banner. It arrives whatever the app notification permissions say, as a phone's own reminders do. Read what arrived with notifications. Fails with bad_time, bad_title, too_long, bad_repeat or too_many.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "title": {
+          "type": "string",
+          "description": "What to remind (up to 200 characters)"
+        },
+        "body": {
+          "type": "string",
+          "description": "More detail (up to 1000 characters)"
+        },
+        "at": {
+          "type": "string",
+          "description": "Phone-clock time such as 2026-11-14T09:00"
+        },
+        "in_minutes": {
+          "type": "number",
+          "description": "Minutes from now on the phone's clock (0 to 525600)"
+        },
+        "repeat": {
+          "type": "string",
+          "enum": [
+            "none",
+            "daily",
+            "weekly"
+          ]
+        }
+      },
+      "required": [
+        "session",
+        "title"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "set_setting",
     "description": "Change one system setting, as a person would in the phone's Settings screen. The app sees it through Appearance (dark_mode), PixelRatio.getFontScale (font_size), AccessibilityInfo (bold_text, reduce_motion), I18nManager (rtl) and Intl (language). Setting language to ar turns rtl on; en and fr turn it off. Fails with unknown_setting for a key that does not exist and bad_value for a value it does not take. Logged in device_log as simulated.",
     "inputSchema": {
@@ -2023,6 +3498,78 @@
     },
     "annotations": {
       "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "share",
+    "description": "Share text into another app on the phone, like picking it in the share sheet: the text goes into that app's share action (for example a new note in Notes and Tasks). A title input that is not the share input gets `title`, or the first line of the text. Logged in app_activity as \"share\". Use share_targets to see which apps take shared text.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "to": {
+          "type": "string",
+          "description": "App id from share_targets"
+        },
+        "text": {
+          "type": "string",
+          "description": "The text to share, up to 5000 characters"
+        },
+        "title": {
+          "type": "string",
+          "description": "A title for the shared item (default: the first line of the text)"
+        },
+        "action": {
+          "type": "string",
+          "description": "The share action, when the app has more than one (from share_targets)"
+        },
+        "from": {
+          "type": "string",
+          "description": "The app the text is shared from, for the activity log"
+        }
+      },
+      "required": [
+        "session",
+        "to",
+        "text"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "share_targets",
+    "description": "The apps on this phone that take shared text, like the share sheet on Android and iOS: app id and name, the action and the input that receives the text.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
       "destructiveHint": false
     },
     "execution": {
@@ -2071,8 +3618,8 @@
         },
         "ref": {
           "type": "string",
-          "pattern": "^e\\d+$",
-          "description": "Element ref from the screen, e.g. e42"
+          "pattern": "^(?:p\\d+|f\\d+)?e\\d+$",
+          "description": "Element ref from the screen, e.g. e42. After a restart refs can carry a prefix, such as f1e42; use them exactly as the screen shows them."
         },
         "compact": {
           "type": "boolean",
@@ -2083,7 +3630,7 @@
           "properties": {
             "ref": {
               "type": "string",
-              "pattern": "^e\\d+$"
+              "pattern": "^(?:p\\d+|f\\d+)?e\\d+$"
             },
             "text": {
               "type": "string"
@@ -2175,8 +3722,8 @@
         },
         "ref": {
           "type": "string",
-          "pattern": "^e\\d+$",
-          "description": "Element ref from the screen, e.g. e42"
+          "pattern": "^(?:p\\d+|f\\d+)?e\\d+$",
+          "description": "Element ref from the screen, e.g. e42. After a restart refs can carry a prefix, such as f1e42; use them exactly as the screen shows them."
         },
         "text": {
           "type": "string"
@@ -2194,7 +3741,7 @@
           "properties": {
             "ref": {
               "type": "string",
-              "pattern": "^e\\d+$"
+              "pattern": "^(?:p\\d+|f\\d+)?e\\d+$"
             },
             "text": {
               "type": "string"
@@ -2295,6 +3842,46 @@
     }
   },
   {
+    "name": "update_app",
+    "description": "Change an app made with create_app by giving its new spec. The change is a new version of the same app: the data and settings the person entered stay, and the open screen shows the new look right away. A spec with problems comes back with each problem's path and a fix, and the running version is not touched. Fails with not_installed (no such spec app) or invalid_spec. Logged in device_log with the old and new version.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "id": {
+          "type": "string",
+          "description": "App id from create_app"
+        },
+        "spec": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "The whole new spec (shipvo.app/v0)"
+        },
+        "name": {
+          "type": "string",
+          "description": "New name under the icon"
+        }
+      },
+      "required": [
+        "session",
+        "id",
+        "spec"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "upload_build",
     "description": "Build the app in this project with the simulated device (the same build `shipvo sim` makes), upload it to the hosted phone for this key, and return a build id. Then call open_app(\"<app>@build:<id>\") on the hosted server. The build is private to your account and is deleted when it expires. Runs only on the local (stdio) server, because it reads your project.",
     "inputSchema": {
@@ -2311,6 +3898,12 @@
         "skip_build": {
           "type": "boolean",
           "description": "Upload the existing sim-dist folder without building again"
+        },
+        "wait_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 55000,
+          "description": "How long to wait for the result before returning { status: \"running\", job } (default 20000). Read it later with job_status."
         }
       },
       "additionalProperties": false,
@@ -2320,6 +3913,37 @@
       "readOnlyHint": false,
       "destructiveHint": false,
       "openWorldHint": true
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "wait_for_event",
+    "description": "Wait until something new arrives for you in the Assistant Inbox app on this phone: a message or a task. Returns when a message or task you have not been told about yet is waiting (at once if one already is), and `nothing yet` after timeout_ms (up to 25000, default 25000) when not. structuredContent.pending lists the new message ids and task ids. When it returns an event, read it with check_inbox or my_tasks, then call wait_for_event again to listen for the next one: items already returned do not wake you again.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 25000,
+          "description": "How long to wait, in ms (default 25000)"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
     },
     "execution": {
       "taskSupport": "forbidden"

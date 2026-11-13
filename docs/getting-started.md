@@ -30,6 +30,16 @@ The `first-run-cross-os` workflow packs the CLI and runs the first-run path from
 
 Each step exited with code 0, and no step failed on any system in this run. The Linux simulator run is in the first-run numbers above and in [`scripts/first-run/`](../scripts/first-run/).
 
+## Try it in your browser first
+
+Open [shipvo.dev/playground](https://shipvo.dev/playground/). No install. The sample app runs on an Android phone and an iPhone side by side. Three entries let you try the main features:
+
+- **Device API:** set location, camera, biometrics, payment, notification and airplane mode, and see the sample app show each result.
+- **Over-the-air updates:** publish a signed update, stage it to 10% and then 100% of phones, crash it, and watch the rollback. The signature result, cohort counts and crash-loop threshold on that panel come from the real signer, verifier, cohort bands and runtime code, recorded when the site was built.
+- **Many phones:** show 1 to 12 Android and iOS phones side by side. Pick the count, choose Android, iOS or both, and turn dark mode on for every phone. **Copy link** shares your setup. You can also write it yourself: `https://shipvo.dev/playground/?phones=6&mix=both&dark=1#many`. `phones` is clamped to 1 to 12, `mix` is `android`, `ios` or `both` (anything else gives `both`), and `dark=1` turns on dark mode.
+
+If a panel does not load, reload the page; it needs JavaScript on.
+
 ## 1. Create the app
 
 Already have an Expo app or a bare React Native app? Run `npx -y @shipvo/cli init` inside it instead: see [adopt mode](cli.md#adopt-mode) and [bare React Native apps](cli.md#bare-react-native-apps). For a bare app, run `cd ios && pod install` and rebuild both apps afterwards. Then continue at step 2 or 3.
@@ -62,6 +72,8 @@ To start from a reader app instead, add `--template content`: a list screen and 
 ### The shop checkout
 
 The `shop` template has a checkout a customer expects: plus and minus on each cart line, Undo after Remove, payment errors in plain words (for example "Your payment was declined. Try another method."), a message when the phone is offline, and an order confirmation screen with a Back to shop button. To see it, run `npx shipvo run android` or `npx shipvo run ios`, add a product and open the cart.
+
+Prices in `src/data/products.json` are whole numbers in the smallest unit: write `2400` for `24.00`. If a price looks like it is in the wrong unit, the app prints a `[shop]` warning that says what to write, and `npm test` fails until you fix it ([shop tutorial](tutorials/your-own-shop.md#troubleshooting)).
 
 ## 2. Run it in the simulator
 
@@ -153,11 +165,13 @@ Then edit `src/release.ts` and run `shipvo publish`. (In a GitHub repo, the work
 3. builds the web artifact of the same commit for the simulator (`/w/<app>/r<N>/`),
 4. signs the release pointer (Ed25519) and writes it for each cohort band (`b0` 1 %, `b1` 10 %, `b2` everyone).
 
-To check a release before you have a control plane or token, run `shipvo publish --dry-run [--out dir]`. It builds, signs and writes everything to `dir` (default `.shipvo/dry-run`), sends nothing, and prints a short summary (release, size in KB below 1 MB and MB above, folder). Layout: `b/<app>/r<N>.hbc` (bundle), `p/<app>/<major>/<band>` (signed pointers; iOS under `p/<app>/<major>/ios/`), `h/<app>/r<N>` (release record), `w/<app>/r<N>/` (web export; add `--skip-web true` to skip it and run faster). The release is 1 unless you pass `--release N`, and no patches are built offline. Old files in `dir` are not cleared. To preview a rollback, run `shipvo rollback --to <n> --dry-run`. It reads release `<n>`'s bundle, prints a summary and writes nothing. It still needs access to the control plane or KV to read the bundle, so it is not offline like `publish --dry-run`.
+To check a release before you have a control plane or token, run `shipvo publish --dry-run [--out dir]`. It builds, signs and writes everything to `dir` (default `.shipvo/dry-run`), sends nothing, and prints a short summary (release, size in KB below 1 MB and MB above, folder). Layout: `b/<app>/r<N>.hbc` (bundle), `p/<app>/<major>/<band>` (signed pointers; iOS under `p/<app>/<major>/ios/`), `h/<app>/r<N>` (release record), `w/<app>/r<N>/` (web export; add `--skip-web true` to skip it and run faster). The release is 1 unless you pass `--release N`, and no patches are built offline. Old files in `dir` are not cleared. To preview a rollback, run `shipvo rollback --to <n> --dry-run`. It prints a summary and writes nothing. With no login or token, it reads release `<n>` from the `.shipvo/dry-run` folder that `publish --dry-run` wrote and prints `Offline rehearsal`. With a login or token, it reads release `<n>` from the control plane.
 
 If your first publish fails, run `shipvo doctor` first. It checks your Node version, `shipvo.json`, signing key match, control plane reachability, and `hermesBytecodeVersion` when present.
 
 Phones check while open, verify signature, hash and size, stage atomically, apply without a restart and mark the release healthy once the first screen renders. A release that fails to boot three times is discarded on that phone. `shipvo rollback --to 7` republishes release 7's code as a new release for everyone.
+
+**Patches never block an update.** On Android, the runtime checks the memory a patch needs (the old bundle, the patch and the new bundle together) against a share of the app's heap limit before it reads anything. If the patch is too big for that budget, or the phone runs out of memory while applying it, the runtime downloads the full bundle instead, and the same signature, hash and size checks run. The phone ends on the same release either way. Telemetry reports the reason in `patchError`: `over_memory_budget` or `out_of_memory`.
 
 To see whether the release reached phones, run `shipvo status [--app <id>] [--json]`. It reads the control plane's `/t/<app>/summary` and prints one row per recent release: counts for each telemetry event, and the median apply and cold start times in milliseconds. It prints "No telemetry yet" when phones have not reported. `--json` prints the endpoint's payload unchanged.
 

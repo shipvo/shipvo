@@ -1,1 +1,0 @@
-- docs: "Build your first app" and "Check every pull request" open with who they are for and end with a Troubleshooting table (messages taken from the CLI and the App Builder reports) and Next steps; the roadmap lists the agents-together epic (#1188).

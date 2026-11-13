@@ -39,7 +39,7 @@ Dialogue, 8 lines (Lumi voices Pip as host per the cast rule): Mara "Nobody come
 
 ## Built so far
 
-Scenes 1 to 6 (0 to 60 s) are in `story/scenes.mjs`. Left: scenes 7 to 10 (rush, orders list, sunset, end card), then the 9:16 cut.
+The 9:16 cut is built by `render-story.mjs --vertical` from `story/vertical.mjs` (ten segments, 37.8 s) and `story/vertical-audio.py`. Scenes 1 to 10 (0 to 100 s) are in `story/scenes.mjs`: street, counter, walk-away, chat, app, order, rush, orders list (caption 3), sunset with confetti, end card. `render-story.mjs` takes `--rec-order` and `--rec-rush` (real recordings from `record-screens.mjs`). Left: dialogue voices and lip sync, sound, music pick with credits, the next-episode trailer, pacing gate and upload.
 
 ## Not in this slice
 

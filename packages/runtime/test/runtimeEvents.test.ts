@@ -29,6 +29,12 @@ describe("forwardRuntimeEvents", () => {
   it("does not override the release for rolled_back", () => {
     expect(run(["rolled_back:6"])).toEqual([["rolled_back", undefined]]);
   });
+  it("reports a JS crash with its load kind", () => {
+    expect(run(["js_crash:cold", "js_crash:reload"])).toEqual([["js_crash_cold", undefined], ["js_crash_reload", undefined]]);
+  });
+  it("ignores a JS crash with an unknown load kind", () => {
+    expect(run(["js_crash", "js_crash:x"])).toEqual([]);
+  });
   it("ignores unknown events", () => {
     expect(run(["applied:3"])).toEqual([]);
   });
@@ -45,5 +51,10 @@ describe("forwardRuntimeEvents", () => {
   });
   it("ignores other pointer_rejected reasons", () => {
     expect(run(["pointer_rejected:hermes_bytecode_mismatch", "pointer_rejected:x", "pointer_rejected"])).toEqual([]);
+  });
+  it("passes the load kind of a crash_loop_revert", () => {
+    const sent: unknown[][] = [];
+    forwardRuntimeEvents(["crash_loop_revert:5:reload", "crash_loop_revert:5:cold", "crash_loop_revert:5:bogus"], (...a) => sent.push(a));
+    expect(sent).toEqual([["crash_loop_revert", undefined, "reload"], ["crash_loop_revert", undefined, "cold"], ["crash_loop_revert", undefined, undefined]]);
   });
 });

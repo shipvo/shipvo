@@ -2,6 +2,8 @@ import schema from "./app-spec.v0.schema.json" with { type: "json" };
 import { checkNames, type NameScope } from "./check.js";
 import { estimateCost, MAX_COST } from "./eval.js";
 import { celSyntaxError, expressionSteps, extractExpressions, MAX_EXPRESSION_STEPS } from "./cel.js";
+import { VECTOR_SHAPES, ENTER_MOTIONS, CHANGE_MOTIONS } from "./vector.js";
+import { CALENDAR_VIEWS, isDay, validCoords } from "./calendar-map.js";
 import { AGGREGATES, CHART_KINDS } from "./chart.js";
 import { checkSchema } from "./jsonschema.js";
 import { childPath, isObject, type Issue, type ValidationResult } from "./types.js";
@@ -116,6 +118,29 @@ class Run {
     }
   }
 
+  /** Warns about keys in `strings` that no text in the spec uses. */
+  checkStrings() {
+    const table = this.spec.strings;
+    if (!isObject(table)) return;
+    const used = new Set<string>();
+    const collect = (v: unknown, depth = 0) => {
+      if (depth > MAX_WALK_DEPTH) return;
+      if (typeof v === "string") used.add(v);
+      else if (Array.isArray(v)) v.forEach((x) => collect(x, depth + 1));
+      else if (isObject(v)) for (const [k, x] of Object.entries(v)) if (k !== "strings") collect(x, depth + 1);
+    };
+    for (const [k, x] of Object.entries(this.spec)) if (k !== "strings") collect(x);
+    for (const [lang, keys] of Object.entries(table)) {
+      if (!isObject(keys)) continue;
+      for (const key of Object.keys(keys)) {
+        if (!used.has(key)) {
+          this.warn(childPath(childPath("$.strings", lang), key), `The key "${key}" in strings.${lang} matches no text in the spec.`,
+            "Fix the key so it equals the text exactly, or remove it.");
+        }
+      }
+    }
+  }
+
   checkExpression(src: string, path: string) {
     if (src.length > MAX_EXPRESSION_LENGTH) {
       this.error(path, `Expression is ${src.length} characters; the limit is ${MAX_EXPRESSION_LENGTH}.`,
@@ -156,6 +181,7 @@ class Run {
       const a = this.spec.actions[action[1] ?? action[2]!];
       names.input = isObject(a) && isObject(a.input) ? Object.keys(a.input) : undefined;
       names.result = undefined;
+      names.caller = undefined;   // the assistant that called the action, "" when a person tapped
     } else if (path.startsWith("$.schedules")) {
       names.input = undefined;
       names.result = undefined;
@@ -199,6 +225,9 @@ class Run {
           }
         }
       }
+      if ("refresh" in src && src.source !== "http") {
+        this.error(childPath(base, "refresh"), "refresh is only for http data sources.", "Remove refresh, or change the source to http.");
+      }
       if (isObject(src.paginate)) {
         this.checkBare(src.paginate.next, childPath(childPath(base, "paginate"), "next"));
         this.checkBare(src.paginate.until, childPath(childPath(base, "paginate"), "until"));
@@ -237,6 +266,12 @@ class Run {
         this.checkSteps(a.do, childPath(p, "do"));
         if (typeof a.description !== "string" || a.description === "") {
           this.warn(p, "Action has no description.", "Add \"description\": agents read it to decide when to call this action.");
+        }
+        if (typeof a.share === "string") {
+          const f = isObject(a.input) ? a.input[a.share] : undefined;
+          if (!isObject(f) || f.type !== "text") {
+            this.error(childPath(p, "share"), `Share input ${JSON.stringify(a.share)} is not a text input of this action.`, "Name a text input from \"input\", for example \"body\"; it receives the shared text.");
+          }
         }
       }
     }
@@ -297,7 +332,11 @@ class Run {
     }
     if (type === "chart") this.chart(b, path);
     if (type === "kanban") this.kanban(b, path);
+    if (type === "vector") this.vector(b, path);
+    if (b.motion !== undefined) this.motion(b.motion, childPath(path, "motion"));
     if (type === "timeline") this.timeline(b, path);
+    if (type === "calendar") this.calendar(b, path);
+    if (type === "map") this.map(b, path);
     if (type === "text" && typeof b.variant === "string") screen.sizes.add(`variant:${b.variant}`);
     if (isObject(b.style)) {
       const st = b.style;
@@ -325,6 +364,36 @@ class Run {
       this.error(bp, `"${String(b.type)}" needs a "bind" to a state value.`, "Add \"bind\": \"state.name\" and declare \"name\" in \"state\".");
     } else if (!isObject(this.spec.state) || !(m[1]! in this.spec.state)) {
       this.error(bp, `State "${m[1]}" is not declared.`, `Add "${m[1]}" to "state" with a type and a default.`);
+    }
+  }
+
+  vector(b: Record<string, unknown>, path: string) {
+    if (typeof b.label !== "string" || b.label.trim() === "") {
+      this.error(childPath(path, "label"), "Vector has no label.", "Add \"label\": a short description agents can read, for example \"Battery gauge\".");
+    }
+    if (!Array.isArray(b.shapes)) {
+      this.error(childPath(path, "shapes"), "Vector has no shapes.", "Add \"shapes\": a list such as [{ \"shape\": \"circle\", \"cx\": 50, \"cy\": 50, \"r\": 40 }].");
+      return;
+    }
+    b.shapes.forEach((s, i) => {
+      const sp = childPath(childPath(path, "shapes"), i);
+      const kind = isObject(s) ? s.shape : undefined;
+      if (typeof kind !== "string" || !(VECTOR_SHAPES as readonly string[]).includes(kind)) {
+        this.error(childPath(sp, "shape"), `Shape ${JSON.stringify(kind ?? null)} is not supported.`, `Use one of: ${VECTOR_SHAPES.join(", ")}.`);
+      }
+    });
+  }
+
+  motion(m: unknown, path: string) {
+    if (!isObject(m)) {
+      this.error(path, "Motion must be an object.", "Use { \"enter\": \"fade\", \"change\": \"pulse\" }.");
+      return;
+    }
+    if (m.enter !== undefined && !(ENTER_MOTIONS as readonly string[]).includes(m.enter as string)) {
+      this.error(childPath(path, "enter"), `Enter motion ${JSON.stringify(m.enter)} is not supported.`, `Use one of: ${ENTER_MOTIONS.join(", ")}.`);
+    }
+    if (m.change !== undefined && !(CHANGE_MOTIONS as readonly string[]).includes(m.change as string)) {
+      this.error(childPath(path, "change"), `Change motion ${JSON.stringify(m.change)} is not supported.`, `Use one of: ${CHANGE_MOTIONS.join(", ")}.`);
     }
   }
 
@@ -414,6 +483,57 @@ class Run {
     }
   }
 
+  /** An optional `onSelect` must name a declared action. */
+  onSelect(b: Record<string, unknown>, path: string) {
+    if (b.onSelect === undefined) return;
+    const a = isObject(b.onSelect) ? b.onSelect.action : undefined;
+    if (typeof a !== "string" || !(isObject(this.spec.actions) && a in this.spec.actions)) {
+      this.error(childPath(childPath(path, "onSelect"), "action"), `Select action ${JSON.stringify(a ?? null)} is not declared.`, "Name an action from \"actions\"; it receives the event or pin in {{ item }}.");
+    }
+  }
+
+  seedPath(b: Record<string, unknown>, i: number, field: string) {
+    return childPath(childPath(childPath(childPath("$.data", String(b.from)), "seed"), i), field);
+  }
+
+  calendar(b: Record<string, unknown>, path: string) {
+    this.itemBlock(b, path, "Calendar", ["date", "title"]);
+    if (b.view !== undefined && !(CALENDAR_VIEWS as readonly unknown[]).includes(b.view)) {
+      this.error(childPath(path, "view"), `Calendar view ${JSON.stringify(b.view)} is not supported.`, `Use one of: ${CALENDAR_VIEWS.join(", ")}.`);
+    }
+    if (typeof b.at === "string" && !b.at.includes("{{") && !isDay(b.at)) {
+      this.error(childPath(path, "at"), `Calendar start ${JSON.stringify(b.at)} is not a date.`, "Use a date like 2026-11-07, or an expression in {{ }}.");
+    }
+    const field = this.itemField(b.date);
+    const seed = this.seedOf(b);
+    if (field && seed) {
+      seed.forEach((row, i) => {
+        const v = isObject(row) ? row[field] : undefined;
+        if (!(typeof v === "string" && /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?)?$/.test(v) && isDay(v.slice(0, 10)))) {
+          this.error(this.seedPath(b, i, field), `Event date ${JSON.stringify(v ?? null)} is not a date.`, "Use a date like 2026-11-07, or a date and time like 2026-11-07T09:30.");
+        }
+      });
+    }
+    this.onSelect(b, path);
+  }
+
+  map(b: Record<string, unknown>, path: string) {
+    this.itemBlock(b, path, "Map", ["lat", "lng", "title"]);
+    const lat = this.itemField(b.lat), lng = this.itemField(b.lng);
+    const seed = this.seedOf(b);
+    if (seed) {
+      seed.forEach((row, i) => {
+        for (const [f, kind] of [[lat, "latitude"], [lng, "longitude"]] as const) {
+          if (!f) continue;
+          const v = isObject(row) ? row[f] : undefined;
+          const other = f === lat ? validCoords(v, 0) : validCoords(0, v);
+          if (!other) this.error(this.seedPath(b, i, f), `Pin ${kind} ${JSON.stringify(v ?? null)} is not valid.`, kind === "latitude" ? "Use a number from -90 to 90." : "Use a number from -180 to 180.");
+        }
+      });
+    }
+    this.onSelect(b, path);
+  }
+
   checkScreens() {
     const screens = this.spec.screens;
     if (!Array.isArray(screens)) return;
@@ -465,6 +585,7 @@ export function validate(spec: unknown): ValidationResult {
     run.checkActions();
     run.checkTheme();
     run.checkScreens();
+    run.checkStrings();
     return { errors: run.errors, warnings: run.warnings };
   } catch (e) {
     return {

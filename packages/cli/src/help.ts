@@ -1,5 +1,5 @@
 export const COMMANDS = [
-  "init", "sim", "smoke", "run", "explore", "lumi", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "skills", "audit", "migrate", "approvals", "test", "eval", "keys", "mcp",
+  "init", "sim", "session", "smoke", "run", "explore", "lumi", "preview", "publish", "promote", "auto-halt", "rollback", "app", "eas", "login", "doctor", "store", "ci", "status", "agents", "skills", "audit", "migrate", "approvals", "test", "eval", "keys", "mcp",
   "keygen", "pubkey", "hash", "sign-file", "sign-json", "verify-json", "verify",
 ] as const;
 
@@ -13,6 +13,8 @@ Start
   sim --watch [--verbose]     Rebuild on file changes and keep serving; --verbose shows full build errors
                               First run installs playwright and, if no Chrome or Edge is found, downloads Chromium once.
                               Set SHIPVO_NO_AUTO_INSTALL=1 to turn the automatic installs off.
+  session start [android|ios] [--device "<model>"] [--max-duration-minutes 30] [--json]  Open any Expo app on a headless Shipvo Phone that stops on its own; then session screen | tap <ref> | type <ref> <text> | scroll <dir> | back | screenshot | record start|stop | errors | devices | get | list | stop | clean
+  session start --a2ui <file> [--device "<model>"]  Open A2UI messages on a phone with no app folder; then session a2ui send <file> | a2ui actions
   smoke [android|ios] [--timeout 30] [--json]  Check the app loads in the simulator as the Android (default) or iPhone-style phone: no thrown errors, a first screen with elements (exit 0 ok, 1 failed, 2 setup error)
   run android|ios [--no-open] [--port n] [--lan]  Open the app in a phone frame in your browser (no Playwright)
                               --lan also serves it to a phone on your Wi-Fi: URL + QR code, token required
@@ -61,6 +63,7 @@ Ship
   keys [--json]               Show the stored key's status and quota
   keys export [--out f]       Print or save this app's signing seed, to back it up
   keys import [seed|--file f] Restore the signing seed on a new machine
+  keys root --out <file>      Create the offline root key (writes the seed, prints the public key)
   keys rotate sign|upload     Sign a key rotation with the root key (offline), upload it
   mcp                         Print the MCP config that agents need
 

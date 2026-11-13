@@ -21,6 +21,8 @@ public final class ShipvoRuntimeModule: Module {
       return out
     }
 
+    AsyncFunction("getAppliedStateVersion") { () -> Int? in Store().appliedStateVersion(running: Store.runningRelease) }
+
     AsyncFunction("checkForUpdate") { (apply: Bool) async -> [String: Any] in
       let r: [String: Any]
       do { r = try await Updater.check(Store()) }
@@ -48,7 +50,10 @@ public final class ShipvoRuntimeModule: Module {
     }
 
     // Called by the JS error handler: a background load that throws still counts against its release.
-    Function("noteCrash") { () in ShipvoBundleSelector.settleDeferred(Store(), visible: false, crashed: true) }
+    Function("noteCrash") { () in
+      // Say which kind of load crashed, so a crash after an in-place reload is not read as a cold-start crash.
+      Store().addEvent("js_crash:\(Store.loadsInProcess <= 1 ? "cold" : "reload")")
+      ShipvoBundleSelector.settleDeferred(Store(), visible: false, crashed: true) }
 
     OnAppEntersBackground { Self.stableNow() }
 
@@ -58,7 +63,7 @@ public final class ShipvoRuntimeModule: Module {
       let s = Store()
       Store.lock.lock()
       if let p = s.pendingPath { try? FileManager.default.removeItem(atPath: p) }
-      s.pendingPath = nil; s.pendingRelease = 0; s.trialBoots = 0
+      s.pendingPath = nil; s.pendingRelease = 0; s.trialBoots = 0; s.pendingStateVersion = 0
       s.addEvent("rolled_back:\(s.currentRelease)")
       s.block(s.currentRelease)
       ShipvoBundleSelector.revertToPrevious(s)

@@ -31,6 +31,8 @@ class ShipvoRuntimeModule : Module() {
       )
     }
 
+    AsyncFunction("getAppliedStateVersion") { StateVersion.applied(Store(ctx), Store.runningRelease) }
+
     AsyncFunction("checkForUpdate") { apply: Boolean ->
       val r = try { check() } catch (e: Exception) { mapOf("status" to "error", "error" to (e.message ?: e.javaClass.simpleName)) }
       if (apply && r["status"] == "staged") reloadHost()
@@ -51,6 +53,7 @@ class ShipvoRuntimeModule : Module() {
         ShipvoHostHandler.settleDeferred(s, visible = true, crashed = false) // count the load first
         if (s.pendingRelease != 0 && Store.runningRelease == s.pendingRelease) {
           s.previousPath?.let { old -> if (old != s.currentPath) File(old).delete() }
+          StateVersion.promote(s)
           s.previousRelease = s.currentRelease; s.previousPath = s.currentPath
           s.currentRelease = s.pendingRelease; s.currentPath = s.pendingPath; s.currentSha = s.pendingSha
           s.pendingRelease = 0; s.pendingPath = null; s.trialBoots = 0
@@ -70,6 +73,8 @@ class ShipvoRuntimeModule : Module() {
     Function("noteCrash") {
       synchronized(ShipvoHostHandler.LOCK) {
         BootRules.noteCrash(Store.loadsInProcess)
+        // Say which kind of load crashed, so a crash after an in-place reload is not read as a cold-start crash.
+        Store(ctx).addEvent("js_crash:${if (Store.loadsInProcess <= 1) "cold" else "reload"}")
         ShipvoHostHandler.settleDeferred(Store(ctx), visible = false, crashed = true) // a headless load that throws still counts
       }
     }
@@ -82,7 +87,7 @@ class ShipvoRuntimeModule : Module() {
       val s = Store(ctx)
       synchronized(ShipvoHostHandler.LOCK) {
         s.pendingPath?.let { File(it).delete() }
-        s.pendingPath = null; s.pendingRelease = 0; s.trialBoots = 0
+        s.pendingPath = null; s.pendingRelease = 0; s.trialBoots = 0; StateVersion.dropPending(s)
         s.addEvent("rolled_back:${s.currentRelease}")
         s.block(s.currentRelease)
         ShipvoHostHandler.revertToPrevious(s)
@@ -162,6 +167,7 @@ class ShipvoRuntimeModule : Module() {
     val bodyStr = envelope.getString("body")
     require(Verify.ed25519(bodyStr.toByteArray(Charsets.UTF_8), envelope.getString("signature"), rotation.currentReleaseKey())) { "pointer signature invalid" }
     val body = JSONObject(bodyStr)
+    require(PointerQuery.isForAndroid(if (body.has("platform") && !body.isNull("platform")) body.getString("platform") else null)) { "pointer is not for Android" }
     require(body.getString("app_id") == s.appId && body.getInt("shell_major") == s.shellMajor) { "pointer for another app/shell" }
     val release = body.getInt("release")
     if (release <= known) return mapOf("status" to "none")
@@ -191,17 +197,24 @@ class ShipvoRuntimeModule : Module() {
         val baseSha = if (baseFile != null) (s.currentSha ?: Verify.sha256Hex(baseFile).also { s.currentSha = it }) else s.embeddedSha()
         var match: JSONObject? = null
         for (i in 0 until patches.length()) { val p = patches.getJSONObject(i); if (p.getString("from_sha256") == baseSha) { match = p; break } }
-        if (match != null) {
-          val patchBytes = http(resolve(s, match.getString("url")), null).let { c ->
-            require(c.responseCode == 200) { "patch HTTP ${c.responseCode}" }
-            c.inputStream.use { it.readBytes() }.also { c.disconnect() }
+        val chosen = match
+        if (chosen != null) {
+          val baseSize = baseFile?.length() ?: s.embeddedSize()
+          // Over the memory budget: skip the patch and take the resumable, streamed full download.
+          val outcome = PatchStep.run(baseSize, chosen.getLong("size"), wantSize) {
+            val patchBytes = http(resolve(s, chosen.getString("url")), null).let { c ->
+              require(c.responseCode == 200) { "patch HTTP ${c.responseCode}" }
+              c.inputStream.use { it.readBytes() }.also { c.disconnect() }
+            }
+            require(patchBytes.size.toLong() == chosen.getLong("size") && Verify.sha256Hex(patchBytes) == chosen.getString("sha256")) { "patch hash mismatch" }
+            val base = baseFile?.readBytes() ?: s.embeddedBundle() ?: error("no base bundle")
+            val out = Patch.apply(base, patchBytes)
+            require(out.size.toLong() == wantSize && Verify.sha256Hex(out) == wantSha) { "patched bundle hash mismatch" }
+            out
           }
-          require(patchBytes.size.toLong() == match.getLong("size") && Verify.sha256Hex(patchBytes) == match.getString("sha256")) { "patch hash mismatch" }
-          val base = baseFile?.readBytes() ?: s.embeddedBundle() ?: error("no base bundle")
-          val out = Patch.apply(base, patchBytes)
-          require(out.size.toLong() == wantSize && Verify.sha256Hex(out) == wantSha) { "patched bundle hash mismatch" }
-          tmp.writeBytes(out)
-          via = "patch"; bytesDownloaded = patchBytes.size.toLong()
+          val decision = PatchStep.decide(outcome, chosen.getLong("size"))
+          via = decision.via; patchError = decision.patchError; bytesDownloaded = decision.bytesDownloaded
+          if (outcome.bytes != null) tmp.writeBytes(outcome.bytes) else tmp.delete()
         }
       } catch (e: Exception) { patchError = e.message; tmp.delete() }
     }
@@ -226,6 +239,7 @@ class ShipvoRuntimeModule : Module() {
       if (!BootRules.mayStage(release, s.currentRelease, s.pendingRelease, s.blockedRelease)) return mapOf("status" to "none")
       s.pendingPath?.let { if (it != dest.path) File(it).delete() }
       s.pendingPath = dest.path; s.pendingRelease = release; s.trialBoots = 0; s.pendingSha = wantSha
+      StateVersion.stage(s, body.opt("state_version"))
       if (s.binaryVersion == null) s.binaryVersion = s.installedBinaryVersion
       s.pendingIssuedAt = body.optString("issued_at")
     }

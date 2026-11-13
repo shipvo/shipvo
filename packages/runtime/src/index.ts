@@ -29,6 +29,7 @@ export type HealthyResult = {
 
 type Native = {
   getState(): RuntimeState;
+  getAppliedStateVersion(): Promise<number | null>;
   checkForUpdate(apply: boolean): Promise<CheckResult>;
   markHealthy(): HealthyResult;
   consumeEvents(): string[];
@@ -44,11 +45,12 @@ try { extra = require("expo-constants").default?.expoConfig?.extra?.shipvo ?? {}
 const fallback: Native = {
   getState: () => ({ cohort: 0, band: "b0", runningRelease: 0, currentRelease: 0, pendingRelease: 0, previousRelease: 0,
     shellVersion: "no-runtime", baseUrl: extra.baseUrl ?? "", appId: extra.appId ?? "", shellMajor: extra.shellMajor ?? 1 }),
+  getAppliedStateVersion: async () => null,
   checkForUpdate: async () => ({ status: "none" }),
   markHealthy: () => ({ release: 0, coldStartMs: Date.now() - t0, sinceLoadMs: 0, promoted: false, kind: "cold" }),
   consumeEvents: () => [], rollback: () => {}, reload: () => {},
 };
-const native = requireOptionalNativeModule<Native & { noteCrash?(): void }>("ShipvoRuntime");
+const native = requireOptionalNativeModule<Omit<Native, "getAppliedStateVersion"> & { getAppliedStateVersion?(): Promise<number | null>; noteCrash?(): void }>("ShipvoRuntime");
 
 // Tell the native side about an uncaught JS error before React destroys the host. Destroying the host
 // pauses the activity, and that pause must not count as "stable". It also lets a background load that throws count against
@@ -109,11 +111,11 @@ export function reportRuntimeEvents(): string[] {
     const rn = require("react-native");
     if (rn.Platform?.OS === "android" && typeof rn.Platform.Version === "number") androidApi = rn.Platform.Version;
   } catch {}
-  forwardRuntimeEvents(events, (event, release) => {
+  forwardRuntimeEvents(events, (event, release, loadKind) => {
     try {
       // Same payload the sample app sent before this moved here: device_class is fixed to "low", android_api is set on Android only.
       const body = { schema_version: "1.0", app_id: appId, release: release ?? state.runningRelease ?? 0, event,
-        device_class: "low", android_api: androidApi };
+        device_class: "low", android_api: androidApi, ...(loadKind ? { load_kind: loadKind } : {}) };
       const post = (b: string) => Promise.resolve(fetch(`${baseUrl}/t`, { method: "POST", headers: { "content-type": "application/json" },
         body: b })).catch(() => {});
       const id = identity;
@@ -136,6 +138,7 @@ const autoReport = () => { if (extra.reportEvents !== false) reportRuntimeEvents
 export const Runtime: Native = native
   ? {
       getState: () => native.getState(),
+      getAppliedStateVersion: async () => (await native.getAppliedStateVersion?.()) ?? null,
       checkForUpdate: async (apply) => { try { return await native.checkForUpdate(apply); } finally { autoReport(); } },
       markHealthy: () => { const r = native.markHealthy(); installCrashHook(); autoReport(); return r; },
       consumeEvents: () => native.consumeEvents(),
@@ -143,3 +146,9 @@ export const Runtime: Native = native
       reload: () => native.reload(),
     }
   : fallback;
+
+/**
+ * The `state_version` the running bundle was published with, or `null` if its release declared none or the embedded
+ * bundle is running. Use it to decide whether stored data needs a migration.
+ */
+export function getAppliedStateVersion(): Promise<number | null> { return Runtime.getAppliedStateVersion(); }

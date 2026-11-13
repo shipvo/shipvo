@@ -128,7 +128,7 @@ Agents use `set_device(calendar: [...], permissions: { calendar })` over MCP.
 
 ## Files
 
-Support level: **simulated** in the simulator, **real** on a phone when `expo-document-picker` is installed (`unavailable` otherwise). One file at a time; camera, photo library, saving and sharing files are not covered.
+Support level: **simulated** in the simulator, **real** on a phone when `expo-document-picker` is installed (`unavailable` otherwise). One file at a time.
 
 ```ts
 const f = await device.files.pick({ type: "image/*" });   // { name, mimeType, size, uri } | null (cancelled)
@@ -183,6 +183,8 @@ await phone.act("set_network_profile", { profile: "2g" });
 
 A name that is not in the table answers `unknown_profile`. Each change is added to `device_log` with `source: "simulated"`.
 
+You can also call `set_network_profile` and `get_network_profile` as MCP tools, use `phone.setNetwork("slow-4g")` in a typed test, or set `"network"` in `phone.json`. See [Network calls on the hosted phone](phone-network.md#over-mcp).
+
 ## The simulated device from the agent's side
 
 | MCP tool | Effect |
@@ -218,6 +220,31 @@ const mic = await device.microphone.open();   // web and simulator only; optiona
 - [Run on a phone in your browser](run.md)
 - [Lumi on Shipvo Phone](lumi.md)
 - [Test with an assistant](test-with-an-assistant.md)
+
+## Android and iOS code in simulator builds
+
+Phone platform mode makes a simulator build run your app's Android and iOS code, so a bug inside it shows up on Shipvo Phone. It has two parts, and both apply to your own files only. Packages in `node_modules` keep their web code.
+
+**`Platform.OS` and `Platform.select`.** Add the Babel plugin for simulator builds in `babel.config.js`:
+
+```js
+module.exports = (api) => {
+  api.cache.using(() => process.env.PN_SIM ?? "");
+  return { presets: ["babel-preset-expo"], plugins: process.env.PN_SIM ? ["@shipvo/device/babel"] : [] };
+};
+```
+
+In a simulator build, `Platform.OS` is then `"android"` or `"ios"`, the platform of the session, read when the code runs. `Platform.select` picks that platform's key, then `native`, then `default`, as React Native does. One build serves the Android phone and the iOS phone.
+
+**`.native.js` files.** Pass `nativeFiles` to `withShipvoSim` in `metro.config.js`:
+
+```js
+module.exports = withShipvoSim(config, { nativeFiles: true });
+```
+
+A relative import in your app then picks `Price.native.js` over `Price.js`, as it does on a phone. A `Price.web.js` file still wins.
+
+Turn this on when your Android and iOS code is JavaScript that runs with the simulated device. Code that checks `Platform.OS === "web"` takes its phone branch in this mode. The [bug-catch benchmark](bug-bench.md) measures what the mode adds.
 
 ## Using raw Expo modules
 

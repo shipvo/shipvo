@@ -59,6 +59,7 @@ enum ShipvoBundleSelector {
     var promoted = false
     if s.pendingRelease != 0 && Store.runningRelease == s.pendingRelease {
       if let old = s.previousPath, old != s.currentPath { remove(old) }
+      s.promoteStateVersion()
       s.previousRelease = s.currentRelease; s.previousPath = s.currentPath
       s.currentRelease = s.pendingRelease; s.currentPath = s.pendingPath; s.currentSha = s.pendingSha
       s.pendingRelease = 0; s.pendingPath = nil; s.trialBoots = 0
@@ -117,10 +118,10 @@ enum ShipvoBundleSelector {
 
     if let pending = s.pendingPath {
       if s.trialBoots >= maxBoots || !exists(pending) {
-        s.addEvent("crash_loop_revert:\(s.pendingRelease)")
+        s.addEvent("crash_loop_revert:\(s.pendingRelease):\(Store.loadsInProcess <= 1 ? "cold" : "reload")")
         s.block(s.pendingRelease)
         remove(pending)
-        s.pendingPath = nil; s.pendingRelease = 0; s.trialBoots = 0
+        s.pendingPath = nil; s.pendingRelease = 0; s.trialBoots = 0; s.pendingStateVersion = 0
       } else {
         if countsAtSelection(visible: visible) { s.trialBoots += 1 }
         else { deferredRelease = s.pendingRelease; deferredIsTrial = true }
@@ -133,7 +134,7 @@ enum ShipvoBundleSelector {
       if !countsAtSelection(visible: visible) {
         deferredRelease = s.currentRelease; deferredIsTrial = false
       } else if countCurrentBoot(s) {
-        s.addEvent("crash_loop_revert:\(s.currentRelease)")
+        s.addEvent("crash_loop_revert:\(s.currentRelease):\(Store.loadsInProcess <= 1 ? "cold" : "reload")")
         s.block(s.currentRelease)
         revertToPrevious(s)
         return currentOrEmbedded(s)
@@ -152,6 +153,7 @@ enum ShipvoBundleSelector {
 
   static func revertToPrevious(_ s: Store) {
     if let c = s.currentPath, c != s.previousPath { remove(c) }
+    s.revertStateVersion()
     s.currentPath = s.previousPath; s.currentRelease = s.previousRelease; s.currentSha = nil
     s.previousPath = nil; s.previousRelease = 0
     s.unhealthyBoots = 0; s.firstUnhealthyAt = 0

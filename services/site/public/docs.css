@@ -105,3 +105,5 @@ body.vid-fs .side-toggle{display:none!important}
 .prose video,.prose iframe,.prose img{max-width:100%;height:auto}
 .prose details.credits{margin:12px 0;padding:8px 14px;border:1px solid var(--line-2);border-radius:10px;background:var(--ink-2);color:var(--mute);font-size:14px}
 .prose details.credits summary{cursor:pointer;min-height:24px}
+
+@media(hover:none){.prose .anchor{display:none}}

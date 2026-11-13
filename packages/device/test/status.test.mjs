@@ -38,3 +38,16 @@ test("reset restores the status and leaves the log empty", () => {
   assert.deepEqual(dev.status(), { online: true, airplane: false, battery: { level: 100, charging: false } });
   assert.equal(dev.log().length, 0);
 });
+
+test("airplane mode turns the radios off, Wi-Fi can come back on and is online, and leaving restores them", () => {
+  dev.reset();
+  dev.set({ mobileData: false });
+  dev.set({ airplane: true });
+  assert.equal(dev.state.wifi, false); assert.equal(dev.state.mobileData, false); assert.equal(dev.status().online, false);
+  dev.set({ wifi: true });
+  assert.equal(dev.status().online, true); assert.equal(dev.status().airplane, true);
+  dev.set({ airplane: false });
+  assert.equal(dev.state.wifi, true); assert.equal(dev.state.mobileData, false); assert.equal(dev.status().online, true);
+  dev.set({ wifi: false });
+  assert.equal(dev.status().online, false);
+});
