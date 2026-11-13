@@ -29,7 +29,9 @@ describe("watch token", () => {
     const [body, sig] = t.split(".");
     const forged = btoa(JSON.stringify({ use: "watch", s: "s1", k: 99, exp: 9999999999 })).replace(/=+$/, "");
     expect(await verifyWatchToken(SECRET, `${forged}.${sig}`, "s1")).toBeNull();
-    expect(await verifyWatchToken(SECRET, `${body}.${sig.slice(0, -2)}AA`, "s1")).toBeNull();
+    const i = Math.floor(sig.length / 2);
+    const bad = sig.slice(0, i) + (sig[i] === "A" ? "B" : "A") + sig.slice(i + 1);
+    expect(await verifyWatchToken(SECRET, `${body}.${bad}`, "s1")).toBeNull();
     expect(await verifyWatchToken("other", t, "s1")).toBeNull();
     expect(await verifyWatchToken(SECRET, "garbage", "s1")).toBeNull();
     expect(await verifyWatchToken(SECRET, "", "s1")).toBeNull();

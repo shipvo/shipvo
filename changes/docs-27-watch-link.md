@@ -1,2 +1,0 @@
-- docs: The agents page explains the hosted watch link (`watch_url`): how to open it, how to take over, and what to do when it does not load.
-- Migration: none.

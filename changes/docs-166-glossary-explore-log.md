@@ -1,2 +1,0 @@
-- Docs: the glossary adds element ref, Capacitor, gallery and caller. The action feature log page says who it is for, has numbered steps, troubleshooting and next steps.
-- Migration: none.

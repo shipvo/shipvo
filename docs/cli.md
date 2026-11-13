@@ -181,6 +181,24 @@ shipvo agents setup --json       # machine-readable result
 - It prints the skill install line.
 - Running it again changes nothing.
 
+## `shipvo session`
+
+Open any Expo app on a headless Shipvo Phone and drive it from the shell, on Android and iOS. It needs no `shipvo.json`.
+
+```bash
+shipvo session start [android|ios] [--device "<model>"] [--name <n>] [--max-duration-minutes 30] [--port <n>] [--skip-build] [--json]
+shipvo session devices
+shipvo session screen | tap <ref> | type <ref> <text> | scroll <up|down|left|right> [<ref>] | back
+shipvo session screenshot [--out <file>] [--no-frame]
+shipvo session record start | record stop [--out <file>]
+shipvo session errors
+shipvo session start --a2ui <file> [--device "<model>"]
+shipvo session a2ui send <file> | a2ui actions [--since <n>]
+shipvo session get | list | stop | clean
+```
+
+Commands after `start` act on the newest running session; `--id <id>` names one. The session stops on its own after `--max-duration-minutes`. Screenshots and recordings show the phone in its Android or iPhone frame with the status bar. `--a2ui` opens A2UI messages on the phone with no app folder: see [A2UI on Shipvo Phone](a2ui.md). Steps, JSON fields and error codes: [Test any Expo app from the terminal](session.md).
+
 ## `shipvo smoke`
 
 Does the app load? Run it after a change, with no test to write.

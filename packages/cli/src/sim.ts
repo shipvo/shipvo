@@ -90,7 +90,8 @@ export function expoExportArgs(outDir: string, warm = false): string[] {
  * The old build is moved aside first and moved back if the swap fails.
  * `command` is the shell command; it gets the output dir as its last argument.
  * With `warm` the default command keeps the Metro cache, so a small edit only re-transforms the changed file.
- * A failed build rejects with an Error whose `output` property holds the last 4000 characters of stdout and stderr.
+ * A failed build rejects with an Error whose `output` property holds the first and the last 4000 characters of stdout and stderr:
+ * the first error of a build is near the top, and a long stack trace under it must not push it out.
  */
 export function rebuildInto(opts: { root?: string; command?: string; echo?: boolean; warm?: boolean } = {}): Promise<void> {
   const root = opts.root ?? process.cwd();
@@ -103,17 +104,18 @@ export function rebuildInto(opts: { root?: string; command?: string; echo?: bool
       ? { command: `${opts.command} "${next}"`, args: [] as string[], shell: true }
       : spawnBin("npx", expoExportArgs(next, opts.warm));
     const p = spawn(call.command, call.args, { cwd: root, shell: call.shell, env: { ...process.env, PN_SIM: "1" }, stdio: ["ignore", "pipe", "pipe"] });
-    let tail = "";
+    let head = "", tail = "";
     // Metro and Expo print resolve errors to either stream, so keep both. `echo` also shows them.
     for (const [stream, out] of [[p.stdout!, process.stdout], [p.stderr!, process.stderr]] as const) {
-      stream.on("data", (d) => { if (opts.echo) out.write(d); tail = (tail + d).slice(-4000); });
+      stream.on("data", (d) => { if (opts.echo) out.write(d); if (head.length < 4000) head = (head + d).slice(0, 4000); else tail = (tail + d).slice(-4000); });
     }
     p.on("error", (e) => { rmSync(next, { recursive: true, force: true }); reject(e); });
     p.on("close", (code) => {
       if (code !== 0) {
         rmSync(next, { recursive: true, force: true });
-        const err = new Error(tail.trim().split("\n").slice(-5).join("\n") || `build exited with code ${code}`);
-        return reject(Object.assign(err, { output: tail }));
+        const output = head + (tail ? `\n${tail}` : "");
+        const err = new Error(output.trim().split("\n").slice(-5).join("\n") || `build exited with code ${code}`);
+        return reject(Object.assign(err, { output }));
       }
       let moved = false;
       try {

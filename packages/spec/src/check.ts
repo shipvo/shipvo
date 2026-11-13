@@ -14,7 +14,8 @@ const GLOBAL_FUNCS = new Set([...Object.keys(LIBRARY_ARITY), "int", "uint", "dou
 const MEMBER_FUNCS = new Set(["contains", "startsWith", "endsWith", "matches", "size"]);
 const PERSON = ["locale", "timeZone", "language"];
 /** Names that exist in every expression. */
-export const BUILTIN_NAMES: Record<string, string[] | undefined> = { now: undefined, person: PERSON };
+const NETWORK = ["online", "type"];
+export const BUILTIN_NAMES: Record<string, string[] | undefined> = { now: undefined, person: PERSON, network: NETWORK };
 
 function distance(a: string, b: string): number {
   const row = Array.from({ length: b.length + 1 }, (_, i) => i);

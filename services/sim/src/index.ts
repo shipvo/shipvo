@@ -3,8 +3,11 @@
 //   - E2B backend (default when E2B_API_KEY is set): one sandbox per MCP session, created on initialize,
 //     killed on DELETE or after idle. Perfect isolation, pay per second of use.
 //   - Cloudflare Containers backend (wrangler.containers.jsonc): one container per app.
+import { sandboxForKey, existingHost, QuotaError } from "./phones";
 import { Container, getContainer } from "@cloudflare/containers";
 import TOOLS from "./tools.json";
+import RESOURCES from "./resources.json";
+import WIDGETS from "./widgets.json";
 import { handleOAuth, wwwAuthenticate } from "./oauth";
 import { negotiateProtocolHeader } from "./protocol";
 import { handleWatch, addWatchUrl, watchUrl } from "./watch";
@@ -24,46 +27,7 @@ const sha256 = async (s: string) => [...new Uint8Array(await crypto.subtle.diges
 const CORS = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "GET,POST,DELETE,OPTIONS", "access-control-expose-headers": "mcp-session-id" };
 const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", ...CORS } });
 
-class QuotaError extends Error { constructor(public quota: number, public used: number) { super(`quota exhausted: ${used}/${quota} sandbox minutes used`); } }
-
-/* ---------- E2B backend ---------- */
-const e2bApi = (env: Env) => (env.E2B_API ?? "https://api.e2b.app").replace(/\/$/, "");
-async function e2b(env: Env, method: string, path: string, body?: unknown) {
-  const r = await fetch(`${e2bApi(env)}${path}`, { method, headers: { "X-API-Key": env.E2B_API_KEY!, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
-  const text = await r.text(); let data: any = null; try { data = text ? JSON.parse(text) : null; } catch {}
-  if (!r.ok) throw new Error(`e2b ${method} ${path}: ${r.status} ${text.slice(0, 200)}`);
-  return data;
-}
-async function newSandbox(env: Env, app: string, scope: string) {
-  const timeout = Number(env.SESSION_TIMEOUT_S ?? 1800);
-  const d = await e2b(env, "POST", "/sandboxes", { templateID: env.E2B_TEMPLATE ?? "shipvo-sim", timeout, metadata: { app, scope, by: "sim.shipvo.dev" } });
-  const id: string = d.sandboxID ?? d.sandboxId; const domain: string = d.domain ?? env.E2B_SANDBOX_DOMAIN ?? "e2b.app";
-  const host = `https://8787-${id}.${domain}`;
-  // Wait for the simulator and MCP inside to be ready (Chromium boot).
-  for (let i = 0; i < 60; i++) { try { const h = await fetch(`${host}/health`); if (h.ok) return { id, host }; } catch {} await new Promise((r) => setTimeout(r, 1000)); }
-  throw new Error("sandbox did not become ready");
-}
-const killSandbox = (env: Env, id: string) => e2b(env, "DELETE", `/sandboxes/${id}`).catch(() => {});
-const touchSandbox = (env: Env, id: string) => e2b(env, "POST", `/sandboxes/${id}/timeout`, { timeout: Number(env.SESSION_TIMEOUT_S ?? 1800) }).catch(() => {});
-
-// One sandbox ("phone pool") per API key: clients such as ChatGPT reconnect between tool calls, and the agent's
-// simulator sessions must survive that. The sandbox is created on first use and expires after idle time.
-async function sandboxForKey(env: Env, keyId: number, app: string, scope: string) {
-  const row = await env.DB.prepare("SELECT sandbox_id, sandbox_host, rev FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).first<{ sandbox_id: string; sandbox_host: string; rev: string | null }>();
-  if (row && env.SIM_REV && row.rev !== env.SIM_REV) { await killSandbox(env, row.sandbox_id); await env.DB.prepare("DELETE FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).run(); }   // built by an older deploy
-  else if (row) {
-    try { const h = await fetch(`${row.sandbox_host}/health`, { signal: AbortSignal.timeout(4000) }); if (h.ok) { touchSandbox(env, row.sandbox_id); return { id: row.sandbox_id, host: row.sandbox_host }; } } catch {}
-    await env.DB.prepare("DELETE FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).run();   // expired: make a new one
-  }
-  // Quota: starting a sandbox costs its lifetime in minutes (it idles out after SESSION_TIMEOUT_S).
-  const q = await env.DB.prepare("SELECT quota_minutes, used_minutes FROM api_keys WHERE id = ?").bind(keyId).first<{ quota_minutes: number; used_minutes: number }>();
-  const cost = Math.ceil(Number(env.SESSION_TIMEOUT_S ?? 1800) / 60);
-  if (q && q.quota_minutes > 0 && q.used_minutes + cost > q.quota_minutes) throw new QuotaError(q.quota_minutes, q.used_minutes);
-  const sb = await newSandbox(env, app, scope);
-  await env.DB.prepare("UPDATE api_keys SET used_minutes = used_minutes + ? WHERE id = ?").bind(cost, keyId).run();
-  await env.DB.prepare("INSERT OR REPLACE INTO sim_sessions (mcp_session, sandbox_id, sandbox_host, app_id, scope, rev) VALUES (?,?,?,?,?,?)").bind(`key:${keyId}`, sb.id, sb.host, app, scope, env.SIM_REV ?? null).run();
-  return sb;
-}
+/* ---------- E2B backend: see phones.ts ---------- */
 async function viaE2B(req: Request, env: Env, row: { id: number; app_id: string; scope: string }, headers: Headers): Promise<Response> {
   const target = await sandboxForKey(env, row.id, row.app_id, row.scope);
   const reqText = req.method === "POST" ? await req.clone().text() : "";
@@ -81,9 +45,9 @@ async function decorate(req: Request, env: Env, keyId: number, res: Response, re
 // An existing sandbox of a key (never starts one), for the watch page.
 async function existingSandbox(env: Env, keyId: number, path: string, init?: RequestInit): Promise<Response> {
   if (env.E2B_API_KEY) {
-    const row = await env.DB.prepare("SELECT sandbox_host FROM sim_sessions WHERE mcp_session = ?").bind(`key:${keyId}`).first<{ sandbox_host: string }>();
-    if (!row) throw new Error("no sandbox");
-    return fetch(`${row.sandbox_host}${path}`, init);
+    const host = await existingHost(env, keyId);
+    if (!host) throw new Error("no sandbox");
+    return fetch(`${host}${path}`, init);
   }
   const k = await env.DB.prepare("SELECT app_id FROM api_keys WHERE id = ?").bind(keyId).first<{ app_id: string }>();
   if (!env.SIM || !k) throw new Error("no sandbox");
@@ -91,8 +55,36 @@ async function existingSandbox(env: Env, keyId: number, path: string, init?: Req
 }
 
 /* ---------- Worker ---------- */
+/** Values pasted into the dashboard often carry spaces or a newline at the ends; GitHub rejects such a client ID. */
+export function cleanEnv(env: Env): Env {
+  return { ...env, GITHUB_CLIENT_ID: env.GITHUB_CLIENT_ID?.trim() || undefined, GITHUB_CLIENT_SECRET: env.GITHUB_CLIENT_SECRET?.trim() || undefined };
+}
+
+/** The registered client name of an OAuth key ("ChatGPT", "Gemini"), or null for other keys. */
+// Assistants whose sign-in names no client: known by the host they sign in from (a client id URL or a redirect URI).
+const ASSISTANT_HOSTS: [RegExp, string][] = [[/(^|\.)(chatgpt\.com|openai\.com)$/, "ChatGPT"], [/(^|\.)(gemini\.google\.com|google\.com|googleapis\.com)$/, "Gemini"], [/(^|\.)(claude\.ai|claude\.com|anthropic\.com)$/, "Claude"]];
+function assistantOfUrls(urls: string[]): string | null {
+  for (const u of urls) { let host = ""; try { host = new URL(u).hostname.toLowerCase(); } catch { continue; } for (const [re, name] of ASSISTANT_HOSTS) if (re.test(host)) return name; }
+  return null;
+}
+export async function clientOfKey(env: Env, keyId: number): Promise<string | null> {
+  const k = await env.DB.prepare("SELECT label FROM api_keys WHERE id = ?").bind(keyId).first<{ label: string | null }>();
+  const label = k?.label ?? "";
+  const now = /^shipvo oauth: (.+)$/.exec(label)?.[1];
+  const id = now ? (now.startsWith("shipvo_") || now.startsWith("https://") ? now : null) : /^shipvo oauth \((shipvo_[\w]+)\)$/.exec(label)?.[1] ?? null;   // older keys: "shipvo oauth (<client id>)"
+  if (now && !id) return now.slice(0, 64);
+  if (!id) return null;
+  if (id.startsWith("https://")) return assistantOfUrls([id]);   // a client id metadata URL
+  const c = await env.DB.prepare("SELECT client_name, redirect_uris FROM oauth_clients WHERE client_id = ?").bind(id).first<{ client_name: string | null; redirect_uris: string | null }>();
+  const named = c?.client_name?.trim().slice(0, 64);
+  if (named) return named;
+  let uris: string[] = []; try { uris = JSON.parse(c?.redirect_uris ?? "[]"); } catch {}
+  return assistantOfUrls(Array.isArray(uris) ? uris : []);
+}
+
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, rawEnv: Env): Promise<Response> {
+    const env = cleanEnv(rawEnv);
     const url = new URL(req.url);
     if (req.method === "OPTIONS") return new Response("", { status: 204, headers: CORS });
     if (url.pathname === "/" || url.pathname === "/health") return json({ ok: true, service: "shipvo-sim", backend: env.E2B_API_KEY ? "e2b" : env.SIM ? "containers" : "none", mcp: "/mcp", docs: "https://github.com/shipvo/shipvo/tree/main/packages/mcp" });
@@ -100,6 +92,9 @@ export default {
     const watch = await handleWatch(req, env, (k, p, i) => existingSandbox(env, k, p, i)); if (watch) return watch;
     // /mcp with Authorization: Bearer <key>, or, for clients that cannot send headers (ChatGPT's custom MCP
     // connectors offer only OAuth or none), /mcp/<key> or /mcp?key=<key>.
+    // Scripts of the MCP Apps views, for hosts whose page policy blocks inline scripts (ChatGPT). Static and public.
+    const widget = req.method === "GET" ? (WIDGETS as Record<string, string>)[url.pathname] : undefined;
+    if (widget) return new Response(widget, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=300", "access-control-allow-origin": "*" } });
     const pathKey = url.pathname.match(/^\/mcp\/([A-Za-z0-9_-]{8,})$/)?.[1];
     if (url.pathname !== "/mcp" && !pathKey) return json({ error: "not_found" }, 404);
 
@@ -112,9 +107,12 @@ export default {
       if (msg && !Array.isArray(msg) && msg.jsonrpc === "2.0") {
         if (msg.method === "notifications/initialized") return new Response(null, { status: 202, headers: CORS });
         const rpc = (result: unknown) => json({ jsonrpc: "2.0", id: msg.id ?? null, result });
-        if (msg.method === "initialize") return rpc({ protocolVersion: msg.params?.protocolVersion ?? "2025-03-26", capabilities: { tools: { listChanged: false } }, serverInfo: { name: "shipvo", version: "0.0.6" }, instructions: "Shipvo lets an assistant use a React Native app in a simulated phone. Tools that open or act on an app need an API key: Authorization: Bearer <key> (run `npx @shipvo/cli login`). https://shipvo.dev/docs/test-with-an-assistant/" });
+        if (msg.method === "initialize") return rpc({ protocolVersion: msg.params?.protocolVersion ?? "2025-03-26", capabilities: { tools: { listChanged: false }, resources: { listChanged: false } }, serverInfo: { name: "shipvo", version: "0.0.6" }, instructions: "Shipvo lets an assistant use a React Native app in a simulated phone. Tools that open or act on an app need an API key: Authorization: Bearer <key> (run `npx @shipvo/cli login`). https://shipvo.dev/docs/test-with-an-assistant/" });
         if (msg.method === "ping") return rpc({});
         if (msg.method === "tools/list") return rpc({ tools: TOOLS });
+        // The MCP Apps pages (such as the live inbox) are static, so hosts can fetch them before signing in.
+        if (msg.method === "resources/list") return rpc({ resources: RESOURCES.map(({ contents: _, ...r }) => r) });
+        if (msg.method === "resources/read") { const r = RESOURCES.find((x) => x.uri === (msg.params as { uri?: string } | undefined)?.uri); return r ? rpc({ contents: r.contents }) : json({ jsonrpc: "2.0", id: msg.id ?? null, error: { code: -32002, message: "Resource not found" } }); }
       }
     }
     const challenge = { "www-authenticate": wwwAuthenticate(url.origin) };
@@ -135,7 +133,11 @@ export default {
     headers.set("x-shipvo-public", pub.join(",")); headers.set("x-shipvo-scope", row.scope); headers.delete("authorization"); headers.delete("host");
     // The verified key, for the build lookup in open_app. Set after the client headers are copied, so a client-sent x-shipvo-key is replaced.
     headers.set("x-shipvo-key", key);
-    negotiateProtocolHeader(headers);   // a client newer than the server (ChatGPT) names a version the SDK would reject with 400
+    // The assistant behind an OAuth key, so the phone can say who sent a message even when a request carries no
+    // client name (stateless HTTP: the name only arrives with initialize). A client-sent value is never trusted.
+    headers.delete("x-shipvo-client");
+    const named = await clientOfKey(env, row.id); if (named) headers.set("x-shipvo-client", named);
+        negotiateProtocolHeader(headers);   // a client newer than the server (ChatGPT) names a version the SDK would reject with 400
     if (row.scope === "owner" && env.OWNER_TOKEN) headers.set("x-shipvo-owner-token", env.OWNER_TOKEN); else headers.delete("x-shipvo-owner-token");
 
     try {

@@ -1,2 +1,0 @@
-- Docs: the Secrets screen steps in Settings cover the Rotate button and its one-time link.
-- Migration: none.

@@ -191,6 +191,17 @@ export function createApp(spec: unknown, options: CreateAppOptions = {}): { ok: 
         data[st.delete] = coll(st.delete).filter((item) => !(!st.where || test(st.where, { ...scope, item })));
       } else if (typeof st.set === "string") state[st.set.replace(/^state\./, "")] = ev(st.value, scope);
       else if ("notify" in st) { /* shown by the phone; the permission was checked before the action ran */ }
+      else if (st.saveFile && typeof st.saveFile === "object") {
+        const f = ev(st.saveFile, scope) as Obj;
+        if (typeof f.to !== "string" || !f.to) throw new Error("saveFile needs \"to\", the collection that holds files.");
+        if (typeof f.name !== "string" || !f.name.trim()) throw new Error("saveFile needs a file name.");
+        if (/[\\/\0]/.test(f.name.trim())) throw new Error("saveFile needs a file name with no slash");
+        if (typeof f.content !== "string") throw new Error("saveFile needs text content.");
+        const mime = typeof f.mime === "string" && f.mime ? f.mime : "text/plain";
+        const list = coll(f.to);
+        const id = list.reduce((m, x) => Math.max(m, typeof x.id === "number" ? x.id : 0), 0) + 1;
+        list.push({ id, name: f.name.trim(), kind: "file", mime, size: new TextEncoder().encode(f.content).length, content: f.content, added: options.now ?? new Date().toISOString() });
+      }
       else if (typeof st.saveFile === "string") {
         const name = String(ev(st.saveFile, scope)).trim();
         if (!name || /[\\/\0]/.test(name)) throw new Error("saveFile needs a file name with no slash");

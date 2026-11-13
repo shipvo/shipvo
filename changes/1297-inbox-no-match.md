@@ -1,2 +1,0 @@
-- `templates/assistant-inbox`: `mark_read`, `start_task` and `finish_task` return `updated: false` with a reason when nothing matched (not yours, not found, already started or done), instead of reporting success. A finished task keeps its first reply.
-- Migration: tools that read the result of these three actions now get `{ updated, reason }` instead of nothing.
