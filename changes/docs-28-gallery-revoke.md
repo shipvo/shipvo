@@ -1,2 +1,0 @@
-- Docs: the spec gallery list now names all five example specs, and the Secrets screen steps in Settings cover the Revoke button.
-- Migration: none.

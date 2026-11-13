@@ -1,0 +1,1 @@
+- runtime: the iOS scene host test waits for the app to be active before it reports, so a slow Simulator launch no longer reads a trial-boot count too early.

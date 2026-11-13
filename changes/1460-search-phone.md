@@ -1,2 +1,0 @@
-- New MCP tool `search_phone`: finds text in every app's data and in notifications, in one call, on Android and iOS. Optional `app` and `limit`. Error codes `bad_query`, `bad_limit`, `not_installed`.
-- Migration: none; this is a new tool.

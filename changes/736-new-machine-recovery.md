@@ -1,2 +1,0 @@
-- docs: `new-machine.md` starts the lost-seed path with root-key rotation on Android and iOS, and covers apps without a root key separately.
-- Migration: none; docs only.

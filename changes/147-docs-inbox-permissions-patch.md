@@ -1,2 +1,0 @@
-- Docs: Assistant Inbox refusals (`updated`, `reason`), permissions detected from camera, scanner and file blocks, patch fallback on small heaps (Android), refs after a phone restart.
-- Migration: none.

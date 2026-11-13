@@ -1,2 +1,0 @@
-- `shipvo.dev`: Many phones in the playground reads `?phones=6&mix=both&dark=1`, and a Copy link button shares the current setup.
-- Migration: none.
