@@ -89,7 +89,10 @@ export async function dispatchSchedules(
     started++;
     let status = "ok";
     try { await runSchedule(s.app, s.name); }
-    catch (e) { status = `error: ${String((e as Error)?.message ?? e).slice(0, 200)}`; }
+    catch (e) {
+      const code = (e as { code?: unknown })?.code;
+      status = `error: ${typeof code === "string" && (e as Error).name === "RunError" ? `${code}: ` : ""}${String((e as Error)?.message ?? e).slice(0, 200)}`;
+    }
     // An invalid cron cannot be rescheduled; park it far away so it does not run every tick.
     const next = nextRun(s.cron, now) ?? new Date(now.getTime() + 365 * 86400000).toISOString();
     if (!parseCron(s.cron) && status === "ok") status = "error: invalid cron";
@@ -102,6 +105,3 @@ export async function dispatchSchedules(
   }
   return started;
 }
-
-/** Stub until the spec runner lands (slice 3 of #842). */
-export const runScheduleStub: RunSchedule = async () => {};
