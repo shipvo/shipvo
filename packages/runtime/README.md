@@ -29,6 +29,8 @@ Runtime.markHealthy();                   // call once the first screen rendered
 
 `shipvo init` wires all of this for you.
 
+### Read the state version
+
 ```ts
 import { getAppliedStateVersion } from "@shipvo/runtime";
 const v = await getAppliedStateVersion(); // number, or null for the embedded bundle or a release with no stateVersion

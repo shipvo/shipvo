@@ -101,10 +101,11 @@ console.log(report.day, report.active_testers, report.warnings);
 
 `rows` is a list of `{ install_id, received_at }`. The options are `now` (required), `windowDays` (default 14), `needed` (default 12) and `recruit` (default 16).
 
-With two testers and `now` of 6 Nov 2026, the report prints `day: 5`, `active_testers: 0` and these warnings:
+Take two testers. Tester `a1b2c3d4` sent rows at `2026-11-01T09:00:00Z` and `2026-11-02T09:00:00Z`. Tester `e5f6a7b8` sent rows at `2026-11-01T10:00:00Z` and `2026-11-02T10:00:00Z`. With `now` of `2026-11-05T12:00:00Z`, both testers have been quiet for 3 days, so the report prints `day: 5`, `active_testers: 0` and these warnings:
 
 ```
 Tester a1b2c3d4 has been quiet for 3 days. Ask them to open the app.
+Tester e5f6a7b8 has been quiet for 3 days. Ask them to open the app.
 Only 0 testers were active in the last 3 days. The 14-day clock resets if the count drops below 12.
 2 testers seen so far: recruit 14 more so a dropout never resets the clock.
 Day 5 of 14: remind every tester to open the app today.
