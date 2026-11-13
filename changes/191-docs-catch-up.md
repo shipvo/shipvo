@@ -1,0 +1,1 @@
+- docs: Phone apps troubleshooting covers reminders, wake-ups and the accessibility audit; the glossary adds A2UI, wake-up, reminder, permission log, session and the bug-catch benchmark; the README lists A2UI, the bug-catch benchmark and the phone tools.
