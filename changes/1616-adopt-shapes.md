@@ -1,0 +1,1 @@
+- cli: tests run `shipvo init --yes` on Expo managed, Expo prebuilt and bare React Native app fixtures and check the files it changes.
