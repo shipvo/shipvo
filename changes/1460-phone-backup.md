@@ -1,2 +1,0 @@
-- New MCP tools `backup_phone` and `restore_phone`: back up the whole phone (apps you built with data, layout and permission answers; Store apps with permission answers; system settings; the clipboard) and restore it on the same or another phone, on Android and iOS. A bad backup changes nothing. Error codes `bad_backup`, `invalid_spec`, `already_installed`.
-- Migration: none; these are new tools. The backup format is `shipvo.phone-backup/v0`.

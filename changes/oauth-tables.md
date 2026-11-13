@@ -1,2 +1,0 @@
-- Hosted MCP: sign-in with OAuth (dynamic client registration at `/register`, then `/authorize` and `/token`) works. The tables it uses are now created by the migrations the deploy applies, so clients that register themselves, such as Gemini custom MCP servers, connect.
-- Migration: none for callers. Two additive tables (`oauth_clients`, `oauth_codes`, `CREATE TABLE IF NOT EXISTS`) in `services/control-plane/migrations`.

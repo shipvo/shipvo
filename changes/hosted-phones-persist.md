@@ -1,4 +1,0 @@
-- Hosted simulator: an idle sandbox pauses instead of being deleted, and the next call resumes it with its phones, open apps and their data.
-- Hosted simulator: one sandbox per GitHub account, so every assistant you sign in (ChatGPT, Gemini, Claude) sees the same phones. A key with no account keeps its own sandbox.
-- OAuth sign-in replaces only the keys the same assistant made before; other assistants stay signed in.
-- Migration: none. A sandbox started per key before this change carries over to the account on its next call.

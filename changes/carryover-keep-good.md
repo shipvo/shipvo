@@ -1,2 +1,0 @@
-- Hosted phones: moving phones into a new version on deploy no longer drops every phone when one has a problem. That phone is skipped and listed under `failed`; the rest move over.
-- The hosted Worker logs one line for each step (`{"carryover":"export"|"import", ...}`) with the phones moved and any that failed, and waits up to 5 minutes for each step.

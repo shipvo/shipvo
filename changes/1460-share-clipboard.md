@@ -1,4 +1,0 @@
-- New MCP tools `share_targets`, `share`, `get_clipboard` and `set_clipboard`: share text from one app into another and copy and paste on the phone, on Android and iOS. Error codes `not_a_share_target`, `pick_action`, `bad_text`.
-- `@shipvo/spec`: an action can declare `"share": "<text input>"` to take shared text. The validator checks that the input exists and is text. Notes and Tasks takes shared text as a note or a task.
-- `@shipvo/device`: the clipboard is kept in sessionStorage, so it outlives a page load (switching apps).
-- Migration: none; `share` is an optional key and the tools are new.

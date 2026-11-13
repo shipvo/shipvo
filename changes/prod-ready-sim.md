@@ -1,4 +1,0 @@
-- `@shipvo/sim`: the simulator listens on this machine only (`127.0.0.1`) by default. Migration: to serve other machines, start the server with `--host 0.0.0.0` or set `SHIPVO_SIM_HOST=0.0.0.0`.
-- `@shipvo/sim`: `POST /session` for an A2UI session answers with `applied` and `errors`, so a refused first message is seen when the session opens.
-- `@shipvo/mcp`, `@shipvo/mcp-tools`: new tools `a2ui_open`, `a2ui_send` and `a2ui_actions` draw A2UI messages on a phone, change the screen and read the actions a person sent. Migration: none; new tools.
-- `@shipvo/cli`: a failed web build reports its first error (the file and the message) however long the stack trace under it is. `shipvo session start --a2ui` says how many messages were refused and lists them under `data.a2ui_errors`.

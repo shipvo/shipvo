@@ -1,3 +1,0 @@
-- New MCP tool `wait_for_event`: waits up to 25 seconds until a new message or task is waiting for the calling assistant in the Assistant Inbox, and returns at once when one already is. Items already returned do not wake the assistant again. Returns `nothing yet` when the time is up. Typed errors `bad_timeout` and `no_caller`.
-- `@shipvo/sim`: new `wait_for_event` action next to `pending_banner`.
-- Migration: none; a new tool.

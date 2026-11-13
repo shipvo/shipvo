@@ -1,3 +1,0 @@
-- New MCP tools `register_wakeup`, `list_wakeups` and `clear_wakeup`: when a new message or task arrives for an assistant name in the Assistant Inbox, the phone POSTs a signed JSON note (who, message or task, a one-line summary, the ids; never the message text) to the registered URL. Failed calls are retried twice. Every delivery is in `device_log`. Private and local addresses are refused unless `allow_private` is set.
-- `@shipvo/sim`: new `register_wakeup`, `list_wakeups` and `clear_wakeup` actions.
-- Migration: none; new tools.

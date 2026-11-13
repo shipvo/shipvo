@@ -1,1 +1,0 @@
-- docs: the `shipvo audit` section lists key rotations as `key-rotation` rows.

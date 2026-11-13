@@ -1,2 +1,0 @@
-- The Assistant Inbox view also uses ChatGPT's own widget bridge when it is there: it shows the first result at once, refreshes through it, and posts new messages into the chat with it.
-- An assistant that connects as "Google" is named `gemini` in the Assistant Inbox, like other Gemini clients.
