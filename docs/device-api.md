@@ -221,6 +221,31 @@ const mic = await device.microphone.open();   // web and simulator only; optiona
 - [Lumi on Shipvo Phone](lumi.md)
 - [Test with an assistant](test-with-an-assistant.md)
 
+## Android and iOS code in simulator builds
+
+Phone platform mode makes a simulator build run your app's Android and iOS code, so a bug inside it shows up on Shipvo Phone. It has two parts, and both apply to your own files only. Packages in `node_modules` keep their web code.
+
+**`Platform.OS` and `Platform.select`.** Add the Babel plugin for simulator builds in `babel.config.js`:
+
+```js
+module.exports = (api) => {
+  api.cache.using(() => process.env.PN_SIM ?? "");
+  return { presets: ["babel-preset-expo"], plugins: process.env.PN_SIM ? ["@shipvo/device/babel"] : [] };
+};
+```
+
+In a simulator build, `Platform.OS` is then `"android"` or `"ios"`, the platform of the session, read when the code runs. `Platform.select` picks that platform's key, then `native`, then `default`, as React Native does. One build serves the Android phone and the iOS phone.
+
+**`.native.js` files.** Pass `nativeFiles` to `withShipvoSim` in `metro.config.js`:
+
+```js
+module.exports = withShipvoSim(config, { nativeFiles: true });
+```
+
+A relative import in your app then picks `Price.native.js` over `Price.js`, as it does on a phone. A `Price.web.js` file still wins.
+
+Turn this on when your Android and iOS code is JavaScript that runs with the simulated device. Code that checks `Platform.OS === "web"` takes its phone branch in this mode. The [bug-catch benchmark](bug-bench.md) measures what the mode adds.
+
 ## Using raw Expo modules
 
 Apps that already import `expo-camera`, `expo-location`, `expo-local-authentication`, `expo-notifications`, `expo-clipboard`, `expo-contacts`, `expo-calendar` or `expo-document-picker` directly also run in the simulator: `withShipvoSim` in `metro.config.js` aliases them to shims that call the simulated device when the bundle is built with `PN_SIM=1`. Phone builds are untouched.

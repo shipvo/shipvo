@@ -875,11 +875,11 @@ test("a declined payment says why and keeps the cart", async ({ phone }) => {
 });
 
 test("each payment failure is explained in plain words, and a new attempt clears the old message", async ({ phone }) => {
-  const words = { decline: "Your payment was declined. Try another method.", timeout: "The payment took too long. Try again.", insufficient_funds: "Not enough funds.", cancel: "Payment cancelled." };
+  const words: Record<"decline" | "timeout" | "insufficient_funds" | "cancel", string> = { decline: "Your payment was declined. Try another method.", timeout: "The payment took too long. Try again.", insufficient_funds: "Not enough funds.", cancel: "Payment cancelled." };
   await phone.tap(products[0].name);
   await phone.tap("Add to cart");
   await phone.tap("Cart");
-  for (const [result, text] of Object.entries(words)) {
+  for (const [result, text] of Object.entries(words) as [keyof typeof words, string][]) {
     await phone.device.set({ payment: { nextResult: result, pin: "1234" } });
     await phone.tap("Pay");
     await phone.waitFor(text);

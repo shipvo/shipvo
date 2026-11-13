@@ -1,1 +1,0 @@
-- docs: the parity page now has a run-it-yourself section, troubleshooting and next steps, and the glossary explains saved key, patch, gallery and parity.

@@ -1,1 +1,0 @@
-- sim: on the hosted phone, `open_app` takes `platform: "android" | "ios"` and its result includes `watch_url`, a short-lived read-only link to watch the phone live at sim.shipvo.dev/watch/<session>. Take over shows only for the key's owner signed in with GitHub.

@@ -1,2 +1,0 @@
-- `@shipvo/runtime`: on iOS, a patch that would not fit in memory is skipped and the full download is used. The update result reports `patchError` as `over_memory_budget`, the same value as Android.
-- Migration: none; additive.

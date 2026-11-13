@@ -1,2 +1,0 @@
-- `@shipvo/spec`: a gallery of eight example specs in `packages/spec/gallery/` (habit tracker, workout log, expense splitter, trip checklist, flashcards, reading board with `kanban`, meal planner with `calendar`, favourite places with `map`), checked by a test.
-- Migration: none; not part of the published package.
