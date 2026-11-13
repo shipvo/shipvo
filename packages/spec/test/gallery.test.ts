@@ -39,8 +39,8 @@ const blocks: Record<string, [string, string]> = {
   "focus-timer": ["image", "Daily goal progress: 25%"],
 };
 
-function screenText(spec: unknown, data: Record<string, unknown>): string {
-  const t = renderScreen(spec as never, { style: "ios", data });
+function screenText(spec: unknown, data: Record<string, unknown>, state?: Record<string, unknown>): string {
+  const t = renderScreen(spec as never, { style: "ios", data, state });
   if (!t.ok) throw new Error(JSON.stringify(t));
   return JSON.stringify(describeTree(t.tree));
 }
@@ -143,6 +143,17 @@ describe("spec gallery", () => {
     const t = renderScreen(spec, { style: "ios", data: r.app.data });
     if (!t.ok) throw new Error("render failed");
     expect(JSON.stringify(t.tree)).toMatch(/"width":25\b/);
+  });
+
+  it("focus-timer: start_session shows a running session until log_session", () => {
+    const spec = JSON.parse(readFileSync(new URL("focus-timer.json", dir), "utf8"));
+    const r = createApp(spec, {});
+    if (!r.ok) throw new Error(JSON.stringify(r.errors));
+    expect(screenText(spec, r.app.data, r.app.state)).toContain("No session running");
+    expect(r.app.call("start_session", {}).ok).toBe(true);
+    expect(screenText(spec, r.app.data, r.app.state)).toContain("Session running");
+    expect(r.app.call("log_session", { task: "Write spec", minutes: 25 }).ok).toBe(true);
+    expect(screenText(spec, r.app.data, r.app.state)).toContain("No session running");
   });
 
   it("project-timeline: the screen has a control for complete_milestone", () => {
