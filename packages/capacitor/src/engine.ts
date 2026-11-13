@@ -157,26 +157,40 @@ export class ShipvoCapacitor implements ShipvoCapacitorPlugin {
     if (semverLess(this.c.shellVersion, p.min_shell_version)) return { status: "none", release: p.release };
 
     const t1 = this.now(); let bytes: Uint8Array;
-    try {
+    // Rule 9: a patch only when its from_sha256 is the hash of the bundle this device runs (the current release).
+    let via: "patch" | "full" = "full"; let patchError: string | undefined; let patchedBytes = 0;
+    const baseSha = s.current ? s.hashes[String(s.current)] : undefined;
+    const chosen = baseSha && this.c.files.patch ? p.core.patches?.find((x) => x.from_sha256 === baseSha) : undefined;
+    if (chosen && this.c.files.patch) {
+      try {
+        const r = await f(new URL(chosen.url, this.c.baseUrl.replace(/\/?$/, "/")).toString());
+        if (!r.ok) throw new Error(`patch HTTP ${r.status}`);
+        const patch = new Uint8Array(await r.arrayBuffer());
+        if (patch.byteLength !== chosen.size) throw new Error("patch size mismatch");
+        const o = await this.c.files.patch({ base: bundleName(s.current), patch, patchSha256: chosen.sha256, name: bundleName(p.release), size: p.core.size, sha256: p.core.sha256 });
+        via = o.via; patchError = o.patchError; if (o.via === "patch") patchedBytes = patch.byteLength;
+      } catch (e) { patchError = String((e as Error)?.message ?? e); }
+    }
+    if (via === "patch") { bytes = new Uint8Array(0); } else try {
       const url = new URL(p.core.url, this.c.baseUrl.replace(/\/?$/, "/")).toString();
       const r = await f(url);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       bytes = new Uint8Array(await r.arrayBuffer());
     } catch (e) { this.push(s, "download_failed"); await this.save(); return { status: "error", release: p.release, error: String((e as Error)?.message ?? e) }; }
     const t2 = this.now();
-    // Size and sha-256 against the signed pointer.
-    if (bytes.byteLength !== p.core.size || (await sha256Hex(bytes)) !== p.core.sha256) {
+    // Size and sha-256 against the signed pointer. A patched bundle was already checked natively.
+    if (via === "full" && (bytes.byteLength !== p.core.size || (await sha256Hex(bytes)) !== p.core.sha256)) {
       this.block(s, p.release); return this.reject(s, "verify_failed", "bundle size or sha-256 does not match", p.release);
     }
     const t3 = this.now();
     // Stage: write the file, then point `pending` at it. A replaced pending release is dropped.
     const old = s.pending;
-    await this.c.files.write(bundleName(p.release), bytes);
+    if (via === "full") await this.c.files.write(bundleName(p.release), bytes);
     s.hashes[String(p.release)] = p.core.sha256; s.pending = p.release; s.pendingBoots = 0;
     if (old && old !== p.release) await this.drop(old);
     await this.save();
     if (apply) await this.reload();
-    return { status: "staged", release: p.release, bytes: bytes.byteLength, downloadMs: t2 - t1, verifyMs: t3 - t2, issuedAt: p.issued_at };
+    return { status: "staged", release: p.release, bytes: via === "patch" ? patchedBytes : bytes.byteLength, via, ...(patchError ? { patchError } : {}), downloadMs: t2 - t1, verifyMs: t3 - t2, issuedAt: p.issued_at };
   }
 
   private push(s: Saved, e: string) { if (!s.events.includes(e) || !e.startsWith("pointer_rejected")) s.events.push(e); }

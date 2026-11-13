@@ -57,6 +57,18 @@ public final class BundleStore {
         for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
     }
 
+    /**
+     * Builds `name` from the stored `baseName` and a patch. Writes the file only when the patch, the
+     * rebuilt size and the rebuilt hash all check out; otherwise the caller downloads the full bundle.
+     */
+    public PatchStep.Outcome patch(String baseName, byte[] patch, String patchSha256, String name, long newSize, String newSha256, long maxMemory) {
+        byte[] base = null;
+        try { if (file(baseName).length() <= maxMemory) base = read(baseName); } catch (IOException | OutOfMemoryError e) { base = null; }
+        PatchStep.Outcome o = PatchStep.run(base, patch, patchSha256, newSize, newSha256, maxMemory);
+        if (o.bytes == null) return o;
+        try { write(name, o.bytes); return o; } catch (IOException e) { return new PatchStep.Outcome("full", null, e.getMessage()); }
+    }
+
     public void remove(String name) throws IOException { file(name).delete(); }
 
     public List<String> list() {
