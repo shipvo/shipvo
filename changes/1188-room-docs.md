@@ -1,0 +1,1 @@
+- docs: new page "Test with a team of agents" (worked example with room, room_note, room_log and room_report), linked from the docs index, Agents and MCP, and the MCP tool registry page.
