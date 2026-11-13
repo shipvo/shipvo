@@ -25,4 +25,18 @@ describe("summariseRoom", () => {
     expect(summariseRoom([{ kind: "note", at: at(1), session: "s9", agent: "c", text: "hi" }]).sessions)
       .toEqual([{ session: "s9", agent: "c", steps: 0, seconds: 0, errors: 0, last_screen_title: null, notes: ["hi"] }]);
   });
+  it("never makes an empty-id session; null-session notes go to the agent's single session or are dropped", () => {
+    const r = summariseRoom([
+      { kind: "action", at: at(1), session: "a", agent: "x", tool: "tap" },
+      { kind: "action", at: at(2), session: "b", agent: "y", tool: "tap" },
+      { kind: "action", at: at(3), session: "c", agent: "y", tool: "tap" },
+      { kind: "note", at: at(4), session: null as any, agent: "x", text: "mine" },
+      { kind: "note", at: at(5), session: null as any, agent: "y", text: "ambiguous" },
+      { kind: "note", at: at(6), session: null as any, agent: null, text: "anon" },
+    ]).sessions;
+    expect(r.map((s) => s.session)).toEqual(["a", "b", "c"]);
+    expect(r[0].notes).toEqual(["mine"]);
+    expect(r[1].notes).toEqual([]);
+    expect(r[2].notes).toEqual([]);
+  });
 });
