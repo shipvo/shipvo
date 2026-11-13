@@ -32,7 +32,7 @@ export function statusFromDevice(device?: DeviceStatusInput, now?: Date): FrameS
 /** True when a CSS colour is dark, so the status text should be light. */
 export function isDarkBackground(color: string): boolean;
 /** The clock text and icons markup, for redrawing the status bar. */
-export function statusParts(status?: FrameStatus): { time: string; icons: string };
+export function statusParts(status?: FrameStatus, skin?: FrameSkin): { time: string; icons: string };
 /** Browser script that keeps the status bar live from the app's `pn:status` events. */
 export function statusClientScript(iframeId?: string, skin?: FrameSkin, phone?: object): string;
 

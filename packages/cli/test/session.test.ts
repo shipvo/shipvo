@@ -13,6 +13,15 @@ function setup(pkg: object = { name: "My Shop", dependencies: { expo: "55", "rea
     root, now: () => state.now,
     build: async () => { state.builds++; },
     resolveServer: () => "/sim/server.mjs",
+    models: async () => ({
+      models: [
+        { name: "Pixel 8", platform: "android", width: 412, height: 915, scale: 2.625 },
+        { name: "Galaxy S24", platform: "android", width: 360, height: 780, scale: 3 },
+        { name: "iPhone 16", platform: "ios", width: 393, height: 852, scale: 3 },
+        { name: "iPhone 16 Pro", platform: "ios", width: 402, height: 874, scale: 3 },
+      ],
+      defaults: { android: "Pixel 8", ios: "iPhone 16" },
+    }),
     ensureBrowser: () => undefined,
     freePort: async () => 5123,
     startServer: async () => { state.alive.add(900); return 900; },
@@ -50,21 +59,51 @@ describe("shipvo session", () => {
     const { deps, state, root } = setup();
     const { doc, exit } = await run(deps, ["start", "ios", "--max-duration-minutes", "20"]);
     expect(exit).toBe(0); expect(doc.code).toBe("started");
-    expect(doc.data).toMatchObject({ app: "my-shop", platform: "ios", status: "in_progress", port: 5123, url: "http://127.0.0.1:5123", expires_at: "2026-11-13T10:20:00.000Z", mcp_env: { PN_SIM: "http://127.0.0.1:5123" } });
+    expect(doc.data).toMatchObject({ app: "my-shop", platform: "ios", device: "iPhone 16", status: "in_progress", port: 5123, url: "http://127.0.0.1:5123", expires_at: "2026-11-13T10:20:00.000Z", mcp_env: { PN_SIM: "http://127.0.0.1:5123" } });
     expect(doc.data.id).toMatch(/^ios-[0-9a-f]{8}$/);
     expect(doc.data.screen).toContain("[ref=e1]");
     expect(state.builds).toBe(1);
     expect(state.watchdog).toBe(20 * 60_000);
     expect(state.watched).toEqual({ port: 5123, id: doc.data.id });
-    expect(state.posts[0]).toEqual({ path: "/session", body: { session: doc.data.id, app: "my-shop", skin: "ios", device: { platform: "ios" }, fit_frame: true } });
+    expect(state.posts[0]).toEqual({ path: "/session", body: { session: doc.data.id, app: "my-shop", model: "iPhone 16" } });
     expect(readFileSync(join(root, ".gitignore"), "utf8")).toContain(".shipvo/");
   });
 
-  it("defaults to Android and 30 minutes", async () => {
+  it("defaults to Android, the Pixel 8 and 30 minutes", async () => {
     const { deps, state } = setup();
     const { doc } = await run(deps, ["start"]);
     expect(doc.data.platform).toBe("android");
+    expect(doc.data.device).toBe("Pixel 8");
+    expect(doc.summary).toContain("simulated Pixel 8");
     expect(state.watchdog).toBe(30 * 60_000);
+  });
+
+  it("--device starts that phone model, and the model decides the platform", async () => {
+    const { deps, state } = setup();
+    const { doc } = await run(deps, ["start", "--device", "  iphone 16  pro "]);
+    expect(doc.data).toMatchObject({ platform: "ios", device: "iPhone 16 Pro" });
+    expect(doc.data.id).toMatch(/^ios-/);
+    expect(state.posts[0].body.model).toBe("iPhone 16 Pro");
+    expect((await run(deps, ["start", "android", "--device", "Galaxy S24"])).doc.data.device).toBe("Galaxy S24");
+  });
+
+  it("refuses an unknown model, and a model that is not the platform asked for", async () => {
+    const { deps, state } = setup();
+    const unknown = await run(deps, ["start", "--device", "Nokia 3310"]);
+    expect(unknown.exit).toBe(2); expect(unknown.doc.code).toBe("bad_model");
+    expect(unknown.doc.next[0].command).toBe("shipvo session devices --json");
+    const wrong = await run(deps, ["start", "android", "--device", "iPhone 16"]);
+    expect(wrong.exit).toBe(2); expect(wrong.doc.summary).toContain("iPhone 16 is an iOS phone");
+    expect(state.builds).toBe(0);
+  });
+
+  it("devices lists the phone models with their screen size and the defaults", async () => {
+    const { deps } = setup();
+    const { doc, exit } = await run(deps, ["devices"]);
+    expect(exit).toBe(0);
+    expect(doc.data.devices).toHaveLength(4);
+    expect(doc.data.devices[2]).toEqual({ name: "iPhone 16", platform: "ios", width: 393, height: 852, scale: 3 });
+    expect(doc.data.defaults).toEqual({ android: "Pixel 8", ios: "iPhone 16" });
   });
 
   it("names the web packages an app is missing and how to add them", async () => {

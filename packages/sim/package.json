@@ -14,6 +14,7 @@
     "./server.mjs": "./server.mjs",
     "./screen-rules.mjs": "./screen-rules.mjs",
     "./network-profiles.mjs": "./network-profiles.mjs",
+    "./models.mjs": "./models.mjs",
     "./frame.mjs": {
       "types": "./frame.d.mts",
       "default": "./frame.mjs"
@@ -63,6 +64,7 @@
     "build-cache.mjs",
     "build-open.mjs",
     "capture.mjs",
+    "models.mjs",
     "README.md"
   ],
   "peerDependencies": {

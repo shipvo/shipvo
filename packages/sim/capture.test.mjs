@@ -38,7 +38,7 @@ for (const skin of ["android", "ios"]) {
       await page.setContent(cp.html);
       const src = await b.newPage({ viewport: size });
       await src.setContent(`<body style="margin:0;background:#0a7"></body>`);
-      await page.evaluate(showShot, shotArgs(await src.screenshot(), "image/png", { time: "7:05", airplane: true }));
+      await page.evaluate(showShot, shotArgs(await src.screenshot(), "image/png", skin, { time: "7:05", airplane: true }));
       const box = (sel) => page.locator(sel).boundingBox();
       const img = await box("#shot"), body = await box('[data-part="phone-body"]'), status = await box('[data-part="status-bar"]'), bar = await box(`[data-part="${SKINS[skin].bottom}"]`);
       assert.deepEqual([img.width, img.height], [size.width, size.height]);
@@ -51,6 +51,12 @@ for (const skin of ["android", "ios"]) {
     } finally { await b.close(); }
   });
 }
+
+test("the status bar icons are in the platform's order: Wi-Fi first on Android, signal first on iOS", () => {
+  const order = (skin) => [...shotArgs(Buffer.from("x"), "image/png", skin, {})[2].matchAll(/data-part="(\w+)"/g)].map((m) => m[1]);
+  assert.deepEqual(order("android"), ["wifi", "signal", "battery"]);
+  assert.deepEqual(order("ios"), ["signal", "wifi", "battery"]);
+});
 
 test("the concat list shows each frame until the next one and the last until the end", () => {
   assert.equal(concatList([1000, 1250, 2000], 2600), "file '0.jpg'\nduration 0.250\nfile '1.jpg'\nduration 0.750\nfile '2.jpg'\nduration 0.600\nfile '2.jpg'\n");

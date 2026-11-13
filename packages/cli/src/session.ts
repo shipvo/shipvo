@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { randomBytes } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { ensurePlaywright } from "./ensure-playwright.js";
 import { rebuildInto, waitListening } from "./sim.js";
 import { describeWebBuildFailure, ensureShipvoIgnored, type Platform } from "./run.js";
@@ -14,7 +15,8 @@ import { CliFailure, UsageError, emit, envelope, type Done, type Next } from "./
 
 export const SESSION_USAGE = `Usage: shipvo session <command> [options]
 
-  start [android|ios] [--name <n>] [--max-duration-minutes <n>] [--port <n>] [--skip-build]
+  start [android|ios] [--device "<model>"] [--name <n>] [--max-duration-minutes <n>] [--port <n>] [--skip-build]
+  devices
   screen | back | screenshot [--out <file>] [--no-frame]
   record start | record stop [--out <file>]
   tap <ref> | type <ref> <text> | scroll <up|down|left|right> [<ref>]
@@ -26,8 +28,10 @@ Example: shipvo session start ios --max-duration-minutes 20 --json`;
 export const WEB_DEPS = ["react-native-web", "react-dom", "@expo/metro-runtime"];
 export const DEFAULT_MINUTES = 30;
 
+export type PhoneModel = { name: string; platform: Platform; width: number; height: number; scale: number };
+
 export type SessionRecord = {
-  id: string; name: string; app: string; platform: Platform; status: "in_progress" | "stopped";
+  id: string; name: string; app: string; platform: Platform; device: string; status: "in_progress" | "stopped";
   port: number; pid: number; watchdog_pid?: number; url: string; watch_url: string;
   started_at: string; expires_at: string; stopped_at?: string; stop_reason?: "stopped" | "expired" | "exited";
 };
@@ -40,6 +44,8 @@ export type SessionDeps = {
   resolveServer: (root: string) => string;
   ensureBrowser: (root: string) => void;
   freePort: () => Promise<number>;
+  /** The phone models the simulator knows, and the one each platform gets by default. Read from @shipvo/sim. */
+  models: (root: string) => Promise<{ models: PhoneModel[]; defaults: Record<Platform, string> }>;
   /** Starts the simulator detached and resolves with its pid once it listens. */
   startServer: (o: { server: string; port: number; app: string; dir: string; root: string }) => Promise<number>;
   /** Starts a detached timer that ends the simulator after `ms`. Returns its pid. */
@@ -117,9 +123,23 @@ async function post(d: SessionDeps, port: number, path: string, body: object): P
   return res.json();
 }
 
-export async function startSession(d: SessionDeps, o: { platform: Platform; name?: string; minutes?: number; port?: number; skipBuild?: boolean }): Promise<Done> {
+const DEVICES_NEXT: Next[] = [{ command: "shipvo session devices --json", why: "See the phone models you can start." }];
+
+/** The model a session starts as: the one named, or the platform's default. A name decides the platform. */
+export async function pickModel(d: SessionDeps, o: { platform?: Platform; device?: string }): Promise<PhoneModel> {
+  const { models, defaults } = await d.models(d.root);
+  const want = (o.device ?? defaults[o.platform ?? "android"]).trim().replace(/\s+/g, " ").toLowerCase();
+  const m = models.find((x) => x.name.toLowerCase() === want);
+  if (!m) throw new CliFailure(`"${o.device}" is not a phone model Shipvo knows.`, "bad_model", 2, DEVICES_NEXT);
+  if (o.device && o.platform && m.platform !== o.platform) throw new CliFailure(`${m.name} is an ${m.platform === "ios" ? "iOS" : "Android"} phone, so it cannot start as ${o.platform}.`, "bad_model", 2, DEVICES_NEXT);
+  return m;
+}
+
+export async function startSession(d: SessionDeps, o: { platform?: Platform; device?: string; name?: string; minutes?: number; port?: number; skipBuild?: boolean }): Promise<Done> {
   const minutes = o.minutes ?? DEFAULT_MINUTES;
   const info = projectInfo(d.root);
+  const model = await pickModel(d, o);
+  const platform = model.platform;
   if (info.missingWebDeps.length) {
     throw new CliFailure(`The app needs ${info.missingWebDeps.join(", ")} to run on Shipvo Phone.`, "web_deps_missing", 1,
       [{ command: `npx expo install ${info.missingWebDeps.join(" ")}`, why: "Add the packages Expo uses to build for web." }]);
@@ -131,23 +151,23 @@ export async function startSession(d: SessionDeps, o: { platform: Platform; name
   }
   d.ensureBrowser(d.root);
   const server = d.resolveServer(d.root);
-  const id = `${o.platform}-${randomBytes(4).toString("hex")}`;
+  const id = `${platform}-${randomBytes(4).toString("hex")}`;
   const port = o.port ?? await d.freePort();
   try { ensureShipvoIgnored(d.root); } catch { /* read-only project: the session still works */ }
   mkdirSync(join(dirOf(d.root), id), { recursive: true });
   const pid = await d.startServer({ server, port, app: info.app, dir: join(dirOf(d.root), id), root: d.root });
   let opened: any;
-  try { opened = await post(d, port, "/session", { session: id, app: info.app, skin: o.platform, device: { platform: o.platform }, fit_frame: true }); }
+  try { opened = await post(d, port, "/session", { session: id, app: info.app, model: model.name }); }
   catch (e) { d.kill(pid); throw e; }
   if (!opened?.ok) { d.kill(pid); throw new CliFailure(`The app did not open: ${opened?.error ?? "unknown error"}`, opened?.code ?? "open_failed", 1); }
   const started = d.now();
   const rec: SessionRecord = {
-    id, name: o.name ?? info.name, app: info.app, platform: o.platform, status: "in_progress", port, pid,
+    id, name: o.name ?? info.name, app: info.app, platform, device: model.name, status: "in_progress", port, pid,
     watchdog_pid: d.startWatchdog(pid, minutes * 60_000, { port, id }), url: `http://127.0.0.1:${port}`, watch_url: `http://127.0.0.1:${port}/watch?session=${id}`,
     started_at: new Date(started).toISOString(), expires_at: new Date(started + minutes * 60_000).toISOString(),
   };
   save(d.root, rec);
-  return { code: "started", summary: `${info.name} is open on a simulated ${o.platform === "ios" ? "iPhone" : "Android phone"}. It stops at ${rec.expires_at}.`,
+  return { code: "started", summary: `${info.name} is open on a simulated ${model.name}. It stops at ${rec.expires_at}.`,
     data: { ...view(d.root, rec), screen: opened.screen, mcp_env: { PN_SIM: rec.url } }, next: driveNext(id) };
 }
 
@@ -204,6 +224,10 @@ export function defaultDeps(root = process.cwd()): SessionDeps {
       throw new CliFailure("@shipvo/sim was not found. Run `npm i -D @shipvo/sim`.", "no_sim", 2);
     },
     freePort: () => new Promise((done, fail) => { const s = createServer(); s.once("error", fail); s.listen(0, "127.0.0.1", () => { const { port } = s.address() as { port: number }; s.close(() => done(port)); }); }),
+    models: async (r) => {
+      const mod = await import(pathToFileURL(join(dirname(defaultDeps(r).resolveServer(r)), "models.mjs")).href);
+      return { models: mod.MODELS, defaults: mod.DEFAULT_MODEL };
+    },
     startServer: async ({ server, port, app, dir, root: cwd }) => {
       const log = openSync(join(dir, "sim.log"), "a");
       const p = spawn(process.execPath, [server, "--port", String(port), "--app", app, "--dir", dir], { cwd, detached: true, stdio: ["ignore", log, log] });
@@ -226,7 +250,7 @@ export function defaultDeps(root = process.cwd()): SessionDeps {
 export async function session(argv: string[], deps: SessionDeps = defaultDeps()): Promise<number> {
   const json = argv.includes("--json");
   const flags: Record<string, string> = {}; const words: string[] = [];
-  const VALUE = new Set(["id", "name", "max-duration-minutes", "port", "out"]);
+  const VALUE = new Set(["id", "name", "max-duration-minutes", "port", "out", "device"]);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith("--")) words.push(a);
@@ -239,14 +263,15 @@ export async function session(argv: string[], deps: SessionDeps = defaultDeps())
   try {
     let done: Done;
     if (verb === "start") {
-      const platform = (rest[0] ?? "android") as Platform;
-      if (platform !== "android" && platform !== "ios") throw new UsageError(`"${rest[0]}" is not a phone. Use android or ios.`);
+      const platform = rest[0] as Platform | undefined;
+      if (platform !== undefined && platform !== "android" && platform !== "ios") throw new UsageError(`"${rest[0]}" is not a phone. Use android or ios.`);
       const minutes = flags["max-duration-minutes"] === undefined ? undefined : Number(flags["max-duration-minutes"]);
       if (minutes !== undefined && !(minutes > 0 && minutes <= 24 * 60)) throw new UsageError("--max-duration-minutes needs a number from 1 to 1440.");
       const port = flags.port === undefined ? undefined : Number(flags.port);
       if (port !== undefined && !(Number.isInteger(port) && port > 0 && port < 65536)) throw new UsageError("--port needs a number from 1 to 65535.");
-      done = await startSession(deps, { platform, name: flags.name, minutes, port, skipBuild: flags["skip-build"] === "true" });
+      done = await startSession(deps, { platform, device: flags.device, name: flags.name, minutes, port, skipBuild: flags["skip-build"] === "true" });
     } else if (verb === "stop") done = await stopSession(deps, flags.id);
+    else if (verb === "devices") { const { models, defaults } = await deps.models(deps.root); done = { code: "listed", summary: `${models.length} phone models. Defaults: ${defaults.android} for android, ${defaults.ios} for ios.`, data: { devices: models.map(({ name, platform, width, height, scale }) => ({ name, platform, width, height, scale })), defaults }, next: START_NEXT }; }
     else if (verb === "get") { const r = pick(deps, flags.id); done = { code: r.status, summary: `Session ${r.id} is ${r.status === "in_progress" ? "running" : "stopped"}.`, data: view(deps.root, r), next: r.status === "in_progress" ? driveNext(r.id) : START_NEXT }; }
     else if (verb === "list") { const list = all(deps); done = { code: "listed", summary: `${list.length} session${list.length === 1 ? "" : "s"} in this folder.`, data: { sessions: list }, next: list.some((s) => s.status === "in_progress") ? [] : START_NEXT }; }
     else if (["screen", "tap", "type", "scroll", "back", "screenshot", "record"].includes(verb)) done = await actSession(deps, verb, rest, { id: flags.id, out: flags.out, noFrame: flags["no-frame"] === "true" });
@@ -262,7 +287,8 @@ export async function session(argv: string[], deps: SessionDeps = defaultDeps())
     (exit ? console.error : console.log)(doc.summary);
     const screen = (doc.data as { screen?: string }).screen;
     if (screen) console.log(screen);
-    if (verb === "list") for (const s of (doc.data as { sessions?: SessionRecord[] }).sessions ?? []) console.log(`${s.id}  ${s.status}  ${s.platform}  ${s.name}  ${s.url}`);
+    if (verb === "devices") for (const m of (doc.data as { devices?: PhoneModel[] }).devices ?? []) console.log(`${m.name.padEnd(18)} ${m.platform.padEnd(8)} ${m.width}x${m.height} @${m.scale}x`);
+    if (verb === "list") for (const s of (doc.data as { sessions?: SessionRecord[] }).sessions ?? []) console.log(`${s.id}  ${s.status}  ${s.device ?? s.platform}  ${s.name}  ${s.url}`);
     for (const n of doc.next) console.error(`next: ${n.command}  (${n.why})`);
   }
   return exit;

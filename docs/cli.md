@@ -186,7 +186,8 @@ shipvo agents setup --json       # machine-readable result
 Open any Expo app on a headless Shipvo Phone and drive it from the shell, on Android and iOS. It needs no `shipvo.json`.
 
 ```bash
-shipvo session start [android|ios] [--name <n>] [--max-duration-minutes 30] [--port <n>] [--skip-build] [--json]
+shipvo session start [android|ios] [--device "<model>"] [--name <n>] [--max-duration-minutes 30] [--port <n>] [--skip-build] [--json]
+shipvo session devices
 shipvo session screen | tap <ref> | type <ref> <text> | scroll <up|down|left|right> [<ref>] | back
 shipvo session screenshot [--out <file>] [--no-frame]
 shipvo session record start | record stop [--out <file>]

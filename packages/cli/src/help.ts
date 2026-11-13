@@ -13,7 +13,7 @@ Start
   sim --watch [--verbose]     Rebuild on file changes and keep serving; --verbose shows full build errors
                               First run installs playwright and, if no Chrome or Edge is found, downloads Chromium once.
                               Set SHIPVO_NO_AUTO_INSTALL=1 to turn the automatic installs off.
-  session start [android|ios] [--max-duration-minutes 30] [--json]  Open any Expo app on a headless Shipvo Phone that stops on its own; then session screen | tap <ref> | type <ref> <text> | scroll <dir> | back | screenshot | record start|stop | get | list | stop
+  session start [android|ios] [--device "<model>"] [--max-duration-minutes 30] [--json]  Open any Expo app on a headless Shipvo Phone that stops on its own; then session screen | tap <ref> | type <ref> <text> | scroll <dir> | back | screenshot | record start|stop | devices | get | list | stop
   smoke [android|ios] [--timeout 30] [--json]  Check the app loads in the simulator as the Android (default) or iPhone-style phone: no thrown errors, a first screen with elements (exit 0 ok, 1 failed, 2 setup error)
   run android|ios [--no-open] [--port n] [--lan]  Open the app in a phone frame in your browser (no Playwright)
                               --lan also serves it to a phone on your Wi-Fi: URL + QR code, token required

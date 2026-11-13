@@ -48,6 +48,7 @@ import { searchPhone, SearchError } from "./search.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
 import { statusFromDevice } from "./frame.mjs";
+import { MODELS, findModel, modelContext } from "./models.mjs";
 import { capturePage, contentSize, showShot, shotArgs, encodeFrames, CaptureError } from "./capture.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
@@ -168,7 +169,7 @@ async function framed(s, buf, mime, jpeg) {
       s.framePage = await s.frameCtx.newPage(); await s.framePage.setContent(cp.html);
     }
     const c = s.conn ?? initialConnectivity();
-    await s.framePage.evaluate(showShot, shotArgs(buf, mime, statusFromDevice({ online: networkOf(c, s.netProfile ?? "online").online, airplane: c.airplane, wifi: c.wifi, mobileData: c.mobile_data }, nowOf(s))));
+    await s.framePage.evaluate(showShot, shotArgs(buf, mime, s.skin, statusFromDevice({ online: networkOf(c, s.netProfile ?? "online").online, airplane: c.airplane, wifi: c.wifi, mobileData: c.mobile_data }, nowOf(s))));
     return s.framePage.screenshot(jpeg ? { type: "jpeg", quality: 85 } : { omitBackground: true });
   });
   s.frameQueue = job; return job;
@@ -192,6 +193,9 @@ async function newSession(id, opts = {}) {
   const room = opts.room == null ? undefined : String(opts.room);
   if (room !== undefined && !/^[\w-]{1,64}$/.test(room)) throw new SimError("bad_room", "room must be 1 to 64 letters, digits, _ or -");
   if (sessions.has(id)) { specHost.dropSession(id); const old = sessions.get(id); for (const p of old.peers ?? []) p.close(); closeWatchers(old); await (await old.browserP?.catch(() => undefined))?.close(); await old.ctx.close().catch(() => {}); old.inbox?.close(); old.wakeups?.close(); clearInterval(old.reminderTimer); sessions.delete(id); leaveRoom(old, id); }
+  const model = opts.model == null ? null : findModel(opts.model);
+  if (opts.model != null && !model) throw new SimError("bad_model", `unknown phone model "${String(opts.model).slice(0, 40)}". Models: ${MODELS.map((m) => m.name).join(", ")}`);
+  if (model) opts = { ...opts, skin: model.platform, device: { ...(opts.device ?? {}), platform: opts.device?.platform ?? model.platform } };
   let target, buildId;
   if (opts.build_url != null) {
     // Fetch the build before anything else is created, so a bad URL leaves no session behind.
@@ -211,7 +215,8 @@ async function newSession(id, opts = {}) {
   const size = Number.isInteger(opts.width) && Number.isInteger(opts.height) && opts.width > 0 && opts.height > 0 ? { viewport: { width: Math.round(opts.width / (opts.scale || 1)), height: Math.round(opts.height / (opts.scale || 1)) }, deviceScaleFactor: opts.scale || 1 } : {};
   // fit_frame: the app gets exactly the app area of its Android or iOS frame, so framed screenshots and recordings show the phone at its real size.
   const fit = opts.fit_frame === true ? { viewport: contentSize(opts.skin), deviceScaleFactor: 2 } : {};
-  ctx = await browser.newContext({ ...phone, ...fit, ...size, colorScheme: opts.dark ? "dark" : "light" });
+  // model: the session is a real phone model, with that phone's screen size, pixel ratio and user agent.
+  ctx = await browser.newContext({ ...phone, ...fit, ...(model ? modelContext(model) : {}), ...size, colorScheme: opts.dark ? "dark" : "light" });
   // The app's Linking.openURL for a web page lands here (see @shipvo/device): it opens in the Browser app, not in the app.
   await ctx.exposeFunction("__pnOpenBrowser", (url) => openInBrowserApp(id, String(url)));
   // The app's Linking.openURL for another installed app's scheme lands here: the phone switches to that app and hands it the link once.
@@ -241,7 +246,7 @@ async function newSession(id, opts = {}) {
   const patch = profilePatch(apps);
   if (Object.keys(patch).length) { await page.evaluate((p) => globalThis.__pnDevice?.set?.(p), patch); await syncMedia(page); }
   if (apps.network) { try { getProfile(apps.network); } catch (e) { await ctx.close(); throw new SimError("bad_profile", `phone.json: ${e.message}`); } }
-  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, room, skin: opts.skin === "ios" ? "ios" : "android", startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav(), inbox: createInbox() });
+  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, room, skin: opts.skin === "ios" ? "ios" : "android", model: model?.name ?? null, startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav(), inbox: createInbox() });
   await ensureNetworkRoute(sessions.get(id), page);   // the mail sink answers from the first page load
   if (buildId) sessions.get(id).build = buildId;
   if (apps.network && apps.network !== "online") await setNetworkProfile(sessions.get(id), page, apps.network);
@@ -1052,7 +1057,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== "POST") return send(404, { error: "not found" });
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
     if (url.pathname === "/apps") return send(200, { ok: true, apps: [{ id: DEFAULT_APP, name: APP_NAME }] });
-    if (url.pathname === "/sessions") return send(200, { ok: true, sessions: await Promise.all([...sessions.entries()].map(async ([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, skin: s.skin, streaming: isWatched(s) || !!s.browser?.screencast, url: s.page.url(), room: s.room ?? null, title: await s.page.title().catch(() => "") }))) });
+    if (url.pathname === "/sessions") return send(200, { ok: true, sessions: await Promise.all([...sessions.entries()].map(async ([id, s]) => ({ session: id, app: s.app, release: s.release, started_at: s.startedAt ?? null, skin: s.skin, model: s.model ?? null, streaming: isWatched(s) || !!s.browser?.screencast, url: s.page.url(), room: s.room ?? null, title: await s.page.title().catch(() => "") }))) });
     if (url.pathname === "/room_log" || url.pathname === "/room_note") {
       const room = String(body.room ?? "");
       if (!rooms.has(room)) return send(200, { ok: false, code: "no_room", error: `no open room "${room}"` });
@@ -1096,7 +1101,7 @@ const server = http.createServer(async (req, res) => {
       for (const s of skipped) failed.push({ session: s.session, error: s.error });
       return send(200, { ok: true, imported, ...(failed.length ? { failed } : {}) });
     }
-    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof BuildCacheError || (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_room" || e.code === "bad_app"))) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, ...(s.build ? { build: s.build } : {}), screen: await screen(s.page) }); }
+    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof BuildCacheError || (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_model" || e.code === "bad_room" || e.code === "bad_app"))) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, ...(s.build ? { build: s.build } : {}), ...(s.model ? { model: s.model, skin: s.skin } : {}), screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const s0 = sessions.get(body.session); const prevScreen = s0?.lastScreen; const r = await act(body.session, body);
         if (s0 && typeof r.screen === "string") { s0.lastScreen = r.screen; watch.step(body.session, describeStep(body, prevScreen), changeLine(prevScreen, r.screen)); }

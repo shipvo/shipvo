@@ -66,6 +66,28 @@ test("a session without fit_frame keeps its size and can still be framed", async
   assert.deepEqual(pngSize(framed.path), [phone.width * 2, phone.height * 2]);
 });
 
+test("a session started as a phone model is that phone: its screen, pixel ratio, user agent and platform", async () => {
+  const opened = await call("/session", { session: "cap-model", model: "iphone 16 pro" });
+  assert.ok(opened.ok, opened.error);
+  assert.equal(opened.model, "iPhone 16 Pro"); assert.equal(opened.skin, "ios");
+  const list = (await call("/sessions", {})).sessions.find((s) => s.session === "cap-model");
+  assert.equal(list.model, "iPhone 16 Pro"); assert.equal(list.skin, "ios");
+  const plain = await act("cap-model", { action: "screenshot" });
+  assert.deepEqual(pngSize(plain.path), [402 * 3, (874 - 54 - 34) * 3], "the app area at the phone's own pixel ratio");
+  const phone = capturePage({ skin: "ios", width: 402, height: 874 - 54 - 34 });
+  assert.deepEqual(pngSize((await act("cap-model", { action: "screenshot", frame: true })).path), [phone.width * 2, phone.height * 2]);
+  const android = await call("/session", { session: "cap-pixel", model: "Pixel 8" });
+  assert.equal(android.skin, "android");
+});
+
+test("an unknown phone model is refused with the list of models, and leaves no session", async () => {
+  const r = await call("/session", { session: "cap-nokia", model: "Nokia 3310" });
+  assert.equal(r.ok, false); assert.equal(r.code, "bad_model");
+  assert.match(r.error, /Pixel 8/); assert.match(r.error, /iPhone 16/);
+  const list = (await call("/sessions", {})).sessions;
+  assert.equal(list.some((s) => s.session === "cap-nokia"), false);
+});
+
 test("record_start then record_stop saves an MP4 of the framed phone in the session folder", { skip: !hasFfmpeg && "ffmpeg is not installed" }, async () => {
   assert.ok((await call("/session", { session: "cap-rec", skin: "android", fit_frame: true })).ok);
   const started = await act("cap-rec", { action: "record_start" });

@@ -39,9 +39,9 @@ export const showShot = async ([src, time, icons]) => {
   const i = document.querySelector(".sf-icons"); if (i) i.innerHTML = icons;
 };
 
-/** The arguments for `showShot`: the app picture as a data URL and the status bar for `status`. */
-export function shotArgs(buf, mime, status) {
-  const { time, icons } = statusParts(status);
+/** The arguments for `showShot`: the app picture as a data URL and the status bar for `status`, drawn as `skin` draws it. */
+export function shotArgs(buf, mime, skin, status) {
+  const { time, icons } = statusParts(status, skin);
   return [`data:${mime};base64,${buf.toString("base64")}`, time, icons];
 }
 

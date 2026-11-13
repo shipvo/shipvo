@@ -27,6 +27,31 @@ This page is for you if you have an Expo app and a coding agent that can run she
    - textbox "Your name" [ref=e8]
    ```
 
+## Pick a phone model
+
+A session is a real phone model, with that phone's screen size, pixel ratio and user agent. `session start android` is a Pixel 8 and `session start ios` is an iPhone 16. Name another one with `--device`:
+
+```bash
+shipvo session start --device "iPhone 16 Pro"
+shipvo session start --device "Galaxy S24"
+shipvo session devices          # every model, with its platform and screen size
+```
+
+The model decides the platform, so `android` or `ios` can be left out. The app gets the phone's screen without the status bar and the bottom bar, as an app does on that phone, and `data.device` in the result names the model. Screenshots and recordings show the frame at that phone's proportions, with the status bar icons in the platform's order.
+
+| Model | Platform | Screen (CSS pixels) | Pixel ratio |
+| --- | --- | --- | --- |
+| Pixel 7, Pixel 8 | Android | 412x915 | 2.625 |
+| Pixel 8 Pro, Pixel 9 Pro XL | Android | 448x997 | 3 |
+| Pixel 9 | Android | 360x808 | 3 |
+| Pixel 9 Pro | Android | 427x952 | 3 |
+| Galaxy S24 | Android | 360x780 | 3 |
+| Galaxy A55 | Android | 480x1040 | 2.25 |
+| iPhone 15, iPhone 16 | iOS | 393x852 | 3 |
+| iPhone 15 Pro Max | iOS | 430x932 | 3 |
+| iPhone 16 Pro, iPhone 17 | iOS | 402x874 | 3 |
+| iPhone 16 Pro Max, iPhone 17 Pro Max | iOS | 440x956 | 3 |
+
 The session stops on its own at `data.expires_at`. `--max-duration-minutes` sets that time (default 30, at most 1440).
 
 ## Drive the phone
@@ -50,7 +75,7 @@ shipvo session screenshot --out shots/home.png
 
 | | Android | iOS |
 | --- | --- | --- |
-| App area | 412x855 | 393x764 |
+| App area (Pixel 8, iPhone 16) | 412x855 | 393x764 |
 | Top | Status bar with punch-hole camera | Status bar with Dynamic Island |
 | Bottom | Gesture bar | Home indicator |
 
@@ -102,6 +127,7 @@ With `--json` every command prints `{ ok, code, summary, data, next }` on stdout
 | --- | --- |
 | `id` | The session id, for `--id`. |
 | `platform` | `android` or `ios`. |
+| `device` | The phone model, for example `iPhone 16`. |
 | `status` | `in_progress`. |
 | `url`, `watch_url` | The simulator's address and the live view. |
 | `started_at`, `expires_at` | When it started and when it stops on its own. |
@@ -118,6 +144,7 @@ With `--json` every command prints `{ ok, code, summary, data, next }` on stdout
 | `no_browser` | No Chromium was found and it could not be installed. | Run `shipvo doctor`. |
 | `no_session` | No running session, or the id is unknown. | Run `shipvo session list`, or start one. |
 | `session_stopped` | The session ended. | Start a new one. |
+| `bad_model` | The `--device` name is not a model Shipvo knows, or it is not a phone of the platform you named. | Run `shipvo session devices` and use a name from it. |
 | `no_ffmpeg` | `record stop` did not find ffmpeg. | Install ffmpeg, then record again. |
 | `recording_active` | `record start` was called while a recording runs. | Run `shipvo session record stop` first. |
 | `no_recording` | `record stop` was called with no recording running. | Run `shipvo session record start` first. |

@@ -54,9 +54,9 @@ export function isDarkBackground(color) {
 }
 
 /** The parts of the status bar that change: the clock text and the icons markup. */
-export function statusParts(status) {
+export function statusParts(status, skin = "ios") {
   const st = normalizeStatus(status);
-  return { time: st.time, icons: icons(st) };
+  return { time: st.time, icons: icons(st, skin) };
 }
 
 /**
@@ -70,7 +70,7 @@ var statusParts=${statusParts.toString()},normalizeStatus=${normalizeStatus.toSt
 var clean=${clean.toString()},clamp=${clamp.toString()};
 var dev={online:true,airplane:false,battery:{level:100,charging:false}};
 function root(){return document.querySelector('[data-part="phone-body"]')}
-function draw(){var r=root();if(!r)return;var p=statusParts(statusFromDevice(dev,new Date()));
+function draw(){var r=root();if(!r)return;var p=statusParts(statusFromDevice(dev,new Date()),${JSON.stringify(skin === "ios" ? "ios" : "android")});
 r.querySelector('[data-part="time"]').textContent=p.time;var lt=r.querySelector('[data-part="lock-time"]');if(lt)lt.textContent=p.time;r.querySelector(".sf-icons").innerHTML=p.icons}
 function topColor(w){try{var d=w.document,e=d.elementFromPoint(Math.floor(w.innerWidth/2),1);
 while(e){var c=w.getComputedStyle(e).backgroundColor;if(c&&c!=="transparent"&&!/rgba\\(.*,\\s*0\\)$/.test(c))return c;e=e.parentElement}var b=d.body&&w.getComputedStyle(d.body).backgroundColor;if(b&&!/rgba\\(.*,\\s*0\\)$/.test(b)&&b!=="transparent")return b}catch(x){}return"#fff"}
@@ -161,7 +161,8 @@ setInterval(function(){if(document.hidden)return;var f=document.getElementById($
 
 const svg = (w, h, body, extra = "") => `<svg class="sf-ico" ${extra} width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${body}</svg>`;
 
-function icons(st) {
+// Android shows Wi-Fi, then signal, then battery. iOS shows signal, then Wi-Fi, then battery.
+function icons(st, skin = "ios") {
   if (st.airplane) {
     return svg(16, 16, `<path d="M8 1.5 9.4 6.5 15 9.5v1.4l-5.6-1.5-.4 3 1.6 1.2v1L8 14.7 5.4 15.6v-1L7 13.4l-.4-3L1 10.9V9.5l5.6-3z" fill="currentColor"/>`, 'data-part="airplane"');
   }
@@ -171,7 +172,7 @@ function icons(st) {
   const wifi = st.wifi
     ? svg(16, 12, `<path d="M1 4.5a10 10 0 0 1 14 0M3.5 7.2a6.4 6.4 0 0 1 9 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="10" r="1.4" fill="currentColor"/>`, 'data-part="wifi"')
     : "";
-  return signal + wifi + battery(st.battery);
+  return (skin === "android" ? wifi + signal : signal + wifi) + battery(st.battery);
 }
 
 function battery(b) {
@@ -199,7 +200,7 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     ? `<span class="sf-cut sf-island" data-part="dynamic-island"></span>`
     : `<span class="sf-cut sf-hole" data-part="punch-hole"></span>`;
   const html = `<div class="sf-body" data-skin="${skin}" data-theme="${dark ? "dark" : "light"}" data-part="phone-body">`
-    + `<div class="sf-screen"><div class="sf-status" data-part="status-bar"><span class="sf-time" data-part="time">${st.time}</span>${shape}${lumi ? lumiHtml() : ""}<span class="sf-icons">${icons(st)}</span></div>`
+    + `<div class="sf-screen"><div class="sf-status" data-part="status-bar"><span class="sf-time" data-part="time">${st.time}</span>${shape}${lumi ? lumiHtml() : ""}<span class="sf-icons">${icons(st, skin)}</span></div>`
     + `<div class="sf-content">${screen}</div>` + (lumi ? lumiCaptionHtml() : "") + updateBannerHtml()
     + shadeHtml(skin) + `<span class="sf-edge" data-part="edge-swipe"></span>` + homeScreenHtml().replace(/<\/div>$/, settingsIconHtml() + storeIconHtml() + "</div>") + settingsHtml() + storeScreenHtml() + recentsHtml() + lockScreenHtml(st.time) + bootScreenHtml() + offScreenHtml() + (lumi && guide ? guideHtml() : "")
     + `<div class="sf-vol" data-part="volume-overlay" role="status" aria-live="polite" hidden><span data-part="volume-level">50</span><i class="sf-vbar" data-part="volume-bar"><b style="width:50%"></b></i></div><div class="sf-menu" data-part="power-menu" role="menu" aria-label="Power menu" hidden><button role="menuitem" data-act="restart">Restart</button><button role="menuitem" data-act="poweroff">Power off</button>${skin === "android" ? `<button role="menuitem" data-act="navstyle" data-part="nav-style-toggle">3-button navigation</button>` : ""}<button role="menuitem" data-act="cancel">Cancel</button></div>`
