@@ -9,7 +9,7 @@ Founders: you can skip this page. Your assistant uses these controls for you whe
 | Part | What it is | Tools |
 | --- | --- | --- |
 | Home screen and app switcher | Your app's icon, a switcher card, 3-button or swipe navigation | `press_home`, `open_recents`, `resume_app`, `kill_app` |
-| Power and volume | Lock screen, restart, volume overlay | `lock`, `unlock`, `restart` |
+| Power and volume | Lock screen, restart, volume overlay | `lock`, `unlock`, `restart`, `set_lock_method` |
 | Shade, Notification Center, Control Center | Quick tiles and notifications | `open_notifications`, `open_control_center`, `toggle_tile`, `dismiss_notification`, `close_panels` |
 | Settings | System switches your app can read | `get_settings`, `set_setting` |
 | Browser | A separate web browser on the phone | `browser_open` and the other `browser_*` tools |
@@ -385,7 +385,9 @@ Which mechanism fits which assistant:
 | `host_not_allowed` | The address is private | Use a public URL, or pass `allow_hosts` for that host |
 | `unknown_setting` / `bad_value` | Wrong key or value | Use the table above |
 | `app_not_foreground` | The home screen or switcher is showing | Call `resume_app` |
-| `phone_locked` | The phone is locked | Call `unlock` |
+| `phone_locked` | The phone is locked | Call `unlock` (with `pin` when the phone has a PIN) |
+| `pin_required` | The phone has a PIN and `unlock` had none | Call `unlock` with `pin` |
+| `wrong_pin` | The PIN is wrong | Try again with the right PIN |
 | The Secrets screen is empty | No key is saved for the apps on this phone, or the simulator cannot reach the saved-key routes | Save a key for an app first; check that the simulator is running |
 | "Could not revoke this key. Try again." | The simulator did not accept the request or could not be reached; the key is still saved | Check the simulator is running, then tap **Revoke** again |
 | `bad_placement` from `arrange_apps` | A field is unknown, `position` is not a whole number from 0 to 99, or `days`, `from` or `to` is not valid | Use `pinned`, `hidden`, `position` and `schedule`; days are `sun` to `sat` and times look like `09:00` |

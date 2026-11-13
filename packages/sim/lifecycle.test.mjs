@@ -7,8 +7,25 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pickPort } from "./test-port.mjs";
-import { createLifecycle, lock, unlock, restart, assertUnlocked } from "./lifecycle.mjs";
+import { createLifecycle, lock, unlock, restart, assertUnlocked, setLockMethod } from "./lifecycle.mjs";
 import { renderFrame, statusClientScript } from "./frame.mjs";
+
+test("a PIN is needed to unlock, restart keeps the phone locked, and the PIN is never logged", () => {
+  const st = createLifecycle();
+  assert.throws(() => setLockMethod(st, { method: "pin", pin: "12" }), { code: "bad_pin" });
+  assert.throws(() => setLockMethod(st, { method: "face" }), { code: "bad_method" });
+  setLockMethod(st, { method: "pin", pin: "2468" });
+  lock(st);
+  assert.throws(() => unlock(st), { code: "pin_required" });
+  assert.throws(() => unlock(st, { pin: "0000" }), { code: "wrong_pin" });
+  assert.equal(st.failed, 1); assert.equal(st.locked, true);
+  restart(st); assert.equal(st.locked, true);
+  unlock(st, { pin: "2468" }); assert.equal(st.locked, false); assert.equal(st.failed, 0);
+  assert.throws(() => setLockMethod(st, { method: "none" }), { code: "wrong_pin" });
+  setLockMethod(st, { method: "none", current: "2468" });
+  lock(st); unlock(st); assert.equal(st.locked, false);
+  assert.ok(!JSON.stringify(st.log).includes("2468"));
+});
 
 test("lock, unlock and restart change state and log as simulated", () => {
   const st = createLifecycle();

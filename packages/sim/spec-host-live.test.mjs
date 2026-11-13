@@ -239,6 +239,20 @@ for (const style of ["android", "ios"]) {
 }
 
 for (const style of ["android", "ios"]) {
+  test(`${style}: a PIN lock screen needs the PIN, survives a restart, and a wrong PIN is refused`, async () => {
+    const sid = `sp-pin-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "set_lock_method", method: "pin", pin: "2468" })).ok, true);
+    assert.equal((await act(sid, { action: "phone_apps" })).lock_method, "pin");
+    await act(sid, { action: "lock" });
+    assert.equal((await act(sid, { action: "unlock" })).code, "pin_required");
+    assert.equal((await act(sid, { action: "unlock", pin: "1111" })).code, "wrong_pin");
+    const r = await act(sid, { action: "restart" });
+    assert.equal(r.locked, true);
+    assert.equal((await act(sid, { action: "unlock", pin: "2468" })).locked, false);
+    assert.equal((await act(sid, { action: "set_lock_method", method: "none" })).code, "wrong_pin");
+    assert.equal((await act(sid, { action: "set_lock_method", method: "none", current: "2468" })).ok, true);
+  });
   test(`${style}: share puts text into another app, and the clipboard survives switching apps`, async () => {
     const NOTES = JSON.parse(readFileSync(new URL("../../templates/notes-tasks/app.json", import.meta.url), "utf8"));
     const sid = `sp-share-${style}`;
