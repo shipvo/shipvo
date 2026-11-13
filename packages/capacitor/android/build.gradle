@@ -14,5 +14,7 @@ android {
 
 dependencies {
     implementation project(':capacitor-android')
+    // bzip2 for the BSDIFF40 patch step; the same version packages/runtime uses.
+    implementation 'org.apache.commons:commons-compress:1.21'
     testImplementation "junit:junit:4.13.2"
 }
