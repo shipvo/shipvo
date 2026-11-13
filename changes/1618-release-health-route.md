@@ -1,0 +1,2 @@
+- `@shipvo/control-plane`: new read-only route `GET /health/<app>/releases` with applied, healthy, reverted and failed counts per release for Android and iOS, and the bands serving each release.
+- Migration: none; new route.
