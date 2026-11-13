@@ -43,12 +43,12 @@ Order of priority when choosing work: **correctness and safety of updates > reli
 
 ## Now
 
+The planner keeps this list current: the epics in flight, newest owner direction first. Each line links its epic; open the epic for its slices.
+
 The three bets of the 2026-11-10 strategy review come first, because they move adoption and trust ([strategy](product/strategy.md)):
 - Adopt mode proven on Expo managed, Expo prebuilt and bare React Native apps, to a first healthy update on the Android emulator and the iOS Simulator (#1613)
 - Release health at a glance: applied, healthy, reverted and halted per release in the API, CLI and `/admin` (#1614)
 - The Shipvo release format as an open spec with conformance vectors (#1615)
-
-The planner keeps this list current: the epics in flight, newest owner direction first. Each line links its epic; open the epic for its slices.
 
 **Lumi (owner direction, 6 Nov 2026):**
 - Lumi in every Shipvo Phone: the assistant that shows each step live, reacts to results, appears in recordings and guides new users (#872)
