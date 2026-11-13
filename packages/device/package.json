@@ -9,6 +9,7 @@
   "files": [
     "src",
     "metro.cjs",
+    "babel.cjs",
     "README.md"
   ],
   "scripts": {
@@ -83,6 +84,7 @@
       "default": "./src/index.ts"
     },
     "./metro": "./metro.cjs",
+    "./babel": "./babel.cjs",
     "./package.json": "./package.json",
     "./scan": {
       "types": "./src/scan.tsx",
