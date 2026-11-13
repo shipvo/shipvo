@@ -85,6 +85,8 @@ The planner keeps this list current: the epics in flight, newest owner direction
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-13: `room_report` gives a lead agent one summary per session in a room ([Agents](agents.md#room-log-and-notes), #1595)
+- 2026-11-13: `@shipvo/mcp-tools` publishes every Shipvo MCP tool as data ([The MCP tool registry](mcp-tools.md), #1647)
 - 2026-11-13: `shipvo session start android|ios` opens any Expo app on a headless Shipvo Phone with framed screenshots, video and real phone models ([Test any Expo app from the terminal](session.md), #1641, #1643)
 - 2026-11-13: Shipvo Phone reads A2UI 1.0, and `a2ui_open`, `a2ui_send` and `a2ui_actions` tools are in `@shipvo/mcp` ([A2UI](a2ui.md), #1645, #1646)
 - 2026-11-13: A bug-catch benchmark counts seeded app bugs caught on Android and iOS ([Bug-catch benchmark](bug-bench.md), #1642)
