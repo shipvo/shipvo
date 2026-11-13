@@ -18,7 +18,9 @@ The device hardware bugs are set up through the simulated device: the check sets
 
 ## Result
 
-Measured on 13 Nov 2026 in a development container (Linux, 4 CPUs, Node 22.23.4, Chrome Headless Shell), with `node bench/run.mjs`. A bug that exists on one platform only is counted on that platform only, so the 23 bugs give 45 checks.
+Measured on 13 Nov 2026. A bug that exists on one platform only is counted on that platform only, so the 23 bugs give 45 checks.
+
+The first row is from CI on a GitHub-hosted Linux runner: [run 43383998094](https://github.com/shipvo/shipvo/actions/runs/43383998094), job `test`, step `pnpm -r test`, which printed `Total: 45 of 45 caught`. The second row was measured in a development container (Linux, 4 CPUs, Node 22.23.4, Chrome Headless Shell) with `BUG_BENCH_PHONE_PLATFORM=off node bench/run.mjs`; the same container also measured 45 of 45 for the first row.
 
 | Build | Android | iOS | Total |
 | --- | --- | --- | --- |
