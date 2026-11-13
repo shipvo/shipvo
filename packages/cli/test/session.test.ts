@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { session, projectInfo, type SessionDeps } from "../src/session";
@@ -121,6 +121,22 @@ describe("shipvo session", () => {
     expect(exit).toBe(1); expect(doc.code).toBe("web_deps_missing");
     expect(doc.next[0].command).toBe("npx expo install react-native-web @expo/metro-runtime");
     expect(state.builds).toBe(0);
+  });
+
+  it("a web package the app does not list but has installed is not reported as missing", async () => {
+    const { deps, state, root } = setup({ name: "game", dependencies: { expo: "55", "expo-router": "6", "react-native-web": "1", "react-dom": "19" } });
+    mkdirSync(join(root, "node_modules", "@expo", "metro-runtime"), { recursive: true });
+    writeFileSync(join(root, "node_modules", "@expo", "metro-runtime", "package.json"), JSON.stringify({ name: "@expo/metro-runtime", version: "6.0.0" }));
+    const { doc, exit } = await run(deps, ["start"]);
+    expect(exit).toBe(0); expect(doc.code).toBe("started");
+    expect(state.builds).toBe(1);
+  });
+
+  it("an app on an Expo version older than 49 is not asked for @expo/metro-runtime", async () => {
+    const { deps, state } = setup({ name: "conf", dependencies: { expo: "^48.0.0", "react-native-web": "~0.18.7", "react-dom": "18.2.0" } });
+    const { doc } = await run(deps, ["start"]);
+    expect(doc.code).toBe("started");
+    expect(state.builds).toBe(1);
   });
 
   it("refuses a folder that is not an Expo app", async () => {

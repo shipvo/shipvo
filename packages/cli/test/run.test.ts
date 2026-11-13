@@ -84,6 +84,27 @@ describe("frame page, live status bar", () => {
   });
 });
 
+describe("describeWebBuildFailure, npm refusals", () => {
+  it("says which Node version the app needs when npm refuses to run the build", () => {
+    const out = 'npm error code EBADDEVENGINES\nnpm error EBADDEVENGINES Invalid devEngines.runtime\nnpm error EBADDEVENGINES Invalid semver version "^24.22.1" does not match "v22.23.4" for "runtime"\nnpm error A complete log of this run can be found in: /root/.npm/_logs/x-debug-0.log';
+    expect(describeWebBuildFailure(out)).toBe("The app needs Node ^24.22.1 and this machine runs Node 22.23.4. Switch to that Node version, then start again.");
+  });
+  it("says what to add when the app is not set up to build for web with Metro", () => {
+    const msg = describeWebBuildFailure('CommandError: Platform "web" is not configured to use the Metro bundler in the project Expo config.');
+    expect(msg).toContain('"web": { "bundler": "metro" }');
+    expect(msg).not.toContain("--native");
+  });
+  it("quotes a compile error and its file, not a line from the stack trace", () => {
+    const out = "Bundling\nSyntaxError: node_modules/react-native-reanimated/lib/index.web.js: /home/me/app/node_modules/react-native-reanimated/lib/index.web.js: Export namespace should be first transformed by `@babel/plugin-proposal-export-namespace-from`.\n    at File.buildCodeFrameError (/home/me/app/node_modules/@babel/core/lib/transformation/file/file.js:205:12)\n    at emit (node:internal/child_process:949:14)";
+    expect(describeWebBuildFailure(out)).toBe("The app cannot build for web (in node_modules/react-native-reanimated/lib/index.web.js): Export namespace should be first transformed by `@babel/plugin-proposal-export-namespace-from`.");
+  });
+  it("quotes the line that says what went wrong, not npm's pointer to its log file", () => {
+    const msg = describeWebBuildFailure("npm error code E404\nnpm error 404 Not Found - GET https://registry.example/expo\nnpm error A complete log of this run can be found in: /root/.npm/_logs/x-debug-0.log");
+    expect(msg).toContain("404 Not Found");
+    expect(msg).not.toContain("complete log");
+  });
+});
+
 describe("frame page, shared renderer", () => {
   it("uses the sim frame body, with light and dark status text and no badge on the phone", () => {
     for (const p of ["android", "ios"] as const) {

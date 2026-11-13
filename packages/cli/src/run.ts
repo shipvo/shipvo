@@ -277,12 +277,21 @@ export async function startRunServer(opts: { dir: string; platform: Platform; na
 
 /** Names the module or file a web build failed on, from the build's error output. */
 export function describeWebBuildFailure(output: string): string {
+  // npm refuses to run the build when the app asks for another Node version (devEngines).
+  const eng = /Invalid semver version "([^"]+)" does not match "v?([^"]+)" for "runtime"/.exec(output);
+  if (eng) return `The app needs Node ${eng[1]} and this machine runs Node ${eng[2]}. Switch to that Node version, then start again.`;
+  // Expo builds for web with Metro only when the app's config says so (older apps default to another bundler).
+  if (/Platform "web" is not configured to use the Metro bundler/.test(output)) return `The app is not set up to build for web with Metro. Add "web": { "bundler": "metro" } under "expo" in app.json (or app.config.js), then start again.`;
   const m = /Unable to resolve module ['"]?([^'"\s]+)['"]?(?: from ['"]?([^'":\s]+))?/.exec(output)
     ?? /Module not found: (?:Error: )?Can't resolve '([^']+)'(?: in '([^']+)')?/.exec(output)
     ?? /Cannot find module ['"]([^'"]+)['"]/.exec(output);
   if (m) return `The app cannot build for web: ${m[1]} fails to resolve${m[2] ? ` (from ${m[2]})` : ""}. Fix or stub that module for web, or use \`shipvo run <platform> --native\`.`;
+  // A compile error: quote the error itself, with the file it names, not a line from the stack trace under it.
+  const err = /^\s*(\w*Error): (?:(\S+\.(?:tsx?|jsx?|json)): )?(?:\/\S+: )?(.+)$/m.exec(output);
+  if (err?.[2]) return `The app cannot build for web (in ${err[2]}): ${err[3].trim().slice(0, 240)}`;
   const f = /(?:SyntaxError|Error)[^\n]*\n?[^\n]*?(\S+\.(?:tsx?|jsx?|json))/.exec(output) ?? /(\S+\.(?:tsx?|jsx?|json))/.exec(output);
-  const last = output.trim().split("\n").slice(-1)[0] ?? "";
+  // npm ends with a line that only points at its log file: the line before it says what went wrong.
+  const last = output.trim().split("\n").filter((l) => !/A complete log of this run can be found in/.test(l)).slice(-1)[0] ?? "";
   return `The app cannot build for web${f ? ` (in ${f[1]})` : ""}: ${last || "see the build output above"}. Use \`shipvo run <platform> --native\` to run it natively.`;
 }
 

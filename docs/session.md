@@ -6,7 +6,7 @@ This page is for you if you have an Expo app and a coding agent that can run she
 
 - An Expo app (a folder whose `package.json` lists `expo`).
 - Node 22.
-- The web packages Expo builds with: `react-native-web`, `react-dom` and `@expo/metro-runtime`. If one is missing, `session start` names it and prints the command that adds it.
+- The web packages Expo builds with: `react-native-web`, `react-dom` and, from Expo 49, `@expo/metro-runtime`. A package another dependency already installs counts. If one is missing, `session start` names it and prints the command that adds it.
 
 ## Start a session
 
@@ -27,9 +27,16 @@ This page is for you if you have an Expo app and a coding agent that can run she
    - textbox "Your name" [ref=e8]
    ```
 
-## Apps that use expo-router
+## Apps with a router
 
-`session start` sees `expo-router` in your `package.json` and opens the app at its own root route, so the first screen is your index route. Moving between screens, a phone restart on a deep screen such as `/feed/1`, and a reload all stay inside the app.
+`session start` sees `expo-router` or `@react-navigation/native` in your `package.json` and opens the app at its own root route, so the first screen is your index route. Moving between screens, a phone restart on a deep screen such as `/feed/1`, and a reload all stay inside the app.
+
+## What the phone does for a real app
+
+- **A build with a base path.** An app built with Expo's `experiments.baseUrl` (for example `/static`) gets its files under that path.
+- **An app that keeps the network busy.** The session opens once the app has loaded. It waits up to 5 seconds more for the network to go quiet, so an app that polls or streams still opens. `SHIPVO_SIM_NET_QUIET_MS` changes that wait.
+- **Sound.** The app may play sound without a tap first, as on a phone.
+- **A script that does not load.** It is recorded with the app's other errors, so a blank screen comes with its cause.
 
 ## Pick a phone model
 
@@ -144,7 +151,7 @@ With `--json` every command prints `{ ok, code, summary, data, next }` on stdout
 | --- | --- | --- |
 | `not_expo` | `package.json` has no `expo` dependency. | Run the command in your Expo app's folder. |
 | `web_deps_missing` | A web package is missing. | Run the command in `next`, then start again. |
-| `build_failed` | The web build failed. The summary names the module or file. | Fix or stub that module for web, then start again. |
+| `build_failed` | The web build failed. The summary names the cause: the module or file, the Node version the app needs, or the `"web": { "bundler": "metro" }` setting an older app has to add. | Do what the summary says, then start again. |
 | `no_browser` | No Chromium was found and it could not be installed. | Run `shipvo doctor`. |
 | `no_session` | No running session, or the id is unknown. | Run `shipvo session list`, or start one. |
 | `session_stopped` | The session ended. | Start a new one. |

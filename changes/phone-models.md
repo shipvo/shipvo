@@ -4,5 +4,10 @@
 - `@shipvo/sim`: `POST /session` takes `root_mount: true` for apps with a router that reads the address (expo-router). The app sees its own routes and no longer starts on its "not found" screen. A page load of an address the simulator does not know now redirects to the app under `/app/`.
 - `@shipvo/sim`: in framed screenshots and recordings the status bar and the bottom bar take the colour of the app's screen, with light marks on a dark screen.
 - `@shipvo/cli`: `shipvo session start` opens an app that depends on `expo-router` with `root_mount`.
+- `@shipvo/sim`: a local build made with a base path (Expo `experiments.baseUrl`, for example `/static`) gets its files under that path, so the app no longer stays blank.
+- `@shipvo/sim`: a session opens once the app has loaded and waits up to 5 seconds more for the network to go quiet (`SHIPVO_SIM_NET_QUIET_MS`), so an app that polls or streams still opens.
+- `@shipvo/sim`: the `errors` action lists scripts that did not load, and apps may play sound without a tap first.
+- `@shipvo/cli`: `shipvo session start` also uses `root_mount` for apps that depend on `@react-navigation/native`, accepts a web package that another dependency installs, and asks for `@expo/metro-runtime` only from Expo 49.
+- `@shipvo/cli`: a failed web build says why: the Node version the app needs, the `"web": { "bundler": "metro" }` setting an older app has to add, or the compile error and its file.
 - `@shipvo/cli`: `shipvo session start --device "<model>"` starts that model, and `shipvo session devices` lists the models. `session start android` is a Pixel 8 and `session start ios` is an iPhone 16.
 - Migration: the frame has no `simulated-label` part, and `outerHeight` is 14 pixels smaller. `statusParts(status, skin?)` in `@shipvo/sim/frame.mjs` takes an optional second argument. Sessions started without `model` are unchanged.

@@ -57,6 +57,12 @@ export type SessionDeps = {
 
 const readJson = (p: string): any => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; } };
 
+/** The Expo SDK number in a version range such as "~54.0.32". Expo 49 is the first to build for web with @expo/metro-runtime. */
+const expoMajor = (range: unknown) => Number(/(\d+)/.exec(String(range ?? ""))?.[1] ?? 99);
+
+/** True when the app can load a package it does not list itself, for example one that another dependency brings in. */
+const installed = (root: string, pkg: string) => { try { createRequire(join(root, "package.json")).resolve(`${pkg}/package.json`); return true; } catch { return false; } };
+
 /** What to call the app, from shipvo.json, then app.json, then package.json. Any Expo app qualifies. */
 export function projectInfo(root: string): { app: string; name: string; missingWebDeps: string[]; router: boolean } {
   const pkg = readJson(join(root, "package.json"));
@@ -66,7 +72,7 @@ export function projectInfo(root: string): { app: string; name: string; missingW
   const cfg = readJson(join(root, "shipvo.json")); const expo = readJson(join(root, "app.json"))?.expo ?? {};
   const raw = String(cfg?.appId ?? expo.slug ?? pkg.name ?? "app");
   const app = raw.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "app";
-  return { app, name: String(cfg?.name ?? expo.name ?? pkg.name ?? app), missingWebDeps: WEB_DEPS.filter((d) => !deps[d]), router: !!deps["expo-router"] };
+  return { app, name: String(cfg?.name ?? expo.name ?? pkg.name ?? app), missingWebDeps: WEB_DEPS.filter((d) => !deps[d] && !installed(root, d) && !(d === "@expo/metro-runtime" && expoMajor(deps.expo) < 49)), router: !!(deps["expo-router"] || deps["@react-navigation/native"]) };
 }
 
 const dirOf = (root: string) => join(root, ".shipvo", "sessions");
