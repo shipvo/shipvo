@@ -1,1 +1,0 @@
-- `site`: the playground Device API panel sets location, camera, biometrics, payment, notification and airplane mode on the Android and iOS phone, and the sample app shows each result.

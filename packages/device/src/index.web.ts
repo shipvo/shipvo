@@ -42,6 +42,9 @@ export type DeviceState = {
 const g = globalThis as any;
 const cfg = g.__PN_SIM__ ?? {};
 const platform: "android" | "ios" = cfg.device?.platform ?? "android"; const api: number = cfg.device?.api ?? 30;
+// The clipboard outlives a page load (switching apps), as on a phone: it is kept in sessionStorage for this tab.
+function keptClipboard(): string { try { return globalThis.sessionStorage?.getItem("pn.clipboard") ?? ""; } catch { return ""; } }
+function copy(text: string) { state.clipboard = text; try { globalThis.sessionStorage?.setItem("pn.clipboard", text); } catch { /* storage blocked: kept for this page only */ } }
 const state: DeviceState = {
   appName: cfg.appName ?? "This app", platform, api,
   // Before Android 13 (API 33) notifications need no runtime permission.
@@ -57,14 +60,16 @@ const state: DeviceState = {
   payment: { nextResult: "approve", pin: "1234" },
   online: true, networkProfile: "online", airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70,
   fontSize: "default", boldText: false, reduceMotion: false, language: "en", rtl: false,
-  battery: { level: 100, charging: false }, clipboard: "", log: [],
+  battery: { level: 100, charging: false }, clipboard: keptClipboard(), log: [],
   ...(cfg.device ?? {}),
 };
 // Every entry is marked simulated: a simulated fingerprint or payment is for testing and is never a real verification or money movement.
 // Readings from real hardware are marked source "real".
 const log = (kind: string, detail?: unknown, source: Source = "simulated") => state.log.push({ at: Date.now(), kind, detail, source, simulated: source === "simulated" } as any);
 // Network, airplane and battery feed the phone frame's status bar. Every change is logged (simulated) and announced as a "pn:status" event.
-const isOnline = () => state.online && state.networkProfile !== "offline" && !state.airplane && (state.wifi || state.mobileData);
+// Wi-Fi works in airplane mode once it is turned back on; mobile data does not, as on Android and iOS.
+const isOnline = () => state.online && state.networkProfile !== "offline" && (state.wifi || (!state.airplane && state.mobileData));
+let radiosBefore: { wifi: boolean; mobileData: boolean } | null = null;
 // A slow profile is a cellular link of the matching generation. `spotty` (500 kbps down in the sim's table) is closest to 3g.
 const PROFILE_GEN: Record<string, ConnectionType> = { "2g": "2g", "3g": "3g", "slow-4g": "4g", "low-end-4g": "4g", spotty: "3g" };
 /** The connection type: "none" when not connected; a slow profile reports its cellular generation; otherwise Wi-Fi if on, else generic cellular. */
@@ -227,7 +232,7 @@ export const device: Device = {
       let ok = false;
       await sheet("Share", (card, close) => {
         card.append(p(title ?? text));
-        for (const t of ["WhatsApp", "Messages", "Copy"]) card.append(btn(t, () => { ok = true; if (t === "Copy") state.clipboard = text; log("share", { target: t, text }); close(); }));
+        for (const t of ["WhatsApp", "Messages", "Copy"]) card.append(btn(t, () => { ok = true; if (t === "Copy") copy(text); log("share", { target: t, text }); close(); }));
         card.append(btn("Cancel", () => close()));
       });
       return ok;
@@ -266,7 +271,7 @@ export const device: Device = {
       log("files", { picked: f.name }); return out;
     },
   },
-  clipboard: { async set(t) { state.clipboard = t; }, async get() { return state.clipboard; } },
+  clipboard: { async set(t) { copy(t); }, async get() { return state.clipboard; } },
   net: { online: isOnline, type: connectionType, onChange(cb) { netSubs.add(cb); return () => { netSubs.delete(cb); }; } },
 };
 
@@ -274,8 +279,9 @@ export const device: Device = {
 const recent: Notification[] = [];
 let seq = 0;
 /** Deliver a notification to the app. Returns its id, or null when notification permission is not granted (nothing reaches the app). */
-function deliver(n: Omit<Notification, "id">): string | null {
-  if (state.permissions.notifications !== "granted") { log("notification_blocked", { title: n.title, permission: state.permissions.notifications }); return null; }
+function deliver(n: Omit<Notification, "id">, system = false): string | null {
+  // The phone's own notifications (reminders, alarms) do not need an app's notification permission.
+  if (!system && state.permissions.notifications !== "granted") { log("notification_blocked", { title: n.title, permission: state.permissions.notifications }); return null; }
   const full: Notification = { id: `n${Date.now().toString(36)}${(seq++).toString(36)}`, at: Date.now(), app: state.appName, ...n };
   // Do Not Disturb keeps the notification in the shade but shows no heads-up banner.
   showBanner(full, !state.dnd); log("notification", { ...full }); recvSubs.forEach((f) => f(full)); return full.id;
@@ -294,9 +300,14 @@ function showBanner(n: Notification, popup = true) {
 // Control surface for the simulator (page.evaluate): set state, push a notification, flip the network, read the log.
 g.__pnDevice = {
   state,
-  set(patch: Partial<DeviceState>) { const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasNet = netKey(); Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, microphone: { ...state.microphone, ...(patch.microphone ?? {}) }, battery: { ...state.battery, ...(patch.battery ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (netKey() !== wasNet) netSubs.forEach((f) => f(isOnline())); announceSystem(sk); announceStatus(before, true, bs); },
+  set(patch: Partial<DeviceState>) {
+    // Airplane mode turns Wi-Fi and mobile data off unless the same patch sets them; leaving it brings them back as they were.
+    if (patch.airplane === true && !state.airplane) { radiosBefore = { wifi: state.wifi, mobileData: state.mobileData }; patch = { wifi: false, mobileData: false, ...patch }; }
+    else if (patch.airplane === false && state.airplane) { patch = { ...(radiosBefore ?? { wifi: true, mobileData: true }), ...patch }; radiosBefore = null; }
+    if (typeof patch.clipboard === "string") copy(patch.clipboard);
+    const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasNet = netKey(); Object.assign(state, patch, { permissions: { ...state.permissions, ...(patch.permissions ?? {}) }, contacts: patch.contacts ? patch.contacts.map((c) => ({ ...c })) : state.contacts, calendar: patch.calendar ? patch.calendar.map((e) => ({ ...e })) : state.calendar, files: patch.files ? patch.files.map((f) => ({ ...f })) : state.files, camera: { ...state.camera, ...(patch.camera ?? {}) }, microphone: { ...state.microphone, ...(patch.microphone ?? {}) }, battery: { ...state.battery, ...(patch.battery ?? {}) }, biometrics: { ...state.biometrics, ...(patch.biometrics ?? {}) }, payment: { ...state.payment, ...(patch.payment ?? {}) } }); if (netKey() !== wasNet) netSubs.forEach((f) => f(isOnline())); announceSystem(sk); announceStatus(before, true, bs); },
   /** Push a notification to the app. Returns its id, or null when permission is not granted. */
-  push(n: Omit<Notification, "id">) { return deliver(n); },
+  push(n: Omit<Notification, "id">, o?: { system?: boolean }) { return deliver(n, o?.system === true); },
   log: () => state.log,
   /** Notifications delivered so far (the banner is gone after 5 s, like a heads-up on a phone; this is the notification shade). */
   notifications: () => recent.map((n) => ({ id: n.id, title: n.title, body: n.body, at: n.at, app: n.app, data: n.data })),
@@ -326,7 +337,7 @@ g.__pnDevice = {
     const before = statusKey(), bs = settingsKey(), sk = systemKey(), wasNet = netKey();
     Object.assign(state, { permissions: { camera: "undetermined", microphone: "undetermined", location: "undetermined", contacts: "undetermined", calendar: "undetermined", notifications: (profile?.platform ?? state.platform) === "android" && (profile?.api ?? state.api) < 33 ? "granted" : "undetermined" },
       source: "auto", microphone: { level: 0.2 }, location: { latitude: 4.0225, longitude: 9.6967, accuracy: 20 }, camera: { barcode: null, delayMs: 800 }, biometrics: { enrolled: true, nextResult: "success" }, payment: { nextResult: "approve", pin: "1234" }, online: true, networkProfile: "online", airplane: false, wifi: true, mobileData: true, locationServices: true, darkMode: false, dnd: false, autoRotate: true, flashlight: false, orientationLock: false, brightness: 70, fontSize: "default", boldText: false, reduceMotion: false, language: "en", rtl: false, battery: { level: 100, charging: false }, clipboard: "", contacts: [], calendar: [], files: [], log: [] }, profile ?? {});
-    recent.length = 0; seq = 0; initialUrl = null; pendingShare = null;
+    recent.length = 0; seq = 0; initialUrl = null; pendingShare = null; radiosBefore = null; copy(state.clipboard);
     announceSystem(sk, false); announceStatus(before, false, bs); if (netKey() !== wasNet) netSubs.forEach((f) => f(isOnline()));
     for (const el of document.querySelectorAll("[data-pn-sheet],[data-pn-banner]")) el.remove();
   },

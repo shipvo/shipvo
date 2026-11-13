@@ -46,6 +46,7 @@ Updates are interpreted JavaScript running on native capabilities the shell decl
 - **Admin per app** at `/app/<id>/admin`: live content, prices, offers, orders, history, publish to every phone in seconds; the same typed owner commands are available to agents with a token.
 - **Agent-operable apps:** every app exposes typed commands and a UI simulator; `@shipvo/mcp` plugs both into Claude, Cursor, Claude Code or PiPilot.
 - **Simulated device:** `@shipvo/device` runs camera, location, biometrics, payments, notifications, share and network on phones (Expo modules) and in the simulator (system sheets in the accessibility tree, state set by the agent). Each capability declares its support level: real, simulated or unavailable.
+- **Any Expo app, from the shell:** `npx -y @shipvo/cli session start android` or `session start ios` opens any Expo app on a headless phone with no setup. Your coding agent reads the screen, taps, types, saves screenshots and a video of the phone in its frame with the status bar, and the session stops on its own ([session](docs/session.md)).
 - **Shipvo Phone:** `shipvo run android` or `shipvo run ios` opens your app in an Android or iPhone frame in your browser, with live reload, a notification shade, Settings, a Browser app, network profiles and a device panel. No emulator or Xcode needed ([run](docs/run.md)).
 - **Describe an app and it appears:** your assistant calls `create_app` and `update_app` to build a spec app on the phone, then `arrange_apps`, `schedule_app`, `refresh_app` and `app_activity` to place it, time it, refresh its data and read what changed, on Android and iOS ([Describe an app](docs/describe-an-app.md), [Phone apps](docs/phone-apps.md)).
 - **Email sign-in without a mailbox:** every session has a private inbox, so a test or an agent reads the code or magic link and finishes the sign-in on Android and iOS ([Test an email sign-in](docs/email-sign-in.md)).
@@ -135,7 +136,7 @@ Telemetry                   POST /t → D1;  orders POST /o/{app} → D1
 | `packages/spec` | `@shipvo/spec`: the JSON Schema for `shipvo.app/v0` app specs and a validator that returns errors and warnings with a JSON path and a suggested fix |
 | `packages/shipvo`, `packages/create-shipvo` | `shipvo` and `create-shipvo`: the CLI under its short name (`npx shipvo`, `npm i -g shipvo`) and `npm create shipvo`; both forward to `@shipvo/cli` |
 | `packages/capacitor` | `@shipvo/capacitor`: signed web bundles for Capacitor apps: release decisions, Ed25519 + SHA-256 verification and rollback rules |
-| `packages/mcp-tools` | The one MCP tool registry shared by the local and hosted servers |
+| `packages/mcp-tools` | `@shipvo/mcp-tools`: the registry of every Shipvo MCP tool (name, description, input schema, error codes), shared by the local and hosted servers (`docs/mcp-tools.md`) |
 | `services/control-plane` | Hono worker on Cloudflare: pointers, bundles, web artifacts, content, orders, telemetry, admin, owner API |
 | `services/sim` | Hosted simulator Worker: one sandbox per API key, the same MCP tools over HTTPS (sim.shipvo.dev) |
 | `services/site` | shipvo.dev: landing page and the public app marketplace |

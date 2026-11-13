@@ -1,2 +1,0 @@
-- docs: Key rotation and CLI guide show `key-rotation` rows in `shipvo audit`; the email sign-in page has a Troubleshooting table and Next steps.
-- Migration: none.

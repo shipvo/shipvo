@@ -1,2 +1,0 @@
-- `@shipvo/mcp`: new tool `find_apps(session, query, country?, language?, currency?, limit?)` searches the Store by need and returns id, name, description, version and installed state, best match first. Fails with `store_unreachable` when the marketplace cannot be reached. The `PN_STORE_FIXTURE=1` list now has a fourth app, `splitly`.
-- Migration: none; new tool.

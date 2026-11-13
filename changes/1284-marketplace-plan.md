@@ -1,1 +1,0 @@
-- Docs: the app marketplace plan covers declarative apps, the submission flow and the next steps (`docs/design/app-marketplace.md`).

@@ -1,2 +1,0 @@
-- `@shipvo/sim`: the simulator forwards four vault key routes (list, rotate, revoke, use log) under `/vault-ui/*` for the Settings app, on loopback and same-origin only. The owner token stays on the server.
-- Migration: none; new routes.

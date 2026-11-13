@@ -1,1 +1,0 @@
-- docs: `@shipvo/mcp` README lists `room_log` and `room_note` and their error codes.

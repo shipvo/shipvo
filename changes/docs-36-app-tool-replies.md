@@ -1,1 +1,0 @@
-- docs: Describe an app lists what `app_activity`, `refresh_app` and `export_phone_apps` return, in text and `structuredContent`.

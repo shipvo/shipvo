@@ -1,2 +1,0 @@
-- docs: the threat model has a "Lost or leaked release key" section for Android and iOS.
-- Migration: none.

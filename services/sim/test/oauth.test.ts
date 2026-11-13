@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
-import worker from "../src/index";
+import worker, { clientOfKey } from "../src/index";
 
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite");
 const O = "https://sim.shipvo.dev";
@@ -19,7 +19,7 @@ function setup() {
 }
 const call = (env: any, path: string, init?: RequestInit) => worker.fetch(new Request(O + path, init), env);
 const post = (env: any, path: string, body: unknown) => call(env, path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-const rpc = (env: any, method: string, headers: Record<string, string> = {}) => call(env, "/mcp", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params: {} }) });
+const rpc = (env: any, method: string, headers: Record<string, string> = {}, params: unknown = {}) => call(env, "/mcp", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
 
 describe("metadata", () => {
   it("protected resource", async () => {
@@ -89,6 +89,26 @@ describe("401 challenge", () => {
     const { env } = setup();
     for (const m of ["initialize", "tools/list"]) { const r = await rpc(env, m); expect(r.status).toBe(200); expect(r.headers.get("www-authenticate")).toBeNull(); }
   });
+  it("the inbox widget page can be listed and read without a key", async () => {
+    const { env } = setup();
+    const init = await (await rpc(env, "initialize")).json() as any;
+    expect(init.result.capabilities.resources).toBeDefined();
+    const list = await (await rpc(env, "resources/list")).json() as any;
+    expect(list.result.resources.map((r: any) => r.uri)).toContain("ui://shipvo/inbox.html");
+    const read = await (await rpc(env, "resources/read", {}, { uri: "ui://shipvo/inbox.html" })).json() as any;
+    expect(read.result.contents[0].mimeType).toBe("text/html;profile=mcp-app");
+    const tools = await (await rpc(env, "tools/list")).json() as any;
+    expect(tools.result.tools.find((t: any) => t.name === "inbox_view")._meta.ui.resourceUri).toBe("ui://shipvo/inbox.html");
+  });
+  it("serves the inbox view's script for hosts that block inline scripts", async () => {
+    const { env } = setup();
+    const r = await call(env, "/widgets/inbox.js");
+    expect(r.status).toBe(200); expect(r.headers.get("content-type")).toMatch(/javascript/);
+    const js = await r.text();
+    const read = await (await rpc(env, "resources/read", {}, { uri: "ui://shipvo/inbox.html" })).json() as any;
+    expect(read.result.contents[0].text).toContain(js);                   // the same code as the inline copy
+    expect((await call(env, "/widgets/other.js")).status).toBe(404);
+  });
   it("a valid key passes the auth check", async () => {
     const { env, sql } = setup();
     const h = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode("goodkey12345")))].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -116,7 +136,7 @@ function stubGitHub() {
 }
 afterEach(() => vi.unstubAllGlobals());
 
-async function register(env: any) { return ((await (await post(env, "/register", { redirect_uris: [REDIR] })).json()) as any).client_id as string; }
+async function register(env: any, client_name?: string) { return ((await (await post(env, "/register", { redirect_uris: [REDIR], ...(client_name ? { client_name } : {}) })).json()) as any).client_id as string; }
 async function startAuthorize(env: any, client_id: string, over: Record<string, string> = {}) {
   const q = new URLSearchParams({ response_type: "code", client_id, redirect_uri: REDIR, code_challenge: await challengeOf(VERIFIER), code_challenge_method: "S256", state: "xyz", ...over });
   return call(env, "/authorize?" + q, { redirect: "manual" });
@@ -135,6 +155,16 @@ const tok = (env: any, client_id: string, code: string, over: Record<string, str
   call(env, "/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", client_id, code, code_verifier: VERIFIER, redirect_uri: REDIR, ...over }) });
 
 describe("authorize and token", () => {
+  it("a client ID or secret pasted with spaces or a newline at the ends still signs in", async () => {
+    const { env } = setup(); stubGitHub();
+    env.GITHUB_CLIENT_ID = "gh-id  "; env.GITHUB_CLIENT_SECRET = "\ngh-secret \n";
+    const id = await register(env);
+    const a = await startAuthorize(env, id);
+    expect(new URL(a.headers.get("location")!).searchParams.get("client_id")).toBe("gh-id");
+    const { loc } = await signIn(env, id);
+    const r = await tok(env, id, loc.searchParams.get("code")!);
+    expect(r.status).toBe(200);
+  });
   it("full PKCE exchange against a GitHub stub, and the token opens a session", async () => {
     stubGitHub(); const { env, sql } = setup(); const cid = await register(env);
     const { loc } = await signIn(env, cid);
@@ -206,10 +236,42 @@ describe("authorize and token", () => {
     await call(env, `/authorize/callback?code=gh-ok&state=${st}`, { redirect: "manual" });
     expect((await call(env, `/authorize/callback?code=gh-ok&state=${st}`, { redirect: "manual" })).status).toBe(400);
   });
-  it("a new sign-in replaces the account's earlier test key, even from another client", async () => {
-    stubGitHub(); const { env, sql } = setup(); const c1 = await register(env); const c2 = await register(env);
-    const t1: any = await (await tok(env, c1, (await signIn(env, c1)).loc.searchParams.get("code")!)).json();
-    const t2: any = await (await tok(env, c2, (await signIn(env, c2)).loc.searchParams.get("code")!)).json();
+  it("each assistant keeps its own key: another assistant signing in does not sign it out", async () => {
+    stubGitHub(); const { env, sql } = setup(); const chatgpt = await register(env, "ChatGPT"); const gemini = await register(env, "Gemini");
+    const a: any = await (await tok(env, chatgpt, (await signIn(env, chatgpt)).loc.searchParams.get("code")!)).json();
+    const b: any = await (await tok(env, gemini, (await signIn(env, gemini)).loc.searchParams.get("code")!)).json();
+    expect(sql.prepare("SELECT COUNT(*) n FROM api_keys WHERE revoked_at IS NULL").get().n).toBe(2);
+    expect((await rpc(env, "tools/call", { authorization: "Bearer " + a.access_token })).status).toBe(503);   // valid key; no sandbox backend in tests
+    expect((await rpc(env, "tools/call", { authorization: "Bearer " + b.access_token })).status).toBe(503);
+  });
+  it("knows which assistant a key belongs to, for keys made now and before names were in labels", async () => {
+    stubGitHub(); const { env, sql } = setup(); const g = await register(env, "Gemini"); const anon = await register(env);
+    await tok(env, g, (await signIn(env, g)).loc.searchParams.get("code")!);
+    await tok(env, anon, (await signIn(env, anon)).loc.searchParams.get("code")!);
+    const ids = (sql.prepare("SELECT id, label FROM api_keys ORDER BY id").all() as { id: number; label: string }[]);
+    expect(await clientOfKey(env, ids[0].id)).toBe("Gemini");
+    expect(await clientOfKey(env, ids[1].id)).toBeNull();                 // registered with no name
+    sql.prepare("INSERT INTO api_keys (id, label, scope, account_id) VALUES (90, ?, 'test', 1)").run(`shipvo oauth (${g})`);
+    expect(await clientOfKey(env, 90)).toBe("Gemini");                   // older label format
+    sql.prepare("INSERT INTO api_keys (id, label, scope, account_id) VALUES (91, 'shipvo login', 'test', 1)").run();
+    expect(await clientOfKey(env, 91)).toBeNull();
+  });
+  it("knows ChatGPT, Gemini and Claude by where they sign in from when they register with no name", async () => {
+    const { env, sql } = setup();
+    sql.prepare("INSERT INTO oauth_clients (client_id, client_name, redirect_uris, grant_types) VALUES ('shipvo_cg', NULL, ?, '[]')").run(JSON.stringify(["https://chatgpt.com/connector_platform_oauth_redirect"]));
+    sql.prepare("INSERT INTO oauth_clients (client_id, client_name, redirect_uris, grant_types) VALUES ('shipvo_lo', NULL, ?, '[]')").run(JSON.stringify(["http://localhost:3000/cb"]));
+    sql.prepare("INSERT INTO api_keys (id, label, scope, account_id) VALUES (92, 'shipvo oauth: shipvo_cg', 'test', 1), (93, 'shipvo oauth (shipvo_cg)', 'test', 1), (94, 'shipvo oauth: shipvo_lo', 'test', 1)").run();
+    sql.prepare("INSERT INTO api_keys (id, label, scope, account_id) VALUES (95, 'shipvo oauth: https://gemini.google.com/mcp/client.json', 'test', 1), (96, 'shipvo oauth: https://example.com/client.json', 'test', 1)").run();
+    expect(await clientOfKey(env, 92)).toBe("ChatGPT");
+    expect(await clientOfKey(env, 93)).toBe("ChatGPT");
+    expect(await clientOfKey(env, 94)).toBeNull();
+    expect(await clientOfKey(env, 95)).toBe("Gemini");
+    expect(await clientOfKey(env, 96)).toBeNull();
+  });
+  it("the same assistant signing in again replaces its earlier key, even after registering again", async () => {
+    stubGitHub(); const { env, sql } = setup(); const g1 = await register(env, "Gemini"); const g2 = await register(env, "Gemini");
+    const t1: any = await (await tok(env, g1, (await signIn(env, g1)).loc.searchParams.get("code")!)).json();
+    const t2: any = await (await tok(env, g2, (await signIn(env, g2)).loc.searchParams.get("code")!)).json();
     expect(sql.prepare("SELECT COUNT(*) n FROM api_keys WHERE revoked_at IS NULL").get().n).toBe(1);
     expect((await rpc(env, "tools/call", { authorization: "Bearer " + t1.access_token })).status).toBe(401);
     expect((await rpc(env, "tools/call", { authorization: "Bearer " + t2.access_token })).status).toBe(503);

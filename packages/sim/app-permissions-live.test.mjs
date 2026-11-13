@@ -170,3 +170,40 @@ for (const style of ["android", "ios"]) {
     } finally { await b.close(); }
   });
 }
+
+for (const style of ["android", "ios"]) {
+  test(`${style}: permission_log records install answers, blocks, Settings changes, uses and uninstall`, async () => {
+    const sid = `pl-${style}`;
+    assert.ok((await call("/session", { session: sid })).ok);
+    assert.equal((await act(sid, { action: "create_app", id: "remind", spec: REMIND, style, permissions: { notifications: false } })).ok, true);
+    assert.equal((await ping(sid, "remind")).code, "permission_denied");
+    assert.equal((await act(sid, { action: "set_app_permission", id: "remind", permission: "notifications", allowed: true })).ok, true);
+    assert.equal((await act(sid, { action: "app_action", id: "remind", action_name: "ping", input: {}, agent: "claude-ai" })).ok, true);
+    const log = await act(sid, { action: "permission_log", app: "remind" });
+    assert.equal(log.ok, true, JSON.stringify(log).slice(0, 300));
+    assert.deepEqual(log.entries.map((e) => [e.permission, e.event, e.by]), [
+      ["notifications", "denied", "install"], ["camera", "granted", "install"],
+      ["notifications", "blocked", "ping"],
+      ["notifications", "granted", "settings"],
+      ["notifications", "used", "ping"],
+    ]);
+    assert.equal(log.entries.at(-1).caller, "claude");
+    assert.deepEqual((await act(sid, { action: "permission_log", event: "blocked" })).entries.map((e) => e.app), ["remind"]);
+    assert.equal((await act(sid, { action: "permission_log", event: "maybe" })).code, "bad_event");
+    assert.equal((await act(sid, { action: "permission_log", limit: 0 })).code, "bad_limit");
+    // update: a new version that drops camera and adds contacts; import: a fresh copy replaces the app
+    const v2 = { ...REMIND, permissions: { device: ["notifications", "contacts"] } };
+    assert.equal((await act(sid, { action: "update_app", id: "remind", spec: v2 })).ok, true);
+    const ex = (await act(sid, { action: "export_apps", ids: ["remind"] })).apps;
+    assert.equal((await act(sid, { action: "import_apps", apps: [{ ...ex[0], permissions: { notifications: false, contacts: true } }], replace: true })).ok, true);
+    assert.deepEqual((await act(sid, { action: "permission_log", app: "remind" })).entries.slice(5).map((e) => [e.permission, e.event, e.by]), [
+      ["contacts", "granted", "update"], ["camera", "removed", "update"],
+      ["notifications", "denied", "import"],
+    ]);
+    const unknown = await act(sid, { action: "no_such_action" });
+    assert.match(unknown.error, /search_phone/); assert.match(unknown.error, /permission_log/);
+    assert.equal((await act(sid, { action: "uninstall_app", id: "remind" })).ok, true);
+    const gone = (await act(sid, { action: "permission_log", app: "remind", event: "removed" })).entries;
+    assert.deepEqual(gone.filter((e) => e.by === "uninstall").map((e) => e.permission).sort(), ["contacts", "notifications"]);
+  });
+}

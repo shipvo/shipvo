@@ -1,1 +1,0 @@
-- Docs: new "Key rotation" page (`shipvo keys root`, `keys rotate sign` and `upload`, troubleshooting) and "Device permissions per app" in the phone apps guide.

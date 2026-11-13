@@ -1,2 +1,0 @@
-- Docs: the Capacitor page and the test-your-build page have more troubleshooting entries, each with the message you see and the fix.
-- Docs: the README lists safe rollbacks with stored data, key rotation and the browser playground.

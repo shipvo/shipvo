@@ -1,3 +1,0 @@
-- `@shipvo/sim`: new `update_app` action replaces a spec app's spec as a new version; entered data and state carry over, and a bad spec changes nothing.
-- `@shipvo/mcp`: new tool `update_app`.
-- Migration: none; new tool.

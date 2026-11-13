@@ -1,6 +1,6 @@
 {
   "name": "@shipvo/sim",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "type": "module",
   "license": "Apache-2.0",
   "description": "The Shipvo simulator: runs a Shipvo app's web build in a phone-sized headless browser and exposes it to agents (accessibility tree, tap/type/scroll, simulated device, mock backend). Used by @shipvo/mcp and `shipvo sim`.",
@@ -14,6 +14,8 @@
     "./server.mjs": "./server.mjs",
     "./screen-rules.mjs": "./screen-rules.mjs",
     "./network-profiles.mjs": "./network-profiles.mjs",
+    "./models.mjs": "./models.mjs",
+    "./a2ui.mjs": "./a2ui.mjs",
     "./frame.mjs": {
       "types": "./frame.d.mts",
       "default": "./frame.mjs"
@@ -29,8 +31,14 @@
     "app-name.mjs",
     "identity.mjs",
     "banner.mjs",
+    "permission-log.mjs",
+    "share.mjs",
+    "backup.mjs",
     "search.mjs",
+    "connectivity.mjs",
+    "carryover.mjs",
     "wakeup.mjs",
+    "reminders.mjs",
     "frame.mjs",
     "lumi.mjs",
     "guide.mjs",
@@ -56,6 +64,10 @@
     "apps.mjs",
     "build-cache.mjs",
     "build-open.mjs",
+    "capture.mjs",
+    "models.mjs",
+    "a2ui.mjs",
+    "a2ui-page.mjs",
     "README.md"
   ],
   "peerDependencies": {
