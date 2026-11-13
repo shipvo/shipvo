@@ -103,11 +103,11 @@ export const tools = {
   a2ui_send: def("a2ui_send", "Send more A2UI messages to a session from a2ui_open and return the screen after them. The result says how many were applied and lists each refused message with the reason.", {
   session: sid,
   messages: z.array(z.record(z.string(), z.unknown())).describe("A2UI messages to apply in order"),
-}, WR, ["not_a2ui","bad_message"]),
+}, WR, ["not_agent_ui","bad_message"]),
   a2ui_actions: def("a2ui_actions", "What an A2UI session sent to the agent: the action messages from buttons the person pressed, with their context read from the data model. Pass `since` (the `next` of the last call) to get only newer ones.", {
   session: sid,
   since: z.number().int().min(0).optional().describe("Return messages after this position (the `next` of an earlier call)"),
-}, RO, ["not_a2ui"]),
+}, RO, ["not_agent_ui"]),
   set_device: def("set_device", "Change what the simulated phone has: location, the address book (contacts), calendar events, files for the file picker, a barcode in front of the camera, permission states, whether the fingerprint will match, whether a payment will be approved, network on/off. Takes effect for the next action.", {
   session: sid,
   location: z.object({ latitude: z.number(), longitude: z.number(), accuracy: z.number().optional() }).optional(),

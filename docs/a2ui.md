@@ -99,7 +99,7 @@ The Shipvo Phone catalog is an A2UI catalog document. Use its components with `"
 | `bad_message` | The file starts like a JSON list but is not valid JSON. | Fix the file, or use one message per line. |
 | `a2ui_errors` | `a2ui send` refused one or more messages. | Read `data.errors`: each has a code, a message and a path. |
 | `data.a2ui_errors` on `session start` | The simulator refused one or more messages of the file. The summary says how many. | Read each entry: it has a code and a message. Fix the file, or send the fixed messages with `a2ui send`. |
-| `not_a2ui` | The session was not started with `--a2ui`. | Start one with `shipvo session start --a2ui <file>`. |
+| `not_agent_ui` | The session was not started with `--a2ui`. | Start one with `shipvo session start --a2ui <file>`. |
 | The screen says "No surface yet." | No `createSurface` has been applied. | Send one, with a component whose id is `root`. |
 
 ## Next steps

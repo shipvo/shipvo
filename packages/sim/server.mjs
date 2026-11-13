@@ -1015,7 +1015,7 @@ async function act(id, body) {
     }
     case "a2ui_send": case "a2ui_actions": {
       const host = a2uiHosts.get(id);
-      if (!host) throw new SimError("not_a2ui", "this session is not an A2UI session: open it with a2ui: true");
+      if (!host) throw new SimError("not_agent_ui", "this session is not an A2UI session: open it with a2ui: true");
       if (body.action === "a2ui_actions") return { ...host.take(body.since), effects: host.effects, surfaces: host.surfaceIds() };
       const input = body.jsonl ?? body.messages;
       if (input === undefined) throw new SimError("bad_message", "a2ui_send needs messages (a list) or jsonl (one message per line)");

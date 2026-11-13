@@ -29,7 +29,7 @@ beforeAll(async () => {
       const bad = body.a2ui_messages.filter((m: any) => !m.version);
       return res.end(JSON.stringify({ ok: true, app: "a2ui", release: "a2ui", applied: body.a2ui_messages.length - bad.length, errors: bad.map(() => ({ code: "VALIDATION_FAILED", message: "version must be 1.0" })), screen: SCREEN }));
     }
-    if (body.action === "a2ui_send") return res.end(JSON.stringify(body.session === "plain" ? { ok: false, code: "not_a2ui", error: "this session is not an A2UI session: open it with a2ui: true" } : { ok: true, applied: 1, errors: [], surfaces: ["s"], screen: '- paragraph: "two"' }));
+    if (body.action === "a2ui_send") return res.end(JSON.stringify(body.session === "plain" ? { ok: false, code: "not_agent_ui", error: "this session is not an A2UI session: open it with a2ui: true" } : { ok: true, applied: 1, errors: [], surfaces: ["s"], screen: '- paragraph: "two"' }));
     if (body.action === "a2ui_actions") return res.end(JSON.stringify({ ok: true, messages: ACTIONS.slice(body.since ?? 0), next: ACTIONS.length, effects: [], surfaces: ["s"] }));
     res.end(JSON.stringify({ ok: true, screen: SCREEN }));
   });
@@ -77,11 +77,11 @@ describe("a2ui_send and a2ui_actions", () => {
     expect(calls.find((x) => x.body.action === "a2ui_send")!.body).toMatchObject({ session: "a1", messages: [msg] });
     await c.close();
   });
-  it("a2ui_send on a session that is not A2UI returns not_a2ui", async () => {
+  it("a2ui_send on a session that is not A2UI returns not_agent_ui", async () => {
     const c = await connect();
     const r: any = await c.callTool({ name: "a2ui_send", arguments: { session: "plain", messages: [SURFACE] } });
     expect(r.isError).toBe(true);
-    expect(r.structuredContent.code).toBe("not_a2ui");
+    expect(r.structuredContent.code).toBe("not_agent_ui");
     await c.close();
   });
   it("a2ui_actions returns what the person did, and only the newer ones with since", async () => {
