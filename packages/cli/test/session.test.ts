@@ -97,6 +97,15 @@ describe("shipvo session", () => {
     expect(state.builds).toBe(0);
   });
 
+  it("an app that uses expo-router is opened at its own root route", async () => {
+    const withRouter = setup({ name: "shop", dependencies: { expo: "55", "expo-router": "6", "react-native-web": "1", "react-dom": "19", "@expo/metro-runtime": "5" } });
+    await run(withRouter.deps, ["start"]);
+    expect(withRouter.state.posts[0].body.root_mount).toBe(true);
+    const plain = setup();
+    await run(plain.deps, ["start"]);
+    expect("root_mount" in plain.state.posts[0].body).toBe(false);
+  });
+
   it("devices lists the phone models with their screen size and the defaults", async () => {
     const { deps } = setup();
     const { doc, exit } = await run(deps, ["devices"]);

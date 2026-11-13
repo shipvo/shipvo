@@ -27,6 +27,10 @@ This page is for you if you have an Expo app and a coding agent that can run she
    - textbox "Your name" [ref=e8]
    ```
 
+## Apps that use expo-router
+
+`session start` sees `expo-router` in your `package.json` and opens the app at its own root route, so the first screen is your index route. Moving between screens, a phone restart on a deep screen such as `/feed/1`, and a reload all stay inside the app.
+
 ## Pick a phone model
 
 A session is a real phone model, with that phone's screen size, pixel ratio and user agent. `session start android` is a Pixel 8 and `session start ios` is an iPhone 16. Name another one with `--device`:
@@ -79,7 +83,7 @@ shipvo session screenshot --out shots/home.png
 | Top | Status bar with punch-hole camera | Status bar with Dynamic Island |
 | Bottom | Gesture bar | Home indicator |
 
-The status bar follows the phone: it shows the phone's clock, and airplane mode or Wi-Fi off change its icons. Add `--no-frame` to save the app area alone.
+The status bar follows the phone: it shows the phone's clock, and airplane mode or Wi-Fi off change its icons. The status bar and the bottom bar take the colour of your app's screen next to them, with light marks on a dark screen, as when an app draws behind them on a phone. Add `--no-frame` to save the app area alone.
 
 ## Record a video
 

@@ -52,6 +52,32 @@ for (const skin of ["android", "ios"]) {
   });
 }
 
+for (const skin of ["android", "ios"]) {
+  test(`${skin}: the status bar and the bottom bar take the colour of the app's screen, with light marks on a dark screen`, async () => {
+    const b = await chromium.launch();
+    try {
+      const size = { width: 300, height: 500 };
+      const cp = capturePage({ skin, ...size });
+      const page = await b.newPage({ viewport: { width: cp.width, height: cp.height } });
+      await page.setContent(cp.html);
+      const src = await b.newPage({ viewport: size });
+      const look = async (appCss) => {
+        await src.setContent(`<body style="margin:0;${appCss}"></body>`);
+        await page.evaluate(showShot, shotArgs(await src.screenshot(), "image/png", skin, {}));
+        return page.evaluate((bottomPart) => {
+          const cs = (sel) => getComputedStyle(document.querySelector(sel));
+          return { statusBg: cs('[data-part="status-bar"]').backgroundColor, statusFg: cs('[data-part="status-bar"]').color, barBg: cs(`[data-part="${bottomPart}"]`).backgroundColor, markBg: cs(`[data-part="${bottomPart}"] i`).backgroundColor };
+        }, SKINS[skin].bottom);
+      };
+      assert.deepEqual(await look("background:#101418"), { statusBg: "rgb(16, 20, 24)", statusFg: "rgb(255, 255, 255)", barBg: "rgb(16, 20, 24)", markBg: "rgb(255, 255, 255)" });
+      assert.deepEqual(await look("background:#ffffff"), { statusBg: "rgb(255, 255, 255)", statusFg: "rgb(17, 17, 17)", barBg: "rgb(255, 255, 255)", markBg: "rgb(17, 17, 17)" });
+      // A dark header over a light page: the top follows the header, the bottom follows the page.
+      const mixed = await look("background:linear-gradient(#0a2a4a 0 40px,#fafafa 40px)");
+      assert.equal(mixed.statusFg, "rgb(255, 255, 255)"); assert.equal(mixed.markBg, "rgb(17, 17, 17)");
+    } finally { await b.close(); }
+  });
+}
+
 test("the status bar icons are in the platform's order: Wi-Fi first on Android, signal first on iOS", () => {
   const order = (skin) => [...shotArgs(Buffer.from("x"), "image/png", skin, {})[2].matchAll(/data-part="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(order("android"), ["wifi", "signal", "battery"]);

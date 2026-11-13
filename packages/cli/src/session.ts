@@ -58,7 +58,7 @@ export type SessionDeps = {
 const readJson = (p: string): any => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; } };
 
 /** What to call the app, from shipvo.json, then app.json, then package.json. Any Expo app qualifies. */
-export function projectInfo(root: string): { app: string; name: string; missingWebDeps: string[] } {
+export function projectInfo(root: string): { app: string; name: string; missingWebDeps: string[]; router: boolean } {
   const pkg = readJson(join(root, "package.json"));
   if (!pkg) throw new CliFailure("No package.json in this folder. Run this in your Expo app's folder.", "no_project", 2);
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };
@@ -66,7 +66,7 @@ export function projectInfo(root: string): { app: string; name: string; missingW
   const cfg = readJson(join(root, "shipvo.json")); const expo = readJson(join(root, "app.json"))?.expo ?? {};
   const raw = String(cfg?.appId ?? expo.slug ?? pkg.name ?? "app");
   const app = raw.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "app";
-  return { app, name: String(cfg?.name ?? expo.name ?? pkg.name ?? app), missingWebDeps: WEB_DEPS.filter((d) => !deps[d]) };
+  return { app, name: String(cfg?.name ?? expo.name ?? pkg.name ?? app), missingWebDeps: WEB_DEPS.filter((d) => !deps[d]), router: !!deps["expo-router"] };
 }
 
 const dirOf = (root: string) => join(root, ".shipvo", "sessions");
@@ -157,7 +157,7 @@ export async function startSession(d: SessionDeps, o: { platform?: Platform; dev
   mkdirSync(join(dirOf(d.root), id), { recursive: true });
   const pid = await d.startServer({ server, port, app: info.app, dir: join(dirOf(d.root), id), root: d.root });
   let opened: any;
-  try { opened = await post(d, port, "/session", { session: id, app: info.app, model: model.name }); }
+  try { opened = await post(d, port, "/session", { session: id, app: info.app, model: model.name, ...(info.router ? { root_mount: true } : {}) }); }
   catch (e) { d.kill(pid); throw e; }
   if (!opened?.ok) { d.kill(pid); throw new CliFailure(`The app did not open: ${opened?.error ?? "unknown error"}`, opened?.code ?? "open_failed", 1); }
   const started = d.now();

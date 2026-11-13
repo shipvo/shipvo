@@ -1,5 +1,8 @@
 - `@shipvo/sim`: a session can be a real phone model. `POST /session` takes `model` (15 models: Pixel 7 to Pixel 9 Pro XL, Galaxy S24, Galaxy A55, iPhone 15 to iPhone 17 Pro Max) and the session gets that phone's screen size, pixel ratio, user agent and platform. An unknown name answers `bad_model`. `/sessions` reports each session's `model`.
 - `@shipvo/sim`: the status bar shows its icons in the platform's order: Wi-Fi, signal, battery on Android; signal, Wi-Fi, battery on iOS.
 - `@shipvo/sim`: the phone frame no longer prints a "Simulated" badge under the screen, and its bezel is the same on every side. This applies to `shipvo run`, the watch page, screenshots and recordings.
+- `@shipvo/sim`: `POST /session` takes `root_mount: true` for apps with a router that reads the address (expo-router). The app sees its own routes and no longer starts on its "not found" screen. A page load of an address the simulator does not know now redirects to the app under `/app/`.
+- `@shipvo/sim`: in framed screenshots and recordings the status bar and the bottom bar take the colour of the app's screen, with light marks on a dark screen.
+- `@shipvo/cli`: `shipvo session start` opens an app that depends on `expo-router` with `root_mount`.
 - `@shipvo/cli`: `shipvo session start --device "<model>"` starts that model, and `shipvo session devices` lists the models. `session start android` is a Pixel 8 and `session start ios` is an iPhone 16.
 - Migration: the frame has no `simulated-label` part, and `outerHeight` is 14 pixels smaller. `statusParts(status, skin?)` in `@shipvo/sim/frame.mjs` takes an optional second argument. Sessions started without `model` are unchanged.

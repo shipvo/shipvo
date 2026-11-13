@@ -181,6 +181,14 @@ async function stopRecording(s) {
   try { return await encodeFrames({ dir: rec.dir, times: rec.times, end: Date.now(), out: rec.out }); }
   catch (e) { if (e instanceof CaptureError) throw new SimError(e.code, e.message); throw e; }
 }
+// Pages of this server that are not the local app: other apps, builds, releases, the session backend and the simulator's own pages.
+const NOT_THE_APP = /^\/(?:app|spec|b|w|s|phone|browser|watch|_expo|assets)(?:\/|$)/;
+/** The address a session's page is at, for comparing with an app's address. In a root_mount session the local app's screens are at /, /feed/1 and so on: all of them are the app at /app/. */
+function whereOf(s, pageUrl) {
+  if (!s.rootMount) return pageUrl;
+  try { const u = new URL(pageUrl); if (u.origin === `http://localhost:${PORT}` && !NOT_THE_APP.test(u.pathname)) return `http://localhost:${PORT}/app/`; } catch {}
+  return pageUrl;
+}
 async function endSession(id) {
   const s = sessions.get(id); if (!s) return false;
   specHost.dropSession(id);
@@ -235,6 +243,9 @@ async function newSession(id, opts = {}) {
   });
   await ctx.addInitScript((cfg) => { globalThis.__PN_SIM__ = cfg; }, { baseUrl: `http://localhost:${PORT}/s/${bk}`, appId: target.app, appName: APP_NAME, seed_cart: opts.seed_cart ?? null, device: opts.device ?? null });
   await ctx.addInitScript(installNetGate);
+  // root_mount: for apps with a router that reads the address (expo-router). The app is served under /app/, and the router
+  // would take "app" as a screen name, so the address loses that prefix before the app starts: /app/ is / and /app/feed/1 is /feed/1.
+  if (opts.root_mount === true) await ctx.addInitScript(() => { const p = location.pathname; if (p === "/app" || p.startsWith("/app/")) history.replaceState(history.state, "", (p.slice(4) || "/") + location.search + location.hash); });
   const page = await ctx.newPage();
   const errors = [];
   // phone.json: the apps and settings this phone starts with. The same profile gives the same phone every run.
@@ -246,7 +257,7 @@ async function newSession(id, opts = {}) {
   const patch = profilePatch(apps);
   if (Object.keys(patch).length) { await page.evaluate((p) => globalThis.__pnDevice?.set?.(p), patch); await syncMedia(page); }
   if (apps.network) { try { getProfile(apps.network); } catch (e) { await ctx.close(); throw new SimError("bad_profile", `phone.json: ${e.message}`); } }
-  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, room, skin: opts.skin === "ios" ? "ios" : "android", model: model?.name ?? null, startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav(), inbox: createInbox() });
+  sessions.set(id, { pageErrors, update: createUpdate({ release: target.release, url: target.url }), updateSrc: { url: opts.update_url ?? UPDATE.url, key: opts.update_key ?? UPDATE.key }, apps, ctx, page, errors, app: target.app, release: target.release, room, skin: opts.skin === "ios" ? "ios" : "android", model: model?.name ?? null, rootMount: opts.root_mount === true, startedAt: new Date().toISOString(), life: createLifecycle(), shade: { open: "none" }, nav: createNav(), inbox: createInbox() });
   await ensureNetworkRoute(sessions.get(id), page);   // the mail sink answers from the first page load
   if (buildId) sessions.get(id).build = buildId;
   if (apps.network && apps.network !== "online") await setNetworkProfile(sessions.get(id), page, apps.network);
@@ -343,7 +354,7 @@ async function switchToApp(s, page, id, fresh = false) {
     catch (e) { if (e instanceof BrowserError) throw new SimError(e.code, e.message); throw e; }
   }
   switchApp(s.apps, id, s.nav);
-  if (dest && (fresh || page.url() !== dest)) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
+  if (dest && (fresh || whereOf(s, page.url()) !== dest)) { await page.goto(dest, { waitUntil: "networkidle" }); await page.waitForTimeout(300); }
   await reapplyNetProfile(s, page);
   await page.evaluate(setVisibilityInPage, "active");
   // A one-shot link belongs to the load it was delivered to: a plain switch never inherits one.
@@ -1053,6 +1064,9 @@ const server = http.createServer(async (req, res) => {
         if (!isOp && req.method === "GET") { const html = specHost.page(key, app); return html ? send(200, html, MIME[".html"]) : send(404, { error: "no_app" }); }
         if (isOp && req.method === "POST") { let b = ""; for await (const ch of req) { b += ch; if (b.length > 65536) return send(413, { error: "too_large" }); } let j; try { j = JSON.parse(b || "{}"); } catch { return send(400, { error: "bad_json" }); } return send(200, specHost.op(key, app, j)); }
       } }
+    // A page load of an address this server does not know is a screen of the local app (a reload or a deep link in an app
+    // with a router): send it to the app under /app/, which serves the app for any path.
+    if (req.method === "GET" && req.headers["sec-fetch-dest"] === "document" && existsSync(join(DIST, "index.html"))) { res.writeHead(302, { location: `/app${url.pathname}${url.search}`, ...CORS }); return res.end(); }
     // agent API
     if (req.method !== "POST") return send(404, { error: "not found" });
     let raw = ""; for await (const ch of req) raw += ch; const body = raw ? JSON.parse(raw) : {};
