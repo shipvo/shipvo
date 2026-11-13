@@ -1,0 +1,5 @@
+{
+  "platforms": ["android", "apple"],
+  "android": { "modules": ["dev.shipvo.busystate.BusyStateModule"] },
+  "apple": { "modules": ["BusyStateModule"] }
+}

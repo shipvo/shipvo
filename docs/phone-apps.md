@@ -118,6 +118,20 @@ Any spec app can turn a collection into CSV with the `csv()` function. Return it
 
 The first line holds the column names. Fields with commas, quotes or line breaks are quoted, and lists such as tags are joined with `; `. Leave the column list out to export every field. Spreadsheets treat a cell that starts with `=`, `+`, `-` or `@` as a formula. For text that other people typed, map the field first, for example `data.entries.map(r, {'note': has(r.note) && r.note.startsWith('=') ? "'" + r.note : (has(r.note) ? r.note : '')})`, then pass that list to `csv()`.
 
+## Save data into a collection
+
+The object form of `saveFile` stores text as a file in one of the app's collections. Pair it with `csv()` to save an export the person can find later. The step needs the `files` device permission, and works the same on Android and iOS.
+
+```json
+{ "do": [ { "saveFile": { "to": "files", "name": "diary.csv", "mime": "text/csv", "content": "{{ csv(data.entries) }}" } } ] }
+```
+
+This form adds a new record each time, even with the same name. The string form in "Save as a file" below replaces the file with the same name. Use the collection form to keep a history or list files in the app; use the string form for one named file.
+
+Declare the `to` collection under `data` with the fields `id`, `name`, `kind`, `mime`, `size`, `content` and `added`.
+
+Each file gets the next `id` and the fields `name`, `kind` (`file`), `mime` (default `text/plain`), `size` in bytes, `content` and `added`. Read the content back with `parseCsv()` to import it.
+
 ## Save as a file
 
 A `saveFile` step keeps text as a named file on the phone. It needs the `files` device permission, on Android and iOS alike. Saving again with the same name replaces the file.
