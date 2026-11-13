@@ -6,6 +6,7 @@
   "shipvoCommands": [
     "init",
     "sim",
+    "session",
     "smoke",
     "run",
     "explore",
