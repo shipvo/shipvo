@@ -47,6 +47,8 @@ import { makeBackup, checkBackup, BackupError } from "./backup.mjs";
 import { searchPhone, SearchError } from "./search.mjs";
 import { createLifecycle, lock, unlock, restart, assertUnlocked, LifecycleError } from "./lifecycle.mjs";
 import { applyScreenRules, clearScreenRules, filterTree } from "./screen-rules.mjs";
+import { statusFromDevice } from "./frame.mjs";
+import { capturePage, contentSize, showShot, shotArgs, encodeFrames, CaptureError } from "./capture.mjs";
 // Playwright: the app's own install first (its browsers match it), then this package's, then a global one.
 const require_ = createRequire(import.meta.url);
 let pw, pwVersion;
@@ -156,9 +158,32 @@ function leaveRoom(s, id) {
   const set = rooms.get(s.room); set?.delete(id);
   if (!set?.size) { rooms.delete(s.room); roomLogs.delete(s.room); try { rmSync(join(DIR, `${backendOf(id, s.room)}.json`), { force: true }); rmSync(join(DIR, `${backendOf(id, s.room)}.json.log`), { force: true }); } catch {} }
 }
+// Framed captures: one hidden page per session holds the phone frame; each app picture is shown in it and the whole phone is captured.
+// Calls are queued so a screenshot and a running recording never swap the picture under each other.
+async function framed(s, buf, mime, jpeg) {
+  const job = (s.frameQueue ?? Promise.resolve()).catch(() => {}).then(async () => {
+    if (!s.framePage) {
+      const vp = s.page.viewportSize(); const cp = capturePage({ skin: s.skin, width: vp.width, height: vp.height });
+      s.frameCtx = await (await browserReady).newContext({ viewport: { width: cp.width, height: cp.height }, deviceScaleFactor: 2 });
+      s.framePage = await s.frameCtx.newPage(); await s.framePage.setContent(cp.html);
+    }
+    const c = s.conn ?? initialConnectivity();
+    await s.framePage.evaluate(showShot, shotArgs(buf, mime, statusFromDevice({ online: networkOf(c, s.netProfile ?? "online").online, airplane: c.airplane, wifi: c.wifi, mobileData: c.mobile_data }, nowOf(s))));
+    return s.framePage.screenshot(jpeg ? { type: "jpeg", quality: 85 } : { omitBackground: true });
+  });
+  s.frameQueue = job; return job;
+}
+/** Stops a running recording and encodes it. Resolves the video, or null when nothing was recording. */
+async function stopRecording(s) {
+  const rec = s.rec; if (!rec) return null;
+  s.rec = null; rec.on = false; await rec.loop;
+  try { return await encodeFrames({ dir: rec.dir, times: rec.times, end: Date.now(), out: rec.out }); }
+  catch (e) { if (e instanceof CaptureError) throw new SimError(e.code, e.message); throw e; }
+}
 async function endSession(id) {
   const s = sessions.get(id); if (!s) return false;
   specHost.dropSession(id);
+  await stopRecording(s).catch(() => {}); await s.frameCtx?.close().catch(() => {});
   for (const p of s.peers ?? []) p.close(); closeWatchers(s);
   await (await s.browserP?.catch(() => undefined))?.close(); await s.ctx.close().catch(() => {});
   s.inbox?.close(); s.wakeups?.close(); clearInterval(s.reminderTimer); sessions.delete(id); leaveRoom(s, id); return true;
@@ -184,7 +209,9 @@ async function newSession(id, opts = {}) {
   const browser = await browserReady;
   // Optional width, height (output pixels) and scale (device pixel ratio) make a session render at a store screenshot size.
   const size = Number.isInteger(opts.width) && Number.isInteger(opts.height) && opts.width > 0 && opts.height > 0 ? { viewport: { width: Math.round(opts.width / (opts.scale || 1)), height: Math.round(opts.height / (opts.scale || 1)) }, deviceScaleFactor: opts.scale || 1 } : {};
-  ctx = await browser.newContext({ ...phone, ...size, colorScheme: opts.dark ? "dark" : "light" });
+  // fit_frame: the app gets exactly the app area of its Android or iOS frame, so framed screenshots and recordings show the phone at its real size.
+  const fit = opts.fit_frame === true ? { viewport: contentSize(opts.skin), deviceScaleFactor: 2 } : {};
+  ctx = await browser.newContext({ ...phone, ...fit, ...size, colorScheme: opts.dark ? "dark" : "light" });
   // The app's Linking.openURL for a web page lands here (see @shipvo/device): it opens in the Browser app, not in the app.
   await ctx.exposeFunction("__pnOpenBrowser", (url) => openInBrowserApp(id, String(url)));
   // The app's Linking.openURL for another installed app's scheme lands here: the phone switches to that app and hands it the link once.
@@ -925,9 +952,26 @@ async function act(id, body) {
       const away = s.nav.where !== "app";
       if (away) await page.evaluate((h) => { const d = document.createElement("div"); d.id = "__pn_away"; d.innerHTML = h; document.body.appendChild(d); }, awayScreenHtml(s.nav.where, APP_NAME) + (s.nav.where === "home" ? `<style>${storeCss}</style><div class="sf-apps" style="position:fixed;z-index:2147483647;color:#fff;font-family:system-ui,sans-serif">${installedIconsHtml(s.apps, nowOf(s))}</div>` : ""));
       let buf; try { buf = await page.screenshot(jpeg ? { path: p, type: "jpeg", quality: 90 } : { path: p }); } finally { if (away) await page.evaluate(() => document.getElementById("__pn_away")?.remove()); }
+      // frame: true saves the whole phone: the picture inside its Android or iOS frame, with the status bar.
+      if (body.frame === true) { buf = await framed(s, buf, jpeg ? "image/jpeg" : "image/png", jpeg); writeFileSync(p, buf); }
       return { path: p, ...(body.inline ? { data: buf.toString("base64") } : {}), screen: await screen(page) };
     }
-    default: throw new Error(`unknown action '${body.action}'. Actions: permission_log, screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for, search_phone, share_targets, share, get_clipboard, set_clipboard, set_reminder, list_reminders, cancel_reminder, backup_phone, restore_phone, get_connectivity, set_connectivity`);
+    case "record_start": {
+      if (s.rec) throw new SimError("recording_active", "a recording is already running: call record_stop first");
+      const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+      const rec = s.rec = { on: true, times: [], dir: join(DIR, `${id}-rec-${stamp}.frames`), out: join(DIR, `${id}-rec-${stamp}.mp4`) };
+      mkdirSync(rec.dir, { recursive: true });
+      const grab = async () => { const b = await framed(s, await page.screenshot({ type: "jpeg", quality: 80 }), "image/jpeg", true); writeFileSync(join(rec.dir, `${rec.times.length}.jpg`), b); rec.times.push(Date.now()); };
+      await grab();
+      rec.loop = (async () => { while (rec.on) { try { await grab(); } catch { await new Promise((r) => setTimeout(r, 100)); } } })();
+      return { recording: true, path: rec.out, screen: await screen(page) };
+    }
+    case "record_stop": {
+      const video = await stopRecording(s);
+      if (!video) throw new SimError("no_recording", "no recording is running: call record_start first");
+      return { ...video, screen: await screen(page) };
+    }
+    default: throw new Error(`unknown action '${body.action}'. Actions: record_start, record_stop, permission_log, screen, phone_apps, create_app, update_app, refresh_app, app_activity, arrange_apps, schedule_app, clear_schedule, set_time, pin_app, hide_app, export_apps, import_apps, app_action, set_app_permission, get_update_state, check_for_update, apply_update, install_app, uninstall_app, switch_app, lock, unlock, restart, press_home, open_recents, resume_app, kill_app, open_notifications, open_control_center, close_panels, toggle_tile, dismiss_notification, get_settings, set_setting, tap, locate, type, scroll, back, screenshot, set_device, push_notification, notifications, open_notification, open_url, errors, sizes, device_log, device_reset, set_network_mocks, set_network_profile, get_network_profile, pending_banner, wait_for_event, register_wakeup, list_wakeups, clear_wakeup, inbox_read, inbox_wait, inbox_clear, browser_open, browser_snapshot, browser_click, browser_type, browser_back, browser_screenshot, browser_tabs, browser_close_tab, browser_scroll, browser_wait_for, search_phone, share_targets, share, get_clipboard, set_clipboard, set_reminder, list_reminders, cancel_reminder, backup_phone, restore_phone, get_connectivity, set_connectivity`);
   }
   return { ...(["tap", "scroll", "back"].includes(body.action) ? { delivery: "delivered" } : {}), screen: await screen(page) };
 }

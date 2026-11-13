@@ -62,6 +62,7 @@
     "apps.mjs",
     "build-cache.mjs",
     "build-open.mjs",
+    "capture.mjs",
     "README.md"
   ],
   "peerDependencies": {
