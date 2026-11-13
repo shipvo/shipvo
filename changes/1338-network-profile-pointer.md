@@ -1,2 +1,0 @@
-- Docs: network profile tools (MCP, `phone.setNetwork`, `phone.json`) are linked from the device API page.
-- Migration: none.

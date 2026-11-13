@@ -1,3 +1,0 @@
-- `@shipvo/mcp`: new read-only tool `a11y_audit` lists controls with no accessible name (`missing_label`) and tap targets under 48 dp (Android style) or 44 pt (iPhone style) (`small_target`).
-- `@shipvo/test`: new `phone.a11yAudit()`.
-- Migration: none; new API.

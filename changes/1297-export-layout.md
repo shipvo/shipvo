@@ -1,3 +1,0 @@
-- `@shipvo/sim`: `import_apps` lists a warning for each field of an app's exported layout (`placement`) that is rejected, for example `apps[0].placement.schedule: not valid, dropped`. Valid layouts, including hand-written ones, import without a warning.
-- `@shipvo/mcp`: `export_phone_apps` and `import_phone_apps` descriptions mention the home-screen layout.
-- Migration: none.

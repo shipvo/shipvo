@@ -1,4 +1,0 @@
-- `apps/bug-bench`: the bug-catch benchmark. An Expo app with 23 seeded bugs (app logic, device hardware, Android and iOS only code) and a runner that opens each one fixed and buggy on the Android and iOS phones and counts the bugs that show up. See `docs/bug-bench.md`.
-- `@shipvo/device`: new `@shipvo/device/babel` plugin. In simulator builds, `Platform.OS` and `Platform.select` in the app's own files follow the phone the session simulates.
-- `@shipvo/device`: `withShipvoSim(config, { nativeFiles: true })` makes the app's relative imports pick `.native.js` files in simulator builds.
-- Migration: none. The plugin and the option are opt-in; builds that do not add them are unchanged.

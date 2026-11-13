@@ -1,2 +1,0 @@
-- docs: "Moving to a new machine" and "Test your app with an assistant" now have troubleshooting from the real error messages and next steps; the glossary explains the signing seed.
-- Migration: none.

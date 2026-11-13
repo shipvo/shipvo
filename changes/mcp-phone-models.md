@@ -1,6 +1,0 @@
-- `@shipvo/mcp`: `open_app` takes `model` (for example `"iPhone 16 Pro"`), `screenshot` takes `frame: true` for the phone in its frame, and the new `phone_models` tool lists the phones a headless session can be. An unknown model answers `bad_model`.
-- `@shipvo/sim`: `POST /models` returns the phone models and the default for each platform.
-- `@shipvo/cli`: `shipvo session errors` lists what the app threw and scripts that did not load.
-- The Shipvo skill has the full `shipvo session` workflow, with a new `references/session.md`.
-- `apps/bug-bench`: `bench/speed.mjs` times opening a phone, screen reads, taps, typing and screenshots on an Android and an iOS phone model, and measures a screen as a tree against the same screen as a picture. Results are in `docs/bug-bench.md`.
-- Migration: none; new tool, new options and a new command.

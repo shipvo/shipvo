@@ -1,1 +1,0 @@
-- The Assistant Inbox view also loads its script from `https://sim.shipvo.dev/widgets/inbox.js`, declared in the view's resource domains, so it runs in hosts whose page policy blocks inline scripts (ChatGPT). The script runs once either way.

@@ -1,2 +1,0 @@
-- `@shipvo/sim`: each key on the Secrets screen in Settings has a Revoke button. It asks to confirm, deletes the key and removes the row, on Android and iPhone skins.
-- Migration: none.

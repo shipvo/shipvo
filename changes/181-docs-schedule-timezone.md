@@ -1,1 +1,0 @@
-- Docs: Phone apps page covers the `timezone` option of `schedule_app`, `bad_timezone` and the attached-phone hint; the Lumi ranker page gets an intro, troubleshooting and next steps, and the Lumi benchmark and ranker pages are in the sidebar.
