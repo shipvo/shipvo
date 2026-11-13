@@ -29,6 +29,19 @@ shipvo sim --watch       # rebuild on file changes
 
 `shipvo run` writes `.shipvo/run.json`. While it is up, `open_app` over MCP drives that same phone. `shipvo run android --native` uses a real emulator instead.
 
+## Test any Expo app from the shell
+
+```bash
+shipvo session start android --max-duration-minutes 20 --json   # or ios; no shipvo.json needed
+shipvo session screen            # tree with [ref=eN]
+shipvo session tap e6            # also: type <ref> <text>, scroll <dir>, back
+shipvo session screenshot --out shots/home.png        # the phone in its frame
+shipvo session record start      # then act, then: shipvo session record stop --out videos/run.mp4
+shipvo session stop
+```
+
+Every result has `next`: run its first command. The session stops on its own at `data.expires_at`. `web_deps_missing` means run the `npx expo install ...` command in `next`. Details: `docs/session.md`.
+
 ## Test it through @shipvo/mcp
 
 Add the server to your MCP config (`shipvo mcp` prints it):
