@@ -5,14 +5,15 @@ exports[`phone app tools > lists the four tools with their schemas 1`] = `
   {
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "additionalProperties": false,
       "properties": {
         "id": {
           "description": "App id from list_store_apps",
+          "maxLength": 1000000,
           "type": "string",
         },
         "session": {
           "description": "Session from open_app",
+          "maxLength": 1000000,
           "type": "string",
         },
       },
@@ -35,14 +36,15 @@ exports[`phone app tools > lists the four tools with their schemas 1`] = `
   {
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "additionalProperties": false,
       "properties": {
         "id": {
           "description": "Installed app id",
+          "maxLength": 1000000,
           "type": "string",
         },
         "session": {
           "description": "Session from open_app",
+          "maxLength": 1000000,
           "type": "string",
         },
       },
@@ -57,14 +59,15 @@ exports[`phone app tools > lists the four tools with their schemas 1`] = `
   {
     "inputSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "additionalProperties": false,
       "properties": {
         "id": {
           "description": "Installed app id",
+          "maxLength": 1000000,
           "type": "string",
         },
         "session": {
           "description": "Session from open_app",
+          "maxLength": 1000000,
           "type": "string",
         },
       },

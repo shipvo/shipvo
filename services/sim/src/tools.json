@@ -7,13 +7,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -32,18 +32,19 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "since": {
+          "description": "Return messages after this position (the `next` of an earlier call)",
           "type": "integer",
           "minimum": 0,
-          "description": "Return messages after this position (the `next` of an earlier call)"
+          "maximum": 9007199254740991
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -61,26 +62,32 @@
       "type": "object",
       "properties": {
         "messages": {
+          "maxItems": 1000,
           "type": "array",
           "items": {
             "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "maxLength": 1000000
+            },
             "additionalProperties": {}
           },
           "description": "A2UI messages, each { version: \"1.0\", createSurface | updateComponents | updateDataModel | deleteSurface: {...} }"
         },
         "session": {
+          "description": "Session name (default: generated)",
           "type": "string",
-          "description": "Session name (default: generated)"
+          "maxLength": 1000000
         },
         "model": {
+          "description": "Phone model from phone_models, for example 'iPhone 16 Pro' (default: Pixel 8)",
           "type": "string",
-          "description": "Phone model from phone_models, for example 'iPhone 16 Pro' (default: Pixel 8)"
+          "maxLength": 1000000
         }
       },
       "required": [
         "messages"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -99,12 +106,18 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "messages": {
+          "maxItems": 1000,
           "type": "array",
           "items": {
             "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "maxLength": 1000000
+            },
             "additionalProperties": {}
           },
           "description": "A2UI messages to apply in order"
@@ -114,7 +127,6 @@
         "session",
         "messages"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -133,23 +145,24 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
+          "description": "App id; omit for every app",
           "type": "string",
-          "description": "App id; omit for every app"
+          "maxLength": 1000000
         },
         "limit": {
+          "description": "Most recent events per app (default 50)",
           "type": "integer",
           "minimum": 1,
-          "maximum": 200,
-          "description": "Most recent events per app (default 50)"
+          "maximum": 200
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -168,13 +181,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -192,10 +205,12 @@
       "type": "object",
       "properties": {
         "app": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         },
         "id": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Hold id from approvals_list"
         }
       },
@@ -203,7 +218,6 @@
         "app",
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -221,13 +235,13 @@
       "type": "object",
       "properties": {
         "app": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         }
       },
       "required": [
         "app"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -246,10 +260,12 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "App id"
         },
         "pinned": {
@@ -276,6 +292,7 @@
               "type": "object",
               "properties": {
                 "days": {
+                  "maxItems": 1000,
                   "type": "array",
                   "items": {
                     "type": "string",
@@ -292,17 +309,19 @@
                 },
                 "from": {
                   "type": "string",
+                  "maxLength": 1000000,
                   "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                 },
                 "to": {
                   "type": "string",
+                  "maxLength": 1000000,
                   "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                 },
                 "timezone": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 1000000
                 }
-              },
-              "additionalProperties": false
+              }
             },
             {
               "type": "null"
@@ -314,7 +333,6 @@
         "session",
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -332,15 +350,16 @@
       "type": "object",
       "properties": {
         "app": {
+          "description": "App id; default: the app of the live run",
           "type": "string",
-          "description": "App id; default: the app of the live run"
+          "maxLength": 1000000
         },
         "session": {
+          "description": "Session name (default: generated)",
           "type": "string",
-          "description": "Session name (default: generated)"
+          "maxLength": 1000000
         }
       },
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -358,21 +377,24 @@
       "type": "object",
       "properties": {
         "app": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         },
         "limit": {
+          "description": "Rows to return (default 50, max 200; values outside are clamped)",
           "type": "integer",
-          "description": "Rows to return (default 50, max 200; values outside are clamped)"
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "action": {
+          "description": "Only rows with this action, for example rollback",
           "type": "string",
-          "description": "Only rows with this action, for example rollback"
+          "maxLength": 1000000
         }
       },
       "required": [
         "app"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -391,50 +413,53 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "compact": {
-          "type": "boolean",
-          "description": "When the change is 'content changed', return only the added/removed lines, not the whole screen"
+          "description": "When the change is 'content changed', return only the added/removed lines, not the whole screen",
+          "type": "boolean"
         },
         "wait_for": {
+          "description": "Use after any action that starts work. Wait until this appears (a ref, a text, or role+name), or disappears with gone: true. The result says Waited: matched or timed out.",
           "type": "object",
           "properties": {
             "ref": {
               "type": "string",
+              "maxLength": 1000000,
               "pattern": "^(?:p\\d+|f\\d+)?e\\d+$"
             },
             "text": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 1000000
             },
             "role": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 1000000
             },
             "name": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 1000000
             },
             "gone": {
               "type": "boolean"
             }
-          },
-          "additionalProperties": false,
-          "description": "Use after any action that starts work. Wait until this appears (a ref, a text, or role+name), or disappears with gone: true. The result says Waited: matched or timed out."
+          }
         },
         "timeout_ms": {
+          "description": "How long wait_for and settle may take, in ms (default 2000)",
           "type": "integer",
           "minimum": 0,
-          "maximum": 30000,
-          "description": "How long wait_for and settle may take, in ms (default 2000)"
+          "maximum": 30000
         },
         "settle": {
-          "type": "boolean",
-          "description": "Wait until the screen stops changing (two equal reads 100 ms apart), up to timeout_ms. Use after any action that starts work. A slow result can still follow a pause, so prefer wait_for when you know the expected text."
+          "description": "Wait until the screen stops changing (two equal reads 100 ms apart), up to timeout_ms. Use after any action that starts work. A slow result can still follow a pause, so prefer wait_for when you know the expected text.",
+          "type": "boolean"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -453,13 +478,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -478,13 +503,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -503,10 +528,12 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "ref": {
           "type": "string",
+          "maxLength": 1000000,
           "pattern": "^(?:f\\d+)?e\\d+$",
           "description": "Element ref from browser_snapshot, e.g. e12 or f1e12"
         }
@@ -515,7 +542,6 @@
         "session",
         "ref"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -535,18 +561,19 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "index": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       },
       "required": [
         "session",
         "index"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -565,29 +592,32 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "url": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "http or https URL"
         },
         "allow_private": {
-          "type": "boolean",
-          "description": "Allow every private host"
+          "description": "Allow every private host",
+          "type": "boolean"
         },
         "allow_hosts": {
+          "description": "Allow only these host names",
+          "maxItems": 1000,
           "type": "array",
           "items": {
-            "type": "string"
-          },
-          "description": "Allow only these host names"
+            "type": "string",
+            "maxLength": 1000000
+          }
         }
       },
       "required": [
         "session",
         "url"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -607,13 +637,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -632,13 +662,14 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "dy": {
+          "description": "Default 400",
           "type": "number",
           "minimum": -5000,
-          "maximum": 5000,
-          "description": "Default 400"
+          "maximum": 5000
         },
         "dx": {
           "type": "number",
@@ -649,7 +680,6 @@
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -668,13 +698,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -693,13 +723,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -718,19 +748,22 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "ref": {
           "type": "string",
+          "maxLength": 1000000,
           "pattern": "^(?:f\\d+)?e\\d+$",
           "description": "Element ref from browser_snapshot, e.g. e12 or f1e12"
         },
         "text": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         },
         "enter": {
-          "type": "boolean",
-          "description": "Press Enter afterwards"
+          "description": "Press Enter afterwards",
+          "type": "boolean"
         }
       },
       "required": [
@@ -738,7 +771,6 @@
         "ref",
         "text"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -758,6 +790,7 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "text": {
@@ -769,17 +802,16 @@
           "type": "boolean"
         },
         "timeout_ms": {
+          "description": "Default 5000",
           "type": "integer",
           "minimum": 100,
-          "maximum": 30000,
-          "description": "Default 5000"
+          "maximum": 30000
         }
       },
       "required": [
         "session",
         "text"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -798,17 +830,18 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         }
       },
       "required": [
         "session",
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -827,13 +860,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -852,10 +885,12 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "App id"
         }
       },
@@ -863,7 +898,6 @@
         "session",
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -882,17 +916,18 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "name": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         }
       },
       "required": [
         "session",
         "name"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -911,13 +946,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -936,32 +971,39 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "App id: lowercase letters, digits and dashes, up to 40"
         },
         "spec": {
           "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 1000000
+          },
           "additionalProperties": {},
           "description": "The app spec (shipvo.app/v0)"
         },
         "name": {
+          "description": "Name under the icon. Default: app.name in the spec",
           "type": "string",
-          "description": "Name under the icon. Default: app.name in the spec"
+          "maxLength": 1000000
         },
         "style": {
+          "description": "Look of the app. Default android",
           "type": "string",
           "enum": [
             "android",
             "ios"
-          ],
-          "description": "Look of the app. Default android"
+          ]
         },
         "open": {
-          "type": "boolean",
-          "description": "Open the app right away (default true)"
+          "description": "Open the app right away (default true)",
+          "type": "boolean"
         }
       },
       "required": [
@@ -969,7 +1011,6 @@
         "id",
         "spec"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -988,13 +1029,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1013,6 +1054,7 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "platform": {
@@ -1029,7 +1071,6 @@
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1048,10 +1089,12 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         },
         "all": {
           "type": "boolean"
@@ -1060,7 +1103,6 @@
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1079,13 +1121,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1104,20 +1146,22 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "ids": {
+          "description": "App ids to export. Default: every spec app",
+          "maxItems": 1000,
           "type": "array",
           "items": {
-            "type": "string"
-          },
-          "description": "App ids to export. Default: every spec app"
+            "type": "string",
+            "maxLength": 1000000
+          }
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1136,13 +1180,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1161,36 +1205,40 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "query": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "What the person needs, for example \"split bills\""
         },
         "country": {
+          "description": "Country code, for example FR",
           "type": "string",
-          "description": "Country code, for example FR"
+          "maxLength": 1000000
         },
         "language": {
+          "description": "Language code, for example fr",
           "type": "string",
-          "description": "Language code, for example fr"
+          "maxLength": 1000000
         },
         "currency": {
+          "description": "Currency code, for example EUR",
           "type": "string",
-          "description": "Currency code, for example EUR"
+          "maxLength": 1000000
         },
         "limit": {
+          "description": "Most results to return (default 10, max 25)",
           "type": "integer",
           "minimum": 1,
-          "maximum": 25,
-          "description": "Most results to return (default 10, max 25)"
+          "maximum": 25
         }
       },
       "required": [
         "session",
         "query"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1209,13 +1257,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1234,13 +1282,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1259,13 +1307,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1284,13 +1332,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1309,13 +1357,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1334,10 +1382,12 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Installed app id"
         },
         "hidden": {
@@ -1350,7 +1400,6 @@
         "id",
         "hidden"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1369,26 +1418,31 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "apps": {
+          "maxItems": 1000,
           "type": "array",
           "items": {
             "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "maxLength": 1000000
+            },
             "additionalProperties": {}
           },
           "description": "The apps array from export_phone_apps"
         },
         "replace": {
-          "type": "boolean",
-          "description": "Overwrite apps with the same id (default false)"
+          "description": "Overwrite apps with the same id (default false)",
+          "type": "boolean"
         }
       },
       "required": [
         "session",
         "apps"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1407,13 +1461,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1432,21 +1486,23 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "subject": {
+          "description": "Only mail whose subject contains this",
           "type": "string",
-          "description": "Only mail whose subject contains this"
+          "maxLength": 1000000
         },
         "from": {
+          "description": "Only mail whose sender contains this",
           "type": "string",
-          "description": "Only mail whose sender contains this"
+          "maxLength": 1000000
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1465,13 +1521,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1500,27 +1556,29 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "subject": {
+          "description": "Only mail whose subject contains this (not case sensitive)",
           "type": "string",
-          "description": "Only mail whose subject contains this (not case sensitive)"
+          "maxLength": 1000000
         },
         "from": {
+          "description": "Only mail whose sender contains this",
           "type": "string",
-          "description": "Only mail whose sender contains this"
+          "maxLength": 1000000
         },
         "timeout_ms": {
+          "description": "How long to wait, in ms (default 10000)",
           "type": "integer",
           "minimum": 0,
-          "maximum": 25000,
-          "description": "How long to wait, in ms (default 10000)"
+          "maximum": 25000
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1539,10 +1597,12 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "App id from list_store_apps"
         }
       },
@@ -1550,7 +1610,6 @@
         "session",
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1569,19 +1628,19 @@
       "properties": {
         "job": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Job id from a tool that returned status running"
         },
         "wait_ms": {
+          "description": "How long to wait while it is still running (default 0)",
           "type": "integer",
           "minimum": 0,
-          "maximum": 55000,
-          "description": "How long to wait while it is still running (default 0)"
+          "maximum": 55000
         }
       },
       "required": [
         "job"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1600,13 +1659,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1624,10 +1683,10 @@
       "type": "object",
       "properties": {
         "query": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         }
       },
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1662,13 +1721,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1719,13 +1778,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1744,13 +1803,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1769,13 +1828,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1794,78 +1853,85 @@
       "properties": {
         "app": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "App id from list_apps, optionally with a release: 'tide' (local build), 'tide@latest' or 'tide@r13' (the published release phones run), or 'tide@build:<id>' (a build from upload_build, on the hosted phone)"
         },
         "session": {
+          "description": "Session name (default: generated). One session is one phone.",
           "type": "string",
-          "description": "Session name (default: generated). One session is one phone."
+          "maxLength": 1000000
         },
         "restart": {
-          "type": "boolean",
-          "description": "Only with a session id that is already open: true starts that session over, empty, with this app. By default the open session is reused: the phone switches to this app and keeps its other apps and data."
+          "description": "Only with a session id that is already open: true starts that session over, empty, with this app. By default the open session is reused: the phone switches to this app and keeps its other apps and data.",
+          "type": "boolean"
         },
         "room": {
+          "description": "Room name. Every session opened with the same room on the same simulator shares one backend (orders, content, telemetry), read and written through the same store. Without room, each session has its own. 1 to 64 letters, digits, _ or -.",
           "type": "string",
-          "description": "Room name. Every session opened with the same room on the same simulator shares one backend (orders, content, telemetry), read and written through the same store. Without room, each session has its own. 1 to 64 letters, digits, _ or -."
+          "maxLength": 1000000
         },
         "seed_cart": {
+          "description": "Start with these items already in the cart (test shortcut). Each line: { product_id, quantity }; { id, qty } also works.",
+          "maxItems": 1000,
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
               "product_id": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 1000000
               },
               "id": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 1000000
               },
               "quantity": {
                 "type": "integer",
-                "exclusiveMinimum": 0
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
               },
               "qty": {
                 "type": "integer",
-                "exclusiveMinimum": 0
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
               }
-            },
-            "additionalProperties": false
-          },
-          "description": "Start with these items already in the cart (test shortcut). Each line: { product_id, quantity }; { id, qty } also works."
+            }
+          }
         },
         "dark": {
-          "type": "boolean",
-          "description": "Dark mode"
+          "description": "Dark mode",
+          "type": "boolean"
         },
         "platform": {
+          "description": "Which phone to show: 'android' or 'ios' (default: the live run's, else android). Ignored when no phone is started (show false, attach never, or a live run is attached as it is)",
           "type": "string",
           "enum": [
             "android",
             "ios"
-          ],
-          "description": "Which phone to show: 'android' or 'ios' (default: the live run's, else android). Ignored when no phone is started (show false, attach never, or a live run is attached as it is)"
+          ]
         },
         "model": {
+          "description": "Phone model for a headless session, from phone_models, for example 'iPhone 16 Pro' or 'Galaxy S24'. The session gets that phone's screen size, pixel ratio, user agent and platform. Ignored when a live run is attached.",
           "type": "string",
-          "description": "Phone model for a headless session, from phone_models, for example 'iPhone 16 Pro' or 'Galaxy S24'. The session gets that phone's screen size, pixel ratio, user agent and platform. Ignored when a live run is attached."
+          "maxLength": 1000000
         },
         "show": {
-          "type": "boolean",
-          "description": "true: open the phone in the user's browser so they can watch (default on a computer with a desktop, when the project has `shipvo` installed; a server over HTTP never starts a run). false: headless, nobody sees it (default in CI)."
+          "description": "true: open the phone in the user's browser so they can watch (default on a computer with a desktop, when the project has `shipvo` installed; a server over HTTP never starts a run). false: headless, nobody sees it (default in CI).",
+          "type": "boolean"
         },
         "attach": {
+          "description": "'auto' (default): drive the phone of a live `shipvo run` in this project if there is one, else a headless session. 'never': always headless. 'always': error if there is no live `shipvo run`.",
           "type": "string",
           "enum": [
             "auto",
             "never",
             "always"
-          ],
-          "description": "'auto' (default): drive the phone of a live `shipvo run` in this project if there is one, else a headless session. 'never': always headless. 'always': error if there is no live `shipvo run`."
+          ]
         }
       },
       "required": [
         "app"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1884,13 +1950,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1909,16 +1975,17 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1937,17 +2004,17 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "expand": {
-          "type": "boolean",
-          "description": "Android: go straight to all tiles"
+          "description": "Android: go straight to all tiles",
+          "type": "boolean"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1966,13 +2033,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -1991,10 +2058,12 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "url": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "The URL to deliver, e.g. myapp://item/3"
         }
       },
@@ -2002,7 +2071,6 @@
         "session",
         "url"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2023,25 +2091,31 @@
       "type": "object",
       "properties": {
         "app": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         },
         "command": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         },
         "args": {
           "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 1000000
+          },
           "additionalProperties": {}
         },
         "approval": {
+          "description": "Challenge id the owner approved; pass the same args",
           "type": "string",
-          "description": "Challenge id the owner approved; pass the same args"
+          "maxLength": 1000000
         }
       },
       "required": [
         "app",
         "command"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2059,13 +2133,13 @@
       "type": "object",
       "properties": {
         "app": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         }
       },
       "required": [
         "app"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2084,15 +2158,18 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "app": {
+          "description": "Only this app id",
           "type": "string",
-          "description": "Only this app id"
+          "maxLength": 1000000
         },
         "permission": {
+          "description": "Only this permission, such as camera or notifications",
           "type": "string",
-          "description": "Only this permission, such as camera or notifications"
+          "maxLength": 1000000
         },
         "event": {
           "type": "string",
@@ -2105,16 +2182,15 @@
           ]
         },
         "limit": {
+          "description": "Most recent entries to return (default 100)",
           "type": "integer",
           "minimum": 1,
-          "maximum": 500,
-          "description": "Most recent entries to return (default 100)"
+          "maximum": 500
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2149,10 +2225,12 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Installed app id"
         },
         "pinned": {
@@ -2165,7 +2243,6 @@
         "id",
         "pinned"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2184,13 +2261,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2208,13 +2285,12 @@
       "type": "object",
       "properties": {
         "wait_ms": {
+          "description": "How long to wait for the result before returning { status: \"running\", job } (default 20000). Read it later with job_status.",
           "type": "integer",
           "minimum": 0,
-          "maximum": 55000,
-          "description": "How long to wait for the result before returning { status: \"running\", job } (default 20000). Read it later with job_status."
+          "maximum": 55000
         }
       },
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2236,16 +2312,23 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "title": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         },
         "body": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         },
         "data": {
           "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 1000000
+          },
           "additionalProperties": {}
         }
       },
@@ -2254,7 +2337,6 @@
         "title",
         "body"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2273,13 +2355,13 @@
       "properties": {
         "caption": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 1000000
         }
       },
       "required": [
         "caption"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2297,45 +2379,51 @@
       "type": "object",
       "properties": {
         "format": {
+          "description": "Video shape (default 9:16: 1080x1920; 16:9 is 1920x1080; 1:1 is 1080x1080)",
           "type": "string",
           "enum": [
             "9:16",
             "16:9",
             "1:1"
-          ],
-          "description": "Video shape (default 9:16: 1080x1920; 16:9 is 1920x1080; 1:1 is 1080x1080)"
+          ]
         },
         "fps": {
-          "type": "number",
-          "enum": [
-            30,
-            60
-          ],
-          "description": "Frames per second (default 30)"
+          "description": "Frames per second (default 30)",
+          "anyOf": [
+            {
+              "type": "number",
+              "const": 30
+            },
+            {
+              "type": "number",
+              "const": 60
+            }
+          ]
         },
         "title": {
+          "description": "Used in the file name",
           "type": "string",
-          "description": "Used in the file name"
+          "maxLength": 1000000
         },
         "show_taps": {
-          "type": "boolean",
-          "description": "Draw a finger dot and ripple on taps and a trail on scrolls (default true)"
+          "description": "Draw a finger dot and ripple on taps and a trail on scrolls (default true)",
+          "type": "boolean"
         },
         "background": {
+          "description": "Behind the phone: \"brand\", \"plain\" (white) or a CSS colour such as \"#102030\"",
           "type": "string",
           "minLength": 1,
-          "description": "Behind the phone: \"brand\", \"plain\" (white) or a CSS colour such as \"#102030\""
+          "maxLength": 1000000
         },
         "lumi": {
-          "type": "boolean",
-          "description": "Include Lumi and its step captions in the video (default true for recordings; set false for a plain phone)."
+          "description": "Include Lumi and its step captions in the video (default true for recordings; set false for a plain phone).",
+          "type": "boolean"
         },
         "lumi_voice": {
-          "type": "boolean",
-          "description": "Lumi speaks its short step lines with the energetic voice preset (default false). Needs python3, ffmpeg and network access for the voice. Ignored when record_stop gets a narration file."
+          "description": "Lumi speaks its short step lines with the energetic voice preset (default false). Needs python3, ffmpeg and network access for the voice. Ignored when record_stop gets a narration file.",
+          "type": "boolean"
         }
       },
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2353,15 +2441,15 @@
       "type": "object",
       "properties": {
         "music": {
-          "type": "boolean",
-          "description": "Mix a music bed under the video (default false). Needs python3, ffmpeg and ffprobe; picks a track from Jamendo unless SHIPVO_MUSIC_FILE is set."
+          "description": "Mix a music bed under the video (default false). Needs python3, ffmpeg and ffprobe; picks a track from Jamendo unless SHIPVO_MUSIC_FILE is set.",
+          "type": "boolean"
         },
         "narration": {
+          "description": "Path to a wav with a voice track. It is mixed over the video, trimmed to the video length (the result says so), and ducks the music when music is true.",
           "type": "string",
-          "description": "Path to a wav with a voice track. It is mixed over the video, trimmed to the video length (the result says so), and ducks the music when music is true."
+          "maxLength": 1000000
         }
       },
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2380,10 +2468,12 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "App id"
         }
       },
@@ -2391,7 +2481,6 @@
         "session",
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2410,17 +2499,22 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "name": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "The assistant to wake, such as chatgpt or claude (the same names check_inbox uses)"
         },
         "url": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "http or https URL that receives the POST"
         },
         "events": {
+          "description": "What wakes it (default: both)",
+          "maxItems": 1000,
           "type": "array",
           "items": {
             "type": "string",
@@ -2428,25 +2522,25 @@
               "message",
               "task"
             ]
-          },
-          "description": "What wakes it (default: both)"
+          }
         },
         "secret": {
+          "description": "Shared secret, at least 16 characters (default: generated and returned once)",
           "type": "string",
-          "description": "Shared secret, at least 16 characters (default: generated and returned once)"
+          "maxLength": 1000000
         },
         "format": {
+          "description": "What is sent (default json). text: one plain line for a push service such as ntfy, so the person is told to open their chat. slack: {\"text\": line} for a Slack-style incoming webhook",
           "type": "string",
           "enum": [
             "json",
             "text",
             "slack"
-          ],
-          "description": "What is sent (default json). text: one plain line for a push service such as ntfy, so the person is told to open their chat. slack: {\"text\": line} for a Slack-style incoming webhook"
+          ]
         },
         "allow_private": {
-          "type": "boolean",
-          "description": "Allow a private or local address (for a service you run yourself)"
+          "description": "Allow a private or local address (for a service you run yourself)",
+          "type": "boolean"
         }
       },
       "required": [
@@ -2454,7 +2548,6 @@
         "name",
         "url"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2473,13 +2566,13 @@
       "properties": {
         "app": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "App id"
         }
       },
       "required": [
         "app"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2497,10 +2590,12 @@
       "type": "object",
       "properties": {
         "app": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         },
         "name": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Name for the key, e.g. STRIPE_KEY (letters, digits and underscores)"
         },
         "purpose": {
@@ -2511,15 +2606,16 @@
         "service": {
           "type": "string",
           "minLength": 1,
+          "maxLength": 1000000,
           "description": "Service name (stripe) or its domain (api.example.com)"
         },
         "access": {
+          "description": "Access the key should have (default read)",
           "type": "string",
           "enum": [
             "read",
             "write"
-          ],
-          "description": "Access the key should have (default read)"
+          ]
         }
       },
       "required": [
@@ -2528,7 +2624,6 @@
         "purpose",
         "service"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2547,13 +2642,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2572,23 +2667,27 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "backup": {
           "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 1000000
+          },
           "additionalProperties": {},
           "description": "The backup object from backup_phone"
         },
         "replace": {
-          "type": "boolean",
-          "description": "Replace apps already on the phone (default false)"
+          "description": "Replace apps already on the phone (default false)",
+          "type": "boolean"
         }
       },
       "required": [
         "session",
         "backup"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2607,13 +2706,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2632,17 +2731,18 @@
       "properties": {
         "room": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Room name used in open_app"
         },
         "since": {
+          "description": "Cursor from an earlier room_log; only newer entries come back",
           "type": "string",
-          "description": "Cursor from an earlier room_log; only newer entries come back"
+          "maxLength": 1000000
         }
       },
       "required": [
         "room"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2661,10 +2761,12 @@
       "properties": {
         "room": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Room name used in open_app"
         },
         "text": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "The note, plain text, up to 500 characters"
         }
       },
@@ -2672,7 +2774,6 @@
         "room",
         "text"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2691,20 +2792,27 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "App id"
         },
         "action": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Action name from the spec"
         },
         "input": {
+          "description": "The action's input",
           "type": "object",
-          "additionalProperties": {},
-          "description": "The action's input"
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 1000000
+          },
+          "additionalProperties": {}
         }
       },
       "required": [
@@ -2712,7 +2820,6 @@
         "id",
         "action"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2731,25 +2838,31 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "App id"
         },
         "timezone": {
+          "description": "IANA time zone name, for example Europe/Berlin",
           "type": "string",
-          "description": "IANA time zone name, for example Europe/Berlin"
+          "maxLength": 1000000
         },
         "from": {
           "type": "string",
+          "maxLength": 1000000,
           "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
         },
         "to": {
           "type": "string",
+          "maxLength": 1000000,
           "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
         },
         "days": {
+          "maxItems": 1000,
           "type": "array",
           "items": {
             "type": "string",
@@ -2769,7 +2882,6 @@
         "session",
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2788,13 +2900,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2813,17 +2925,17 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "frame": {
-          "type": "boolean",
-          "description": "true: the whole phone, the app inside its Android or iPhone frame with the status bar, for showing a person. Headless sessions only. Default false: the app's screen alone."
+          "description": "true: the whole phone, the app inside its Android or iPhone frame with the status bar, for showing a person. Headless sessions only. Default false: the app's screen alone.",
+          "type": "boolean"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2842,6 +2954,7 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "direction": {
@@ -2854,53 +2967,56 @@
           ]
         },
         "ref": {
+          "description": "Scroll inside this element (a rail or list); omit for the page",
           "type": "string",
-          "pattern": "^(?:p\\d+|f\\d+)?e\\d+$",
-          "description": "Scroll inside this element (a rail or list); omit for the page"
+          "maxLength": 1000000,
+          "pattern": "^(?:p\\d+|f\\d+)?e\\d+$"
         },
         "compact": {
-          "type": "boolean",
-          "description": "When the change is 'content changed', return only the added/removed lines, not the whole screen"
+          "description": "When the change is 'content changed', return only the added/removed lines, not the whole screen",
+          "type": "boolean"
         },
         "wait_for": {
+          "description": "Use after any action that starts work. Wait until this appears (a ref, a text, or role+name), or disappears with gone: true. The result says Waited: matched or timed out.",
           "type": "object",
           "properties": {
             "ref": {
               "type": "string",
+              "maxLength": 1000000,
               "pattern": "^(?:p\\d+|f\\d+)?e\\d+$"
             },
             "text": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 1000000
             },
             "role": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 1000000
             },
             "name": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 1000000
             },
             "gone": {
               "type": "boolean"
             }
-          },
-          "additionalProperties": false,
-          "description": "Use after any action that starts work. Wait until this appears (a ref, a text, or role+name), or disappears with gone: true. The result says Waited: matched or timed out."
+          }
         },
         "timeout_ms": {
+          "description": "How long wait_for and settle may take, in ms (default 2000)",
           "type": "integer",
           "minimum": 0,
-          "maximum": 30000,
-          "description": "How long wait_for and settle may take, in ms (default 2000)"
+          "maximum": 30000
         },
         "settle": {
-          "type": "boolean",
-          "description": "Wait until the screen stops changing (two equal reads 100 ms apart), up to timeout_ms. Use after any action that starts work. A slow result can still follow a pause, so prefer wait_for when you know the expected text."
+          "description": "Wait until the screen stops changing (two equal reads 100 ms apart), up to timeout_ms. Use after any action that starts work. A slow result can still follow a pause, so prefer wait_for when you know the expected text.",
+          "type": "boolean"
         }
       },
       "required": [
         "session",
         "direction"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2919,28 +3035,30 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "query": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Text to look for, up to 200 characters"
         },
         "app": {
+          "description": "Only this app id, or 'notifications'",
           "type": "string",
-          "description": "Only this app id, or 'notifications'"
+          "maxLength": 1000000
         },
         "limit": {
+          "description": "Most results to return (default 20)",
           "type": "integer",
           "minimum": 1,
-          "maximum": 100,
-          "description": "Most results to return (default 20)"
+          "maximum": 100
         }
       },
       "required": [
         "session",
         "query"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2958,17 +3076,18 @@
       "type": "object",
       "properties": {
         "app": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         },
         "name": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         }
       },
       "required": [
         "app",
         "name"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -2987,10 +3106,12 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "text": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Up to 20000 characters"
         }
       },
@@ -2998,7 +3119,6 @@
         "session",
         "text"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3017,6 +3137,7 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "wifi": {
@@ -3032,7 +3153,6 @@
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3051,6 +3171,7 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "location": {
@@ -3069,8 +3190,7 @@
           "required": [
             "latitude",
             "longitude"
-          ],
-          "additionalProperties": false
+          ]
         },
         "camera": {
           "type": "object",
@@ -3081,17 +3201,18 @@
                   "type": "object",
                   "properties": {
                     "type": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 1000000
                     },
                     "data": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 1000000
                     }
                   },
                   "required": [
                     "type",
                     "data"
-                  ],
-                  "additionalProperties": false
+                  ]
                 },
                 {
                   "type": "null"
@@ -3101,8 +3222,7 @@
             "delayMs": {
               "type": "number"
             }
-          },
-          "additionalProperties": false
+          }
         },
         "permissions": {
           "type": "object",
@@ -3147,68 +3267,81 @@
                 "undetermined"
               ]
             }
-          },
-          "additionalProperties": false
+          }
         },
         "contacts": {
+          "description": "Replace the address book the app can read (needs contacts permission)",
+          "maxItems": 1000,
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
               "id": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 1000000
               },
               "name": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 1000000
               },
               "phoneNumbers": {
+                "maxItems": 1000,
                 "type": "array",
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 1000000
                 }
               },
               "emails": {
+                "maxItems": 1000,
                 "type": "array",
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 1000000
                 }
               }
             },
             "required": [
               "id",
               "name"
-            ],
-            "additionalProperties": false
-          },
-          "description": "Replace the address book the app can read (needs contacts permission)"
+            ]
+          }
         },
         "calendar": {
+          "description": "Replace the calendar events the app can read (needs calendar permission)",
+          "maxItems": 1000,
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
               "id": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 1000000
               },
               "title": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 1000000
               },
               "start": {
                 "type": "string",
+                "maxLength": 1000000,
                 "description": "ISO 8601"
               },
               "end": {
                 "type": "string",
+                "maxLength": 1000000,
                 "description": "ISO 8601"
               },
               "allDay": {
                 "type": "boolean"
               },
               "location": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 1000000
               },
               "notes": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 1000000
               }
             },
             "required": [
@@ -3216,24 +3349,27 @@
               "title",
               "start",
               "end"
-            ],
-            "additionalProperties": false
-          },
-          "description": "Replace the calendar events the app can read (needs calendar permission)"
+            ]
+          }
         },
         "files": {
+          "description": "Replace the files the file picker offers",
+          "maxItems": 1000,
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
               "name": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 1000000
               },
               "mimeType": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 1000000
               },
               "content": {
                 "type": "string",
+                "maxLength": 1000000,
                 "description": "The file's text"
               }
             },
@@ -3241,10 +3377,8 @@
               "name",
               "mimeType",
               "content"
-            ],
-            "additionalProperties": false
-          },
-          "description": "Replace the files the file picker offers"
+            ]
+          }
         },
         "biometrics": {
           "type": "object",
@@ -3260,8 +3394,7 @@
                 "cancel"
               ]
             }
-          },
-          "additionalProperties": false
+          }
         },
         "payment": {
           "type": "object",
@@ -3277,10 +3410,10 @@
               ]
             },
             "pin": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 1000000
             }
-          },
-          "additionalProperties": false
+          }
         },
         "online": {
           "type": "boolean"
@@ -3298,12 +3431,12 @@
           "type": "boolean"
         },
         "darkMode": {
-          "type": "boolean",
-          "description": "The app's colour scheme (prefers-color-scheme)"
+          "description": "The app's colour scheme (prefers-color-scheme)",
+          "type": "boolean"
         },
         "dnd": {
-          "type": "boolean",
-          "description": "Do Not Disturb: notifications go to the shade without a banner"
+          "description": "Do Not Disturb: notifications go to the shade without a banner",
+          "type": "boolean"
         },
         "autoRotate": {
           "type": "boolean"
@@ -3320,12 +3453,12 @@
           "maximum": 100
         },
         "source": {
+          "description": "\"simulated\" forces the simulated camera, microphone and location even when a person could grant the real ones, for reproducible runs",
           "type": "string",
           "enum": [
             "auto",
             "simulated"
-          ],
-          "description": "\"simulated\" forces the simulated camera, microphone and location even when a person could grant the real ones, for reproducible runs"
+          ]
         },
         "microphone": {
           "type": "object",
@@ -3335,14 +3468,12 @@
               "minimum": 0,
               "maximum": 1
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3361,10 +3492,12 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "profile": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "online, offline, 2g, 3g, slow-4g, spotty or low-end-4g"
         }
       },
@@ -3372,7 +3505,6 @@
         "session",
         "profile"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3391,12 +3523,18 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "at": {
-          "type": [
-            "string",
-            "null"
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 1000000
+            },
+            {
+              "type": "null"
+            }
           ],
           "description": "ISO time without a zone, or null for the real time"
         }
@@ -3405,7 +3543,6 @@
         "session",
         "at"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3424,23 +3561,27 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "title": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "What to remind (up to 200 characters)"
         },
         "body": {
+          "description": "More detail (up to 1000 characters)",
           "type": "string",
-          "description": "More detail (up to 1000 characters)"
+          "maxLength": 1000000
         },
         "at": {
+          "description": "Phone-clock time such as 2026-11-14T09:00",
           "type": "string",
-          "description": "Phone-clock time such as 2026-11-14T09:00"
+          "maxLength": 1000000
         },
         "in_minutes": {
-          "type": "number",
-          "description": "Minutes from now on the phone's clock (0 to 525600)"
+          "description": "Minutes from now on the phone's clock (0 to 525600)",
+          "type": "number"
         },
         "repeat": {
           "type": "string",
@@ -3455,7 +3596,6 @@
         "session",
         "title"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3474,16 +3614,23 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "key": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "dark_mode, font_size, bold_text, reduce_motion, language or rtl"
         },
         "value": {
-          "type": [
-            "boolean",
-            "string"
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "maxLength": 1000000
+            }
           ],
           "description": "true or false for switches; small, default, large or largest for font_size; en, fr or ar for language"
         }
@@ -3493,7 +3640,6 @@
         "key",
         "value"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3512,27 +3658,33 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "to": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "App id from share_targets"
         },
         "text": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "The text to share, up to 5000 characters"
         },
         "title": {
+          "description": "A title for the shared item (default: the first line of the text)",
           "type": "string",
-          "description": "A title for the shared item (default: the first line of the text)"
+          "maxLength": 1000000
         },
         "action": {
+          "description": "The share action, when the app has more than one (from share_targets)",
           "type": "string",
-          "description": "The share action, when the app has more than one (from share_targets)"
+          "maxLength": 1000000
         },
         "from": {
+          "description": "The app the text is shared from, for the activity log",
           "type": "string",
-          "description": "The app the text is shared from, for the activity log"
+          "maxLength": 1000000
         }
       },
       "required": [
@@ -3540,7 +3692,6 @@
         "to",
         "text"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3559,13 +3710,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3584,10 +3735,12 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Installed app id"
         }
       },
@@ -3595,7 +3748,6 @@
         "session",
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3614,56 +3766,60 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "ref": {
           "type": "string",
+          "maxLength": 1000000,
           "pattern": "^(?:p\\d+|f\\d+)?e\\d+$",
           "description": "Element ref from the screen, e.g. e42. After a restart refs can carry a prefix, such as f1e42; use them exactly as the screen shows them."
         },
         "compact": {
-          "type": "boolean",
-          "description": "When the change is 'content changed', return only the added/removed lines, not the whole screen"
+          "description": "When the change is 'content changed', return only the added/removed lines, not the whole screen",
+          "type": "boolean"
         },
         "wait_for": {
+          "description": "Use after any action that starts work. Wait until this appears (a ref, a text, or role+name), or disappears with gone: true. The result says Waited: matched or timed out.",
           "type": "object",
           "properties": {
             "ref": {
               "type": "string",
+              "maxLength": 1000000,
               "pattern": "^(?:p\\d+|f\\d+)?e\\d+$"
             },
             "text": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 1000000
             },
             "role": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 1000000
             },
             "name": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 1000000
             },
             "gone": {
               "type": "boolean"
             }
-          },
-          "additionalProperties": false,
-          "description": "Use after any action that starts work. Wait until this appears (a ref, a text, or role+name), or disappears with gone: true. The result says Waited: matched or timed out."
+          }
         },
         "timeout_ms": {
+          "description": "How long wait_for and settle may take, in ms (default 2000)",
           "type": "integer",
           "minimum": 0,
-          "maximum": 30000,
-          "description": "How long wait_for and settle may take, in ms (default 2000)"
+          "maximum": 30000
         },
         "settle": {
-          "type": "boolean",
-          "description": "Wait until the screen stops changing (two equal reads 100 ms apart), up to timeout_ms. Use after any action that starts work. A slow result can still follow a pause, so prefer wait_for when you know the expected text."
+          "description": "Wait until the screen stops changing (two equal reads 100 ms apart), up to timeout_ms. Use after any action that starts work. A slow result can still follow a pause, so prefer wait_for when you know the expected text.",
+          "type": "boolean"
         }
       },
       "required": [
         "session",
         "ref"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3682,24 +3838,25 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "tile": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         },
         "value": {
+          "description": "true or false; 0 to 100 for brightness. Omit to flip.",
           "type": [
             "boolean",
             "number"
-          ],
-          "description": "true or false; 0 to 100 for brightness. Omit to flip."
+          ]
         }
       },
       "required": [
         "session",
         "tile"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3718,56 +3875,62 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "ref": {
           "type": "string",
+          "maxLength": 1000000,
           "pattern": "^(?:p\\d+|f\\d+)?e\\d+$",
           "description": "Element ref from the screen, e.g. e42. After a restart refs can carry a prefix, such as f1e42; use them exactly as the screen shows them."
         },
         "text": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 1000000
         },
         "enter": {
-          "type": "boolean",
-          "description": "Press Enter afterwards"
+          "description": "Press Enter afterwards",
+          "type": "boolean"
         },
         "compact": {
-          "type": "boolean",
-          "description": "When the change is 'content changed', return only the added/removed lines, not the whole screen"
+          "description": "When the change is 'content changed', return only the added/removed lines, not the whole screen",
+          "type": "boolean"
         },
         "wait_for": {
+          "description": "Use after any action that starts work. Wait until this appears (a ref, a text, or role+name), or disappears with gone: true. The result says Waited: matched or timed out.",
           "type": "object",
           "properties": {
             "ref": {
               "type": "string",
+              "maxLength": 1000000,
               "pattern": "^(?:p\\d+|f\\d+)?e\\d+$"
             },
             "text": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 1000000
             },
             "role": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 1000000
             },
             "name": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 1000000
             },
             "gone": {
               "type": "boolean"
             }
-          },
-          "additionalProperties": false,
-          "description": "Use after any action that starts work. Wait until this appears (a ref, a text, or role+name), or disappears with gone: true. The result says Waited: matched or timed out."
+          }
         },
         "timeout_ms": {
+          "description": "How long wait_for and settle may take, in ms (default 2000)",
           "type": "integer",
           "minimum": 0,
-          "maximum": 30000,
-          "description": "How long wait_for and settle may take, in ms (default 2000)"
+          "maximum": 30000
         },
         "settle": {
-          "type": "boolean",
-          "description": "Wait until the screen stops changing (two equal reads 100 ms apart), up to timeout_ms. Use after any action that starts work. A slow result can still follow a pause, so prefer wait_for when you know the expected text."
+          "description": "Wait until the screen stops changing (two equal reads 100 ms apart), up to timeout_ms. Use after any action that starts work. A slow result can still follow a pause, so prefer wait_for when you know the expected text.",
+          "type": "boolean"
         }
       },
       "required": [
@@ -3775,7 +3938,6 @@
         "ref",
         "text"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3794,10 +3956,12 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Installed app id"
         }
       },
@@ -3805,7 +3969,6 @@
         "session",
         "id"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3824,13 +3987,13 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3849,20 +4012,27 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "id": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "App id from create_app"
         },
         "spec": {
           "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 1000000
+          },
           "additionalProperties": {},
           "description": "The whole new spec (shipvo.app/v0)"
         },
         "name": {
+          "description": "New name under the icon",
           "type": "string",
-          "description": "New name under the icon"
+          "maxLength": 1000000
         }
       },
       "required": [
@@ -3870,7 +4040,6 @@
         "id",
         "spec"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3888,25 +4057,26 @@
       "type": "object",
       "properties": {
         "dir": {
+          "description": "Project folder (default: the server's working directory)",
           "type": "string",
-          "description": "Project folder (default: the server's working directory)"
+          "maxLength": 1000000
         },
         "app": {
+          "description": "App id (default: read from the project's shipvo config)",
           "type": "string",
-          "description": "App id (default: read from the project's shipvo config)"
+          "maxLength": 1000000
         },
         "skip_build": {
-          "type": "boolean",
-          "description": "Upload the existing sim-dist folder without building again"
+          "description": "Upload the existing sim-dist folder without building again",
+          "type": "boolean"
         },
         "wait_ms": {
+          "description": "How long to wait for the result before returning { status: \"running\", job } (default 20000). Read it later with job_status.",
           "type": "integer",
           "minimum": 0,
-          "maximum": 55000,
-          "description": "How long to wait for the result before returning { status: \"running\", job } (default 20000). Read it later with job_status."
+          "maximum": 55000
         }
       },
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
@@ -3926,19 +4096,19 @@
       "properties": {
         "session": {
           "type": "string",
+          "maxLength": 1000000,
           "description": "Session from open_app"
         },
         "timeout_ms": {
+          "description": "How long to wait, in ms (default 25000)",
           "type": "integer",
           "minimum": 0,
-          "maximum": 25000,
-          "description": "How long to wait, in ms (default 25000)"
+          "maximum": 25000
         }
       },
       "required": [
         "session"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "annotations": {
