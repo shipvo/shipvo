@@ -23,7 +23,7 @@ test("a frame-sized app gives a phone of the frame's own size, with no Lumi in i
   for (const skin of ["android", "ios"]) {
     const k = SKINS[skin], c = contentSize(skin), p = capturePage({ skin, ...c, margin: 0 });
     assert.equal(p.width, k.width + k.bezel * 2);
-    assert.equal(p.height, k.height + k.bezel * 2 + 14);
+    assert.equal(p.height, k.height + k.bezel * 2);
     assert.ok(!/data-part="lumi"/.test(p.html));
   }
 });
@@ -47,7 +47,7 @@ for (const skin of ["android", "ios"]) {
       assert.deepEqual([body.x, body.y, body.width, body.height], [24, 24, cp.width - 48, cp.height - 48]);
       assert.equal(await page.textContent('[data-part="time"]'), "7:05");
       assert.equal(await page.locator(`[data-part="${SKINS[skin].part}"]`).count(), 1);
-      assert.equal(await page.locator('[data-part="simulated-label"]').count(), 1);
+      assert.equal(await page.locator('[data-part="simulated-label"]').count(), 0, "a capture shows the phone alone, with no badge");
     } finally { await b.close(); }
   });
 }

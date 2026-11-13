@@ -18,7 +18,7 @@ You need the app folder from [Build your first app](getting-started.md) and a te
 
    Use `ios` instead of `android` for an iPhone-style phone.
 2. Wait while Shipvo builds a web copy of your app. It does not need an account or a phone.
-3. Your browser opens on a page with a phone in the middle. A label says **Simulated**, because this is a copy of a phone and not a real one.
+3. Your browser opens on a page with a phone in the middle, in its Android or iPhone frame.
 4. Click around in the phone like you would tap. When you are done, go back to the terminal and press **Ctrl+C**.
 
 **If it fails:**

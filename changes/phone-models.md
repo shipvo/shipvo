@@ -1,4 +1,5 @@
 - `@shipvo/sim`: a session can be a real phone model. `POST /session` takes `model` (15 models: Pixel 7 to Pixel 9 Pro XL, Galaxy S24, Galaxy A55, iPhone 15 to iPhone 17 Pro Max) and the session gets that phone's screen size, pixel ratio, user agent and platform. An unknown name answers `bad_model`. `/sessions` reports each session's `model`.
 - `@shipvo/sim`: the status bar shows its icons in the platform's order: Wi-Fi, signal, battery on Android; signal, Wi-Fi, battery on iOS.
+- `@shipvo/sim`: the phone frame no longer prints a "Simulated" badge under the screen, and its bezel is the same on every side. This applies to `shipvo run`, the watch page, screenshots and recordings.
 - `@shipvo/cli`: `shipvo session start --device "<model>"` starts that model, and `shipvo session devices` lists the models. `session start android` is a Pixel 8 and `session start ios` is an iPhone 16.
-- Migration: `statusParts(status, skin?)` in `@shipvo/sim/frame.mjs` takes an optional second argument. Sessions started without `model` are unchanged.
+- Migration: the frame has no `simulated-label` part, and `outerHeight` is 14 pixels smaller. `statusParts(status, skin?)` in `@shipvo/sim/frame.mjs` takes an optional second argument. Sessions started without `model` are unchanged.

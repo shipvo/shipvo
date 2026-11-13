@@ -16,7 +16,6 @@ export const SKINS = {
   ios: { label: "iPhone", width: 393, height: 852, radius: 55, bezel: 12, status: 54, bar: 34, pad: 36, indicator: 134, part: "dynamic-island", bottom: "home-indicator" },
 };
 
-const FOOT = 14; // extra bezel under the screen, holds the "Simulated" label
 const clean = (s) => String(s).replace(/[<>&"'\\]/g, "").slice(0, 12);
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 
@@ -195,7 +194,7 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
   const k = SKINS[skin];
   if (!k) throw new Error(`Unknown skin "${skin}". Use "android" or "ios".`);
   const st = normalizeStatus(status);
-  const outerWidth = k.width + k.bezel * 2, outerHeight = k.height + k.bezel + k.bezel + FOOT;
+  const outerWidth = k.width + k.bezel * 2, outerHeight = k.height + k.bezel * 2;
   const shape = skin === "ios"
     ? `<span class="sf-cut sf-island" data-part="dynamic-island"></span>`
     : `<span class="sf-cut sf-hole" data-part="punch-hole"></span>`;
@@ -206,9 +205,9 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     + `<div class="sf-vol" data-part="volume-overlay" role="status" aria-live="polite" hidden><span data-part="volume-level">50</span><i class="sf-vbar" data-part="volume-bar"><b style="width:50%"></b></i></div><div class="sf-menu" data-part="power-menu" role="menu" aria-label="Power menu" hidden><button role="menuitem" data-act="restart">Restart</button><button role="menuitem" data-act="poweroff">Power off</button>${skin === "android" ? `<button role="menuitem" data-act="navstyle" data-part="nav-style-toggle">3-button navigation</button>` : ""}<button role="menuitem" data-act="cancel">Cancel</button></div>`
     + `<div class="sf-bar" data-part="${k.bottom}"><i></i>${skin === "android" ? navButtonsHtml() : ""}</div></div>`
     + `<button class="sf-btn sf-power" data-part="power-button" aria-label="Power"></button><button class="sf-btn sf-volup" data-part="volume-up-button" aria-label="Volume up"></button><button class="sf-btn sf-voldown" data-part="volume-down-button" aria-label="Volume down"></button>`
-    + `<span class="sf-label" data-part="simulated-label">Simulated</span></div>`;
+    + `</div>`;
   const css = [
-    `.sf-body{--sf-bg:${dark ? "#000" : "#fff"};--sf-fg:${dark ? "#fff" : "#111"};position:relative;box-sizing:border-box;width:${outerWidth}px;height:${outerHeight}px;padding:${k.bezel}px ${k.bezel}px ${k.bezel + FOOT}px;`
+    `.sf-body{--sf-bg:${dark ? "#000" : "#fff"};--sf-fg:${dark ? "#fff" : "#111"};position:relative;box-sizing:border-box;width:${outerWidth}px;height:${outerHeight}px;padding:${k.bezel}px ${k.bezel}px ${k.bezel}px;`
       + `border-radius:${k.radius + k.bezel}px;background:linear-gradient(145deg,#3a3d42,#15171a);box-shadow:0 0 0 1px #000,0 10px 34px #0007;touch-action:manipulation;user-select:none;-webkit-user-select:none}`,
     `.sf-screen{width:${k.width}px;height:${k.height}px;border-radius:${k.radius}px;background:var(--sf-bg);color:var(--sf-fg);overflow:hidden;display:flex;flex-direction:column;position:relative}`,
     `.sf-status{flex:none;height:${k.status}px;display:flex;justify-content:space-between;align-items:center;padding:0 ${k.pad}px;font:600 14px system-ui,sans-serif;position:relative;z-index:2;color:var(--sf-status-fg,var(--sf-fg));background:var(--sf-status-bg,transparent)}`,
@@ -235,7 +234,6 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     `.sf-edge{position:absolute;left:0;top:${k.status}px;bottom:${k.bar}px;width:14px;z-index:3}.sf-home[hidden],.sf-recents[hidden],.sf-navbtns[hidden]{display:none}`,
     navScreensCss(),
     `.sf-bar{position:relative}.sf-navbtns{position:absolute;inset:0;display:flex;justify-content:space-around;align-items:center;background:var(--sf-bg)}.sf-navbtns button{border:0;background:none;color:var(--sf-fg);font-size:16px;padding:2px 24px;cursor:pointer}.sf-body[data-nav="buttons"] .sf-bar i{display:none}`,
-    `.sf-label{position:absolute;left:0;right:0;bottom:3px;text-align:center;font:600 9px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9aa0a6}`,
   ].join("\n");
   return { skin, width: k.width, height: k.height, outerWidth, outerHeight, html, css };
 }

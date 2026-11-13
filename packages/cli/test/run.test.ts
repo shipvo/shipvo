@@ -85,10 +85,10 @@ describe("frame page, live status bar", () => {
 });
 
 describe("frame page, shared renderer", () => {
-  it("uses the sim frame body, with light and dark status text and a Simulated label", () => {
+  it("uses the sim frame body, with light and dark status text and no badge on the phone", () => {
     for (const p of ["android", "ios"] as const) {
       const l = runFramePage(p, "Tide", renderFrame), d = runFramePage(p, "Tide", renderFrame, true);
-      expect(l).toContain('data-part="phone-body"'); expect(l).toContain('data-part="simulated-label"');
+      expect(l).toContain('data-part="phone-body"'); expect(l).not.toContain("simulated-label");
       expect(l).toContain("--sf-fg:#111"); expect(d).toContain("--sf-fg:#fff");
       expect(l).toContain('<iframe id="app" src="/app/"'); expect(l).toContain("scale(");
     }
