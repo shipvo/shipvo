@@ -27,6 +27,7 @@ import { connectDriver, findLiveRun, type Driver, type RunInfo } from "./attach.
 import { INBOX_WIDGET_URI, INBOX_WIDGET_HTML, INBOX_WIDGET_META, INBOX_TOOL_META, MCP_APP_MIME } from "./widgets/inbox.js";
 import { BuildError, hostedKey, resolveBuild, uploadBuild } from "./build-upload.js";
 import { findProjectDir, hasDesktop, localShipvo, runUrl, startRun } from "./launch.js";
+import { summariseRoom, type RoomEntry, type SessionSummary } from "./room-report.js";
 import { JobStore, type JobView } from "./jobs.js";
 import { satisfied, sameTree, type WaitFor, type Waited } from "./wait.js";
 
@@ -379,6 +380,13 @@ use(server, tools.room_log, async ({ room, since }) => {
   const rows = r.entries ?? [];
   const line = (e: Record<string, unknown>) => e.kind === "note" ? `${e.at} ${e.agent ?? "agent"} note: ${e.text}` : `${e.at} ${e.session} (${e.agent ?? "agent"}) ${e.tool}${e.target ? " " + e.target : ""}${e.change ? ": " + e.change : ""}`;
   return { ...text((rows.length ? rows.map(line).join("\n") : "no new entries") + `\ncursor: ${r.cursor}`), structuredContent: { room, entries: rows, cursor: r.cursor } };
+});
+use(server, tools.room_report, async ({ room }) => {
+  const r = await sim("/room_log", { room }) as Act & { entries?: RoomEntry[] };
+  if (!r.ok) return result("", r);
+  const { sessions } = summariseRoom(r.entries ?? []);
+  const line = (s: SessionSummary) => `${s.session} (${s.agent ?? "agent"}): ${s.steps} steps in ${s.seconds}s, ${s.errors} errors${s.last_screen_title ? `, screen "${s.last_screen_title}"` : ""}${s.notes.length ? `, notes: ${s.notes.join(" | ")}` : ""}`;
+  return { ...text(sessions.length ? sessions.map(line).join("\n") : "no sessions in this room yet"), structuredContent: { room, sessions } };
 });
 use(server, tools.room_note, async ({ room, text: note }) => {
   const r = await sim("/room_note", { room, text: note, agent: clientName() }) as Act & { cursor?: string };

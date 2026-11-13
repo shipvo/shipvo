@@ -31,6 +31,7 @@ const NO_SESSION: Record<string, string> = {
   list_installed_apps: "works on the person's phone, takes no session",
   list_store_apps: "lists the marketplace, takes no session",
   room_log: "reads a room, takes no session id",
+  room_report: "reads a room, takes no session id",
   room_note: "posts to a room, takes no session id",
   list_sessions: "lists all sessions, takes no session id",
   record_start: "records the phone frame page, takes no session id",
