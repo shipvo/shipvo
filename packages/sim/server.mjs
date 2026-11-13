@@ -2,7 +2,7 @@
 // Shipvo UI simulator: runs the real app UI (React Native Web build) in a phone-sized headless browser,
 // and lets an agent see the screen as an accessibility tree and act on it: tap, type, scroll, back.
 // No emulator, no device. Each session also gets a mock control plane that records orders for grading.
-//   shipvo sim  (or: node packages/sim/server.mjs) [--port 4545] [--dir /tmp/pn-ui] [--dist ./sim-dist] [--app <id>]
+//   shipvo sim  (or: node packages/sim/server.mjs) [--port 4545] [--dir /tmp/pn-ui] [--dist ./sim-dist] [--app <id>] [--host 127.0.0.1]
 // Reads shipvo.json in the current directory (appId, name, controlPlane) when present.
 import http from "node:http";
 import { readFileSync, existsSync, writeFileSync, appendFileSync, mkdirSync, statSync, rmSync, realpathSync } from "node:fs";
@@ -248,7 +248,8 @@ async function newSession(id, opts = {}) {
   } else if (opts.a2ui === true) {
     // An A2UI session shows surfaces an agent describes, not an app build. Messages given here are applied before the page opens.
     const host = createA2ui(); a2uiHosts.set(id, host);
-    if (opts.a2ui_messages !== undefined) host.applyAll(opts.a2ui_messages);
+    // What the first messages did is part of the answer, so a refused message is seen at once.
+    if (opts.a2ui_messages !== undefined) host.opened = host.applyAll(opts.a2ui_messages);
     target = { app: "a2ui", url: `http://localhost:${PORT}/a2ui/${encodeURIComponent(id)}/`, release: "a2ui" };
   } else target = await resolveApp(opts.app);
   const bk = backendOf(id, room);
@@ -1014,7 +1015,7 @@ async function act(id, body) {
     }
     case "a2ui_send": case "a2ui_actions": {
       const host = a2uiHosts.get(id);
-      if (!host) throw new SimError("not_a2ui", "this session is not an A2UI session: open it with a2ui: true");
+      if (!host) throw new SimError("not_agent_ui", "this session is not an A2UI session: open it with a2ui: true");
       if (body.action === "a2ui_actions") return { ...host.take(body.since), effects: host.effects, surfaces: host.surfaceIds() };
       const input = body.jsonl ?? body.messages;
       if (input === undefined) throw new SimError("bad_message", "a2ui_send needs messages (a list) or jsonl (one message per line)");
@@ -1185,7 +1186,7 @@ const server = http.createServer(async (req, res) => {
       for (const s of skipped) failed.push({ session: s.session, error: s.error });
       return send(200, { ok: true, imported, ...(failed.length ? { failed } : {}) });
     }
-    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof BuildCacheError || (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_model" || e.code === "bad_room" || e.code === "bad_app"))) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, ...(s.build ? { build: s.build } : {}), ...(s.model ? { model: s.model, skin: s.skin } : {}), screen: await screen(s.page) }); }
+    if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof BuildCacheError || (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_model" || e.code === "bad_room" || e.code === "bad_app"))) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, ...(s.build ? { build: s.build } : {}), ...(s.model ? { model: s.model, skin: s.skin } : {}), ...(a2uiHosts.get(body.session)?.opened ?? {}), screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const s0 = sessions.get(body.session); const prevScreen = s0?.lastScreen; const r = await act(body.session, body);
         if (s0 && typeof r.screen === "string") { s0.lastScreen = r.screen; watch.step(body.session, describeStep(body, prevScreen), changeLine(prevScreen, r.screen)); }
@@ -1236,7 +1237,8 @@ server.on("upgrade", (req, socket) => {
 });
 // Agents and parity runs pause between actions; keep idle connections open well beyond Node's 5 s default.
 server.keepAliveTimeout = 300_000; server.headersTimeout = 310_000; server.requestTimeout = 0;
-// --host limits who can reach the simulator: 127.0.0.1 is this machine only. Without it the server listens on every interface.
-const HOST = arg("host", undefined);
-server.listen(PORT, ...(HOST ? [HOST] : []), () => console.log(`Shipvo UI simulator on http://${HOST ?? "localhost"}:${PORT} (sessions in ${DIR})`));
+// The simulator listens on this machine only (127.0.0.1): a phone session can read app data, so nothing else on the
+// network reaches it by default. --host (or SHIPVO_SIM_HOST) names another address, for example 0.0.0.0 for every interface.
+const HOST = arg("host", process.env.SHIPVO_SIM_HOST || "127.0.0.1");
+server.listen(PORT, HOST, () => console.log(`Shipvo UI simulator on http://${HOST === "127.0.0.1" ? "localhost" : HOST}:${PORT} (sessions in ${DIR})`));
 launchBrowser();

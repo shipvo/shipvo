@@ -36,7 +36,7 @@ This page is for you if you have an Expo app and a coding agent that can run she
 - **A build with a base path.** An app built with Expo's `experiments.baseUrl` (for example `/static`) gets its files under that path.
 - **An app that keeps the network busy.** The session opens once the app has loaded. It waits up to 5 seconds more for the network to go quiet, so an app that polls or streams still opens. `SHIPVO_SIM_NET_QUIET_MS` changes that wait.
 - **Sound.** The app may play sound without a tap first, as on a phone.
-- **Only this machine.** The session's simulator listens on `127.0.0.1`, so other machines on your network cannot reach it.
+- **Only this machine.** The session's simulator listens on `127.0.0.1`, so other machines on your network cannot reach it. The simulator started any other way (`shipvo sim`, `node server.mjs`) does the same; pass `--host 0.0.0.0` to the server, or set `SHIPVO_SIM_HOST=0.0.0.0`, to serve other machines.
 - **A script that does not load.** It is recorded with the app's other errors, so a blank screen comes with its cause.
 
 ## Pick a phone model

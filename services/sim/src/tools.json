@@ -25,6 +25,107 @@
     }
   },
   {
+    "name": "a2ui_actions",
+    "description": "What an A2UI session sent to the agent: the action messages from buttons the person pressed, with their context read from the data model. Pass `since` (the `next` of the last call) to get only newer ones.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "since": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Return messages after this position (the `next` of an earlier call)"
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "a2ui_open",
+    "description": "Open A2UI v1.0 messages as a screen on a phone and return it as a tree. The messages are the agent's own: createSurface, updateComponents, updateDataModel, deleteSurface. Needs no app. Then use screen, tap, type and screenshot on the session like any app, a2ui_send to change the screen and a2ui_actions to read what the person did.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "description": "A2UI messages, each { version: \"1.0\", createSurface | updateComponents | updateDataModel | deleteSurface: {...} }"
+        },
+        "session": {
+          "type": "string",
+          "description": "Session name (default: generated)"
+        },
+        "model": {
+          "type": "string",
+          "description": "Phone model from phone_models, for example 'iPhone 16 Pro' (default: Pixel 8)"
+        }
+      },
+      "required": [
+        "messages"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
+    "name": "a2ui_send",
+    "description": "Send more A2UI messages to a session from a2ui_open and return the screen after them. The result says how many were applied and lists each refused message with the reason.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "description": "Session from open_app"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "description": "A2UI messages to apply in order"
+        }
+      },
+      "required": [
+        "session",
+        "messages"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "app_activity",
     "description": "What was built and changed on the phone: for each app made with create_app, its versions with a plain line for what changed in each (added, removed or changed screens, actions and data), its http data sources and how often each refreshes, and its events (create, update, action, data refresh). Pass id for one app. Fails with not_installed.",
     "inputSchema": {

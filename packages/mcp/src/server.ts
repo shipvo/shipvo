@@ -424,6 +424,28 @@ use(server, tools.phone_models, async () => {
   const lines = r.models.map((m) => `${m.name} | ${m.platform} | ${m.width}x${m.height} @${m.scale}x`);
   return { content: [{ type: "text" as const, text: `Defaults: android is ${r.defaults?.android}, ios is ${r.defaults?.ios}\n\n${lines.join("\n")}` }], structuredContent: { ok: true, models: r.models, defaults: r.defaults ?? {} } };
 });
+// A2UI: the agent's own messages drawn as a phone screen. The session then takes screen, tap, type and screenshot like any app.
+type A2uiAct = Act & { applied?: number; errors?: { code?: string; message?: string }[]; surfaces?: string[]; messages?: unknown[]; next?: number; effects?: unknown[] };
+const a2uiSent = (r: A2uiAct) => `${r.applied ?? 0} applied${r.errors?.length ? `, ${r.errors.length} refused:\n${r.errors.map((e) => `  ${e.code ?? "error"}: ${e.message ?? ""}`).join("\n")}` : ""}`;
+use(server, tools.a2ui_open, async ({ messages, session, model }) => {
+  if (ctx.scope === "read") throw new Error("this key is read-only: it cannot open sessions");
+  const sid = session ?? `a2ui-${Date.now().toString(36)}`;
+  const r = (await sim("/session", { session: sid, a2ui: true, a2ui_messages: messages, ...(model ? { model } : {}) })) as A2uiAct;
+  if (!r.ok) return result(sid, r);
+  sessions.set(sid, { app: "a2ui", steps: 0, startedAt: Date.now(), client: clientName(), platform: "headless" });
+  return { ...text(`Session: ${sid}\n${a2uiSent(r)}\n\n${r.screen ?? ""}`), structuredContent: { ok: true, session: sid, applied: r.applied ?? 0, errors: r.errors ?? [] } };
+});
+use(server, tools.a2ui_send, async ({ session, messages }) => {
+  need(session); const r = (await act({ session, action: "a2ui_send", messages })) as A2uiAct;
+  if (!r.ok) return result(session, r);
+  return { ...text(`${a2uiSent(r)}\n\n${r.screen ?? ""}`), structuredContent: { ok: true, applied: r.applied ?? 0, errors: r.errors ?? [], surfaces: r.surfaces ?? [] } };
+});
+use(server, tools.a2ui_actions, async ({ session, since }) => {
+  need(session); const r = (await act({ session, action: "a2ui_actions", ...(since !== undefined ? { since } : {}) })) as A2uiAct;
+  if (!r.ok) return result(session, r);
+  const list = r.messages ?? [];
+  return { ...text(list.length ? list.map((x) => JSON.stringify(x)).join("\n") : "No messages for the agent yet."), structuredContent: { ok: true, messages: list, next: r.next ?? 0, effects: r.effects ?? [], surfaces: r.surfaces ?? [] } };
+});
 // The simulated device: what the phone has, and what happens to it.
 use(server, tools.set_device, async ({ session, ...device }) => { need(session); const r = await act({ session, action: "set_device", device }); if (r.ok) steps.get(session)?.push({ action: "set_device", device: device.payment?.pin === undefined ? device : { ...device, payment: { ...device.payment, pin: undefined } } }); return result(session, r); });
 use(server, tools.push_notification, 

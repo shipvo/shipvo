@@ -120,6 +120,15 @@ describe("shipvo session", () => {
     expect(state.posts.at(-1)!.body.a2ui_messages).toEqual([{ version: "1.0", deleteSurface: { surfaceId: "s" } }]);
   });
 
+  it("start --a2ui says how many messages the simulator refused, with the reasons", async () => {
+    const { deps, state, root } = setup({ name: "not-an-app" });
+    writeFileSync(join(root, "ui.jsonl"), JSON.stringify({ createSurface: { surfaceId: "s" } }));
+    state.reply.session = { ok: true, applied: 0, errors: [{ code: "VALIDATION_FAILED", message: "version must be 1.0" }], screen: "" };
+    const { doc } = await run(deps, ["start", "--a2ui", "ui.jsonl"]);
+    expect(doc.summary).toContain("with 1 A2UI message refused (see data.a2ui_errors)");
+    expect(doc.data.a2ui_errors).toEqual([{ code: "VALIDATION_FAILED", message: "version must be 1.0" }]);
+  });
+
   it("a2ui send streams more messages and a2ui actions reads what the screen sent to the agent", async () => {
     const { deps, state, root } = setup({ name: "x" });
     writeFileSync(join(root, "ui.jsonl"), JSON.stringify({ version: "1.0", createSurface: { surfaceId: "s" } }));
