@@ -136,7 +136,7 @@ Telemetry                   POST /t → D1;  orders POST /o/{app} → D1
 | `packages/spec` | `@shipvo/spec`: the JSON Schema for `shipvo.app/v0` app specs and a validator that returns errors and warnings with a JSON path and a suggested fix |
 | `packages/shipvo`, `packages/create-shipvo` | `shipvo` and `create-shipvo`: the CLI under its short name (`npx shipvo`, `npm i -g shipvo`) and `npm create shipvo`; both forward to `@shipvo/cli` |
 | `packages/capacitor` | `@shipvo/capacitor`: signed web bundles for Capacitor apps: release decisions, Ed25519 + SHA-256 verification and rollback rules |
-| `packages/mcp-tools` | The one MCP tool registry shared by the local and hosted servers |
+| `packages/mcp-tools` | `@shipvo/mcp-tools`: the registry of every Shipvo MCP tool (name, description, input schema, error codes), shared by the local and hosted servers (`docs/mcp-tools.md`) |
 | `services/control-plane` | Hono worker on Cloudflare: pointers, bundles, web artifacts, content, orders, telemetry, admin, owner API |
 | `services/sim` | Hosted simulator Worker: one sandbox per API key, the same MCP tools over HTTPS (sim.shipvo.dev) |
 | `services/site` | shipvo.dev: landing page and the public app marketplace |

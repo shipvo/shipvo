@@ -1,15 +1,15 @@
 {
   "name": "@shipvo/mcp-tools",
   "version": "0.0.1",
-  "private": true,
   "type": "module",
   "license": "Apache-2.0",
-  "description": "The one registry of Shipvo MCP tool definitions (names, descriptions, input schemas, error codes, approval steps). The stdio and remote MCP servers both build their tool lists from it. Not published: @shipvo/mcp bundles it.",
+  "description": "The registry of Shipvo MCP tool definitions: names, descriptions, input schemas, hints, error codes and approval steps. The local and hosted Shipvo MCP servers build their tool lists from it.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "zod": "^3.23.8",
@@ -19,5 +19,37 @@
     "@types/node": "^22.8.0",
     "typescript": "^5.6.3",
     "vitest": "^2.1.4"
+  },
+  "keywords": [
+    "shipvo",
+    "mcp",
+    "model-context-protocol",
+    "tools",
+    "json-schema",
+    "zod",
+    "react-native",
+    "expo",
+    "simulator",
+    "ai-agents"
+  ],
+  "homepage": "https://github.com/shipvo/shipvo/tree/main/packages/mcp-tools#readme",
+  "bugs": {
+    "url": "https://github.com/shipvo/shipvo/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shipvo/shipvo.git",
+    "directory": "packages/mcp-tools"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
