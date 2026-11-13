@@ -5,8 +5,8 @@
 //   shipvo sim  (or: node packages/sim/server.mjs) [--port 4545] [--dir /tmp/pn-ui] [--dist ./sim-dist] [--app <id>]
 // Reads shipvo.json in the current directory (appId, name, controlPlane) when present.
 import http from "node:http";
-import { readFileSync, existsSync, writeFileSync, appendFileSync, mkdirSync, statSync, rmSync } from "node:fs";
-import { join, extname, dirname, sep } from "node:path";
+import { readFileSync, existsSync, writeFileSync, appendFileSync, mkdirSync, statSync, rmSync, realpathSync } from "node:fs";
+import { join, extname, dirname, sep, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withAppName } from "./app-name.mjs";
 import { openBuild } from "./build-open.mjs";
@@ -187,6 +187,19 @@ async function stopRecording(s) {
   s.rec = null; rec.on = false; await rec.loop;
   try { return await encodeFrames({ dir: rec.dir, times: rec.times, end: Date.now(), out: rec.out }); }
   catch (e) { if (e instanceof CaptureError) throw new SimError(e.code, e.message); throw e; }
+}
+/**
+ * The file in the local build that a request path names, or null. null when the path leaves the build folder (with ".."
+ * in any spelling, or through a link inside the build), names a folder or nothing, or is not valid.
+ */
+function distFile(requestPath) {
+  try {
+    const root = realpathSync(resolvePath(DIST));
+    const p = resolvePath(root, "." + sep + decodeURIComponent(String(requestPath)).replace(/^[/\\]+/, ""));
+    if (!p.startsWith(root + sep) || !existsSync(p) || statSync(p).isDirectory()) return null;
+    const real = realpathSync(p);
+    return real.startsWith(root + sep) ? real : null;
+  } catch { return null; }
 }
 // The base path the local build was made with: what stands before /_expo/ in the script address of its index.html. "" when there is none.
 let appBaseCache = { at: -1, base: "" };
@@ -1027,11 +1040,11 @@ const server = http.createServer(async (req, res) => {
     // An app built with a base path (Expo's experiments.baseUrl, for example /static) asks for its files under that path.
     { const base = appBase();
       if (base && url.pathname.startsWith(base + "/")) {
-        const p = join(DIST, decodeURIComponent(url.pathname.slice(base.length)));
-        if (p.startsWith(DIST + sep) && existsSync(p) && !statSync(p).isDirectory()) return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
+        const p = distFile(url.pathname.slice(base.length));
+        if (p) return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
       } }
     if (url.pathname.startsWith("/_expo/") || url.pathname.startsWith("/assets/") || url.pathname === "/favicon.ico") {
-      const p = join(DIST, decodeURIComponent(url.pathname)); if (existsSync(p)) return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
+      const p = distFile(url.pathname); if (p) return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
     }
     // released web artifacts, proxied from the control plane and cached (immutable per release)
     if (url.pathname.startsWith("/w/")) {
@@ -1054,7 +1067,7 @@ const server = http.createServer(async (req, res) => {
         return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
       } }
     if (url.pathname.startsWith("/app/")) {
-      let p = join(DIST, url.pathname.slice(5) || "index.html"); if (!existsSync(p) || statSync(p).isDirectory()) p = join(DIST, "index.html");
+      const p = distFile(url.pathname.slice(5)) ?? join(DIST, "index.html");   // any other path is a screen of the app: serve the app
       if (extname(p) === ".html") return send(200, withAppName(readFileSync(p, "utf8"), APP_NAME), MIME[".html"]);
       return send(200, readFileSync(p), MIME[extname(p)] ?? "application/octet-stream");
     }
@@ -1190,5 +1203,7 @@ server.on("upgrade", (req, socket) => {
 });
 // Agents and parity runs pause between actions; keep idle connections open well beyond Node's 5 s default.
 server.keepAliveTimeout = 300_000; server.headersTimeout = 310_000; server.requestTimeout = 0;
-server.listen(PORT, () => console.log(`Shipvo UI simulator on http://localhost:${PORT} (sessions in ${DIR})`));
+// --host limits who can reach the simulator: 127.0.0.1 is this machine only. Without it the server listens on every interface.
+const HOST = arg("host", undefined);
+server.listen(PORT, ...(HOST ? [HOST] : []), () => console.log(`Shipvo UI simulator on http://${HOST ?? "localhost"}:${PORT} (sessions in ${DIR})`));
 launchBrowser();

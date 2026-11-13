@@ -4,7 +4,7 @@ import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,6 +39,8 @@ before(async () => {
   mkdirSync(join(dist, "_expo", "static", "js", "web"), { recursive: true });
   writeFileSync(join(dist, "index.html"), INDEX); writeFileSync(join(dist, "_expo", "static", "js", "web", "app.js"), BUNDLE);
   writeFileSync(join(root, "secret.txt"), "outside the build");
+  mkdirSync(join(dist, "assets"), { recursive: true }); writeFileSync(join(dist, "assets", "logo file.txt"), "a build file");
+  try { symlinkSync(join(root, "secret.txt"), join(dist, "assets", "link.txt")); } catch { /* no links on this system: that case is skipped */ }
   proc = spawn(process.execPath, [join(here, "server.mjs"), "--port", String(PORT), "--dir", dir, "--dist", dist], { stdio: ["ignore", "ignore", "pipe"], cwd: here, env: { ...process.env, SHIPVO_SIM_NET_QUIET_MS: "1500" } });
   let err = ""; proc.stderr.on("data", (d) => { err += d; });
   let up = false;
@@ -57,6 +59,26 @@ test("a build made with a base path gets its files under that path, and nothing 
   assert.equal((await fetch(`http://localhost:${PORT}/static/_expo/static/js/web/nope.js`)).status, 404);
   assert.equal((await fetch(`http://localhost:${PORT}/static/..%2Fsecret.txt`)).status, 404);
   assert.equal((await fetch(`http://localhost:${PORT}/other/_expo/static/js/web/app.js`)).status, 404, "only the build's own base path is served");
+});
+
+test("no address reads a file outside the build folder", async () => {
+  const get = async (path) => { const r = await fetch(`http://localhost:${PORT}${path}`); return { status: r.status, body: await r.text() }; };
+  for (const path of [
+    "/_expo/..%2F..%2Fsecret.txt", "/assets/..%2F..%2Fsecret.txt", "/_expo/%2e%2e%2f%2e%2e%2fsecret.txt", "/assets/..%5C..%5Csecret.txt",
+    "/assets/%2e%2e/%2e%2e/secret.txt", "/static/_expo/..%2F..%2F..%2Fsecret.txt", "/app/..%2Fsecret.txt", "/assets/%E0%A4%A",
+  ]) {
+    const r = await get(path);
+    assert.doesNotMatch(r.body, /outside the build/, `${path} returned a file from outside the build`);
+  }
+  assert.equal((await get("/_expo/..%2F..%2Fsecret.txt")).status, 404);
+  if (existsSync(join(dist, "assets", "link.txt"))) assert.doesNotMatch((await get("/assets/link.txt")).body, /outside the build/, "a link inside the build must not lead out of it");
+});
+
+test("build files are still served, with spaces and other escaped characters in their names", async () => {
+  const r = await fetch(`http://localhost:${PORT}/assets/logo%20file.txt`);
+  assert.equal(r.status, 200); assert.equal(await r.text(), "a build file");
+  assert.equal((await fetch(`http://localhost:${PORT}/_expo/static/js/web/app.js`)).status, 200);
+  assert.match(await (await fetch(`http://localhost:${PORT}/app/any/screen`)).text(), /not started/, "an unknown path under /app/ is the app");
 });
 
 test("an app that keeps the network busy still opens, and it has run", async () => {

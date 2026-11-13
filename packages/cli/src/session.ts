@@ -2,7 +2,7 @@
 // start builds the app for web and serves it on a headless phone (Android or iOS frame) that stops on its own;
 // screen/tap/type/scroll/back/screenshot drive it; get/list/stop manage it. No shipvo.json and no emulator needed.
 import { spawn } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { randomBytes } from "node:crypto";
@@ -21,6 +21,7 @@ export const SESSION_USAGE = `Usage: shipvo session <command> [options]
   record start | record stop [--out <file>]
   tap <ref> | type <ref> <text> | scroll <up|down|left|right> [<ref>]
   get | list | stop
+  clean                     remove the folders of stopped sessions (their screenshots and videos too)
 
 Commands after start use the newest running session; pass --id <id> to name one. Add --json for one JSON document.
 Example: shipvo session start ios --max-duration-minutes 20 --json`;
@@ -189,6 +190,14 @@ export async function stopSession(d: SessionDeps, id?: string): Promise<Done> {
   return { code: "stopped", summary: `Session ${r.id} is stopped.`, data: view(d.root, r), next: START_NEXT };
 }
 
+/** Removes the record and the folder of every stopped session. Running sessions are left alone. */
+export function cleanSessions(d: SessionDeps): Done {
+  const stopped = all(d).filter((s) => s.status === "stopped");
+  for (const s of stopped) { rmSync(join(dirOf(d.root), s.id), { recursive: true, force: true }); rmSync(fileOf(d.root, s.id), { force: true }); }
+  const running = all(d).length;
+  return { code: "cleaned", summary: `Removed ${stopped.length} stopped session${stopped.length === 1 ? "" : "s"}. ${running} still running.`, data: { removed: stopped.map((s) => s.id), running }, next: running ? [] : START_NEXT };
+}
+
 const DIRECTIONS = new Set(["up", "down", "left", "right"]);
 
 /** One action on the phone. `words` are the positionals after the verb. */
@@ -236,7 +245,7 @@ export function defaultDeps(root = process.cwd()): SessionDeps {
     },
     startServer: async ({ server, port, app, dir, root: cwd }) => {
       const log = openSync(join(dir, "sim.log"), "a");
-      const p = spawn(process.execPath, [server, "--port", String(port), "--app", app, "--dir", dir], { cwd, detached: true, stdio: ["ignore", log, log] });
+      const p = spawn(process.execPath, [server, "--port", String(port), "--host", "127.0.0.1", "--app", app, "--dir", dir], { cwd, detached: true, stdio: ["ignore", log, log] });
       let exited = false; p.once("exit", () => { exited = true; });
       if (!(await waitListening(port, () => exited))) throw new CliFailure(`The phone stopped before it started. See ${join(dir, "sim.log")}.`, "sim_exited", 1);
       p.unref();
@@ -277,6 +286,7 @@ export async function session(argv: string[], deps: SessionDeps = defaultDeps())
       if (port !== undefined && !(Number.isInteger(port) && port > 0 && port < 65536)) throw new UsageError("--port needs a number from 1 to 65535.");
       done = await startSession(deps, { platform, device: flags.device, name: flags.name, minutes, port, skipBuild: flags["skip-build"] === "true" });
     } else if (verb === "stop") done = await stopSession(deps, flags.id);
+    else if (verb === "clean") done = cleanSessions(deps);
     else if (verb === "devices") { const { models, defaults } = await deps.models(deps.root); done = { code: "listed", summary: `${models.length} phone models. Defaults: ${defaults.android} for android, ${defaults.ios} for ios.`, data: { devices: models.map(({ name, platform, width, height, scale }) => ({ name, platform, width, height, scale })), defaults }, next: START_NEXT }; }
     else if (verb === "get") { const r = pick(deps, flags.id); done = { code: r.status, summary: `Session ${r.id} is ${r.status === "in_progress" ? "running" : "stopped"}.`, data: view(deps.root, r), next: r.status === "in_progress" ? driveNext(r.id) : START_NEXT }; }
     else if (verb === "list") { const list = all(deps); done = { code: "listed", summary: `${list.length} session${list.length === 1 ? "" : "s"} in this folder.`, data: { sessions: list }, next: list.some((s) => s.status === "in_progress") ? [] : START_NEXT }; }

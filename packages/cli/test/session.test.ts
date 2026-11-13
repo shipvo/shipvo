@@ -233,6 +233,22 @@ describe("shipvo session", () => {
     expect(after.doc.code).toBe("session_stopped");
   });
 
+  it("clean removes stopped sessions with their screenshots, and leaves a running one alone", async () => {
+    const { deps, root } = setup();
+    const first = (await run(deps, ["start"])).doc.data.id;
+    await run(deps, ["screenshot"]);
+    await run(deps, ["stop", "--id", first]);
+    const second = (await run(deps, ["start", "ios"])).doc.data.id;
+    expect(existsSync(join(root, ".shipvo", "sessions", first, "shot-1.png"))).toBe(true);
+    const { doc, exit } = await run(deps, ["clean"]);
+    expect(exit).toBe(0); expect(doc.code).toBe("cleaned");
+    expect(doc.data).toEqual({ removed: [first], running: 1 });
+    expect(existsSync(join(root, ".shipvo", "sessions", first))).toBe(false);
+    expect(existsSync(join(root, ".shipvo", "sessions", `${first}.json`))).toBe(false);
+    expect((await run(deps, ["list"])).doc.data.sessions.map((s: { id: string }) => s.id)).toEqual([second]);
+    expect((await run(deps, ["clean"])).doc.data.removed).toEqual([]);
+  });
+
   it("reports a session that reached its time limit as expired", async () => {
     const { deps, state } = setup();
     const id = (await run(deps, ["start", "--max-duration-minutes", "5"])).doc.data.id;

@@ -36,6 +36,7 @@ This page is for you if you have an Expo app and a coding agent that can run she
 - **A build with a base path.** An app built with Expo's `experiments.baseUrl` (for example `/static`) gets its files under that path.
 - **An app that keeps the network busy.** The session opens once the app has loaded. It waits up to 5 seconds more for the network to go quiet, so an app that polls or streams still opens. `SHIPVO_SIM_NET_QUIET_MS` changes that wait.
 - **Sound.** The app may play sound without a tap first, as on a phone.
+- **Only this machine.** The session's simulator listens on `127.0.0.1`, so other machines on your network cannot reach it.
 - **A script that does not load.** It is recorded with the app's other errors, so a blank screen comes with its cause.
 
 ## Pick a phone model
@@ -109,7 +110,10 @@ shipvo session record stop --out videos/checkout.mp4
 shipvo session get        # status, address, expiry and the screenshots taken
 shipvo session list       # every session started in this folder
 shipvo session stop       # end it now; safe to run twice
+shipvo session clean      # remove stopped sessions and their files
 ```
+
+`shipvo session clean` removes the folders of stopped sessions, with their screenshots and videos. Running sessions are left alone.
 
 `get` returns `status` (`in_progress` or `stopped`), and for a stopped session `stop_reason`: `stopped` (you stopped it), `expired` (it reached its time limit) or `exited`. `artifacts` lists each screenshot and video with its path. Session files live in `.shipvo/sessions/`, which Shipvo adds to `.gitignore`.
 

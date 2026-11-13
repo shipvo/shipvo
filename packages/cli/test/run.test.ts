@@ -9,7 +9,7 @@ vi.mock("node:child_process", async (orig) => {
   return { ...m, spawnSync: vi.fn((...a: Parameters<typeof m.spawnSync>) => (process.env.RUN_TEST_FAKE_NATIVE ? ({ status: 0 } as never) : m.spawnSync(...a))) };
 });
 import { renderFrame } from "../../sim/frame.mjs";
-import { parseRunArgs, nativeCommand, runFramePage, loadFrameRenderer, startRunServer, describeWebBuildFailure, buildWeb, run, lanAddress, isFirstBuild } from "../src/run";
+import { parseRunArgs, nativeCommand, runFramePage, loadFrameRenderer, startRunServer, hasRouter, buildBase, describeWebBuildFailure, buildWeb, run, lanAddress, isFirstBuild } from "../src/run";
 
 describe("parseRunArgs", () => {
   it("parses platform and flags", () => {
@@ -151,6 +151,54 @@ describe("server", () => {
     expect(js.headers.get("content-type")).toContain("javascript");
     expect((await fetch(base + "/nope")).status).toBe(404);
     expect((await fetch(base + "/..%2f..%2fetc/passwd")).status).toBeGreaterThanOrEqual(403);
+  });
+  it("an app with a router sees its own routes, and the frame's page loads go back to the app", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "run-"));
+    writeFileSync(join(dir, "index.html"), "<html><head><title>x</title></head><body>the app</body></html>");
+    const project = mkdtempSync(join(tmpdir(), "run-proj-"));
+    writeFileSync(join(project, "package.json"), JSON.stringify({ dependencies: { expo: "55", "expo-router": "6" } }));
+    expect(hasRouter(project)).toBe(true);
+    const s = await startRunServer({ dir, platform: "ios", name: "Shop", render: renderFrame, projectDir: project });
+    close = s.close;
+    const base = `http://127.0.0.1:${s.port}`;
+    const shell = await (await fetch(base + "/app/")).text();
+    expect(shell).toContain("history.replaceState");
+    expect(shell.indexOf("history.replaceState")).toBeLessThan(shell.indexOf("<title>"));
+    expect(await (await fetch(base + "/app/feed/1")).text()).toContain("the app");
+    const fromFrame = (path: string) => fetch(base + path, { redirect: "manual", headers: { "sec-fetch-dest": "iframe" } });
+    const deep = await fromFrame("/feed/1?tab=new");
+    expect(deep.status).toBe(302); expect(deep.headers.get("location")).toBe("/app/feed/1?tab=new");
+    const home = await fromFrame("/");
+    expect(home.status).toBe(302); expect(home.headers.get("location")).toBe("/app/");
+    expect((await fromFrame("/app/feed/1")).status).toBe(200);
+    expect(await (await fetch(base + "/")).text()).toContain("dynamic-island");
+  });
+  it("a build made with a base path gets its files under that path", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "run-"));
+    mkdirSync(join(dir, "_expo", "static", "js", "web"), { recursive: true });
+    writeFileSync(join(dir, "_expo", "static", "js", "web", "app.js"), "bundle");
+    writeFileSync(join(dir, "index.html"), '<html><head></head><body><script src="/static/_expo/static/js/web/app.js" defer></script></body></html>');
+    expect(buildBase(dir)).toBe("/static");
+    const s = await startRunServer({ dir, platform: "ios", name: "Social", render: renderFrame });
+    close = s.close;
+    const base = `http://127.0.0.1:${s.port}`;
+    expect(await (await fetch(base + "/static/_expo/static/js/web/app.js")).text()).toBe("bundle");
+    expect((await fetch(base + "/other/_expo/static/js/web/app.js")).status).toBe(404);
+    expect((await fetch(base + "/static/..%2f..%2fetc/passwd")).status).toBeGreaterThanOrEqual(403);
+    expect(buildBase(mkdtempSync(join(tmpdir(), "run-empty-")))).toBe("");
+  });
+  it("an app without a router is served as before", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "run-"));
+    writeFileSync(join(dir, "index.html"), "<html><head><title>x</title></head><body>the app</body></html>");
+    const project = mkdtempSync(join(tmpdir(), "run-proj-"));
+    writeFileSync(join(project, "package.json"), JSON.stringify({ dependencies: { expo: "55" } }));
+    expect(hasRouter(project)).toBe(false); expect(hasRouter(undefined)).toBe(false); expect(hasRouter(join(project, "missing"))).toBe(false);
+    const s = await startRunServer({ dir, platform: "android", name: "Shop", render: renderFrame, projectDir: project });
+    close = s.close;
+    const base = `http://127.0.0.1:${s.port}`;
+    expect(await (await fetch(base + "/app/")).text()).not.toContain("history.replaceState");
+    const framePage = await fetch(base + "/", { redirect: "manual", headers: { "sec-fetch-dest": "iframe" } });
+    expect(framePage.status).toBe(200);
   });
   it("answers 400 to a malformed escape and keeps serving", async () => {
     const dir = mkdtempSync(join(tmpdir(), "run-"));

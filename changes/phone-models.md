@@ -9,5 +9,9 @@
 - `@shipvo/sim`: the `errors` action lists scripts that did not load, and apps may play sound without a tap first.
 - `@shipvo/cli`: `shipvo session start` also uses `root_mount` for apps that depend on `@react-navigation/native`, accepts a web package that another dependency installs, and asks for `@expo/metro-runtime` only from Expo 49.
 - `@shipvo/cli`: a failed web build says why: the Node version the app needs, the `"web": { "bundler": "metro" }` setting an older app has to add, or the compile error and its file.
+- `@shipvo/sim`: security fix. The simulator no longer serves files from outside the build folder. Before, an address such as `/_expo/..%2F..%2Ffile` or `/assets/..%2F..%2Ffile` returned any file the simulator could read. Update if your simulator is reachable from other machines.
+- `@shipvo/sim`: `--host <address>` chooses where the simulator listens; `--host 127.0.0.1` is this machine only. `shipvo session` starts its simulator that way.
+- `@shipvo/cli`: `shipvo run` opens apps that use expo-router or React Navigation on their own first screen, and serves a build made with a base path.
+- `@shipvo/cli`: `shipvo session clean` removes the folders of stopped sessions.
 - `@shipvo/cli`: `shipvo session start --device "<model>"` starts that model, and `shipvo session devices` lists the models. `session start android` is a Pixel 8 and `session start ios` is an iPhone 16.
 - Migration: the frame has no `simulated-label` part, and `outerHeight` is 14 pixels smaller. `statusParts(status, skin?)` in `@shipvo/sim/frame.mjs` takes an optional second argument. Sessions started without `model` are unchanged.
