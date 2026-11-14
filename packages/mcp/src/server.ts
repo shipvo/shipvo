@@ -174,7 +174,16 @@ async function withBanner(out: unknown, sid: unknown, agent: string | undefined)
 }
 // The client name the hosting service attached to a server built for one stateless request (see clientName in makeServer).
 const hostedClient = new WeakMap<McpServer, string>();
+// SHIPVO_MCP_TOOLS limits the tools this server lists: "core" is the short set an agent needs to open an app and use its
+// screen, and a comma list names tools one by one. Every listed tool costs the agent tokens on each turn, so fewer is cheaper.
+export const CORE_TOOLS = ["list_apps", "phone_models", "open_app", "screen", "tap", "type", "scroll", "back", "screenshot", "set_device", "device_log", "open_url", "wait_for_event", "end_session"] as const;
+const TOOLSET: Set<string> | undefined = (() => {
+  const v = (process.env.SHIPVO_MCP_TOOLS ?? "").trim();
+  if (!v || v === "all") return undefined;
+  return new Set(v === "core" ? CORE_TOOLS : v.split(",").map((x) => x.trim()).filter(Boolean));
+})();
 const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: ToolCallback<S>) => {
+  if (TOOLSET && !TOOLSET.has(t.name)) return undefined;
   const clientName = (): string | undefined => server.server.getClientVersion()?.name ?? hostedClient.get(server);
   const guarded = async (args: unknown, extra: unknown) => {
     const trace = traceFromMeta((extra as { _meta?: unknown } | undefined)?._meta);
@@ -544,7 +553,7 @@ const inboxTool = use(server, tools.inbox_view,
       ...(r.messages ?? []).slice(-10).map((m) => `- ${m.from} → ${m.to}${m.read ? "" : " (unread)"}: ${m.body}`),
       ...(r.tasks ?? []).slice(-5).map((h) => `- task ${h.from} → ${h.to} [${h.status}]: ${h.title}`)];
     return { ...text(lines.join("\n")), structuredContent: { session, me: r.me ?? null, messages: r.messages ?? [], tasks: r.tasks ?? [], unread_for_me: r.unread_for_me ?? 0, open_for_me: r.open_for_me ?? 0 } }; });
-inboxTool.update({ _meta: INBOX_TOOL_META });
+inboxTool?.update({ _meta: INBOX_TOOL_META });
 server.registerResource("assistant-inbox-widget", INBOX_WIDGET_URI, { title: "Assistant Inbox", description: "Live Assistant Inbox view for inbox_view results.", mimeType: MCP_APP_MIME, _meta: INBOX_WIDGET_META },
   async () => ({ contents: [{ uri: INBOX_WIDGET_URI, mimeType: MCP_APP_MIME, text: INBOX_WIDGET_HTML, _meta: INBOX_WIDGET_META }] }));
 use(server, tools.permission_log,
