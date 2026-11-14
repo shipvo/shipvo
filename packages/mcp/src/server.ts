@@ -18,7 +18,7 @@ import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { z } from "zod";
 import { tools, inputHasKey, KEY_REFUSAL, KEY_IN_INPUT, type ToolDef } from "@shipvo/mcp-tools";
-import { classify, compactDiff, fieldValue } from "./change.js";
+import { classify, compactDiff, fieldValue, refForStep } from "./change.js";
 import { exportTest, type Step } from "./export.js";
 import { traceFromMeta } from "./trace.js";
 import { findTarget } from "./record.js";
@@ -133,7 +133,8 @@ type CallEntry = { tool: string; at: string; traceId?: string };
 const callLog = new Map<string, CallEntry[]>();
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 // Action result with a "Change:" line on top. Compares this tree with the session's last one.
-// compact: on "content changed", return only the added/removed lines instead of the full tree.
+// On "content changed" the body is only the changed lines, unless compact is false or SHIPVO_MCP_FULL_SCREEN=1 asks for whole screens.
+const FULL_SCREEN = process.env.SHIPVO_MCP_FULL_SCREEN === "1";
 const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?: string; step?: Step; waited?: Waited } = {}) => {
   if (!r.ok || r.screen == null) return result(sid, r);
   const prev = trees.get(sid);
@@ -143,7 +144,7 @@ const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?
   const head = [`Change: ${change}`];
   if (o.waited) head.push(`Waited: ${o.waited.matched ? "matched" : "timed out"} after ${o.waited.ms} ms`);
   if (action === "type" && o.ref) { const v = fieldValue(r.screen, o.ref); head.push(v !== undefined ? `Value of ${o.ref}: ${JSON.stringify(v)}` : `Value of ${o.ref}: not shown`); }
-  const body = o.compact && change === "content changed" && prev !== undefined ? `Changed lines (+ added, - removed; refs as on the full screen):\n${compactDiff(prev, r.screen)}` : r.screen;
+  const body = (o.compact ?? !FULL_SCREEN) && change === "content changed" && prev !== undefined ? `Changed lines (+ added, - removed, ~ changed; refs as on the full screen):\n${compactDiff(prev, r.screen)}` : r.screen;
   const res = result(sid, { ...r, screen: head.join("\n") + "\n\n" + body });
   const value = action === "type" ? (r.value ?? fieldValue(r.screen, o.ref ?? "")) : undefined;
   return { ...res, structuredContent: { delivery: r.delivery ?? "delivered", ...(value !== undefined ? { value } : {}), ...(o.waited ? { waited: o.waited } : {}) } };
@@ -411,7 +412,28 @@ async function waiting(session: string, r: Act, w: Wait): Promise<{ r: Act; wait
   return { r: cur, waited: { matched, ms: Date.now() - t0 } };
 }
 use(server, tools.screen, async ({ session }) => { need(session); const r = await act({ session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
-use(server, tools.tap, async ({ session, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const at = await locating(session, ref); const first = await act({ session, action: "tap", ref }); if (first.ok && at) void recorder.tap(at); const w = await waiting(session, first, { wait_for, timeout_ms, settle }); return acted(session, "tap", w.r, { waited: w.waited, compact, step: { action: "tap", target: findTarget(trees.get(session), ref) } }); });
+use(server, tools.tap, async ({ session, ref, then, compact, wait_for, timeout_ms, settle }) => {
+  need(session);
+  const before = trees.get(session);
+  // One tap, then each step of the path on the screen that follows it. The path stops at the first step that is not there.
+  const path = [ref, ...(then ?? [])]; let last: Act | undefined; let done = 0; let missing: string | undefined; let finalStep: Step | undefined;
+  for (const [i, stepName] of path.entries()) {
+    let target = stepName;
+    if (i > 0) { const f = refForStep(last?.screen ?? "", stepName); if ("error" in f) { missing = `step ${i + 1} of ${path.length} ("${stepName}"): ${f.error}`; break; } target = f.ref; }
+    const at = await locating(session, target); const r = await act({ session, action: "tap", ref: target });
+    if (r.ok && at) void recorder.tap(at);
+    finalStep = { action: "tap", target: findTarget(last?.screen ?? trees.get(session), target) };
+    if (i < path.length - 1 && r.ok) steps.get(session)?.push({ ...finalStep, changed: true });
+    last = r; if (!r.ok || r.screen == null) break; done++;
+    if (i < path.length - 1) { const w = await waiting(session, r, { settle: true, timeout_ms: 1500 }); last = w.r; }
+  }
+  if (missing && last?.ok && last.screen != null) { trees.set(session, last.screen); return { ...text(`Error [path_step_not_found]: tapped ${done} of ${path.length}, then stopped at ${missing}\n\nScreen now:\n${last.screen}`), isError: true as const, structuredContent: { ok: false, code: "path_step_not_found", error: missing, tapped: done } }; }
+  const w = await waiting(session, last!, { wait_for, timeout_ms, settle });
+  // A path compares with the screen before its first tap, so the result says what the whole path changed.
+  if (then?.length && before !== undefined) trees.set(session, before);
+  const res = acted(session, "tap", w.r, { waited: w.waited, compact, step: finalStep });
+  return then?.length && "structuredContent" in res && !("isError" in res) ? { ...res, structuredContent: { ...res.structuredContent, tapped: done } } : res;
+});
 use(server, tools.type, 
   async ({ session, ref, text: t, enter, compact, wait_for, timeout_ms, settle }) => { need(session); const tgt = findTarget(trees.get(session), ref); const w = await waiting(session, await act({ session, action: "type", ref, text: t, enter }), { wait_for, timeout_ms, settle }); return acted(session, "type", w.r, { waited: w.waited, compact, ref, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: tgt?.passwordLike, text: t } }); });
 use(server, tools.scroll, 
