@@ -61,7 +61,7 @@ describe("wait_for and settle", () => {
   });
   it("waits for gone: true", async () => {
     flips = [[250, C]]; const c = await opened();
-    const r: any = await c.callTool({ name: "tap", arguments: { session: "w", ref: "e1", wait_for: { ref: "e1", gone: true } } });
+    const r: any = await c.callTool({ name: "tap", arguments: { session: "w", ref: "e1", compact: false, wait_for: { ref: "e1", gone: true } } });
     expect(r.structuredContent.waited.matched).toBe(true); expect(txt(r)).not.toContain("Pay");
     await c.close();
   });

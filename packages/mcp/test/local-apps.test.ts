@@ -160,7 +160,7 @@ describe("simulator timeout", () => {
 describe("change line", () => {
   let c: Awaited<ReturnType<typeof connect>>;
   const screens: Record<string, string> = {};
-  let step = "";
+  let step = ""; let queue: string[] = []; const taps: string[] = [];
   beforeAll(async () => {
     const list = ['- heading "Shop"', '- button "Buy" [ref=e1]', '- button "Dead" [ref=e2]', '- textbox "Name" [ref=e3]', '- text "Row 1"', '- text "Row 2"', '- text "Row 3"', '- text "Row 4"'];
     screens.home = list.join("\n");
@@ -178,6 +178,10 @@ describe("change line", () => {
       res.writeHead(200, { "content-type": "application/json" });
       if (req.url === "/apps") return res.end(JSON.stringify({ ok: true, apps: [{ id: "menu" }] }));
       if (req.url === "/session") return res.end(JSON.stringify({ ok: true, screen: screens.home }));
+      const body = raw ? JSON.parse(raw) : {};
+      if (body.action === "tap") taps.push(body.ref);
+      // A queue gives each tap its own next screen, for a path of taps; reads between taps see the last one.
+      if (queue.length && body.action === "tap") step = queue.shift()!;
       res.end(JSON.stringify({ ok: true, screen: screens[step] ?? screens.home }));
     });
     c = await connect();
@@ -203,9 +207,9 @@ describe("change line", () => {
   });
   it("compact returns only changed lines, shorter than the full tree, refs intact", async () => {
     await act("tap", "home", { ref: "e2" });
-    const full = await act("tap", "badge", { ref: "e1" });
+    const full = await act("tap", "badge", { ref: "e1", compact: false });
     await act("tap", "home", { ref: "e2" });
-    const compact = await act("tap", "badge", { ref: "e1", compact: true });
+    const compact = await act("tap", "badge", { ref: "e1" });   // changed lines are the default
     expect(full).toContain('- text "Row 1"');
     expect(compact).toContain('+ - text "Added to cart" [ref=e9]');
     expect(compact).not.toContain("Row 1");
@@ -226,6 +230,40 @@ describe("change line", () => {
   });
   it("says when the value is not shown", async () => {
     expect(await act("type", "gone", { ref: "e3", text: "Ana" })).toContain("Value of e3: not shown");
+  });
+  it("shows an element whose text changed as one ~ line with its ref", async () => {
+    await act("tap", "home", { ref: "e2" });
+    const t = await act("type", "typed", { ref: "e3", text: "Ana" });
+    expect(t).toContain('~ textbox "Name" [ref=e3] → textbox "Name" [ref=e3]: Ana');
+    expect(t).not.toContain("Row 1");
+  });
+  it("compact: false returns the whole screen", async () => {
+    await act("tap", "home", { ref: "e2" });
+    expect(await act("type", "typed", { ref: "e3", text: "Ana", compact: false })).toContain('- text "Row 1"');
+  });
+  it("taps a path in one call: the first ref, then each next step by its visible name", async () => {
+    screens.menu = '- heading "Menu"\n- button "Settings" [ref=e7]\n- button "Help" [ref=e8]';
+    screens.settings = '- heading "Settings"\n- switch "Dark theme" [ref=e12]';
+    screens.dark = '- heading "Settings"\n- switch "Dark theme" [checked] [ref=e12]';
+    await act("tap", "home", { ref: "e2" });
+    taps.length = 0; queue = ["menu", "settings", "dark"];
+    const r: any = await c.callTool({ name: "tap", arguments: { session: "chg", ref: "e1", then: ["Settings", "dark theme"] } });
+    expect(taps).toEqual(["e1", "e7", "e12"]);
+    expect(r.isError).toBeFalsy();
+    expect(r.structuredContent.tapped).toBe(3);
+    expect(textOf(r)).toMatch(/^Change: new screen\n/);
+    expect(textOf(r)).toContain('switch "Dark theme" [checked] [ref=e12]');
+  });
+  it("a path stops at the first step that is not on the screen and says which", async () => {
+    await act("tap", "home", { ref: "e2" });
+    taps.length = 0; queue = ["menu"];
+    const r: any = await c.callTool({ name: "tap", arguments: { session: "chg", ref: "e1", then: ["Billing", "Cards"] } });
+    queue = [];
+    expect(taps).toEqual(["e1"]);
+    expect(r.isError).toBe(true);
+    expect(r.structuredContent).toMatchObject({ ok: false, code: "path_step_not_found", tapped: 1 });
+    expect(textOf(r)).toContain('step 2 of 3 ("Billing"): nothing named "Billing" on the screen');
+    expect(textOf(r)).toContain('button "Settings" [ref=e7]');
   });
   it("does not return an empty diff when lines only moved", async () => {
     await act("tap", "home", { ref: "e2" });
