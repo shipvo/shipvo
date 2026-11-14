@@ -1,0 +1,1 @@
+- sim: SIGTERM now stops the simulator server (closes the browser, frees the port), the same as Ctrl-C. `shipvo sim` forwards SIGTERM and SIGINT to the server.
