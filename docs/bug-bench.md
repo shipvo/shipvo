@@ -65,6 +65,48 @@ The same measurements on the first screen of two open-source Expo apps, built fr
 
 Both apps were then used end to end: the Obytes starter (Expo 54, expo-router) through onboarding, form validation, login, its feed, a post screen, a phone restart on that screen, Settings, the theme sheet, dark theme and logout; Bluesky (Expo 58, React Navigation) through its welcome screen, the signed-out Discover feed, the drawer menu and the sign-in form.
 
+## Agent jobs
+
+`apps/bug-bench/bench/agent-jobs.mjs` gives the work to a real coding agent. The agent gets one screen and one sentence on what the screen should do. It uses the screen through the Shipvo Phone MCP tools and ends its report with `VERDICT: BUG` or `VERDICT: OK`.
+
+Each of the 8 jobs runs twice: on the screen with the seeded bug and on the fixed screen. The agent is not told which one is open. A run on the buggy screen passes when the verdict is BUG and the report names the bug. A run on the fixed screen passes when the verdict is OK, so an agent that always says BUG fails half its runs.
+
+Measured on 14 Nov 2026 in a development container (Linux, 4 CPUs, Node 22.23.4) with Claude Code 2.1.325 and `claude-sonnet-5-5`, one run per job and variant, on a simulated Pixel 8. The agent had the phone tools only. Tokens are input, output, cache write and cache read together. Raw runs: [bug-bench-agent-runs.json](bug-bench-agent-runs.json).
+
+| MCP server setup | Runs passed | Bugs found | False alarms | Tokens | Tool calls | Seconds |
+| --- | --- | --- | --- | --- | --- | --- |
+| As it ships | 16 of 16 | 8 of 8 | 0 of 8 | 3,157,776 | 82 | 191 |
+| Whole screens (`SHIPVO_MCP_FULL_SCREEN=1`) | 16 of 16 | 8 of 8 | 0 of 8 | 3,081,959 | 81 | 185.7 |
+| Core tools (`SHIPVO_MCP_TOOLS=core`) | 16 of 16 | 8 of 8 | 0 of 8 | 993,652 | 78 | 187.9 |
+
+What the numbers say:
+
+- The agent found all 8 seeded bugs and raised no false alarm, in every setup.
+- With `SHIPVO_MCP_TOOLS=core` the same jobs took 3.2 times fewer tokens: 993,652 against 3,157,776. The server then lists 14 tools, so the agent reads a much shorter tool list on every turn.
+- Changed lines and whole screens came out within 2.5% of each other. These screens have under ten lines, so a whole screen is already short.
+
+The jobs are `cart-total`, `stale-state`, `delete-wrong-row`, `double-submit`, `empty-form`, `pagination-repeat`, `nav-state-lost` and `button-stays-disabled`. The heading of each screen shows its case id on both variants.
+
+Run it yourself (needs the `claude` command signed in):
+
+```bash
+pnpm --filter @shipvo/mcp... build
+cd apps/bug-bench
+BENCH_MODEL=claude-sonnet-5-5 node bench/agent-jobs.mjs --out runs.json
+```
+
+`--jobs cart-total,empty-form` picks jobs, `--sides core-tools` picks setups and `--runs 3` repeats each run; tokens, tool calls and seconds are then the sum of each job's median.
+
+### Run another MCP server on the same jobs
+
+`--sides-file sides.json` adds other MCP servers as setups, so two tools can be compared on the same jobs with the same agent and the same scoring. Each entry has a `name`, the `serverName` and MCP `config` to give the agent, and an `openCmd` that opens a case on that tool's device (`{id}` and `{variant}` are replaced):
+
+```json
+[{ "name": "other-tool", "serverName": "phone",
+   "config": { "mcpServers": { "phone": { "command": "npx", "args": ["-y", "other-tool", "mcp"] } } },
+   "openCmd": "./open-case.sh {id} {variant}" }]
+```
+
 ## Run it
 
 1. Install and build the packages:
