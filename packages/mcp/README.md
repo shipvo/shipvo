@@ -14,6 +14,20 @@ Each `tap`, `type`, `scroll` and `back` result starts with a line `Change: none 
 
 `tap` takes a path: `tap(session, ref: "e4", then: ["Settings", "Dark theme"])` taps `e4`, then the element named Settings on the screen that follows, then Dark theme, in one call. Each step is a visible name or a ref. The path stops at the first step that is not on the screen and answers `path_step_not_found` with the screen it stopped on.
 
+### Asking a person before a risky tap
+
+Set `SHIPVO_GUARD=on` on the server and a tap on a payment or account-delete button waits for a person. The server knows the button by its label: Pay, Pay now, Buy now, Buy with GPay, Place order, Confirm purchase, Start subscription, Transfer, Delete account and their like.
+
+- In a client that can show a question (MCP elicitation), the person is asked `Allow`, `Allow for this session` or `Decline`. The model never sees the question and cannot answer it. `Decline` returns `tap_declined`.
+- In any other client the tap returns `approval_needed` and nothing is tapped. The agent asks the person in chat and, after a yes, calls `tap` again with `approved: true`.
+
+`SHIPVO_GUARD` also takes a list of kinds: `pay`, `delete` and `send` (Send, Post, Publish, Reply, Share), for example `SHIPVO_GUARD=pay,delete,send`. `on` means `pay,delete`.
+
+### Passwords and codes
+
+Text typed into a password or one-time-code field is typed and then kept out of the tool result, the watch page and exported tests; the result says `Value of <ref>: hidden (a secret field)`. Pass `secret: true` to `type` for any other field that holds a secret.
+
+
 `tap`, `type`, `scroll` and `back` also take optional fields to wait for the effect instead of sleeping:
 
 - `wait_for`: `{ ref }`, `{ text }` or `{ role, name }` that must appear on the screen, or add `gone: true` to wait for it to disappear. `text` and `name` match as substrings.
@@ -36,6 +50,8 @@ The result gets a line `Waited: matched | timed out after <ms> ms` and `structur
 | `sim_timeout` | The simulator did not answer in time. The action may have run. | Call `screen` to see where the app is. Do not repeat the action blindly. |
 | `needs_confirm` | An owner command that cannot be undone did nothing and returned a plan and a one-time `challenge`. | Show the plan to the owner and ask them to approve it at `challenge.approval_url` in the admin. Then call again with the same args and `approval: <challenge id>`. `confirm: true` does nothing. |
 | `bad_model` | `open_app` got a `model` the simulator does not know. | Call `phone_models` and use a name from it. |
+| `approval_needed` | The tap is on a payment or account-delete button and `SHIPVO_GUARD` is on. Nothing was tapped. | Ask the person in chat. After a yes, call `tap` again with `approved: true`. |
+| `tap_declined` | The person declined the tap. Nothing was tapped. | Stop and tell the person what you stopped at. |
 | `bad_url` | `open_url` got a URL the app cannot take. | Fix the URL and call again. |
 | `no_url_listener` | The app is not listening for URLs. | Use the app's screens instead. |
 | `phone_locked` | The phone is locked, so tap, type, scroll and back were not sent. | Call `unlock`, then try again. |

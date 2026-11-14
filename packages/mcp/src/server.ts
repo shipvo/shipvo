@@ -19,6 +19,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { tools, inputHasKey, KEY_REFUSAL, KEY_IN_INPUT, type ToolDef } from "@shipvo/mcp-tools";
 import { classify, compactDiff, fieldValue, refForStep } from "./change.js";
+import { guardKinds, guardedKind, guardQuestion, type GuardKind } from "./guard.js";
 import { exportTest, type Step } from "./export.js";
 import { traceFromMeta } from "./trace.js";
 import { findTarget } from "./record.js";
@@ -412,7 +413,25 @@ async function waiting(session: string, r: Act, w: Wait): Promise<{ r: Act; wait
   return { r: cur, waited: { matched, ms: Date.now() - t0 } };
 }
 use(server, tools.screen, async ({ session }) => { need(session); const r = await act({ session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
-use(server, tools.tap, async ({ session, ref, then, compact, wait_for, timeout_ms, settle }) => {
+// The approval guard (SHIPVO_GUARD): a tap on a payment or account-delete button waits for a person. A client that can show a
+// question gets one the model never sees; any other client gets approval_needed and must ask the person in chat.
+const GUARD = guardKinds(process.env.SHIPVO_GUARD);
+const guardAllowed = new Map<string, Set<GuardKind>>();
+async function guardTap(session: string, tree: string | undefined, target: string, approved: boolean | undefined): Promise<{ code: string; error: string } | undefined> {
+  if (!GUARD.length) return undefined;
+  const label = findTarget(tree, target)?.text, kind = guardedKind(label, GUARD);
+  if (!kind || approved === true || guardAllowed.get(session)?.has(kind)) return undefined;
+  const app = sessions.get(session)?.app ?? "the app";
+  if (server.server.getClientCapabilities()?.elicitation) {
+    const answer = await server.server.elicitInput({ message: guardQuestion(label!, kind, app), requestedSchema: { type: "object", properties: { decision: { type: "string", title: "Decision", enum: ["Allow", "Allow for this session", "Decline"] } }, required: ["decision"] } }).catch(() => undefined);
+    const d = answer?.action === "accept" ? String((answer.content as { decision?: unknown } | undefined)?.decision ?? "") : "";
+    if (d === "Allow for this session") { guardAllowed.set(session, (guardAllowed.get(session) ?? new Set()).add(kind)); return undefined; }
+    if (d === "Allow") return undefined;
+    return { code: "tap_declined", error: `the person declined the tap on "${label}". Nothing was tapped. Do not try another way to do the same thing; tell them what you stopped at.` };
+  }
+  return { code: "approval_needed", error: `"${label}" ${kind === "pay" ? "spends money" : kind === "delete" ? "deletes an account or its data" : "sends or publishes something"}, so a person must agree first. Nothing was tapped. Ask the person in chat; only after they say yes, call tap again with approved: true.` };
+}
+use(server, tools.tap, async ({ session, ref, then, approved, compact, wait_for, timeout_ms, settle }) => {
   need(session);
   const before = trees.get(session);
   // One tap, then each step of the path on the screen that follows it. The path stops at the first step that is not there.
@@ -420,6 +439,8 @@ use(server, tools.tap, async ({ session, ref, then, compact, wait_for, timeout_m
   for (const [i, stepName] of path.entries()) {
     let target = stepName;
     if (i > 0) { const f = refForStep(last?.screen ?? "", stepName); if ("error" in f) { missing = `step ${i + 1} of ${path.length} ("${stepName}"): ${f.error}`; break; } target = f.ref; }
+    const held = await guardTap(session, last?.screen ?? before, target, approved);
+    if (held) { if (last?.ok && last.screen != null) trees.set(session, last.screen); return { ...text(`Error [${held.code}]: ${held.error}${i > 0 ? ` (${done} of ${path.length} taps were made before it)` : ""}`), isError: true as const, structuredContent: { ok: false, code: held.code, error: held.error, tapped: done } }; }
     const at = await locating(session, target); const r = await act({ session, action: "tap", ref: target });
     if (r.ok && at) void recorder.tap(at);
     finalStep = { action: "tap", target: findTarget(last?.screen ?? trees.get(session), target) };
@@ -435,7 +456,18 @@ use(server, tools.tap, async ({ session, ref, then, compact, wait_for, timeout_m
   return then?.length && "structuredContent" in res && !("isError" in res) ? { ...res, structuredContent: { ...res.structuredContent, tapped: done } } : res;
 });
 use(server, tools.type, 
-  async ({ session, ref, text: t, enter, compact, wait_for, timeout_ms, settle }) => { need(session); const tgt = findTarget(trees.get(session), ref); const w = await waiting(session, await act({ session, action: "type", ref, text: t, enter }), { wait_for, timeout_ms, settle }); return acted(session, "type", w.r, { waited: w.waited, compact, ref, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: tgt?.passwordLike, text: t } }); });
+  async ({ session, ref, text: t, enter, secret, compact, wait_for, timeout_ms, settle }) => {
+    need(session); const tgt = findTarget(trees.get(session), ref);
+    const first = (await act({ session, action: "type", ref, text: t, enter, ...(secret ? { secret: true } : {}) })) as Act & { secret?: boolean };
+    const w = await waiting(session, first, { wait_for, timeout_ms, settle });
+    // A password or one-time-code field, or secret: true: the text stays out of the result, the watch page, the room log and exports.
+    if (!(secret || first.secret)) return acted(session, "type", w.r, { waited: w.waited, compact, ref, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: tgt?.passwordLike, text: t } });
+    const hide = (x: string | null | undefined) => (x != null && t.length >= 4 ? x.split(t).join("••••") : x);
+    const res = acted(session, "type", { ...w.r, screen: hide(w.r.screen), value: undefined }, { waited: w.waited, compact, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: true } });
+    if ("isError" in res) return res;
+    const body = res.content[0]!.text.replace(/^(Change: [^\n]*)/, `$1\nValue of ${ref}: hidden (a secret field)`);
+    return { ...res, content: [{ type: "text" as const, text: body }], structuredContent: { ...("structuredContent" in res ? res.structuredContent : {}), secret: true } };
+  });
 use(server, tools.scroll, 
   async ({ session, direction, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const box = ref ? await locating(session, ref, true) : undefined; const first = await act({ session, action: "scroll", direction, ref }); if (first.ok && recorder.drawing) void recorder.trail(...scrollTrail(direction, box)); const w = await waiting(session, first, { wait_for, timeout_ms, settle }); return acted(session, "scroll", w.r, { waited: w.waited, compact, step: { action: "scroll", direction } }); });
 use(server, tools.back, async ({ session, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await act({ session, action: "back" }), { wait_for, timeout_ms, settle }); return acted(session, "back", w.r, { waited: w.waited, compact, step: { action: "back" } }); });
