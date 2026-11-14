@@ -3655,6 +3655,10 @@
           "maxItems": 8,
           "description": "More taps to make after this one, in order: each is the visible name of the element to tap on the screen that follows (for example [\"Settings\", \"Dark theme\"]) or a ref. The path stops at the first step that is not on the screen."
         },
+        "approved": {
+          "type": "boolean",
+          "description": "Only after a tap answered approval_needed and the person said yes in chat: true repeats the tap with their approval. Never set it on your own."
+        },
         "compact": {
           "type": "boolean",
           "description": "When the change is 'content changed', the result lists only the lines that changed (+ added, - removed, ~ changed), with refs as on the full screen. This is the default. Pass false to get the whole screen."
@@ -3765,6 +3769,10 @@
         "enter": {
           "type": "boolean",
           "description": "Press Enter afterwards"
+        },
+        "secret": {
+          "type": "boolean",
+          "description": "true: the text is a password, a one-time code or another secret. It is typed, and kept out of the result, the watch page, the room log and exported tests. Password fields are treated this way without it."
         },
         "compact": {
           "type": "boolean",
