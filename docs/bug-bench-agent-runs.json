@@ -1,0 +1,99 @@
+{
+  "measured_at": "2026-11-14T06:45:03.343Z",
+  "complete": false,
+  "agent": "claude 2.1.325 (Claude Code)",
+  "model": "claude-sonnet-5-5",
+  "models_used": [
+    "claude-sonnet-5-5"
+  ],
+  "node": "v22.23.4",
+  "runs_per_job": 1,
+  "jobs": [
+    {
+      "id": "cart-total",
+      "spec": "The total is the price, 1500, times the quantity."
+    },
+    {
+      "id": "stale-state",
+      "spec": "Each tap on Add two raises the count by 2."
+    },
+    {
+      "id": "delete-wrong-row",
+      "spec": "Each Delete button removes the row it names and leaves the other rows."
+    },
+    {
+      "id": "double-submit",
+      "spec": "Tapping Place order twice places one order, not two."
+    },
+    {
+      "id": "empty-form",
+      "spec": "Sign up with an empty email shows \"Enter your email\" and does not sign up."
+    },
+    {
+      "id": "pagination-repeat",
+      "spec": "Load more adds the next three items. No item is listed twice."
+    },
+    {
+      "id": "nav-state-lost",
+      "spec": "The name typed in step 1 is still in the field after going to step 2 and back."
+    },
+    {
+      "id": "button-stays-disabled",
+      "spec": "Continue is enabled after agreeing to the terms, and tapping it creates the account."
+    }
+  ],
+  "totals": [
+    {
+      "side": "changed-lines",
+      "runs": 1,
+      "passed": 1,
+      "bugs_found": 1,
+      "buggy_runs": 1,
+      "false_alarms": 0,
+      "fixed_runs": 0,
+      "tokens": 178579,
+      "calls": 5,
+      "seconds": 12.7
+    },
+    {
+      "side": "full-screen",
+      "runs": 1,
+      "passed": 1,
+      "bugs_found": 1,
+      "buggy_runs": 1,
+      "false_alarms": 0,
+      "fixed_runs": 0,
+      "tokens": 178520,
+      "calls": 5,
+      "seconds": 11.6
+    }
+  ],
+  "runs": [
+    {
+      "side": "changed-lines",
+      "job": "cart-total",
+      "variant": "buggy",
+      "run": 1,
+      "pass": true,
+      "verdict": "BUG",
+      "why": "",
+      "tokens": 178579,
+      "calls": 5,
+      "seconds": 12.7,
+      "cost_usd": 0.0318641
+    },
+    {
+      "side": "full-screen",
+      "job": "cart-total",
+      "variant": "buggy",
+      "run": 1,
+      "pass": true,
+      "verdict": "BUG",
+      "why": "",
+      "tokens": 178520,
+      "calls": 5,
+      "seconds": 11.6,
+      "cost_usd": 0.0317046
+    }
+  ]
+}

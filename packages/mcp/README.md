@@ -14,6 +14,10 @@ Each `tap`, `type`, `scroll` and `back` result starts with a line `Change: none 
 
 `tap` takes a path: `tap(session, ref: "e4", then: ["Settings", "Dark theme"])` taps `e4`, then the element named Settings on the screen that follows, then Dark theme, in one call. Each step is a visible name or a ref. The path stops at the first step that is not on the screen and answers `path_step_not_found` with the screen it stopped on.
 
+### A shorter tool list
+
+Every tool the server lists is sent to the agent on each turn. Set `SHIPVO_MCP_TOOLS=core` to list only the tools an agent needs to open an app and use its screen: `list_apps`, `phone_models`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `device_log`, `open_url`, `wait_for_event` and `end_session`. A comma list names tools one by one, for example `SHIPVO_MCP_TOOLS=open_app,screen,tap,type`. Unset, or `all`, lists every tool. What it saves is measured in the [agent jobs benchmark](../../docs/bug-bench.md#agent-jobs).
+
 ### Asking a person before a risky tap
 
 Set `SHIPVO_GUARD=on` on the server and a tap on a payment or account-delete button waits for a person. The server knows the button by its label: Pay, Pay now, Buy now, Buy with GPay, Place order, Confirm purchase, Start subscription, Transfer, Delete account and their like.

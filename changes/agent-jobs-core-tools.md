@@ -1,0 +1,2 @@
+- `@shipvo/mcp`: `SHIPVO_MCP_TOOLS=core` lists only the 14 tools an agent needs to open an app and use its screen; a comma list names tools one by one. Migration: none; unset lists every tool as before.
+- `apps/bug-bench`: `bench/agent-jobs.mjs` is the agent jobs benchmark. A real agent tests 8 screens through the MCP tools, each with the seeded bug and fixed, and is scored on its verdict; it reports passes, tokens, tool calls and seconds per server setup. See `docs/bug-bench.md`.
