@@ -160,7 +160,7 @@ Go to the first terminal window and press **Ctrl+C**. Nothing was sent to anyone
 
 ## Recap
 
-You put two assistants on one phone, sent a message between them without typing a sender, handed over a task and saw it finished, shared a report and watched all of it on the phone screen. The phone knows who is calling, so a reply always goes to the right assistant. It works the same on the Android and iOS phone.
+You put two assistants on one phone, sent a message between them without typing a sender, handed over a task and saw it finished, shared a report and watched all of it on the phone screen. The phone knows who is calling, so a reply always goes to the right assistant.
 
 ## What we measured
 
