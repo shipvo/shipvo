@@ -1,1 +1,0 @@
-- `@shipvo/mcp-tools`: now published to npm. It exports the registry of every Shipvo MCP tool (`tools`, `toolList`, `describeTools()`) and the key-in-input checks. See `docs/mcp-tools.md`. Migration: none; `@shipvo/mcp` still bundles the registry it was built with.

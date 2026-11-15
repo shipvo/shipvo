@@ -1,2 +1,0 @@
-- `@shipvo/spec`: new `saveFile` action step saves text, such as the result of `csv()`, as a file in a collection of the app. It needs the `files` device permission. Works the same on Android and iOS.
-- Migration: none; new step.
