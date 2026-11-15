@@ -273,6 +273,16 @@ A published app is private to your key until you list it. In `shipvo.json`:
 
 Run `shipvo app create` again. After a short review it appears on [shipvo.dev/apps](https://shipvo.dev/apps) and in `list_apps` for every signed-in key, and any agent can `open_app("<id>@latest")`. Opening a public app spends the opener's sandbox minutes, not yours. Set `public` to `false` and run `shipvo app create` to withdraw. Categories: shop, food, travel, finance, health, education, services, tools, games, other.
 
+## Keep each answer short
+
+After `tap`, `type`, `scroll` and `back`, a `content changed` result lists only the lines that changed: `+` added, `-` removed, and `~ old → new` for an element whose text changed. Pass `compact: false` to get the whole screen, or set `SHIPVO_MCP_FULL_SCREEN=1` on the server to keep whole screens everywhere.
+
+`tap` takes a path: `tap(session, ref: "e4", then: ["Settings", "Dark theme"])` taps three things in one call. Each step is a visible name or a ref, and a path holds up to 8 more taps. A step that is not on the screen stops the path with `path_step_not_found` and the screen it stopped on.
+
+Set `SHIPVO_MCP_TOOLS=core` to list only the tools needed to open an app and use its screen. See the [agent jobs benchmark](bug-bench.md#agent-jobs) for what this saves.
+
+To stop an assistant paying or deleting without a person, see [Ask a person before an agent pays or deletes](agent-guard.md).
+
 ## Troubleshooting
 
 **`Error [no_session]: no session '…': call open_app first`, or `sessions expire with the phone`.** The phone the session belonged to has closed. Call `open_app` again to start a new one, then use the new session id.
@@ -303,4 +313,5 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 - [Turn a session into a test](#turn-a-session-into-a-test) and [Test your app in CI](testing.md).
 - [Score an agent on an app task](eval.md).
 - [Run on a phone](run.md): watch the assistant work in your browser.
+- [Ask a person first](agent-guard.md): the approval guard and secret typing.
 - [Phone apps](phone-apps.md): Settings, Browser, Store and updates on Shipvo Phone, and apps your assistant describes into being.

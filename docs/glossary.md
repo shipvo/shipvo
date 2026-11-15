@@ -176,3 +176,7 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Permission log.** A list of every device permission decision on the phone: which app asked, and whether it was allowed or denied. See [Phone apps](phone-apps.md#see-the-permission-log).
 
 **Session (`shipvo session`).** A headless Shipvo Phone you start from the shell for any Expo app, so a coding agent can tap through it. See [Test any Expo app from the terminal](session.md).
+
+**Approval guard.** A setting (`SHIPVO_GUARD`) that makes a tap on a payment or account-delete button wait for a person to say yes. See [Ask a person before an agent pays or deletes](agent-guard.md).
+
+**Tap path.** Several taps in one `tap` call, by visible name, using `then`. See [Agents](agents.md#keep-each-answer-short).
