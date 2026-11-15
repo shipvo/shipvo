@@ -1,0 +1,173 @@
+{
+  "spec": "shipvo.app/v0",
+  "app": {
+    "id": "focus-timer",
+    "name": "Focus timer",
+    "description": "Start a focus session and watch the bar fill as you log minutes toward your daily goal."
+  },
+  "theme": {
+    "mode": "light",
+    "palette": {
+      "primary": "#0B5FFF",
+      "text": "#111827",
+      "background": "#FFFFFF",
+      "surface": "#F3F4F6",
+      "muted": "#4B5563"
+    },
+    "radius": "lg",
+    "density": "comfortable"
+  },
+  "data": {
+    "sessions": {
+      "source": "collection",
+      "fields": {
+        "task": "text",
+        "minutes": "number"
+      },
+      "seed": []
+    },
+    "total": {
+      "source": "computed",
+      "value": "{{ sum(sessions.map(s, s.minutes)) }}"
+    },
+    "percent": {
+      "source": "computed",
+      "value": "{{ min([100, sum(sessions.map(s, s.minutes)) * 100 / 120]) }}"
+    }
+  },
+  "screens": [
+    {
+      "id": "home",
+      "title": "Focus",
+      "body": [
+        {
+          "type": "vector",
+          "label": "Daily goal progress",
+          "value": "{{ percent }}%",
+          "width": 120,
+          "height": 120,
+          "motion": {
+            "enter": "scale",
+            "change": "pulse"
+          },
+          "shapes": [
+            {
+              "shape": "rect",
+              "x": 10,
+              "y": 50,
+              "width": 100,
+              "height": 16,
+              "rx": 8,
+              "fill": "#F3F4F6"
+            },
+            {
+              "shape": "rect",
+              "x": 10,
+              "y": 50,
+              "width": "{{ percent }}",
+              "height": 16,
+              "rx": 8,
+              "fill": "#0B5FFF"
+            },
+            {
+              "shape": "text",
+              "x": 60,
+              "y": 90,
+              "text": "{{ percent }}%",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "#111827"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "variant": "title",
+          "value": "Minutes focused: {{ total }}"
+        },
+        {
+          "type": "text",
+          "value": "{{ state.active ? 'Session running' : 'No session running' }}"
+        },
+        {
+          "type": "button",
+          "label": "Start session",
+          "action": "start_session"
+        },
+        {
+          "type": "form",
+          "label": "Log session form",
+          "submit": {
+            "label": "Log session",
+            "action": "log_session"
+          },
+          "fields": [
+            {
+              "name": "task",
+              "type": "text",
+              "label": "Task",
+              "required": true,
+              "maxLength": 80
+            },
+            {
+              "name": "minutes",
+              "type": "number",
+              "label": "Minutes",
+              "min": 1,
+              "max": 240
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "actions": {
+    "start_session": {
+      "description": "Start a focus session.",
+      "input": {},
+      "do": [
+        {
+          "set": "state.active",
+          "value": true
+        },
+        {
+          "toast": "Session started"
+        }
+      ]
+    },
+    "log_session": {
+      "description": "Log a finished session and stop the timer.",
+      "input": {
+        "task": {
+          "type": "text"
+        },
+        "minutes": {
+          "type": "number",
+          "default": 25
+        }
+      },
+      "do": [
+        {
+          "insert": "sessions",
+          "value": {
+            "task": "{{ input.task }}",
+            "minutes": "{{ input.minutes }}"
+          }
+        },
+        {
+          "set": "state.active",
+          "value": false
+        },
+        {
+          "toast": "Session logged"
+        }
+      ]
+    }
+  },
+  "state": {
+    "active": {
+      "type": "bool",
+      "default": false
+    }
+  }
+}
