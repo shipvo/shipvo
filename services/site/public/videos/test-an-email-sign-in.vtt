@@ -1,0 +1,129 @@
+WEBVTT
+
+1
+00:00:00.500 --> 00:00:02.750
+Your app emails a sign-in code.
+
+2
+00:00:02.750 --> 00:00:05.363
+Your test reads it, with no mailbox.
+
+3
+00:00:05.363 --> 00:00:09.500
+By the end, a test signs in on Android and iOS by itself.
+
+4
+00:00:11.100 --> 00:00:13.121
+Tests cannot open your inbox.
+
+5
+00:00:13.121 --> 00:00:15.838
+So teams share a test account and wait.
+
+6
+00:00:15.838 --> 00:00:20.925
+In Shipvo, every session has its own private inbox, with its own address.
+
+7
+00:00:22.525 --> 00:00:23.177
+Step one.
+
+8
+00:00:23.177 --> 00:00:24.625
+Ask for the address.
+
+9
+00:00:24.625 --> 00:00:26.291
+The tool is inbox_read.
+
+10
+00:00:26.291 --> 00:00:29.550
+Type that address into the app's email field.
+
+11
+00:00:31.150 --> 00:00:31.803
+Step two.
+
+12
+00:00:31.803 --> 00:00:32.819
+Tap send code.
+
+13
+00:00:32.819 --> 00:00:36.012
+The app sends its mail to the session inbox.
+
+14
+00:00:36.012 --> 00:00:38.625
+A mock network rule can send it too.
+
+15
+00:00:40.225 --> 00:00:40.962
+Step three.
+
+16
+00:00:40.962 --> 00:00:42.169
+Wait for the mail.
+
+17
+00:00:42.169 --> 00:00:45.989
+Inbox wait returns the sender, the subject, and the code.
+
+18
+00:00:45.989 --> 00:00:48.000
+Four eight two nine one three.
+
+19
+00:00:49.600 --> 00:00:50.278
+Step four.
+
+20
+00:00:50.278 --> 00:00:52.243
+Type the code and tap verify.
+
+21
+00:00:52.243 --> 00:00:54.005
+The app says welcome back.
+
+22
+00:00:54.005 --> 00:00:55.225
+You are signed in.
+
+23
+00:00:56.825 --> 00:00:59.590
+It works the same on Android and iOS.
+
+24
+00:00:59.590 --> 00:01:03.775
+Open the session with platform android, or platform iOS.
+
+25
+00:01:05.375 --> 00:01:06.783
+What if no mail comes?
+
+26
+00:01:06.783 --> 00:01:07.807
+You do not hang.
+
+27
+00:01:07.807 --> 00:01:12.350
+You get a typed error, inbox_timeout, and you can read what did arrive.
+
+28
+00:01:13.950 --> 00:01:16.308
+In a typed test, it is three lines.
+
+29
+00:01:16.308 --> 00:01:17.656
+Address, send, code.
+
+30
+00:01:17.656 --> 00:01:21.025
+For a magic link, open the first link in the mail.
+
+31
+00:01:22.625 --> 00:01:25.321
+Test the sign-in, and skip the mailbox.
+
+32
+00:01:25.321 --> 00:01:30.575
+Read the guide at shipvo.dev/docs/email-sign-in.

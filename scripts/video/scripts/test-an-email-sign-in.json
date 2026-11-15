@@ -1,0 +1,158 @@
+{
+  "slug": "test-an-email-sign-in",
+  "posterAt": 3,
+  "title": "Test an email sign-in on Android and iOS",
+  "tutorial": "docs/email-sign-in.md",
+  "voice": "af_heart",
+  "pushIn": true,
+  "retention": {
+    "hook": "0-3 s: 'The app emails a code. Your test reads it.' with the real Check your email screen and the inbox_wait result.",
+    "promise": "By 8 s: a test signs in with an emailed code on Android and iOS, with no mailbox.",
+    "openLoops": [
+      {
+        "question": "Where does the mail go if there is no mailbox?",
+        "opens": "hook (about 4 s)",
+        "paysOff": "why scene (about 20 s): each session has its own private address"
+      },
+      {
+        "question": "What if the mail never comes?",
+        "opens": "both scene (about 60 s)",
+        "paysOff": "timeout scene (about 70 s): a typed inbox_timeout error, not a hang"
+      }
+    ],
+    "reHooks": [
+      "a flash card in every scene (about every 5 to 8 s)",
+      "scene change every 9 to 13 s",
+      "before and after: empty form, then Welcome back",
+      "Android and iOS side by side"
+    ],
+    "payoff": "Welcome back on Android and iOS, from a code read out of the session inbox.",
+    "nextStep": "shipvo.dev/docs/email-sign-in"
+  },
+  "scenes": [
+    {
+      "id": "hook",
+      "visual": "esHook",
+      "min": 0,
+      "narration": "Your app emails a sign-in code. Your test reads it, with no mailbox. By the end, a test signs in on Android and iOS by itself.",
+      "flashes": [
+        {
+          "at": 5.0,
+          "text": "No mailbox"
+        }
+      ]
+    },
+    {
+      "id": "why",
+      "visual": "esWhy",
+      "min": 0,
+      "narration": "Tests cannot open your inbox. So teams share a test account and wait. In Shipvo, every session has its own private inbox, with its own address.",
+      "flashes": [
+        {
+          "at": 4.5,
+          "text": "Private inbox"
+        }
+      ]
+    },
+    {
+      "id": "address",
+      "visual": "esAddress",
+      "min": 0,
+      "narration": "Step one. Ask for the address. The tool is inbox read. Type that address into the app's email field.",
+      "flashes": [
+        {
+          "at": 4.2,
+          "text": "inbox_read"
+        }
+      ],
+      "caption": "Step one. Ask for the address. The tool is inbox_read. Type that address into the app's email field."
+    },
+    {
+      "id": "send",
+      "visual": "esSend",
+      "min": 0,
+      "narration": "Step two. Tap send code. The app sends its mail to the session inbox. A mock network rule can send it too.",
+      "flashes": [
+        {
+          "at": 4.0,
+          "text": "Send code"
+        }
+      ]
+    },
+    {
+      "id": "wait",
+      "visual": "esWait",
+      "min": 0,
+      "narration": "Step three. Wait for the mail. Inbox wait returns the sender, the subject, and the code. Four eight two nine one three.",
+      "flashes": [
+        {
+          "at": 5.0,
+          "text": "Code found"
+        }
+      ],
+      "caption": "Step three. Wait for the mail. inbox_wait returns the sender, the subject, and the code: 482913."
+    },
+    {
+      "id": "verify",
+      "visual": "esVerify",
+      "min": 0,
+      "narration": "Step four. Type the code and tap verify. The app says welcome back. You are signed in.",
+      "flashes": [
+        {
+          "at": 4.2,
+          "text": "Signed in"
+        }
+      ]
+    },
+    {
+      "id": "both",
+      "visual": "esBoth",
+      "min": 0,
+      "narration": "It works the same on Android and iOS. Open the session with platform android, or platform iOS.",
+      "flashes": [
+        {
+          "at": 3.5,
+          "text": "Android + iOS"
+        }
+      ]
+    },
+    {
+      "id": "timeout",
+      "visual": "esTimeout",
+      "min": 0,
+      "narration": "What if no mail comes? You do not hang. You get a typed error, inbox timeout, and you can read what did arrive.",
+      "flashes": [
+        {
+          "at": 3.8,
+          "text": "inbox_timeout"
+        }
+      ],
+      "caption": "What if no mail comes? You do not hang. You get a typed error, inbox_timeout, and you can read what did arrive."
+    },
+    {
+      "id": "test",
+      "visual": "esTest",
+      "min": 0,
+      "narration": "In a typed test, it is three lines. Address, send, code. For a magic link, open the first link in the mail.",
+      "flashes": [
+        {
+          "at": 4.5,
+          "text": "phone.inbox.code"
+        }
+      ]
+    },
+    {
+      "id": "cta",
+      "visual": "esCta",
+      "min": 0,
+      "narration": "Test the sign-in, and skip the mailbox. Read the guide at shipvo dot dev, slash docs, slash email dash sign dash in.",
+      "flashes": [
+        {
+          "at": 3.0,
+          "text": "Memory only"
+        }
+      ],
+      "caption": "Test the sign-in, and skip the mailbox. Read the guide at shipvo.dev/docs/email-sign-in."
+    }
+  ]
+}

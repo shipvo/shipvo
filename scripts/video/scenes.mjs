@@ -671,3 +671,82 @@ ${tpShot("05-many", 860, 14, 260, .5)}`,
 <div class="abs card in mono" style="left:470px;top:360px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="sky">shipvo.dev</span>/playground</div>
 <div class="abs in mute" style="left:470px;top:480px;font-size:28px;line-height:1.4;width:700px;--d:4s">The guide: <span class="sky">shipvo.dev</span>/learn<br>Next: <span class="sky">npx shipvo run android</span></div>`,
 });
+
+// --- email sign-in: real simulator screenshots from scripts/video/inbox/capture-signin.mjs ---
+const es = (n) => "email-sign-in/" + n;
+const esShot = (n, x, y, w, d = 0, extra = "", cls = "pop") => `<div class="abs ${cls}" style="left:${x}px;top:${y}px;width:${w}px;--d:${d}s;${extra}"><div style="border:6px solid #2b3a5c;border-radius:36px;overflow:hidden;background:#05080f;line-height:0"><img src="{{IMG:${es(n)}}}" style="width:100%;display:block"></div></div>`;
+const esCode = (lines, x, y, w, d, fs = 22) => `<div class="abs card in mono" style="left:${x}px;top:${y}px;width:${w}px;padding:18px 24px;font-size:${fs}px;line-height:1.5;--d:${d}s">${lines.map((l, k) => `<div class="fade" style="--d:${d + .3 + k * .5}s">${l}</div>`).join("")}</div>`;
+
+Object.assign(SCENES, {
+  esHook: () => `
+<h1 class="abs in" style="left:72px;top:110px;width:680px;font-size:58px;--d:.2s">The app emails<br>a code.<br><span class="or">Your test reads it.</span></h1>
+${esCode(['<span class="sky">inbox_wait</span> → code <span class="or">482913</span>'], 72, 470, 640, 2.2, 26)}
+${esShot("android-03-sent", 800, 24, 290, .3)}
+<div class="abs pop" style="left:1110px;top:90px;--d:3.4s"><span class="badge" style="background:#12382b;color:var(--green)">No mailbox</span></div>`,
+
+  esWhy: () => `
+${chip("The problem")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">A test cannot open <span class="or">your inbox</span></h2>
+${tpLine("OLD WAY", "A shared test account and a flaky wait", 72, 240, 700, 1)}
+${tpLine("SHIPVO", "Every session has its own private inbox", 72, 370, 700, 3.6, "green")}
+<div class="abs card in mono" style="left:72px;top:500px;padding:18px 26px;font-size:26px;--d:5.6s"><span class="sky">s-1a2b3c4d5e6f</span>@inbox.shipvo.test</div>`,
+
+  esAddress: () => `
+${chip("Step 1")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Ask for the address</h2>
+${esCode(['<span class="sky">inbox_read</span>', '→ address <span class="or">s-69f7…@inbox.shipvo.test</span>', '→ messages <span class="mute">[ ]</span>'], 72, 230, 700, 1)}
+<div class="abs in mute" style="left:72px;top:440px;width:680px;font-size:28px;line-height:1.4;--d:4s">Then type it into the app's Email field.</div>
+${esShot("android-01-form", 830, 24, 270, .4)}
+${esShot("android-02-address", 830, 24, 270, 4, "", "fade")}`,
+
+  esSend: () => `
+${chip("Step 2")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Tap <span class="or">Send code</span></h2>
+${tpLine("APP", "Posts the mail to the session inbox", 72, 240, 700, 1)}
+${tpLine("OR", "A mockNetwork rule with a mail field", 72, 370, 700, 3.6)}
+${esShot("android-02-address", 830, 24, 270, .4)}
+${esShot("android-03-sent", 830, 24, 270, 2.6, "", "fade")}`,
+
+  esWait: () => `
+${chip("Step 3")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Wait for the mail</h2>
+${esCode(['<span class="sky">inbox_wait</span> subject "sign-in", 5000 ms', '→ from <span class="or">login@tideandtackle.test</span>', '→ subject Your sign-in code', '→ codes <span class="or">["482913"]</span>'], 72, 230, 760, 1, 24)}
+<div class="abs pop" style="left:72px;top:520px;--d:5.2s"><span class="badge" style="background:#12382b;color:var(--green)">Code found</span></div>
+${esShot("android-03-sent", 930, 24, 250, .4)}`,
+
+  esVerify: () => `
+${chip("Step 4")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">Type it, tap <span class="or">Verify</span></h2>
+${tpLine("TYPE", "The code from the mail", 72, 240, 640, .9)}
+${tpLine("TAP", "Verify", 72, 365, 640, 2.4)}
+${esShot("android-04-code", 800, 24, 270, .4)}
+${esShot("android-05-signedin", 800, 24, 270, 3.4, "", "fade")}
+<div class="abs pop" style="left:1100px;top:90px;--d:3.6s"><span class="badge" style="background:#12382b;color:var(--green)">Signed in</span></div>`,
+
+  esBoth: () => `
+${chip("Android + iOS")}
+<h2 class="abs in" style="left:72px;top:96px;width:520px;--d:.3s">Android and iOS,<br><span class="or">same steps</span></h2>
+<div class="abs in mute" style="left:72px;top:290px;width:480px;font-size:28px;line-height:1.4;--d:1.2s">Open the session with platform android or ios.</div>
+${esShot("android-05-signedin", 640, 24, 270, .4)}
+${esShot("ios-05-signedin", 940, 24, 270, 2.4)}
+<div class="abs mono sky pop" style="left:700px;top:660px;font-size:22px;--d:1s">ANDROID</div>
+<div class="abs mono sky pop" style="left:1030px;top:660px;font-size:22px;--d:2.8s">iOS</div>`,
+
+  esTimeout: () => `
+${chip("No mail?")}
+<h2 class="abs in" style="left:72px;top:100px;--d:.3s">No hang. <span class="or">A typed error.</span></h2>
+${esCode(['<span class="sky">inbox_wait</span> subject "no such mail", 300 ms', '→ <span class="or">inbox_timeout</span>', '→ no mail with subject containing "no such mail" arrived within 300 ms'], 72, 240, 1000, 1, 24)}
+<div class="abs in mute" style="left:72px;top:470px;width:900px;font-size:28px;line-height:1.4;--d:4.6s">Call inbox_read to see what did arrive. Call inbox_clear between tries.</div>`,
+
+  esTest: () => `
+${chip("In a typed test")}
+<h2 class="abs in" style="left:72px;top:80px;--d:.3s">The same, in <span class="or">three lines</span></h2>
+${esCode(['await phone.type(email, <span class="sky">await phone.inbox.address()</span>);', 'await phone.tap(sendCode);', 'const code = <span class="sky">await phone.inbox.code</span>({ subject: "sign-in code" });', 'await phone.type(codeField, code);'], 72, 210, 1100, 1, 26)}
+<div class="abs in mute" style="left:72px;top:480px;width:1000px;font-size:28px;line-height:1.4;--d:5s">For a magic link, take mail.links[0] and call phone.openUrl.</div>`,
+
+  esCta: () => `
+<div class="abs pop" style="left:72px;top:140px;width:330px;--d:.3s">{{MARK}}</div>
+<h1 class="abs in" style="left:470px;top:110px;--d:.8s">Test the sign-in.<br><span class="or">Skip the mailbox.</span></h1>
+<div class="abs card in mono" style="left:470px;top:350px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="sky">shipvo.dev</span>/docs/email-sign-in</div>
+<div class="abs in mute" style="left:470px;top:470px;font-size:28px;line-height:1.4;width:700px;--d:4s">Memory only. Gone when the session ends.</div>`,
+});
