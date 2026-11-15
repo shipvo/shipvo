@@ -1,1 +1,0 @@
-- Tooling: `scripts/busy-apply/run.mjs` applies a staged update N times under a busy JS loop on the Android emulator and the iOS Simulator and counts crashes, reload time and empty native module state. No package API changes.
