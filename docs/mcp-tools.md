@@ -45,4 +45,5 @@ This page is for developers who build on the Shipvo MCP tools: to generate docs,
 ## Next steps
 
 - [Agents and MCP](agents.md): connect an agent to the tools.
+- [Test with a team of agents](test-with-a-team-of-agents.md): the `open_app`, `room_note`, `room_log` and `room_report` tools in one worked example.
 - [A2UI on Shipvo Phone](a2ui.md): the `a2ui_open`, `a2ui_send` and `a2ui_actions` tools.

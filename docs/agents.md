@@ -40,6 +40,7 @@ PN_API_KEYS="key1,key2" npx @shipvo/mcp --http 8787
 | `list_apps(query?)` | Apps this key can open: the sample app, your own, and every public app on [shipvo.dev/apps](https://shipvo.dev/apps); `query` searches name, description and category |
 | `list_sessions` | Open sessions on this server, to resume after a reconnect. Each row shows app, platform, room, who opened it (the MCP client name), start time and current screen title |
 | `room_log(room, since?)` | Read-only. What every session in a room did, oldest first, plus the notes agents posted. See [Room log and notes](#room-log-and-notes) |
+| `room_report(room)` | Read-only. One summary per session in a room: agent, steps, seconds, errors, last screen title and notes. See [Test with a team of agents](test-with-a-team-of-agents.md) |
 | `room_note(room, text)` | Post a plain-text note (up to 500 characters) for the other agents in the room |
 | `open_app(app, session?, seed_cart?, dark?, attach?, platform?, show?, room?)` | A phone-sized session; returns the first screen. If `shipvo run` is up for this app (`.shipvo/run.json` in the working directory or a parent, up to the git root), the session drives that phone instead and the result says `attached to the live shipvo run phone`; otherwise it says `headless session`. `attach`: `auto` (default), `never` (always headless), `always` (error with no live run). `show: true` opens the phone in your browser and starts `shipvo run <platform>` when none is up; by default that happens only on a desktop machine whose project has `shipvo` installed. A server over HTTP never starts a run. `platform` applies only when a phone is started; with `show: false`, `attach: never` or a live run attached as it is, the result says it was ignored. Attached sessions support screen, tap, type, scroll, back and screenshot; other tools return `not_supported_attached`. Attach needs Node 22+; if attach fails in `auto` mode the headless result says why. `app@release` still attaches to the local run. `myshop` = local build, `myshop@r13` = that published release, `myshop@latest` |
 | `upload_build(dir?, app?, skip_build?)` | Build this project, upload it for your key and return a build id. Open it on the hosted phone with `open_app("<app>@build:<id>")`. Local (stdio) server only. See [Test your build](test-your-build.md) |
@@ -86,6 +87,8 @@ The simulator keeps a log for each room, next to the shared backend. Every actio
 2. Let an agent act, then ask the lead to call `room_log("demo")`.
 3. Post a note with `room_note("demo", "Checkout fails when the cart has 3 items")`.
 4. Call `room_log("demo", since: "<cursor>")` with the `cursor` from your last read to get only what is new.
+
+For a full lead and sub-agent walk-through, see [Test with a team of agents](test-with-a-team-of-agents.md).
 
 Example reply from `room_log`:
 
