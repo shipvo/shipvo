@@ -839,8 +839,10 @@ async function act(id, body) {
         t = named;
       }
       await ready(t);
+      // A password or one-time-code field, or secret: true from the caller: the text is typed and then kept out of the answer and the logs.
+      const secret = body.secret === true || await t.evaluate((el) => el.type === "password" || /one-time-code|password/.test(el.getAttribute("autocomplete") || "")).catch(() => false);
       await t.fill(String(body.text ?? ""), { timeout: 3000 }); if (body.enter) await t.press("Enter");
-      return { delivery: "delivered", value: await t.inputValue().catch(() => null), screen: await screen(page) };
+      return { delivery: "delivered", ...(secret ? { secret: true, value: null } : { value: await t.inputValue().catch(() => null) }), screen: await screen(page) };
     }
     case "scroll": {
       const target = body.ref ? await resolve(body.ref) : page.locator("body");
@@ -1189,7 +1191,8 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === "/session") { try { await newSession(body.session, body); } catch (e) { if (e instanceof BuildCacheError || (e instanceof SimError && (e.code === "bad_profile" || e.code === "bad_model" || e.code === "bad_room" || e.code === "bad_app"))) return send(200, { ok: false, code: e.code, error: e.message }); throw e; } const s = sessions.get(body.session); log(body.session, "start", true, { app: s.app, release: s.release }); return send(200, { ok: true, app: s.app, release: s.release, ...(s.build ? { build: s.build } : {}), ...(s.model ? { model: s.model, skin: s.skin } : {}), ...(a2uiHosts.get(body.session)?.opened ?? {}), screen: await screen(s.page) }); }
     if (url.pathname === "/act") {
       try { const s0 = sessions.get(body.session); const prevScreen = s0?.lastScreen; const r = await act(body.session, body);
-        if (s0 && typeof r.screen === "string") { s0.lastScreen = r.screen; watch.step(body.session, describeStep(body, prevScreen), changeLine(prevScreen, r.screen)); }
+        const shown = r.secret ? { ...body, text: "••••" } : body;   // a secret is never shown on the watch page or in a room
+        if (s0 && typeof r.screen === "string") { s0.lastScreen = r.screen; watch.step(body.session, describeStep(shown, prevScreen), changeLine(prevScreen, r.screen)); }
         if (s0?.room && describeStep(body, prevScreen)) roomLog(s0.room, { kind: "action", session: body.session, agent: typeof body.agent === "string" ? body.agent.slice(0, 64) : null, tool: String(body.action), target: body.ref ? String(body.ref) : null, change: changeLine(prevScreen, r.screen) || null });
         if (body.action !== "pending_banner") log(body.session, body.action, true, body.ref ? { ref: body.ref } : {}); return send(200, { ok: true, ...r }); }
       catch (e) { log(body.session, body.action, false); const s = sessions.get(body.session); return send(200, { ok: false, error: e.code === "invalid_spec" ? String(e.message) : String(e.message).split("\n")[0], ...(e.code ? { code: e.code } : {}), ...(DELIVERY.has(body.action) && REASONS.has(e.code) ? { delivery: "not_delivered", reason: e.code, safe_to_retry: true } : {}), screen: s ? await screen(s.page) : null }); }
