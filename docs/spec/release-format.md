@@ -40,7 +40,7 @@ The signing input is the UTF-8 bytes of the `body` string, exactly as sent. A de
 | `web` | object | Optional. `base`, `entry`, `sha256`, `files`. |
 | `state_version` | positive integer | Optional. Version of the stored-data format the release reads and writes. |
 | `new_control_plane` | object | Optional. `base_url`, `cdn_url`. |
-| `signature` | base64 | In the wire form of the pointer; not part of the signed body. |
+| `signature` | base64 | `ReleasePointer` in the schema includes `signature`, but the signed `body` string never contains it. |
 
 `core.patches` entries have `from_sha256`, `url`, `size` and `sha256`. Patches are BSDIFF40.
 
@@ -59,7 +59,7 @@ A runtime checks, in this order:
 5. Check `app_id` and `shell_major` match the installed shell.
 6. Skip the pointer if `release` is not newer than the newest release the device already knows.
 7. Check the shell version is at least `min_shell_version`.
-8. Check `hermes_bytecode_version` against the shell's Hermes bytecode version.
+8. Check `hermes_bytecode_version` against the shell's Hermes bytecode version. The Android runtime skips this check when it cannot open the bundled asset.
 9. Download `core` (a patch from `core.patches` when one matches, otherwise the full file) and check its `size` and `sha256`.
 
 A release is staged only after every step passes.

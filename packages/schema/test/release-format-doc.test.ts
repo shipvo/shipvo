@@ -20,14 +20,14 @@ describe("docs/spec/release-format.md", () => {
   it("lists only typed reasons that exist in the runtime code", () => {
     const code = read("packages/runtime/android/src/main/java/dev/shipvo/runtime/PointerQuery.kt") + read("packages/runtime/ios/Updater.swift");
     const reasons = [...doc.matchAll(/^- `([a-z_]+)`$/gm)].map((m) => m[1]);
-    expect(reasons.length).toBe(3);
+    expect(reasons.length, "doc lists a different number of typed reasons; update the doc and this count together").toBe(3);
     for (const r of reasons) expect(code, r).toContain(r);
   });
   it("lists only runtime error text that exists in the runtime code", () => {
     const code = read("packages/runtime/ios/Updater.swift") + read("packages/runtime/android/src/main/java/dev/shipvo/runtime/ShipvoRuntimeModule.kt");
     const section = doc.split("Runtime errors")[1].split("Typed reasons")[0];
     const reasons = [...section.matchAll(/^\| `([^`]+)` \|/gm)].map((m) => m[1]);
-    expect(reasons.length).toBe(6);
+    expect(reasons.length, "doc lists a different number of runtime errors; update the doc and this count together").toBe(6);
     for (const r of reasons) expect(code, r).toContain(r);
   });
 });
