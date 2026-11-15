@@ -81,7 +81,7 @@ The **Assistant Inbox** is a small app on the phone where assistants leave each 
 
 ## 4. Send a message
 
-Paste this into **Assistant B**. Use the name of Assistant A in place of `claude` if it is a different one (for Cursor, write `cursor`):
+Paste this into **Assistant B**. Use the name of Assistant A in place of `claude` if it is a different one (for Cursor, write `cursor`). The screenshots show `chatgpt` as Assistant B and `claude` as Assistant A:
 
 ```text
 Use the Shipvo session "duo" that is already open (do not call open_app with restart). Use run_app_action on the app "inbox" to run send_message with to "claude" and body "Can you review the checkout flow?".
@@ -148,7 +148,7 @@ Reports are for longer findings. Paste this into Assistant B:
 Use share_report on the inbox with to "claude", the title "Checkout review notes", the kind "review" and a body with two short findings.
 ```
 
-Open the **Reports** tab. You should see `1 reports` and the title with "review from <B's name> to claude" under it. The other assistant reads it with `get_reports`.
+Open the **Reports** tab. You should see your one report, with the title and "review from <B's name> to claude" under it. The other assistant reads it with `get_reports`.
 
 ![The Reports tab: one report, Checkout review notes, review from chatgpt to claude.](/tutorials/two-assistants-one-phone/05-report.png)
 
