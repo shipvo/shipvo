@@ -31,6 +31,7 @@ Step-by-step tutorials for people who have never used a terminal. Each one ends 
 | --- | --- | --- | --- |
 | [Have an AI assistant test your shop before every release](test-with-an-assistant.md) | Connect Claude or Cursor to your shop, have it shop like a customer, turn its run into a test and run it before a practice release | about two minutes of commands, plus 20 minutes to set up your assistant | Beginner |
 | [Have Lumi test your app while you watch](test-your-app-with-lumi.md) | Run one command, ask Lumi to test your app, read its findings and replay one | about 10 minutes | Beginner |
+| [Let two AI assistants talk to each other on one phone](two-assistants-one-phone.md) | Put two assistants on one phone, send a message, hand over a task and share a report, and watch it all on the screen | about 20 minutes | Beginner |
 
 For ChatGPT and for apps that are already published, see [Test with an assistant](../test-with-an-assistant.md).
 
