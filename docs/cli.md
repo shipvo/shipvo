@@ -262,7 +262,7 @@ For each release it returns, for Android and iOS side by side (plus `unknown` fo
 - `bands`: the bands (`b0`, `b1`, `b2`) whose live pointer serves the release on that platform.
 - `halted_bands`: those bands, when the release is the halted one. Empty otherwise.
 
-Counts come from the verified rows in the `telemetry` table. A report counts as Android when it carries an Android API level, and as iOS when its device model is an iPhone, iPad or iPod. A report with neither is counted under `unknown`, not guessed. Example response from the route run over seeded SQLite telemetry (`services/control-plane/test/release-health.test.ts`, the same `HEALTH_SQL` the route runs; unverified rows are left out):
+Counts come from the verified rows in the `telemetry` table, which has no platform column. A report counts as Android when it carries an Android API level. The runtime sends that level on Android only and sends no device model, so a report with no API level and no model is counted as iOS, as is one whose model is an iPhone, iPad or iPod. A report with any other model is counted under `unknown`. Example response, produced by the route over seeded SQLite telemetry and pointer KV for releases 6 and 7 with release 7 halted (`services/control-plane/test/release-health.test.ts`, test "full route over SQLite rows and pointer KV"; unverified rows are left out):
 
 ```json
 {
@@ -287,8 +287,8 @@ Counts come from the verified rows in the `telemetry` table. A report counts as 
           ]
         },
         "ios": {
-          "applied": 3,
-          "healthy": 3,
+          "applied": 5,
+          "healthy": 5,
           "reverted": 0,
           "failed": 0,
           "bands": [
@@ -299,8 +299,8 @@ Counts come from the verified rows in the `telemetry` table. A report counts as 
           ]
         },
         "unknown": {
-          "applied": 2,
-          "healthy": 2,
+          "applied": 1,
+          "healthy": 1,
           "reverted": 0,
           "failed": 0,
           "bands": [],
@@ -313,8 +313,8 @@ Counts come from the verified rows in the `telemetry` table. A report counts as 
       "halted": false,
       "platforms": {
         "android": {
-          "applied": 0,
-          "healthy": 0,
+          "applied": 5,
+          "healthy": 5,
           "reverted": 0,
           "failed": 0,
           "bands": [
@@ -323,8 +323,8 @@ Counts come from the verified rows in the `telemetry` table. A report counts as 
           "halted_bands": []
         },
         "ios": {
-          "applied": 0,
-          "healthy": 0,
+          "applied": 6,
+          "healthy": 6,
           "reverted": 0,
           "failed": 0,
           "bands": [

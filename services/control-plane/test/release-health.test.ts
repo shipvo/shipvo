@@ -79,6 +79,9 @@ describe("HEALTH_SQL on real SQLite", () => {
     add(1, 7, "crash_loop_revert", null, 34);
     add(3, 7, "applied", "iPhone15,2", null);  // iOS with an Apple model
     add(2, 7, "content_applied", null, null);  // iOS as the runtime sends it today: both NULL
+    add(1, 7, "applied", "Pixel 8", null);     // a non-Apple model without an API level: unknown
+    add(5, 6, "applied", null, 33);
+    add(6, 6, "applied", null, null);
     add(9, 7, "applied", null, 34, 0);         // unverified: excluded
     return sql;
   }
@@ -88,11 +91,22 @@ describe("HEALTH_SQL on real SQLite", () => {
     const j: any = await res.json();
     const p = j.releases.find((r: any) => r.release === 7).platforms;
     expect(p.android).toMatchObject({ applied: 4, reverted: 1, failed: 1 });
-    expect(p.ios).toMatchObject({ applied: 3 });
-    expect(p.unknown).toMatchObject({ applied: 2 });
+    expect(p.ios).toMatchObject({ applied: 5 });
+    expect(p.unknown).toMatchObject({ applied: 1 });
+  });
+  it("full route over SQLite rows and pointer KV (the docs/cli.md example)", async () => {
+    const e = env("viewer"); const real = db(seeded());
+    const DB = { prepare: (q: string) => q.includes("FROM telemetry") ? real.prepare(q) : e.DB.prepare(q) };
+    const res = await app.request("/health/tide/releases", { headers: H }, { ...e, DB });
+    const j: any = await res.json();
+    if (process.env.PRINT_HEALTH) console.log(JSON.stringify(j, null, 2));
+    expect(j.releases.map((r: any) => r.release)).toEqual([7, 6]);
+    expect(j.releases[0]).toMatchObject({ halted: true });
+    expect(j.releases[0].platforms.android).toMatchObject({ applied: 4, bands: ["b0", "b1"], halted_bands: ["b0", "b1"] });
+    expect(j.releases[1].platforms).toMatchObject({ android: { applied: 5, bands: ["b2"] }, ios: { applied: 6, bands: ["b2"], halted_bands: [] } });
   });
   it("is plain SQL over the telemetry table", () => {
-    expect(seeded().prepare(HEALTH_SQL).all("tide", "tide").length).toBe(4);
+    expect(seeded().prepare(HEALTH_SQL).all("tide", "tide").length).toBe(7);
   });
 });
 

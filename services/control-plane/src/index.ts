@@ -407,7 +407,11 @@ app.get("/health/:app/releases", async (c) => {
         const parts = String(k.name).split("/"); // p/<app>/<major>/[ios/]<band>
         const ios = parts.length === 5 && parts[3] === "ios";
         if (!ios && parts.length !== 4) continue;
-        try { const env = JSON.parse((await c.env.POINTERS.get(k.name)) ?? "null"); const rel = JSON.parse(env.body).release; if (Number.isInteger(rel)) { const slot = live[ios ? "ios" : "android"], band = parts[parts.length - 1]!; if (slot[band] === undefined || Number(parts[2]) >= (majors[ios ? "ios" : "android"][band] ?? 0)) { slot[band] = rel; majors[ios ? "ios" : "android"][band] = Number(parts[2]); } } } catch { /* skip a bad pointer */ }
+        const plat: Platform = ios ? "ios" : "android", band = parts[parts.length - 1]!, major = Number(parts[2]);
+        try {
+          const env = JSON.parse((await c.env.POINTERS.get(k.name)) ?? "null"); const rel = JSON.parse(env.body).release;
+          if (Number.isInteger(rel) && (live[plat][band] === undefined || major >= (majors[plat][band] ?? 0))) { live[plat][band] = rel; majors[plat][band] = major; }
+        } catch { /* skip a bad pointer */ }
       }
       cursor = page.list_complete ? undefined : page.cursor;
     } while (cursor);

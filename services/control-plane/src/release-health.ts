@@ -2,7 +2,7 @@
 import { FAILED_EVENTS, HEALTHY_EVENTS } from "./halt";
 
 export type Platform = "android" | "ios";
-/** `unknown`: reports with neither an Android API level nor an Apple device model. */
+/** `unknown`: reports with a non-Apple device model and no Android API level. */
 export type Attributed = Platform | "unknown";
 export type Row = { release: number; platform: Attributed; event: string; n: number };
 export type PlatformHealth = {
@@ -24,8 +24,8 @@ export type ReleaseHealth = { release: number; halted: boolean; platforms: Recor
 const BANDS = ["b0", "b1", "b2"];
 const empty = (): PlatformHealth => ({ applied: 0, healthy: 0, reverted: 0, failed: 0, bands: [], halted_bands: [] });
 
-/** Telemetry carries no platform column. An Android API level means Android; an iPhone, iPad or iPod model means iOS; any other row is `unknown`, never guessed. */
-export const PLATFORM_SQL = "CASE WHEN android_api IS NOT NULL THEN 'android' WHEN device_model LIKE 'iPhone%' OR device_model LIKE 'iPad%' OR device_model LIKE 'iPod%' THEN 'ios' ELSE 'unknown' END";
+/** Telemetry carries no platform column. The runtime sets `android_api` on Android only and sends no `device_model`, so: an API level means Android; an Apple model, or no model and no API level (what the iOS runtime sends), means iOS; any other model is `unknown`. */
+export const PLATFORM_SQL = "CASE WHEN android_api IS NOT NULL THEN 'android' WHEN device_model IS NULL OR device_model LIKE 'iPhone%' OR device_model LIKE 'iPad%' OR device_model LIKE 'iPod%' THEN 'ios' ELSE 'unknown' END";
 
 export const HEALTH_SQL =
   `SELECT release, ${PLATFORM_SQL} AS platform, event, COUNT(*) AS n FROM telemetry WHERE app_id = ? AND verified = 1 ` +
