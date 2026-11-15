@@ -49,10 +49,15 @@ export function assertUnlocked(st) {
   if (st.locked) throw new LifecycleError("phone_locked", "the phone is locked, so nothing was sent to the app. Call unlock first.");
 }
 
-/** Lock screen markup (time and a swipe hint). `time` is plain text such as "9:41". */
+/**
+ * Lock screen markup: time, a swipe hint and an Unlock button, plus a PIN pad that shows when the phone's lock method is "pin"
+ * (the frame sets data-method on the lock screen). `time` is plain text such as "9:41".
+ */
 export function lockScreenHtml(time = "9:41") {
   const t = String(time).replace(/[<>&"'\\]/g, "").slice(0, 12);
-  return `<div class="sf-lock" data-part="lock-screen" role="dialog" aria-label="Lock screen" tabindex="-1" hidden><div class="sf-lock-time" data-part="lock-time">${t}</div><div class="sf-lock-hint">Swipe up to unlock</div><button type="button" data-part="unlock-button">Unlock</button></div>`;
+  const key = (d) => `<button type="button" class="sf-key" data-part="pin-key" data-key="${d}" aria-label="${d}">${d}</button>`;
+  const pad = `<div class="sf-pin" data-part="pin-pad" role="group" aria-label="PIN pad" hidden><div class="sf-pin-dots" data-part="pin-dots" role="status" aria-label="PIN, no digits entered">Enter PIN</div><div class="sf-pin-err" data-part="pin-error" role="alert"></div><div class="sf-pin-keys">${"123456789".split("").map(key).join("")}<button type="button" class="sf-key" data-part="pin-delete" aria-label="Delete">&#9003;</button>${key("0")}<button type="button" class="sf-key sf-key-ok" data-part="pin-submit" aria-label="Unlock with PIN">OK</button></div></div>`;
+  return `<div class="sf-lock" data-part="lock-screen" data-method="none" role="dialog" aria-label="Lock screen" tabindex="-1" hidden><div class="sf-lock-time" data-part="lock-time">${t}</div><div class="sf-lock-hint" data-part="lock-hint">Swipe up to unlock</div><button type="button" data-part="unlock-button">Unlock</button>${pad}</div>`;
 }
 
 /** Boot screen markup: the Shipvo name on black. Shown for a moment during restart. */

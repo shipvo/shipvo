@@ -27,6 +27,25 @@ test("a PIN is needed to unlock, restart keeps the phone locked, and the PIN is 
   assert.ok(!JSON.stringify(st.log).includes("2468"));
 });
 
+test("changing a PIN needs the current one, and the new PIN replaces the old", () => {
+  const st = createLifecycle();
+  setLockMethod(st, { method: "pin", pin: "2468" });
+  assert.throws(() => setLockMethod(st, { method: "pin", pin: "1357" }), { code: "wrong_pin" });
+  assert.throws(() => setLockMethod(st, { method: "pin", pin: "1357", current: "0000" }), { code: "wrong_pin" });
+  setLockMethod(st, { method: "pin", pin: "1357", current: "2468" });
+  lock(st);
+  assert.throws(() => unlock(st, { pin: "2468" }), { code: "wrong_pin" });
+  unlock(st, { pin: "1357" }); assert.equal(st.locked, false);
+  assert.ok(!JSON.stringify(st.log).includes("1357") && !JSON.stringify(st.log).includes("2468"));
+});
+
+test("the lock screen has a PIN pad with labelled keys, hidden until the phone has a PIN", () => {
+  const html = renderFrame({ skin: "android", screen: "" }).html;
+  assert.match(html, /data-part="pin-pad"[^>]*aria-label="PIN pad"[^>]*hidden/);
+  for (const d of "0123456789") assert.match(html, new RegExp(`data-key="${d}" aria-label="${d}"`));
+  assert.match(html, /data-part="pin-delete" aria-label="Delete"/);
+});
+
 test("lock, unlock and restart change state and log as simulated", () => {
   const st = createLifecycle();
   lock(st); assert.equal(st.locked, true);

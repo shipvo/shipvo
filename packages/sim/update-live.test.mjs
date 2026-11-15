@@ -64,6 +64,21 @@ test("check goes to ready, apply restarts and the new bundle runs, with a banner
   assert.equal((await act("a", { action: "check_for_update" })).code, "no_update");
 });
 
+test("apply_update on a locked PIN phone leaves it locked, and on a phone without a PIN it unlocks", async () => {
+  await call("/session", { session: "pin" });
+  publish(2, V2);
+  assert.equal((await act("pin", { action: "set_lock_method", method: "pin", pin: "2468" })).ok, true);
+  assert.equal((await act("pin", { action: "check_for_update" })).update.state, "ready");
+  assert.equal((await act("pin", { action: "lock" })).locked, true);
+  assert.equal((await act("pin", { action: "apply_update" })).ok, true);
+  assert.equal((await act("pin", { action: "phone_apps" })).locked, true);
+  assert.equal((await act("pin", { action: "unlock", pin: "2468" })).locked, false);
+  await call("/session", { session: "nopin" });
+  await act("nopin", { action: "check_for_update" }); await act("nopin", { action: "lock" });
+  await act("nopin", { action: "apply_update" });
+  assert.equal((await act("nopin", { action: "phone_apps" })).locked, false);
+});
+
 test("a bad signature ends idle with verify_failed and is never applied", async () => {
   await call("/session", { session: "b" });
   publish(2, V2); state.pointer.release = 9;

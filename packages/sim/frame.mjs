@@ -59,6 +59,36 @@ export function statusParts(status, skin = "ios") {
 }
 
 /**
+ * Browser script for the lock screen: swipe, Enter and the Unlock button on a phone without a PIN, the PIN pad on a phone with one.
+ * The frame never decides a PIN: it sends "sf:pin" (detail.pin, detail.reply) and the page asks the sim. "sf:lock" and "sf:unlock" tell the page the person locked or unlocked.
+ * `r.sfSetLock(locked, method)` draws the sim's state; `r.sfLockNow()` shows the lock screen.
+ */
+export function lockClientScript() {
+  return `(function(){var r=document.querySelector('[data-part="phone-body"]');if(!r)return;var q=function(p){return r.querySelector('[data-part="'+p+'"]')};
+if(!q("lock-screen"))return;
+function show(el,on){if(el)el.hidden=!on}
+function focusLock(){var m=q("lock-screen").getAttribute("data-method");var u=m==="pin"?q("pin-key"):q("unlock-button");if(u&&!u.hidden&&!u.closest("[hidden]"))u.focus()}
+function unlockNow(){if(q("lock-screen").getAttribute("data-method")==="pin"){focusLock();return}show(q("lock-screen"),false);var p=q("power-button");if(p)p.focus();r.dispatchEvent(new CustomEvent("sf:unlock"))}
+r.sfLockNow=function(){show(q("lock-screen"),true);focusLock();r.dispatchEvent(new CustomEvent("sf:lock"))};
+var sy=null,ls=q("lock-screen");
+ls.addEventListener("pointerdown",function(e){sy=e.clientY});
+ls.addEventListener("pointerup",function(e){if(sy!=null&&sy-e.clientY>60)unlockNow();sy=null});
+var entered="",pad=q("pin-pad");
+function drawPin(msg){var d=q("pin-dots");d.textContent=entered?new Array(entered.length+1).join("\\u2022"):"Enter PIN";d.setAttribute("aria-label","PIN, "+(entered.length||"no")+" digit"+(entered.length===1?"":"s")+" entered");q("pin-error").textContent=msg||""}
+function pinKey(d){if(entered.length<8){entered+=d;drawPin()}}
+function pinDel(){entered=entered.slice(0,-1);drawPin()}
+function pinSubmit(){if(entered.length<4){drawPin("Enter at least 4 digits");return}var p=entered;r.dispatchEvent(new CustomEvent("sf:pin",{detail:{pin:p,reply:function(ok,why){entered="";if(ok)drawPin();else{drawPin(why||"Wrong PIN");focusLock()}}}}))}
+r.sfSetLock=function(locked,method){var m=method==="pin"?"pin":"none";ls.setAttribute("data-method",m);pad.hidden=m!=="pin";var h=q("lock-hint"),u=q("unlock-button");if(h)h.textContent=m==="pin"?"Enter PIN to unlock":"Swipe up to unlock";if(u)u.hidden=m==="pin";
+if(locked&&ls.hidden){show(ls,true);if(m==="pin")focusLock()}else if(!locked&&!ls.hidden){show(ls,false);entered="";drawPin()}};
+pad.addEventListener("click",function(e){var t=e.target.closest&&e.target.closest("button");if(!t)return;if(t.hasAttribute("data-key"))pinKey(t.getAttribute("data-key"));else if(t.getAttribute("data-part")==="pin-delete")pinDel();else if(t.getAttribute("data-part")==="pin-submit")pinSubmit()});
+ls.addEventListener("keydown",function(e){var pin=ls.getAttribute("data-method")==="pin";
+if(pin){if(/^[0-9]$/.test(e.key)){e.preventDefault();pinKey(e.key)}else if(e.key==="Backspace"){e.preventDefault();pinDel()}else if(e.key==="Enter"&&e.target.getAttribute("data-part")!=="pin-delete"){e.preventDefault();pinSubmit()}return}
+if(e.key==="ArrowUp"||e.key==="Enter"){e.preventDefault();unlockNow()}});
+if(q("unlock-button"))q("unlock-button").addEventListener("click",unlockNow);
+})();`;
+}
+
+/**
  * Browser script for the page (online is shown as 4 bars; the simulated device has no signal strength) that holds the frame. It watches the app's "pn:status" events (sent by @shipvo/device when network,
  * airplane or battery change), redraws the status bar, ticks the clock each minute and flips the text colour from the app's top background.
  * `iframeId` is the app iframe. It expects the markup from renderFrame and the functions below inlined by this script.
@@ -83,16 +113,10 @@ var f=document.getElementById(${JSON.stringify(iframeId)});if(f){f.addEventListe
 if(!q("power-button")||!q("lock-screen")||!q("power-menu"))return;
 function show(el,on){if(el)el.hidden=!on}
 function shown(p){var e=q(p);return !!e&&!e.hidden}
-function lockNow(){show(q("power-menu"),false);show(q("lock-screen"),true);var u=q("unlock-button");if(u)u.focus()}
-function unlockNow(){show(q("lock-screen"),false);var p=q("power-button");if(p)p.focus()}
+function lockNow(){show(q("power-menu"),false);r.sfLockNow()}
 function closeMenu(){if(shown("power-menu")){show(q("power-menu"),false);q("power-button").focus()}}
 function powerOn(){show(q("off-screen"),false);show(q("boot-screen"),true);clearTimeout(bootT);bootT=setTimeout(function(){show(q("boot-screen"),false)},1200)}
 function openMenu(){show(q("power-menu"),true);var b=q("power-menu").querySelector("button");if(b)b.focus()}
-var sy=null,ls=q("lock-screen");
-ls.addEventListener("pointerdown",function(e){sy=e.clientY});
-ls.addEventListener("pointerup",function(e){if(sy!=null&&sy-e.clientY>60)unlockNow();sy=null});
-ls.addEventListener("keydown",function(e){if(e.key==="ArrowUp"||e.key==="Enter"){e.preventDefault();unlockNow()}});
-if(q("unlock-button"))q("unlock-button").addEventListener("click",unlockNow);
 var pw=q("power-button");
 function stopHold(){if(hold){clearTimeout(hold);hold=null}}
 pw.addEventListener("pointerdown",function(){stopHold();hold=setTimeout(function(){hold=null;if(shown("off-screen"))return;openMenu();pw.setAttribute("data-held","1")},700)});
@@ -113,8 +137,9 @@ document.addEventListener("pointerdown",function(e){if(shown("power-menu")&&!q("
 q("power-menu").addEventListener("click",function(e){var a=e.target.getAttribute&&e.target.getAttribute("data-act");if(!a)return;show(q("power-menu"),false);
 if(a==="cancel"){pw.focus();return}
 if(a==="navstyle")return;
-if(a==="restart"){show(q("boot-screen"),true);var f=document.getElementById(${JSON.stringify(iframeId)});if(f&&f.contentWindow)f.contentWindow.location.reload();clearTimeout(bootT);bootT=setTimeout(function(){show(q("boot-screen"),false)},1200)}
+if(a==="restart"){r.dispatchEvent(new CustomEvent("sf:restart"));show(q("boot-screen"),true);var f=document.getElementById(${JSON.stringify(iframeId)});if(f&&f.contentWindow)f.contentWindow.location.reload();clearTimeout(bootT);bootT=setTimeout(function(){show(q("boot-screen"),false)},1200)}
 else{show(q("lock-screen"),false);show(q("off-screen"),true);pw.focus()}})})();
+${lockClientScript()}
 ${shadeClientScript(iframeId, skin)}
 ${settingsClientScript(iframeId)}
 ${appsClientScript(iframeId, phone)}
@@ -221,7 +246,7 @@ export function renderFrame({ skin = "android", dark = false, status, screen = "
     `.sf-bar i{display:block;width:${k.indicator}px;height:5px;border-radius:3px;background:var(--sf-fg);opacity:.85}`,
     `.sf-btn{position:absolute;right:-5px;width:5px;padding:0;border:0;border-radius:0 2px 2px 0;background:#5b6068;box-shadow:0 0 0 1px #000;cursor:pointer}.sf-btn::before{content:"";position:absolute;top:-6px;bottom:-6px;left:-4px;right:-10px}.sf-btn:focus-visible,.sf-lock button:focus-visible,.sf-menu button:focus-visible{outline:3px solid #4da3ff;outline-offset:2px}.sf-power{top:200px;height:80px}.sf-volup{top:310px;height:56px}.sf-voldown{top:376px;height:56px}`,
     `.sf-lock,.sf-boot,.sf-off,.sf-menu,.sf-vol{position:absolute;z-index:5}.sf-lock[hidden],.sf-boot[hidden],.sf-off[hidden],.sf-menu[hidden],.sf-vol[hidden]{display:none}.sf-off{inset:0;z-index:7;background:#000;cursor:pointer}`,
-    `.sf-lock{inset:0;background:#10151c;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:system-ui,sans-serif}.sf-lock-time{font-size:64px;font-weight:300}.sf-lock-hint{font-size:14px;opacity:.7}.sf-lock button{margin-top:8px;padding:10px 28px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff;font:600 15px system-ui,sans-serif;cursor:pointer}`,
+    `.sf-lock{inset:0;background:#10151c;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:system-ui,sans-serif}.sf-lock-time{font-size:64px;font-weight:300}.sf-lock-hint{font-size:14px;opacity:.7}.sf-pin{display:flex;flex-direction:column;align-items:center;gap:8px}.sf-pin[hidden]{display:none}.sf-lock button[hidden]{display:none}.sf-pin-dots{font-size:28px;letter-spacing:6px;min-height:36px}.sf-pin-err{min-height:18px;font-size:14px;color:#ffb4ab}.sf-pin-keys{display:grid;grid-template-columns:repeat(3,56px);gap:10px}.sf-lock .sf-key{margin:0;width:56px;height:56px;min-width:44px;min-height:44px;padding:0;border-radius:50%;background:#ffffff1f;font:500 22px system-ui,sans-serif}.sf-lock .sf-key-ok{font-size:15px}.sf-lock button{margin-top:8px;padding:10px 28px;border:1px solid #fff6;border-radius:999px;background:transparent;color:#fff;font:600 15px system-ui,sans-serif;cursor:pointer}`,
     `.sf-boot{inset:0;z-index:6;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;font:700 34px system-ui,sans-serif;letter-spacing:.04em}`,
     `.sf-vbar{display:block;width:90px;height:4px;margin-top:6px;border-radius:2px;background:#fff4}.sf-vbar b{display:block;height:100%;border-radius:2px;background:#fff}.sf-vol{top:80px;right:12px;padding:8px 14px;border-radius:14px;background:#222d;color:#fff;font:600 14px system-ui,sans-serif}`,
     `.sf-menu{left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:16px;background:#222;box-shadow:0 8px 30px #0008}.sf-menu button{padding:10px 24px;border:0;border-radius:10px;background:#3a3d42;color:#fff;font:600 15px system-ui,sans-serif}`,
