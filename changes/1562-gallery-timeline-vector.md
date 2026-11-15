@@ -1,1 +1,0 @@
-- spec: the gallery has two more specs, a project timeline and a focus timer with an animated progress bar.
