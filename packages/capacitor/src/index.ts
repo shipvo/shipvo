@@ -4,4 +4,4 @@ export type { ShipvoConfig } from "./engine.js";
 export { MemoryStore, MemoryFiles } from "./memory.js";
 export { verifyEd25519, sha256Hex, semverLess } from "./verify.js";
 export { NativeStore, NativeFiles, bootAndServe, bootAndSwitch } from "./native.js";
-export type { ShipvoNativePlugin } from "./native.js";
+export type { ShipvoNativePlugin, ShipvoPatchPlugin } from "./native.js";

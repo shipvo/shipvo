@@ -1,4 +1,4 @@
-// @shipvo/mcp-tools is a private workspace package, so it is not on npm. Bundle it into dist/server.js;
+// Bundle @shipvo/mcp-tools into dist/server.js, so @shipvo/mcp runs from one file with the registry it was built with;
 // every other import stays as it is.
 import { build } from "esbuild";
 import { readFileSync, renameSync } from "node:fs";

@@ -57,6 +57,20 @@ public class ShipvoPlugin extends Plugin {
         } catch (Exception e) { call.reject(e.getMessage()); }
     }
 
+    /** Rule 9: build `name` from the stored `base` and a patch. Resolves `via` "patch", or "full" with `patchError`. */
+    @PluginMethod
+    public void filePatch(PluginCall call) {
+        try {
+            byte[] patch = Base64.decode(call.getString("patch", ""), Base64.NO_WRAP);
+            PatchStep.Outcome o = store().patch(call.getString("base"), patch, call.getString("patchSha256"), call.getString("name"),
+                call.getLong("size", -1L), call.getString("sha256"), Runtime.getRuntime().maxMemory());
+            JSObject r = new JSObject();
+            r.put("via", o.via);
+            if (o.patchError != null) r.put("patchError", o.patchError);
+            call.resolve(r);
+        } catch (Exception e) { call.reject(e.getMessage()); }
+    }
+
     @PluginMethod
     public void fileRead(PluginCall call) {
         try {
