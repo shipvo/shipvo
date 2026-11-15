@@ -116,6 +116,11 @@ jobs:
           done
           command -v ffprobe >/dev/null && ffmpeg -version | head -1 || echo "::warning::ffmpeg install failed; video steps will not work in this job"
 
+      - name: Install numpy for music measuring
+        # scripts/video/musicpick.py measures track energy with numpy; the runner has none (escalation #1672).
+        if: steps.chk.outputs.ok == 'true' && inputs.mode != 'read' && inputs.engine == 'claude'
+        run: python3 -c "import numpy" 2>/dev/null || python3 -m pip install --quiet --disable-pip-version-check numpy || echo "::warning::numpy install failed; musicpick.py will not run in this job"
+
       - name: Prepare branch
         if: steps.chk.outputs.ok == 'true'
         run: |
