@@ -1,0 +1,2 @@
+- `@shipvo/control-plane`: the schedule dispatcher now runs app specs on the server with `@shipvo/spec`. Vault keys are injected at call time, responses are trimmed to the fields the spec uses, and each person's result is stored. A failed run is recorded with a typed error code and other schedules still run.
+- Migration: new tables `app_specs` and `app_run_results` (migration 0025, additive). Self-hosters get them on the next upgrade.

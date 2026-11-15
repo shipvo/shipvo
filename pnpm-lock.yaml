@@ -443,6 +443,9 @@ importers:
       '@shipvo/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@shipvo/spec':
+        specifier: workspace:^
+        version: link:../../packages/spec
       hono:
         specifier: ^4.6.8
         version: 4.13.14
