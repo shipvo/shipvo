@@ -17,3 +17,10 @@ Specs with a board, a calendar or a map:
 | [Reading board](reading-board.json) | `kanban` (To read, Reading, Done) | collection, computed pages | `add_book`, `move_book` | title, author, pages |
 | [Meal planner](meal-planner.json) | `calendar` (week) | collection, computed count | `add_meal` | meal, day, note |
 | [Favourite places](favourite-places.json) | `map` | collection, computed count | `add_place` | name, latitude, longitude |
+
+Specs with a timeline or a drawing that moves:
+
+| Spec | Block | Data sources | Actions | Form |
+| --- | --- | --- | --- | --- |
+| [Project timeline](project-timeline.json) | `timeline` (milestones by day) | collection, computed open count | `add_milestone`, `complete_milestone` | milestone, due, note |
+| [Focus timer](focus-timer.json) | `vector` progress bar with `motion` | collection, computed minutes and percent | `start_session`, `log_session` | task, minutes |

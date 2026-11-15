@@ -395,7 +395,7 @@
         },
         "compact": {
           "type": "boolean",
-          "description": "When the change is 'content changed', return only the added/removed lines, not the whole screen"
+          "description": "When the change is 'content changed', the result lists only the lines that changed (+ added, - removed, ~ changed), with refs as on the full screen. This is the default. Pass false to get the whole screen."
         },
         "wait_for": {
           "type": "object",
@@ -2684,6 +2684,31 @@
     }
   },
   {
+    "name": "room_report",
+    "description": "One summary per session in a room: agent, steps, seconds, errors, last screen title and notes. Use it to collect every sub-agent's result in one call.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "room": {
+          "type": "string",
+          "description": "Room name used in open_app"
+        }
+      },
+      "required": [
+        "room"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    },
+    "execution": {
+      "taskSupport": "forbidden"
+    }
+  },
+  {
     "name": "run_app_action",
     "description": "Run one action of an app made with create_app, by name, with its input (for example add_task with { title }). The action changes the app's data the same way tapping its form does, and the open screen shows the result. Fails with not_installed (no such spec app) or action_failed (the action refused the input, with the reason).",
     "inputSchema": {
@@ -2860,7 +2885,7 @@
         },
         "compact": {
           "type": "boolean",
-          "description": "When the change is 'content changed', return only the added/removed lines, not the whole screen"
+          "description": "When the change is 'content changed', the result lists only the lines that changed (+ added, - removed, ~ changed), with refs as on the full screen. This is the default. Pass false to get the whole screen."
         },
         "wait_for": {
           "type": "object",
@@ -3608,7 +3633,7 @@
   },
   {
     "name": "tap",
-    "description": "Tap a button, link or choice by ref. Returns the new screen. The result starts with 'Change: none | content changed | new screen | scrolled'. Work that starts on a tap (paying, saving, loading) can finish after this returns, so the screen may show 'Paying...' or a spinner. Do not report that as the result: pass wait_for with the text you expect (and gone: true for the spinner), or settle: true, before you read the outcome or do anything else.",
+    "description": "Tap a button, link or choice by ref. Returns the new screen, or only the lines that changed when the screen stayed the same one. The result starts with 'Change: none | content changed | new screen | scrolled'. Work that starts on a tap (paying, saving, loading) can finish after this returns, so the screen may show 'Paying...' or a spinner. Do not report that as the result: pass wait_for with the text you expect (and gone: true for the spinner), or settle: true, before you read the outcome or do anything else. To tap a known path in one call, pass `then` with the next things to tap, by visible name or ref.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3621,9 +3646,22 @@
           "pattern": "^(?:p\\d+|f\\d+)?e\\d+$",
           "description": "Element ref from the screen, e.g. e42. After a restart refs can carry a prefix, such as f1e42; use them exactly as the screen shows them."
         },
+        "then": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "maxItems": 8,
+          "description": "More taps to make after this one, in order: each is the visible name of the element to tap on the screen that follows (for example [\"Settings\", \"Dark theme\"]) or a ref. The path stops at the first step that is not on the screen."
+        },
+        "approved": {
+          "type": "boolean",
+          "description": "Only after a tap answered approval_needed and the person said yes in chat: true repeats the tap with their approval. Never set it on your own."
+        },
         "compact": {
           "type": "boolean",
-          "description": "When the change is 'content changed', return only the added/removed lines, not the whole screen"
+          "description": "When the change is 'content changed', the result lists only the lines that changed (+ added, - removed, ~ changed), with refs as on the full screen. This is the default. Pass false to get the whole screen."
         },
         "wait_for": {
           "type": "object",
@@ -3712,7 +3750,7 @@
   },
   {
     "name": "type",
-    "description": "Type into a text field by ref (replaces its content). Returns the new screen. The result starts with 'Change: none | content changed | new screen | scrolled'. Also gives the field's value after typing.",
+    "description": "Type into a text field by ref (replaces its content). Returns the new screen, or only the lines that changed. The result starts with 'Change: none | content changed | new screen | scrolled'. Also gives the field's value after typing.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3732,9 +3770,13 @@
           "type": "boolean",
           "description": "Press Enter afterwards"
         },
+        "secret": {
+          "type": "boolean",
+          "description": "true: the text is a password, a one-time code or another secret. It is typed, and kept out of the result, the watch page, the room log and exported tests. Password fields are treated this way without it."
+        },
         "compact": {
           "type": "boolean",
-          "description": "When the change is 'content changed', return only the added/removed lines, not the whole screen"
+          "description": "When the change is 'content changed', the result lists only the lines that changed (+ added, - removed, ~ changed), with refs as on the full screen. This is the default. Pass false to get the whole screen."
         },
         "wait_for": {
           "type": "object",

@@ -51,6 +51,9 @@ Updates are interpreted JavaScript running on native capabilities the shell decl
 - **Describe an app and it appears:** your assistant calls `create_app` and `update_app` to build a spec app on the phone, then `arrange_apps`, `schedule_app`, `refresh_app` and `app_activity` to place it, time it, refresh its data and read what changed, on Android and iOS ([Describe an app](docs/describe-an-app.md), [Phone apps](docs/phone-apps.md)).
 - **Email sign-in without a mailbox:** every session has a private inbox, so a test or an agent reads the code or magic link and finishes the sign-in on Android and iOS ([Test an email sign-in](docs/email-sign-in.md)).
 - **Assistants talk to each other:** ChatGPT, Claude and others on one phone message each other and hand over tasks in the Assistant Inbox, on Android and iOS ([Phone apps](docs/phone-apps.md#assistants-talking-to-each-other)).
+- **A2UI on Shipvo Phone:** an agent describes a screen as A2UI 1.0 data and Shipvo Phone draws it on an Android or iPhone frame, sends taps back to the agent, and changes the screen while it is open ([a2ui](docs/a2ui.md)).
+- **Bug-catch benchmark:** 23 seeded app bugs, counted on Android and iOS, with the method and the command to run it yourself ([bug-bench](docs/bug-bench.md)).
+- **A whole phone for assistants:** reminders, search across the phone, share sheet and clipboard, Wi-Fi and airplane mode, a permission log, whole-phone backup and an accessibility audit, the same on Android and iOS ([Phone apps](docs/phone-apps.md)).
 - **Playground in your browser:** the sample app on an Android or iOS phone, with the device API, signed updates and up to 12 phones in one shareable link, no install ([Playground](docs/playground.md)).
 - **Lumi:** `shipvo lumi android|ios` tests your app while you watch: it walks every screen, reports findings with replay buttons, shows coverage and saves findings as tests ([Lumi](docs/lumi.md)).
 - **Pull request check:** `shipvo ci init --check` runs your tests and an explore pass on every pull request, with before and after screens of Android and iOS in the comment ([PR check](docs/ci-check.md)).
@@ -136,7 +139,7 @@ Telemetry                   POST /t → D1;  orders POST /o/{app} → D1
 | `packages/spec` | `@shipvo/spec`: the JSON Schema for `shipvo.app/v0` app specs and a validator that returns errors and warnings with a JSON path and a suggested fix |
 | `packages/shipvo`, `packages/create-shipvo` | `shipvo` and `create-shipvo`: the CLI under its short name (`npx shipvo`, `npm i -g shipvo`) and `npm create shipvo`; both forward to `@shipvo/cli` |
 | `packages/capacitor` | `@shipvo/capacitor`: signed web bundles for Capacitor apps: release decisions, Ed25519 + SHA-256 verification and rollback rules |
-| `packages/mcp-tools` | The one MCP tool registry shared by the local and hosted servers |
+| `packages/mcp-tools` | `@shipvo/mcp-tools`: the registry of every Shipvo MCP tool (name, description, input schema, error codes), shared by the local and hosted servers (`docs/mcp-tools.md`) |
 | `services/control-plane` | Hono worker on Cloudflare: pointers, bundles, web artifacts, content, orders, telemetry, admin, owner API |
 | `services/sim` | Hosted simulator Worker: one sandbox per API key, the same MCP tools over HTTPS (sim.shipvo.dev) |
 | `services/site` | shipvo.dev: landing page and the public app marketplace |

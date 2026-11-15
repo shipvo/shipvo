@@ -13,8 +13,8 @@ Order of priority when choosing work: **correctness and safety of updates > reli
 ## Themes
 
 ### 1. Update safety and reach
-- Shells declare the Hermes bytecode version they run, and mismatched releases are refused (epic #14).
-- bsdiff patches on iOS (issue #2); measure OTA apply time on the iOS Simulator in CI (issue #1).
+- Shells declare the Hermes bytecode version they run, and mismatched releases are refused (epic #14, done). bsdiff patches and measured apply time on Android and iOS (epic #15, done).
+- Release health at a glance: one per-release view in the API, `shipvo status --json` and `/admin`, then rollouts stated as a percentage (epic #1614).
 - Stronger rollback: rollback by cohort, automatic rollback on crash-rate thresholds from telemetry.
 - Docker self-hosting target for the control plane.
 - Resumable and delta downloads on slow networks; measure on low-end Android.
@@ -44,6 +44,11 @@ Order of priority when choosing work: **correctness and safety of updates > reli
 ## Now
 
 The planner keeps this list current: the epics in flight, newest owner direction first. Each line links its epic; open the epic for its slices.
+
+The three bets of the 2026-11-10 strategy review come first, because they move adoption and trust ([strategy](product/strategy.md)):
+- Adopt mode proven on Expo managed, Expo prebuilt and bare React Native apps, to a first healthy update on the Android emulator and the iOS Simulator (#1613)
+- Release health at a glance: applied, healthy, reverted and halted per release in the API, CLI and `/admin` (#1614)
+- The Shipvo release format as an open spec with conformance vectors (#1615)
 
 **Lumi (owner direction, 6 Nov 2026):**
 - Lumi in every Shipvo Phone: the assistant that shows each step live, reacts to results, appears in recordings and guides new users (#872)
@@ -77,14 +82,19 @@ The planner keeps this list current: the epics in flight, newest owner direction
 - Enterprise access and hosting: single sign-on, roles, private deployment, LTS (#296)
 
 **Finishing:**
-- A bundle never reaches a shell that cannot run it (#14)
-- iOS reaches Android update quality (#15)
-- First run in under 10 minutes, and measured (#16)
+- Releases declare a state version, and rollbacks refuse code that cannot read stored data (#1414)
+- A patch that runs out of memory falls back to the full download (#1444)
 
 ## Shipped
 
 Newest first. One line per user-visible feature. Dates are each PR's merge date. `#NNN` are pull request numbers.
 
+- 2026-11-13: `shipvo session start android|ios` opens any Expo app on a headless Shipvo Phone with framed screenshots, video and real phone models ([Test any Expo app from the terminal](session.md), #1641, #1643)
+- 2026-11-13: Shipvo Phone reads A2UI 1.0, and `a2ui_open`, `a2ui_send` and `a2ui_actions` tools are in `@shipvo/mcp` ([A2UI](a2ui.md), #1645, #1646)
+- 2026-11-13: A bug-catch benchmark counts seeded app bugs caught on Android and iOS ([Bug-catch benchmark](bug-bench.md), #1642)
+- 2026-11-13: A `saveFile` step saves CSV and other text as a file on the phone, on Android and iOS ([Phone apps](phone-apps.md#save-as-a-file), #1597)
+- 2026-11-11: Live Assistant Inbox view in chats that show MCP Apps, with auto-continue ([Phone apps](phone-apps.md#watching-the-inbox-live-in-the-chat), #1636)
+- 2026-11-11: Hosted phones pause when idle and resume, shared per account ([Agents](agents.md), #1632)
 - 2026-11-10: `schedule_app` and `arrange_apps` read a schedule in the time zone you name, for example `Europe/Berlin` ([Phone apps](phone-apps.md#arrange-the-home-screen), #1536)
 - 2026-11-10: Every phone tool result starts with an `Inbox:` line when something waits for the calling assistant ([Phone apps](phone-apps.md), #1545)
 - 2026-11-10: Run the simulator-vs-device parity check yourself on Android and iOS from the Actions tab, with the results page reorganised ([Parity results](parity-results.md#run-it-yourself))

@@ -10,7 +10,27 @@ Lets AI agents (Claude, Cursor, Claude Code, PiPilot…) **use a Shipvo app with
 
 Start the simulator first (`shipvo sim` in the app). The server asks the simulator which app it serves, so `open_app("<your app id>")` works; set `PN_APPS` (JSON) to override. If the simulator cannot be reached, only the sample app opens. The hosted version needs no local setup: `{ "url": "https://<host>/mcp/<key>" }`.
 
-Each `tap`, `type`, `scroll` and `back` result starts with a line `Change: none | content changed | new screen | scrolled`, then the screen. `type` also adds `Value of <ref>: "..."`. Pass `compact: true` to get only the added (`+`) and removed (`-`) lines when the change is `content changed`; refs match the full screen. If the server has no earlier screen for the session (for example after a reconnect), the first line is `Change: unknown`. The `content changed` / `new screen` split is a heuristic (under half the lines kept means a new screen), so on a short screen one change can read as `new screen`.
+Each `tap`, `type`, `scroll` and `back` result starts with a line `Change: none | content changed | new screen | scrolled`, then the screen. `type` also adds `Value of <ref>: "..."`. When the change is `content changed`, the result lists only the lines that changed: `+` added, `-` removed and `~` for an element whose text changed (`~ switch "Dark theme" [ref=e12] → switch "Dark theme" [checked] [ref=e12]`). Refs are the same as on the full screen. Pass `compact: false` for the whole screen, or set `SHIPVO_MCP_FULL_SCREEN=1` on the server to get whole screens every time. If the server has no earlier screen for the session (for example after a reconnect), the first line is `Change: unknown`. The `content changed` / `new screen` split is a heuristic (under half the lines kept means a new screen), so on a short screen one change can read as `new screen`.
+
+`tap` takes a path: `tap(session, ref: "e4", then: ["Settings", "Dark theme"])` taps `e4`, then the element named Settings on the screen that follows, then Dark theme, in one call. Each step is a visible name or a ref. The path stops at the first step that is not on the screen and answers `path_step_not_found` with the screen it stopped on.
+
+### A shorter tool list
+
+Every tool the server lists is sent to the agent on each turn. Set `SHIPVO_MCP_TOOLS=core` to list only the tools an agent needs to open an app and use its screen: `list_apps`, `phone_models`, `open_app`, `screen`, `tap`, `type`, `scroll`, `back`, `screenshot`, `set_device`, `device_log`, `open_url`, `wait_for_event` and `end_session`. A comma list names tools one by one, for example `SHIPVO_MCP_TOOLS=open_app,screen,tap,type`. Unset, or `all`, lists every tool. What it saves is measured in the [agent jobs benchmark](../../docs/bug-bench.md#agent-jobs).
+
+### Asking a person before a risky tap
+
+Set `SHIPVO_GUARD=on` on the server and a tap on a payment or account-delete button waits for a person. The server knows the button by its label: Pay, Pay now, Buy now, Buy with GPay, Place order, Confirm purchase, Start subscription, Transfer, Delete account and their like.
+
+- In a client that can show a question (MCP elicitation), the person is asked `Allow`, `Allow for this session` or `Decline`. The model never sees the question and cannot answer it. `Decline` returns `tap_declined`.
+- In any other client the tap returns `approval_needed` and nothing is tapped. The agent asks the person in chat and, after a yes, calls `tap` again with `approved: true`.
+
+`SHIPVO_GUARD` also takes a list of kinds: `pay`, `delete` and `send` (Send, Post, Publish, Reply, Share), for example `SHIPVO_GUARD=pay,delete,send`. `on` means `pay,delete`.
+
+### Passwords and codes
+
+Text typed into a password or one-time-code field is typed and then kept out of the tool result, the watch page and exported tests; the result says `Value of <ref>: hidden (a secret field)`. Pass `secret: true` to `type` for any other field that holds a secret.
+
 
 `tap`, `type`, `scroll` and `back` also take optional fields to wait for the effect instead of sleeping:
 
@@ -34,6 +54,8 @@ The result gets a line `Waited: matched | timed out after <ms> ms` and `structur
 | `sim_timeout` | The simulator did not answer in time. The action may have run. | Call `screen` to see where the app is. Do not repeat the action blindly. |
 | `needs_confirm` | An owner command that cannot be undone did nothing and returned a plan and a one-time `challenge`. | Show the plan to the owner and ask them to approve it at `challenge.approval_url` in the admin. Then call again with the same args and `approval: <challenge id>`. `confirm: true` does nothing. |
 | `bad_model` | `open_app` got a `model` the simulator does not know. | Call `phone_models` and use a name from it. |
+| `approval_needed` | The tap is on a payment or account-delete button and `SHIPVO_GUARD` is on. Nothing was tapped. | Ask the person in chat. After a yes, call `tap` again with `approved: true`. |
+| `tap_declined` | The person declined the tap. Nothing was tapped. | Stop and tell the person what you stopped at. |
 | `bad_url` | `open_url` got a URL the app cannot take. | Fix the URL and call again. |
 | `no_url_listener` | The app is not listening for URLs. | Use the app's screens instead. |
 | `phone_locked` | The phone is locked, so tap, type, scroll and back were not sent. | Call `unlock`, then try again. |
