@@ -1,0 +1,2 @@
+- docs: new page "Ask a person before an agent pays or deletes" (approval guard, secret typing, per-app spend limit); agents page explains changed lines, tap paths and the core tool list.
+- Migration: none.
