@@ -62,6 +62,45 @@ Every assistant can use your app. shipvo.dev
 
 </details>
 
+## Let your assistants work together
+
+### Two assistants, one phone: the Assistant Inbox
+
+<video controls preload="metadata" playsinline tabindex="0" data-title="Two assistants, one phone: the Assistant Inbox" data-length="2 min 5 s" poster="/videos/two-assistants-one-phone.jpg" src="/media/videos/two-assistants-one-phone-2830afb7.mp4"><track kind="captions" src="/videos/two-assistants-one-phone.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+
+2 minutes 5 seconds. ChatGPT and Claude share one Shipvo Phone with the Assistant Inbox installed. ChatGPT sends a message and the sender fills itself in. Claude sees "Inbox: 1 unread for claude" on its next call, replies, takes a task that ChatGPT hands off, and finishes it with a reply. ChatGPT reads the finished task with `sent_tasks`. A task for the wrong assistant returns `updated: false` with the reason. Every screen is a real capture from the Shipvo simulator, on the Android and iOS skins (`scripts/video/inbox/capture.mjs`). It follows [Assistants talking to each other](phone-apps.md#assistants-talking-to-each-other).
+
+[Captions (.vtt)](/videos/two-assistants-one-phone.vtt)
+
+<details>
+<summary>Transcript</summary>
+
+Two A I assistants share one phone. Watch one hand work to the other. By the end, ChatGPT has sent a task, Claude has finished it, on Android and iOS.
+
+Normally each assistant works alone. You copy and paste between chats. Here, they share a phone.
+
+Connect both assistants to the same phone, and install the Assistant Inbox. The phone knows who is calling from the name each one connects with. Nobody types a name.
+
+First, ChatGPT calls send_message, to Claude. Look at the phone: chatgpt to claude. The sender filled itself in.
+
+Claude's next call of any phone tool starts with one line: Inbox, 1 unread for claude. Nobody says "check your inbox".
+
+Claude reads it with check_inbox, and answers: "Yes. Send it over as a task." Will the task come back finished? Watch the Tasks tab.
+
+Now ChatGPT hands off a task: Review checkout plan. It appears on the Tasks tab, waiting for Claude.
+
+Claude lists its tasks, starts the task, then finishes it with a reply.
+
+Back on ChatGPT's side, sent_tasks shows it done, with the answer: "Plan looks good. Add a back button on the cart."
+
+Only the right assistant can act. A task for someone else returns updated: false, and says why. Nobody is told it worked when it did not.
+
+The same exchange runs on Android and iOS. Same data. Same tabs.
+
+That is two assistants, one inbox. Run npx shipvo agents setup, connect both, and install the Assistant Inbox. The guide is at shipvo.dev/learn. Next, have an assistant test your app.
+
+</details>
+
 ## Try Shipvo in your browser
 
 ### Try Shipvo in your browser: a phone, device features and a rollback

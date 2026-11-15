@@ -671,3 +671,100 @@ ${tpShot("05-many", 860, 14, 260, .5)}`,
 <div class="abs card in mono" style="left:470px;top:360px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="sky">shipvo.dev</span>/playground</div>
 <div class="abs in mute" style="left:470px;top:480px;font-size:28px;line-height:1.4;width:700px;--d:4s">The guide: <span class="sky">shipvo.dev</span>/learn<br>Next: <span class="sky">npx shipvo run android</span></div>`,
 });
+
+// --- Assistant Inbox: real simulator screenshots (scripts/video/inbox/capture.mjs), Android and iOS skins ---
+const ai = (n) => "assistant-inbox/" + n;
+const aiShot = (n, x, y, w, d = 0, cls = "pop") => `<div class="abs ${cls}" style="left:${x}px;top:${y}px;width:${w}px;--d:${d}s"><img src="{{IMG:${ai(n)}}}" style="width:100%;display:block;filter:drop-shadow(0 10px 24px #000a)"></div>`;
+const aiTool = (who, name, args, x, y, w, d, color = "sky") => `<div class="abs card in" style="left:${x}px;top:${y}px;width:${w}px;padding:16px 24px;--d:${d}s"><div class="mono ${color}" style="font-size:16px">${who}</div><div class="mono" style="font-size:28px;margin-top:4px">${name}</div>${args ? `<div class="mono mute" style="font-size:20px;margin-top:6px;line-height:1.35">${args}</div>` : ""}</div>`;
+
+Object.assign(SCENES, {
+  aiHook: () => `
+<h1 class="abs in" style="left:72px;top:110px;width:640px;font-size:62px;--d:.2s">Two assistants.<br>One phone.<br><span class="or">One hands work to the other.</span></h1>
+${aiTool("CHATGPT", "send_message", "to: claude", 72, 470, 560, 1.4)}
+<div class="abs flight" style="left:560px;top:330px;width:110px;--fx:-40px;--fy:150px;--tx:180px;--ty:-40px;--d:2.2s">${plane(110)}</div>
+${aiShot("android-03-thread", 820, 20, 290, .4)}`,
+
+  aiWhy: () => `
+${chip("The problem")}
+<h2 class="abs in" style="left:72px;top:100px;width:760px;--d:.3s">Each assistant works <span class="or">alone.</span></h2>
+${aiTool("CHAT 1", "ChatGPT", "", 72, 300, 300, .9)}
+${aiTool("CHAT 2", "Claude", "", 72, 430, 300, 2.2)}
+<div class="abs in" style="left:420px;top:350px;font-size:34px;width:420px;line-height:1.3;--d:3.6s">You copy and paste between them.</div>
+<div class="abs pop" style="left:420px;top:480px;--d:6s"><span class="badge" style="background:#4a1c24;color:var(--red);font-size:28px">Slow</span></div>`,
+
+  aiInstall: () => `
+${chip("Set up")}
+<h2 class="abs in" style="left:72px;top:90px;--d:.3s">Same phone. <span class="or">Same inbox.</span></h2>
+${aiTool("CONNECTS AS", "chatgpt", "", 72, 240, 300, .9)}
+${aiTool("CONNECTS AS", "claude", "", 72, 370, 300, 2.4)}
+<div class="abs card in mono" style="left:72px;top:520px;width:700px;padding:18px 26px;font-size:26px;--d:5.6s"><span class="sky">caller</span> = the name it connects with</div>
+${aiShot("android-01-empty", 880, 20, 270, 1)}`,
+
+  aiSend: () => `
+${chip("Step 1")}
+<h2 class="abs in" style="left:72px;top:90px;--d:.3s">ChatGPT sends a message</h2>
+${aiTool("CHATGPT CALLS", "send_message", "to: claude<br>body: Can you review my checkout plan?", 72, 230, 700, .8)}
+<div class="abs in" style="left:72px;top:440px;width:700px;font-size:30px;line-height:1.35;--d:4.6s">The sender fills itself in: <span class="or">chatgpt.</span></div>
+${aiShot("android-02-message", 880, 20, 270, 1.8)}`,
+
+  aiBanner: () => `
+${chip("Step 2")}
+<h2 class="abs in" style="left:72px;top:90px;--d:.3s">Claude sees it <span class="or">at once</span></h2>
+${aiTool("CLAUDE CALLS", "any phone tool", "", 72, 230, 560, .8)}
+<div class="abs card in mono" style="left:72px;top:380px;width:760px;padding:24px 30px;font-size:30px;--d:2.8s"><span class="or">Inbox:</span> 1 unread for claude</div>
+<div class="abs in mute" style="left:72px;top:530px;width:740px;font-size:28px;line-height:1.35;--d:5.4s">No one has to say "check your inbox".</div>
+${aiShot("ios-02-message", 880, 20, 270, 1.2)}`,
+
+  aiReply: () => `
+${chip("Step 3")}
+<h2 class="abs in" style="left:72px;top:90px;--d:.3s">Claude reads and replies</h2>
+${aiTool("CLAUDE CALLS", "check_inbox", "", 72, 230, 520, .8)}
+${aiTool("CLAUDE CALLS", "send_message", "to: chatgpt<br>body: Yes. Send it over as a task.", 72, 370, 720, 3)}
+<div class="abs in mute" style="left:72px;top:570px;width:740px;font-size:26px;--d:6.2s">Next: does the task come back finished?</div>
+${aiShot("android-03-thread", 880, 20, 270, 4.6, "fade")}`,
+
+  aiHandoff: () => `
+${chip("Step 4")}
+<h2 class="abs in" style="left:72px;top:90px;--d:.3s">ChatGPT hands off a task</h2>
+${aiTool("CHATGPT CALLS", "hand_off", "to: claude<br>title: Review checkout plan", 72, 230, 720, .8)}
+<div class="abs in" style="left:72px;top:450px;width:740px;font-size:30px;line-height:1.35;--d:4s">It shows on the <span class="or">Tasks</span> tab.</div>
+${aiShot("android-03-thread", 880, 20, 270, .3, "fade")}
+${aiShot("android-03b-task-open", 880, 20, 270, 4.4, "fade")}`,
+
+  aiWork: () => `
+${chip("Step 5")}
+<h2 class="abs in" style="left:72px;top:90px;--d:.3s">Claude does the work</h2>
+${aiTool("CLAUDE CALLS", "my_tasks", "", 72, 230, 330, .8)}
+${aiTool("CLAUDE CALLS", "start_task", "", 430, 230, 330, 2.6)}
+${aiTool("CLAUDE CALLS", "finish_task", "reply: Plan looks good. Add a back button on the cart.", 72, 400, 690, 4.8, "or")}
+${aiShot("android-03b-task-open", 880, 20, 270, .4)}`,
+
+  aiDone: () => `
+${chip("The payoff")}
+<h2 class="abs in" style="left:72px;top:90px;--d:.3s">ChatGPT gets the answer</h2>
+${aiTool("CHATGPT CALLS", "sent_tasks", "", 72, 230, 520, .8)}
+<div class="abs card in" style="left:72px;top:370px;width:740px;padding:22px 28px;font-size:28px;line-height:1.4;--d:2.6s"><span class="mono" style="color:var(--green)">DONE</span><br>Review checkout plan<br><span class="mute">Plan looks good. Add a back button on the cart.</span></div>
+${aiShot("android-03b-task-open", 880, 20, 270, .3, "fade")}
+${aiShot("android-04-done", 880, 20, 270, 3.4, "fade")}`,
+
+  aiSafe: () => `
+${chip("Honest answers")}
+<h2 class="abs in" style="left:72px;top:90px;width:800px;--d:.3s">Only the right assistant <span class="or">can act</span></h2>
+<div class="abs card in mono" style="left:72px;top:290px;width:760px;padding:22px 28px;font-size:26px;line-height:1.5;--d:1s">ChatGPT calls <span class="sky">finish_task</span> on Claude's task<br>updated: <span class="or">false</span><br><span class="mute">reason: No unfinished task with that id was handed to you.</span></div>
+<div class="abs in mute" style="left:72px;top:540px;width:760px;font-size:28px;line-height:1.35;--d:4.6s">Nobody is told it worked when it did not.</div>`,
+
+  aiIos: () => `
+${chip("Android + iOS")}
+<h2 class="abs in" style="left:72px;top:90px;--d:.3s">Same exchange.<br><span class="or">Both phones.</span></h2>
+<div class="abs in mute" style="left:72px;top:330px;width:420px;font-size:30px;line-height:1.35;--d:1.4s">Same data. Same tabs. Android and iOS.</div>
+${aiShot("android-04-done", 600, 20, 250, .6)}
+${aiShot("ios-04-done", 900, 20, 244, 2.4)}
+<div class="abs mono sky pop" style="left:680px;top:548px;font-size:22px;--d:1s">ANDROID</div>
+<div class="abs mono sky pop" style="left:1000px;top:548px;font-size:22px;--d:2.8s">iOS</div>`,
+
+  aiCta: () => `
+<div class="abs pop" style="left:72px;top:140px;width:330px;--d:.3s">{{MARK}}</div>
+<h1 class="abs in" style="left:470px;top:120px;--d:.8s">Two assistants.<br><span class="or">One inbox.</span></h1>
+<div class="abs card in mono" style="left:470px;top:360px;padding:22px 30px;font-size:28px;--d:2.4s"><span class="sky">npx</span> shipvo agents setup</div>
+<div class="abs in mute" style="left:470px;top:480px;font-size:28px;line-height:1.4;width:700px;--d:4s">The guide: <span class="sky">shipvo.dev</span>/learn<br>Next: <span class="sky">test your app with an assistant</span></div>`,
+});
