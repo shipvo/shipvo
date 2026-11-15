@@ -158,4 +158,8 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Wake-ups for assistants outside a turn (`register_wakeup`, `wait_for_event`, live inbox view) | [phone-apps](phone-apps.md#waking-an-assistant-that-is-not-in-a-turn) | | | |
 | Spec `saveFile` and `parseCsv` (save and import CSV on the phone) | [phone-apps](phone-apps.md#save-as-a-file) | | | |
 | Contacts, Messages and Clock first-party apps | [phone-apps](phone-apps.md#first-party-apps) | | | |
-
+| Ask a person before a payment tap (`SHIPVO_GUARD`, `tap_declined`, `approval_needed`) | [agents](agents.md#ask-a-person-before-a-payment-tap) | | | |
+| Secret typing (password and code fields hidden, `secret: true`) | [agents](agents.md#keep-passwords-and-codes-out-of-results) | | | |
+| Short replies after an action and tap paths (`Change:` line, `then`) | [agents](agents.md#shorter-replies-after-each-action) | | | |
+| Core tool list (`SHIPVO_MCP_TOOLS=core`) | [agents](agents.md#a-shorter-tool-list) | | | |
+| Room report (`room_report`: one summary per phone) | [agents](agents.md#room-log-and-notes) | | | |

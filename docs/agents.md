@@ -99,6 +99,14 @@ cursor: 2
 | --- | --- | --- |
 | `room_log` | `room`, `since?` (a cursor from an earlier `room_log` or `room_note`) | `entries` (each with `at`, `kind` of `action` or `note`, `session`, `agent`, `tool`, `target`, `change` or `text`) and the next `cursor`. Without `since`, you get the whole log |
 | `room_note` | `room`, `text` (1 to 500 characters) | The new `cursor` |
+| `room_report` | `room` | One summary per session: `session`, `agent`, `steps`, `seconds`, `errors`, `last_screen_title` and `notes`. Use it to collect every sub-agent's result in one call |
+
+Example reply from `room_report("demo")`:
+
+```text
+s1 (claude-code): 14 steps in 52s, 0 errors, screen "Order placed"
+s2 (codex): 9 steps in 31s, 1 errors, screen "Cart", notes: Checkout fails when the cart has 3 items
+```
 
 The log keeps the latest 1000 entries. Reading it changes nothing, so a lead can poll it as often as it likes.
 
@@ -119,6 +127,33 @@ When `shipvo run` is up for your app, `open_app` attaches to that phone and the 
 - a step log in plain words, such as `Tapped button "Add to cart"`. Events from the simulated device are marked "(simulated)". **Hide steps** collapses the log so it never covers the app.
 
 The person can stop the agent at any time. Any touch or key press on the phone pauses it, once the agent has made its first request. The next tool call fails with `taken_over` and the text "the person took over". Stop acting and ask the person to press **Hand back** on the banner; then call `screen` and carry on. An action already in flight when the person takes over still finishes, and its step is logged after "You took over".
+
+## Keep agent sessions safe, small and quiet
+
+This section is for developers who connect a coding agent or chat assistant to the Shipvo MCP server (Android and iOS phones alike). It covers the server settings that ask a person before a risky tap, hide secrets, shorten each reply and trim the tool list. Every setting below is an environment variable on the MCP server or an argument on a tool. The full option list is in the [`@shipvo/mcp` README](../packages/mcp/README.md).
+
+### Ask a person before a payment tap
+
+1. Start the server with `SHIPVO_GUARD=on`.
+2. Let the agent work as usual. When it taps a button such as Pay now, Buy now, Place order, Transfer or Delete account, the tap waits.
+3. In a client that can show a question, you see `Allow`, `Allow for this session` or `Decline`. The model never sees this question and cannot answer it. `Decline` returns `tap_declined`.
+4. In any other client, the tap returns `approval_needed` and nothing is tapped. The agent asks you in chat. After your yes, it calls `tap` again with `approved: true`.
+
+`SHIPVO_GUARD` also takes a list of kinds: `pay`, `delete` and `send` (Send, Post, Publish, Reply, Share). For example, `SHIPVO_GUARD=pay,delete,send`. `on` means `pay,delete`.
+
+### Keep passwords and codes out of results
+
+Text typed into a password or one-time-code field is typed, then kept out of the tool result, the watch page and exported tests. The result reads `Value of <ref>: hidden (a secret field)`. Pass `secret: true` to `type` for any other field that holds a secret.
+
+### Shorter replies after each action
+
+Each `tap`, `type`, `scroll` and `back` result starts with `Change: none | content changed | new screen | scrolled`. After a `content changed` result, you get only the lines that changed: `+` added, `-` removed, `~` text changed. Refs match the full screen. Pass `compact: false` for the whole screen, or set `SHIPVO_MCP_FULL_SCREEN=1` for whole screens every time.
+
+`tap` also takes a path, so one call can walk several screens: `tap(session, ref: "e4", then: ["Settings", "Dark theme"])`. If a step is not on the screen, the answer is `path_step_not_found` with the screen where it stopped.
+
+### A shorter tool list
+
+Every listed tool is sent to the agent on each turn. Set `SHIPVO_MCP_TOOLS=core` to list only what an agent needs to open an app and use its screen. A comma list names tools one by one (`SHIPVO_MCP_TOOLS=open_app,screen,tap,type`). Unset or `all` lists every tool. The saving is measured in the [agent jobs benchmark](bug-bench.md#agent-jobs).
 
 ## Watch the agent's phone
 
@@ -288,6 +323,10 @@ Run `shipvo app create` again. After a short review it appears on [shipvo.dev/ap
 **The assistant cannot find a button.** The tree only lists what a person could see and touch (see [What the tree shows](#what-the-tree-shows-and-hides-on-purpose)). Ask the assistant to read the screen again after the app finishes loading, and check that the button has a label.
 
 **The `watch_url` shows an error or does not load.** The link is valid for one hour, for one session. Call `open_app` again for a new one. If there is no `watch_url` in the reply, you are on a local simulator; open `/watch` there instead.
+
+**A tap answers `approval_needed`, `tap_declined` or `path_step_not_found`.** `approval_needed`: `SHIPVO_GUARD` is on and the button looks like a payment or delete. Nothing was tapped. Ask the person, then call `tap` again with `approved: true`. `tap_declined`: the person chose Decline, so do not retry. `path_step_not_found`: a name in `then` is not on the screen the path reached. Read the screen in the reply and fix the name.
+
+**An agent cannot find a tool after you set `SHIPVO_MCP_TOOLS`.** The list only holds the tools you named, or the core set for `core`. Add the tool to the comma list, or unset the variable to list every tool.
 
 **`room_log` or `room_note` returns `no_room`.** The room ends when its last session ends, and its log goes with it. Open a session with `room` again and read the log while a session is still open.
 

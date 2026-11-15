@@ -1,0 +1,2 @@
+- docs: the agents page now explains the approval guard, secret typing, short replies with tap paths, the core tool list and `room_report`, with troubleshooting. The glossary has three new terms.
+- Migration: none.
