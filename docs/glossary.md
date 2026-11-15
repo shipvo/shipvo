@@ -164,3 +164,15 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **Gallery.** Ready-made example specs (habit tracker, workout log, expense splitter and more) you can open on a phone and change. See [Spec blocks](spec-blocks.md#example-specs).
 
 **Parity.** How closely the simulator matches an Android emulator and an iOS Simulator: the same buttons with the same names on every screen. Shipvo measures it and publishes the result. See [Simulator vs device parity](parity-results.md).
+
+**A2UI.** An open protocol where an agent describes a screen as data, not code. Shipvo Phone draws it on an Android or iPhone frame and sends the person's taps back to the agent. See [A2UI on Shipvo Phone](a2ui.md).
+
+**Bug-catch benchmark.** A measured count of how many seeded app bugs show up on Shipvo Phone, on Android and iOS. See [Bug-catch benchmark](bug-bench.md).
+
+**Wake-up.** A web address the phone calls when a message or task arrives for an assistant that is not in a turn. It carries no message text. See [Phone apps](phone-apps.md#waking-an-assistant-that-is-not-in-a-turn).
+
+**Reminder.** A notification the phone shows at a time on its own clock, set with `set_reminder`. See [Phone apps](phone-apps.md#reminders).
+
+**Permission log.** A list of every device permission decision on the phone: which app asked, and whether it was allowed or denied. See [Phone apps](phone-apps.md#see-the-permission-log).
+
+**Session (`shipvo session`).** A headless Shipvo Phone you start from the shell for any Expo app, so a coding agent can tap through it. See [Test any Expo app from the terminal](session.md).

@@ -81,3 +81,5 @@ If you want to see your own app on a simulated phone first, [one command does it
 Related: [test dark mode, large text and right-to-left](/blog/test-dark-mode-large-text-and-rtl-in-react-native/) shows the settings your assistant can change on the simulated phone.
 
 Want to see two agents at work? [Two AI agents play chess on two phones](/blog/two-ai-agents-play-chess-on-two-phones/) shows an Android phone and an iOS phone driven through MCP.
+
+Related: [two assistants, one phone](/blog/two-ai-assistants-one-phone-assistant-inbox/) shows ChatGPT and Claude passing messages and tasks through the Assistant Inbox on the same phone.
