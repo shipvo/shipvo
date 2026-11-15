@@ -126,6 +126,41 @@ That is an app from one sentence. Try it in your own folder. The step by step gu
 
 </details>
 
+## Test a sign-in by email
+
+### Test an email sign-in on Android and iOS
+
+<video controls preload="metadata" playsinline tabindex="0" data-title="Test an email sign-in on Android and iOS" data-length="1 min 35 s" poster="/videos/test-an-email-sign-in.jpg" src="/media/videos/test-an-email-sign-in-d962ba1f.mp4"><track kind="captions" src="/videos/test-an-email-sign-in.vtt" srclang="en" label="English">Your browser cannot play this video. Read the transcript below.</video>
+
+1 minute 35 seconds. Every Shipvo session has a private inbox with its own address. Ask for the address with `inbox_read`, type it into the app, tap Send code, read the code with `inbox_wait`, type it and tap Verify. The same steps work on Android and iOS, and a missing mail gives the typed error `inbox_timeout`. The screens are real recordings of the Shipvo simulator driven the way an agent drives it. It follows [Test an email sign-in](email-sign-in.md).
+
+[Captions (.vtt)](/videos/test-an-email-sign-in.vtt)
+
+<details>
+<summary>Transcript</summary>
+
+Your app emails a sign-in code. Your test reads it, with no mailbox. By the end, a test signs in on Android and iOS by itself.
+
+Tests cannot open your inbox. So teams share a test account and wait. In Shipvo, every session has its own private inbox, with its own address.
+
+Step one. Ask for the address. The tool is inbox read. Type that address into the app's email field.
+
+Step two. Tap send code. The app sends its mail to the session inbox. A mock network rule can send it too.
+
+Step three. Wait for the mail. Inbox wait returns the sender, the subject, and the code. Four eight two nine one three.
+
+Step four. Type the code and tap verify. The app says welcome back. You are signed in.
+
+It works the same on Android and iOS. Open the session with platform android, or platform iOS.
+
+What if no mail comes? You do not hang. You get a typed error, inbox timeout, and you can read what did arrive.
+
+In a typed test, it is three lines. Address, send, code. For a magic link, open the first link in the mail.
+
+Test the sign-in, and skip the mailbox. Read the guide at shipvo dot dev, slash docs, slash email dash sign dash in.
+
+</details>
+
 ## Test your app
 
 ### Have Lumi test your app while you watch
