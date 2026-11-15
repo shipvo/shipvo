@@ -2,7 +2,7 @@ name: deploy-control-plane
 on:
   push:
     branches: [main]
-    paths: ["services/control-plane/**", "packages/schema/**", ".github/workflows/deploy-control-plane.yml"]
+    paths: ["services/control-plane/**", "packages/schema/**", "packages/spec/**", ".github/workflows/deploy-control-plane.yml"]
   workflow_dispatch:
 jobs:
   deploy:

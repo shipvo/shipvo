@@ -111,3 +111,21 @@ test("the phone in its frame can be screenshotted, the catalog is served, and ot
   await call("/end", { session: "a4" });
   assert.equal((await fetch(`http://localhost:${PORT}/a2ui/a4/html`)).status, 404, "an ended session's surfaces are gone");
 });
+
+test("typing into a password field is marked secret and its value stays out of the answer", async () => {
+  const s = "secret-field";
+  const o = await call("/session", { session: s, a2ui: true, model: "Pixel 8", a2ui_messages: [m("createSurface", { surfaceId: "login", catalogId: BASIC_CATALOG_ID, dataModel: { f: { email: "", pass: "" } }, components: [
+    { id: "root", component: "Column", children: ["email", "pass"] },
+    { id: "email", component: "TextField", label: "Email", value: { "@path": "/f/email" } },
+    { id: "pass", component: "TextField", label: "Password", variant: "obscured", value: { "@path": "/f/pass" } },
+  ] })] });
+  assert.equal(o.ok, true, o.error);
+  const plain = await act(s, { action: "type", ref: ref(o.screen, /textbox "Email" \[ref=(\w+)\]/), text: "ana@example.com" });
+  assert.equal(plain.value, "ana@example.com"); assert.equal(plain.secret, undefined);
+  const pw = await act(s, { action: "type", ref: ref(plain.screen, /textbox "Password" \[ref=(\w+)\]/), text: "hunter2-secret" });
+  assert.equal(pw.ok, true, pw.error); assert.equal(pw.secret, true); assert.equal(pw.value, null);
+  // The caller can mark any field: a one-time code typed into a plain field.
+  const code = await act(s, { action: "type", ref: ref(pw.screen, /textbox "Email" \[ref=(\w+)\]/), text: "492817", secret: true });
+  assert.equal(code.secret, true); assert.equal(code.value, null);
+  await call("/end", { session: s });
+});

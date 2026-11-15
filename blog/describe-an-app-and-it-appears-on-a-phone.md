@@ -183,3 +183,5 @@ Use `export_phone_apps` to copy your apps, with their data and layout, to anothe
 You can see phones in your browser before you install anything. Open the [playground](/playground/) to see the sample app on an Android phone and an iPhone side by side.
 
 To make your own app, set up your agent with `npx -y @shipvo/cli agents setup`, open a phone, and say what you want. The [getting started guide](/docs/getting-started/) walks through both.
+
+Related: once an app exists, [two assistants can share one phone](/blog/two-ai-assistants-one-phone-assistant-inbox/): one hands the other a task, such as trying to break what was just built.
