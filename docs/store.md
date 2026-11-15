@@ -88,6 +88,31 @@ shipvo store testers --package com.example.shop --play-key play-key.json
 
 The command opens a Play edit, reads the groups already on the track, adds Shipvo Testers to them, and commits. It never removes a group. The key is read once and not stored. Without `--play-key` no network call is made.
 
+## Read your tester numbers
+
+For app owners running the closed test. `engagementReport` in `@shipvo/store` turns your testers' signed telemetry rows into a day count, one line per tester and plain-English warnings, so you see a dropout before it resets the 14-day clock.
+
+```ts
+import { engagementReport } from "@shipvo/store";
+
+const report = engagementReport(rows, { now: new Date() });
+console.log(report.day, report.active_testers, report.warnings);
+```
+
+`rows` is a list of `{ install_id, received_at }`. The options are `now` (required), `windowDays` (default 14), `needed` (default 12) and `recruit` (default 16).
+
+Take two testers. Tester `a1b2c3d4` sent rows at `2026-11-01T09:00:00Z` and `2026-11-02T09:00:00Z`. Tester `e5f6a7b8` sent rows at `2026-11-01T10:00:00Z` and `2026-11-02T10:00:00Z`. With `now` of `2026-11-05T12:00:00Z`, both testers have been quiet for 3 days, so the report prints `day: 5`, `active_testers: 0` and these warnings:
+
+```
+Tester a1b2c3d4 has been quiet for 3 days. Ask them to open the app.
+Tester e5f6a7b8 has been quiet for 3 days. Ask them to open the app.
+Only 0 testers were active in the last 3 days. The 14-day clock resets if the count drops below 12.
+2 testers seen so far: recruit 14 more so a dropout never resets the clock.
+Day 5 of 14: remind every tester to open the app today.
+```
+
+Each tester has `first_seen`, `last_seen`, `active_days` (distinct UTC dates) and `quiet_days`. A tester is active when `quiet_days` is under 3. With no rows the report has zero testers and no warnings.
+
 ## Screenshots (fast mode)
 
 `shipvo store screenshots` renders your app in the simulator and writes store-sized files. It prints "fast mode: simulator render, not the native UI". The simulator runs your web build in headless Chromium, so fonts, safe areas and native widgets can differ from a phone.

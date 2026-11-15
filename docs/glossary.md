@@ -165,6 +165,11 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 
 **Parity.** How closely the simulator matches an Android emulator and an iOS Simulator: the same buttons with the same names on every screen. Shipvo measures it and publishes the result. See [Simulator vs device parity](parity-results.md).
 
+**Spend limit.** The most an installed app may spend in a month, set by you and only you. It starts at 0. See [Phone apps](phone-apps.md#set-a-spend-limit-for-an-app).
+
+**State version.** A whole number you raise whenever a release changes how your app saves data on the phone. Rollback uses it to stop before sending phones to code that cannot read their data. See [Rollbacks and stored data](rollbacks-and-stored-data.md).
+
+**Quiet tester.** A closed-test tester who has sent no report for 3 days or more. See [Store details](store.md#read-your-tester-numbers).
 **A2UI.** An open protocol where an agent describes a screen as data, not code. Shipvo Phone draws it on an Android or iPhone frame and sends the person's taps back to the agent. See [A2UI on Shipvo Phone](a2ui.md).
 
 **Bug-catch benchmark.** A measured count of how many seeded app bugs show up on Shipvo Phone, on Android and iOS. See [Bug-catch benchmark](bug-bench.md).

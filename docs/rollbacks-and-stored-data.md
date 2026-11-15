@@ -36,6 +36,18 @@ Nothing is written. You have two choices:
 
 Rollbacks to the same or a higher state version need no flag. `shipvo rollback --dry-run` shows what would happen, and with `--allow-state-downgrade` it lists the downgrade under `state_downgrade` in the result.
 
+## Read the state version in your app
+
+`getAppliedStateVersion()` from `@shipvo/runtime` returns the `state_version` of the bundle that is running, on Android and iOS. Use it to decide whether to migrate stored data on start.
+
+```ts
+import { getAppliedStateVersion } from "@shipvo/runtime";
+
+const version = await getAppliedStateVersion(); // 3, or null
+```
+
+It returns `null` when the embedded bundle runs, when the release declared no `stateVersion`, or when the shell is older than this method. The number follows the release: it changes when an update is applied and when the app reverts to the previous release or the embedded bundle.
+
 ## What gets recorded
 
 The rolled-back release keeps the target's `state_version`. The control plane records a rollback that lowers it in the audit log with the `from` and `to` versions. Read it with `shipvo audit <app>`.
