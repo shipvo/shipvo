@@ -1,1 +1,0 @@
-- mcp: new `room_report` tool returns one summary per session in a room (steps, seconds, errors, last screen title, notes). Error code: `no_room`.
