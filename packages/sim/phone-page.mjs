@@ -1,6 +1,6 @@
 // /phone: the phone frame for one live session. Its home screen and Store show the session's installed apps, the same ones the MCP tools
 // install and remove. Tapping Install or an app icon here runs install_app or switch_app on that session, so device_log records it.
-import { renderFrame } from "./frame.mjs";
+import { renderFrame, lockClientScript } from "./frame.mjs";
 import { DAYS, appVisible, clockIn, homeApps, installedIconsHtml, storeRowsHtml, permissionRowsHtml } from "./apps.mjs";
 import { settingsClientScript } from "./settings.mjs";
 
@@ -18,16 +18,24 @@ home=q("home-screen"),sc=q("store-screen"),rows=q("store-rows"),opened=q("opened
 home.hidden=false;var box=document.createElement("div");box.className="sf-apps";box.setAttribute("data-part","installed-apps");home.appendChild(box);
 var st={installed_apps:[],store:[],current_app:null,where:"home"};
 function say(t,bad){msg.textContent=t||"";msg.className="p-msg"+(bad?" err":"")}
-var lastHome=null;
+var lastHome=null,lockBusy=false;
 // Settings: one switch per app and permission. A click asks the sim server (set_app_permission) and the row is drawn from its reply, so a switch always matches what the app may do.
 var ss=q("settings-screen"),pbox=null;
 function drawPerms(){if(!ss||ss.hidden)return;if(!pbox){pbox=document.createElement("div");pbox.setAttribute("data-part","permission-rows");pbox.setAttribute("role","group");pbox.setAttribute("aria-label","App permissions");ss.insertBefore(pbox,q("settings-close"))}var h=permissionRowsHtml(st);if(pbox.getAttribute("data-h")!==h){pbox.setAttribute("data-h",h);pbox.innerHTML=h}}
-function draw(){drawPerms();var h=installedIconsHtml(st,new Date(st.now||Date.now()));if(h!==lastHome){lastHome=h;box.innerHTML=h}if(!sc.hidden)rows.innerHTML=storeRowsHtml(st);
+function draw(){if(r.sfSetLock&&!lockBusy)r.sfSetLock(!!st.locked,st.lock_method);drawPerms();var h=installedIconsHtml(st,new Date(st.now||Date.now()));if(h!==lastHome){lastHome=h;box.innerHTML=h}if(!sc.hidden)rows.innerHTML=storeRowsHtml(st);
 var a=st.where==="app"&&st.installed_apps.filter(function(x){return x.id===st.current_app})[0];
 opened.hidden=!a;opened.textContent=a?a.name+" is open":""}
 function pull(){return fetch("/phone/apps?session="+encodeURIComponent(SESSION)).then(function(x){return x.json()}).then(function(j){
 if(!j.ok){say(j.code==="no_session"?"No such session":(j.error||"Failed"),true);return}if(msg.className.indexOf("err")>-1)say("");st=j;draw()}).catch(function(){say("The simulator is not reachable",true)})}
 function act(body){body.session=SESSION;return fetch("/act",{method:"POST",body:JSON.stringify(body)}).then(function(x){return x.json()}).then(function(j){if(!j.ok)say(j.error||"Failed",true);else say("");return pull()})}
+// The lock screen follows the session: the power button, a swipe and the PIN pad all go through the sim, so the phone and phone_apps agree.
+function simAct(body){body.session=SESSION;return fetch("/act",{method:"POST",body:JSON.stringify(body)}).then(function(x){return x.json()})}
+function sync(body){lockBusy=true;return simAct(body).catch(function(){return {}}).then(function(j){lockBusy=false;return pull().then(function(){return j})})}
+var pwr=q("power-button");if(pwr)pwr.addEventListener("click",function(){if(r.sfLockNow&&q("lock-screen").hidden)r.sfLockNow()});
+r.addEventListener("sf:lock",function(){sync({action:"lock"})});
+r.addEventListener("sf:restart",function(){sync({action:"restart"})});
+r.addEventListener("sf:unlock",function(){sync({action:"unlock"}).then(function(j){if(j&&j.ok===false&&r.sfSetLock)r.sfSetLock(!!st.locked,st.lock_method)})});
+r.addEventListener("sf:pin",function(e){var d=e.detail;sync({action:"unlock",pin:d.pin}).then(function(j){d.reply(!!(j&&j.ok),j&&j.code==="wrong_pin"?"Wrong PIN":(j&&j.error)||"Wrong PIN")})});
 r.addEventListener("click",function(e){var t=e.target;if(!t.closest)return;
 if(t.closest('[data-part="store-icon"]')){sc.hidden=false;draw();sc.focus({preventScroll:true});return}
 if(t.closest('[data-part="store-close"]')){sc.hidden=true;var si=q("store-icon");if(si)si.focus();return}
@@ -45,5 +53,5 @@ export function phonePage(skin = "android", session = "") {
   const frame = renderFrame({ skin, screen: `<p class="p-open" data-part="opened-app" role="status" hidden></p>` });
   const title = `Phone (simulated ${skin === "ios" ? "iPhone" : "Android"})`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
-<style>${CSS}\n${frame.css}</style></head><body><p class="p-msg" role="status" data-part="message">${session ? "" : "Add ?session=NAME to show a live session."}</p>${frame.html}<script>${settingsClientScript("app")}</script><script>${SCRIPT(session).replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
+<style>${CSS}\n${frame.css}</style></head><body><p class="p-msg" role="status" data-part="message">${session ? "" : "Add ?session=NAME to show a live session."}</p>${frame.html}<script>${settingsClientScript("app")}</script><script>${lockClientScript()}</script><script>${SCRIPT(session).replace(/<\/script/gi, "<\\/script")}</script></body></html>`;
 }

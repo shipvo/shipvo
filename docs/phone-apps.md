@@ -9,7 +9,7 @@ Founders: you can skip this page. Your assistant uses these controls for you whe
 | Part | What it is | Tools |
 | --- | --- | --- |
 | Home screen and app switcher | Your app's icon, a switcher card, 3-button or swipe navigation | `press_home`, `open_recents`, `resume_app`, `kill_app` |
-| Power and volume | Lock screen, restart, volume overlay | `lock`, `unlock`, `restart` |
+| Power and volume | Lock screen, restart, volume overlay | `lock`, `unlock`, `restart`, `set_lock_method` |
 | Shade, Notification Center, Control Center | Quick tiles and notifications | `open_notifications`, `open_control_center`, `toggle_tile`, `dismiss_notification`, `close_panels` |
 | Settings | System switches your app can read | `get_settings`, `set_setting` |
 | Browser | A separate web browser on the phone | `browser_open` and the other `browser_*` tools |
@@ -378,6 +378,10 @@ Which mechanism fits which assistant:
 
 `open_url myapp://item/42` finds the installed app that declares the `myapp` scheme. If that app is not the current one, the simulator switches to it. The app's `getInitialURL()` returns the link once, and its `onUrl` listener gets the `url` event. Switching to another app or reloading afterwards does not deliver the link again. Android and iOS skins behave the same. `Linking.openURL` from inside an app does the same for another app's scheme.
 
+## Set a PIN
+
+`set_lock_method` with `method: "pin"` and `pin: "2468"` (4 to 8 digits) gives the phone a PIN. The lock screen then shows a PIN pad on Android and iOS, and `unlock` needs `pin`. To change or remove the PIN, pass the present one in `current`.
+
 ## Troubleshooting
 
 | You see | Why | Fix |
@@ -385,7 +389,11 @@ Which mechanism fits which assistant:
 | `host_not_allowed` | The address is private | Use a public URL, or pass `allow_hosts` for that host |
 | `unknown_setting` / `bad_value` | Wrong key or value | Use the table above |
 | `app_not_foreground` | The home screen or switcher is showing | Call `resume_app` |
-| `phone_locked` | The phone is locked | Call `unlock` |
+| `phone_locked` | The phone is locked | Call `unlock` (with `pin` when the phone has a PIN) |
+| `pin_required` | The phone has a PIN and `unlock` had none | Call `unlock` with `pin` |
+| `wrong_pin` | The PIN is wrong | Try again with the right PIN |
+| `bad_method` | `set_lock_method` got a method other than `none` or `pin` | Use `none` or `pin` |
+| `bad_pin` | The PIN is not 4 to 8 digits | Send 4 to 8 digits in `pin` |
 | The Secrets screen is empty | No key is saved for the apps on this phone, or the simulator cannot reach the saved-key routes | Save a key for an app first; check that the simulator is running |
 | "Could not revoke this key. Try again." | The simulator did not accept the request or could not be reached; the key is still saved | Check the simulator is running, then tap **Revoke** again |
 | `bad_placement` from `arrange_apps` | A field is unknown, `position` is not a whole number from 0 to 99, or `days`, `from` or `to` is not valid | Use `pinned`, `hidden`, `position` and `schedule`; days are `sun` to `sat` and times look like `09:00` |

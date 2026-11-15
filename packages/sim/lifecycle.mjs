@@ -6,7 +6,7 @@ export class LifecycleError extends Error { constructor(code, message) { super(m
 
 /** A new phone state: unlocked, never restarted. `reloads` counts cold starts of the app (the first load is 1). */
 export function createLifecycle() {
-  return { locked: false, reloads: 1, restarts: 0, log: [] };
+  return { locked: false, method: "none", pin: null, failed: 0, reloads: 1, restarts: 0, log: [] };
 }
 
 const note = (st, name, extra = {}) => { st.log.push({ at: Date.now(), name, source: "simulated", ...extra }); };
@@ -17,15 +17,31 @@ export function lock(st) {
   st.locked = true; note(st, "lock"); return st;
 }
 
-/** Swipe up on the lock screen. Throws not_locked if the phone is unlocked. The app and its screen are untouched. */
-export function unlock(st) {
-  if (!st.locked) throw new LifecycleError("not_locked", "the phone is not locked");
-  st.locked = false; note(st, "unlock"); return st;
+/**
+ * Set how the phone unlocks: "none" (swipe up) or "pin" (4 to 8 digits). Changing an existing PIN needs the current one in `current`.
+ * The PIN is kept in memory for the session and never logged.
+ */
+export function setLockMethod(st, { method, pin, current } = {}) {
+  if (method !== "none" && method !== "pin") throw new LifecycleError("bad_method", "method: none or pin");
+  if (method === "pin" && !/^\d{4,8}$/.test(String(pin ?? ""))) throw new LifecycleError("bad_pin", "pin: 4 to 8 digits");
+  if (st.method === "pin" && String(current ?? "") !== st.pin) { note(st, "lock_method_denied"); throw new LifecycleError("wrong_pin", "current: the present PIN is needed to change the lock method"); }
+  st.method = method; st.pin = method === "pin" ? String(pin) : null; st.failed = 0;
+  note(st, "set_lock_method", { method }); return st;
 }
 
-/** Restart from the power menu: the app cold-starts (the caller reloads it), storage is kept, the phone ends unlocked. */
+/** Swipe up on the lock screen, and enter the PIN when the phone has one. Throws not_locked if the phone is unlocked, wrong_pin on a wrong PIN. The app and its screen are untouched. */
+export function unlock(st, { pin } = {}) {
+  if (!st.locked) throw new LifecycleError("not_locked", "the phone is not locked");
+  if (st.method === "pin") {
+    if (pin == null || String(pin) === "") throw new LifecycleError("pin_required", "the phone has a PIN: call unlock with pin");
+    if (String(pin) !== st.pin) { st.failed++; note(st, "unlock_failed", { failed: st.failed }); throw new LifecycleError("wrong_pin", "that PIN is wrong"); }
+  }
+  st.failed = 0; st.locked = false; note(st, "unlock"); return st;
+}
+
+/** Restart from the power menu: the app cold-starts (the caller reloads it), storage is kept. The phone ends unlocked, or locked when it has a PIN. */
 export function restart(st) {
-  st.locked = false; st.restarts++; st.reloads++; note(st, "restart", { reloads: st.reloads }); return st;
+  st.locked = st.method === "pin"; st.restarts++; st.reloads++; note(st, "restart", { reloads: st.reloads }); return st;
 }
 
 /** Throws a typed error when the phone is locked, so no input reaches the app behind the lock screen. */
@@ -33,10 +49,15 @@ export function assertUnlocked(st) {
   if (st.locked) throw new LifecycleError("phone_locked", "the phone is locked, so nothing was sent to the app. Call unlock first.");
 }
 
-/** Lock screen markup (time and a swipe hint). `time` is plain text such as "9:41". */
+/**
+ * Lock screen markup: time, a swipe hint and an Unlock button, plus a PIN pad that shows when the phone's lock method is "pin"
+ * (the frame sets data-method on the lock screen). `time` is plain text such as "9:41".
+ */
 export function lockScreenHtml(time = "9:41") {
   const t = String(time).replace(/[<>&"'\\]/g, "").slice(0, 12);
-  return `<div class="sf-lock" data-part="lock-screen" role="dialog" aria-label="Lock screen" tabindex="-1" hidden><div class="sf-lock-time" data-part="lock-time">${t}</div><div class="sf-lock-hint">Swipe up to unlock</div><button type="button" data-part="unlock-button">Unlock</button></div>`;
+  const key = (d) => `<button type="button" class="sf-key" data-part="pin-key" data-key="${d}" aria-label="${d}">${d}</button>`;
+  const pad = `<div class="sf-pin" data-part="pin-pad" role="group" aria-label="PIN pad" hidden><div class="sf-pin-dots" data-part="pin-dots" role="status" aria-label="PIN, no digits entered">Enter PIN</div><div class="sf-pin-err" data-part="pin-error" role="alert"></div><div class="sf-pin-keys">${"123456789".split("").map(key).join("")}<button type="button" class="sf-key" data-part="pin-delete" aria-label="Delete">&#9003;</button>${key("0")}<button type="button" class="sf-key sf-key-ok" data-part="pin-submit" aria-label="Unlock with PIN">OK</button></div></div>`;
+  return `<div class="sf-lock" data-part="lock-screen" data-method="none" role="dialog" aria-label="Lock screen" tabindex="-1" hidden><div class="sf-lock-time" data-part="lock-time">${t}</div><div class="sf-lock-hint" data-part="lock-hint">Swipe up to unlock</div><button type="button" data-part="unlock-button">Unlock</button>${pad}</div>`;
 }
 
 /** Boot screen markup: the Shipvo name on black. Shown for a moment during restart. */

@@ -239,6 +239,80 @@ for (const style of ["android", "ios"]) {
 }
 
 for (const style of ["android", "ios"]) {
+  test(`${style}: a PIN lock screen needs the PIN, survives a restart, and a wrong PIN is refused`, async () => {
+    const sid = `sp-pin-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    assert.equal((await act(sid, { action: "set_lock_method", method: "pin", pin: "2468" })).ok, true);
+    assert.equal((await act(sid, { action: "phone_apps" })).lock_method, "pin");
+    await act(sid, { action: "lock" });
+    assert.equal((await act(sid, { action: "unlock" })).code, "pin_required");
+    assert.equal((await act(sid, { action: "unlock", pin: "1111" })).code, "wrong_pin");
+    const r = await act(sid, { action: "restart" });
+    assert.equal(r.locked, true);
+    assert.equal((await act(sid, { action: "unlock", pin: "2468" })).locked, false);
+    assert.equal((await act(sid, { action: "set_lock_method", method: "none" })).code, "wrong_pin");
+    assert.equal((await act(sid, { action: "set_lock_method", method: "none", current: "2468" })).ok, true);
+  });
+  test(`${style}: the phone page lock screen asks for the PIN, a swipe does not unlock it, and a wrong PIN says so`, async () => {
+    const sid = `sp-pinui-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    await act(sid, { action: "set_lock_method", method: "pin", pin: "2468" });
+    const { chromium } = createRequire(import.meta.url)("playwright");
+    const b = await chromium.launch();
+    try {
+      const page = await b.newPage({ viewport: { width: 390, height: 844 } });
+      await page.goto(`http://localhost:${PORT}/phone?session=${sid}&skin=${style}`);
+      const lock = page.locator('[data-part="lock-screen"]');
+      assert.equal(await lock.isVisible(), false);
+      // lock through the sim: the frame follows and shows the pad
+      await act(sid, { action: "lock" });
+      await lock.waitFor({ state: "visible" });
+      assert.equal(await page.locator('[data-part="pin-pad"]').isVisible(), true);
+      assert.equal(await page.locator('[data-part="unlock-button"]').isVisible(), false);
+      const box = await page.locator('[data-part="pin-key"]').first().boundingBox();
+      assert.ok(box.width >= 44 && box.height >= 44);
+      // a swipe up and the Enter key leave it locked
+      const lb = await lock.boundingBox();
+      await page.mouse.move(lb.x + lb.width / 2, lb.y + lb.height - 20); await page.mouse.down();
+      await page.mouse.move(lb.x + lb.width / 2, lb.y + 100, { steps: 5 }); await page.mouse.up();
+      await page.keyboard.press("Enter");
+      assert.equal(await lock.isVisible(), true);
+      assert.equal((await act(sid, { action: "phone_apps" })).locked, true);
+      // a wrong PIN shows a message and the phone stays locked
+      for (const d of "1111") await page.click(`[data-part="pin-key"][data-key="${d}"]`);
+      await page.click('[data-part="pin-submit"]');
+      await page.waitForFunction(() => document.querySelector('[data-part="pin-error"]')?.textContent === "Wrong PIN");
+      assert.equal((await act(sid, { action: "phone_apps" })).locked, true);
+      if (process.env.SHIPVO_SHOTS) await page.screenshot({ path: join(process.env.SHIPVO_SHOTS, `pin-wrong-${style}.png`) });
+      // the right PIN, typed on the keyboard, unlocks
+      for (const d of "2468") await page.keyboard.press(d);
+      if (process.env.SHIPVO_SHOTS) await page.screenshot({ path: join(process.env.SHIPVO_SHOTS, `pin-pad-${style}.png`) });
+      await page.keyboard.press("Enter");
+      await lock.waitFor({ state: "hidden" });
+      assert.equal((await act(sid, { action: "phone_apps" })).locked, false);
+      // restart from the sim locks it again and the frame shows the pad
+      await act(sid, { action: "restart" });
+      await lock.waitFor({ state: "visible" });
+      assert.equal(await page.locator('[data-part="pin-pad"]').isVisible(), true);
+    } finally { await b.close(); }
+  });
+  test(`${style}: the phone page lock screen on a phone without a PIN still unlocks with a swipe`, async () => {
+    const sid = `sp-nopin-${style}`;
+    assert.ok((await call("/session", { session: sid, skin: style })).ok);
+    const { chromium } = createRequire(import.meta.url)("playwright");
+    const b = await chromium.launch();
+    try {
+      const page = await b.newPage({ viewport: { width: 390, height: 844 } });
+      await page.goto(`http://localhost:${PORT}/phone?session=${sid}&skin=${style}`);
+      await act(sid, { action: "lock" });
+      const lock = page.locator('[data-part="lock-screen"]');
+      await lock.waitFor({ state: "visible" });
+      assert.equal(await page.locator('[data-part="pin-pad"]').isVisible(), false);
+      await page.click('[data-part="unlock-button"]');
+      await lock.waitFor({ state: "hidden" });
+      await page.waitForFunction(async (s) => (await (await fetch("/phone/apps?session=" + s)).json()).locked === false, sid);
+    } finally { await b.close(); }
+  });
   test(`${style}: share puts text into another app, and the clipboard survives switching apps`, async () => {
     const NOTES = JSON.parse(readFileSync(new URL("../../templates/notes-tasks/app.json", import.meta.url), "utf8"));
     const sid = `sp-share-${style}`;
