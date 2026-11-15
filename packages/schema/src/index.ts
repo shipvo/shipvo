@@ -120,7 +120,7 @@ export const AddonManifest = z.object({
   addon_api: z.number().int().positive(),
   entry: z.string().min(1),
   bytecode_sha256: sha256,
-  commands: z.array(z.object({ name: z.string(), description: z.string().min(1), args: z.record(z.any()).default({}) })).default([]),
+  commands: z.array(z.object({ name: z.string(), description: z.string().min(1), args: z.record(z.string(), z.any()).default({}) })).default([]),
   requires_modules: z.array(z.string()).default([]),
   requires_permissions: z.array(z.string()).default([]),
   signature: b64,
@@ -183,7 +183,7 @@ export function canonicalize(value: unknown): string {
 
 /* ---------- live app content (edited in the admin, served to devices) ---------- */
 const hex = z.string().regex(/^#[0-9A-Fa-f]{6}$/, "colour as #RRGGBB");
-const actionSchema = z.object({ screen: z.enum(["home", "search", "product", "cart", "orders"]), params: z.record(z.union([z.string(), z.number(), z.boolean()])).optional() });
+const actionSchema = z.object({ screen: z.enum(["home", "search", "product", "cart", "orders"]), params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional() });
 export const ContentBlock = z.discriminatedUnion("type", [
   z.object({ id: z.string().min(1), type: z.literal("hero"), title: z.string().min(1).max(120), body: z.string().max(240).optional(), color: hex.optional() }),
   z.object({ id: z.string().min(1), type: z.literal("banner"), text: z.string().min(1).max(140), tone: z.enum(["info", "success", "warning", "critical"]), action: actionSchema.optional() }),
