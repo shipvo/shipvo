@@ -10,6 +10,8 @@ export type RuntimeState = {
 export type CheckResult = {
   status: "none" | "staged" | "error"; release?: number; bytes?: number; downloadMs?: number; verifyMs?: number;
   issuedAt?: string; error?: string;
+  /** How the bundle arrived: a patch against the current bundle, or the full file. `patchError` says why a patch was not used. */
+  via?: "patch" | "full"; patchError?: string;
   reason?: "hermes_bytecode_mismatch" | "native_module_missing" | "native_module_version";
 };
 export type HealthyResult = { release: number; coldStartMs: number; sinceLoadMs: number; promoted: boolean; kind?: "cold" | "reload" };
@@ -33,6 +35,11 @@ export interface KeyValueStore {
 export interface BundleFiles {
   write(name: string, bytes: Uint8Array): Promise<void>;
   remove(name: string): Promise<void>;
+  /**
+   * Optional. Build `name` from the stored `base` file and a patch (rule 9). Native checks the patch hash,
+   * then the rebuilt size and hash, and writes `name` only on success; otherwise it reports `via: "full"`.
+   */
+  patch?(o: { base: string; patch: Uint8Array; patchSha256: string; name: string; size: number; sha256: string }): Promise<{ via: "patch" | "full"; patchError?: string }>;
   /** Remove every file. Used when a new shell is installed. */
   clear(): Promise<void>;
 }

@@ -14,8 +14,14 @@ const ms = (at: RoomEntry["at"]) => { const t = typeof at === "number" ? at : Da
 export function summariseRoom(entries: RoomEntry[]): { sessions: SessionSummary[] } {
   type Acc = SessionSummary & { first: number; firstAt?: number; lastAt?: number };
   const by = new Map<string, Acc>();
+  // The sim logs notes with session null and the poster's agent name, so a note is attributed
+  // to the one session that agent opened. If the agent has no session, or several, the note is dropped.
+  const owners = new Map<string, Set<string>>();
+  for (const e of entries) if (e.kind !== "note" && e.session && e.agent) (owners.get(e.agent) ?? owners.set(e.agent, new Set()).get(e.agent)!).add(e.session);
+  const noteOwner = (e: RoomEntry) => { if (e.session) return e.session; const o = e.agent ? owners.get(e.agent) : undefined; return o?.size === 1 ? [...o][0] : undefined; };
   entries.forEach((e, i) => {
-    const id = e.session ?? "";
+    const id = e.kind === "note" ? noteOwner(e) : e.session || undefined;
+    if (!id) return;
     let s = by.get(id);
     if (!s) by.set(id, s = { session: id, agent: null, steps: 0, seconds: 0, errors: 0, last_screen_title: null, notes: [], first: i });
     if (s.agent === null && e.agent) s.agent = e.agent;
@@ -26,6 +32,7 @@ export function summariseRoom(entries: RoomEntry[]): { sessions: SessionSummary[
       if (e.tool) s.steps++;
       if (typeof e.change === "string" && e.change.startsWith("error")) s.errors++;
     }
+    // The sim's action entries carry no screen title today; list_sessions gives it as `title`.
     const title = e.title ?? e.screen_title;
     if (title) s.last_screen_title = title;
   });
