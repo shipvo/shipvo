@@ -18,7 +18,8 @@ import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { z } from "zod";
 import { tools, inputHasKey, KEY_REFUSAL, KEY_IN_INPUT, type ToolDef } from "@shipvo/mcp-tools";
-import { classify, compactDiff, fieldValue } from "./change.js";
+import { classify, compactDiff, fieldValue, refForStep } from "./change.js";
+import { guardKinds, guardedKind, guardQuestion, type GuardKind } from "./guard.js";
 import { exportTest, type Step } from "./export.js";
 import { traceFromMeta } from "./trace.js";
 import { findTarget } from "./record.js";
@@ -133,7 +134,8 @@ type CallEntry = { tool: string; at: string; traceId?: string };
 const callLog = new Map<string, CallEntry[]>();
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
 // Action result with a "Change:" line on top. Compares this tree with the session's last one.
-// compact: on "content changed", return only the added/removed lines instead of the full tree.
+// On "content changed" the body is only the changed lines, unless compact is false or SHIPVO_MCP_FULL_SCREEN=1 asks for whole screens.
+const FULL_SCREEN = process.env.SHIPVO_MCP_FULL_SCREEN === "1";
 const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?: string; step?: Step; waited?: Waited } = {}) => {
   if (!r.ok || r.screen == null) return result(sid, r);
   const prev = trees.get(sid);
@@ -143,7 +145,7 @@ const acted = (sid: string, action: string, r: Act, o: { compact?: boolean; ref?
   const head = [`Change: ${change}`];
   if (o.waited) head.push(`Waited: ${o.waited.matched ? "matched" : "timed out"} after ${o.waited.ms} ms`);
   if (action === "type" && o.ref) { const v = fieldValue(r.screen, o.ref); head.push(v !== undefined ? `Value of ${o.ref}: ${JSON.stringify(v)}` : `Value of ${o.ref}: not shown`); }
-  const body = o.compact && change === "content changed" && prev !== undefined ? `Changed lines (+ added, - removed; refs as on the full screen):\n${compactDiff(prev, r.screen)}` : r.screen;
+  const body = (o.compact ?? !FULL_SCREEN) && change === "content changed" && prev !== undefined ? `Changed lines (+ added, - removed, ~ changed; refs as on the full screen):\n${compactDiff(prev, r.screen)}` : r.screen;
   const res = result(sid, { ...r, screen: head.join("\n") + "\n\n" + body });
   const value = action === "type" ? (r.value ?? fieldValue(r.screen, o.ref ?? "")) : undefined;
   return { ...res, structuredContent: { delivery: r.delivery ?? "delivered", ...(value !== undefined ? { value } : {}), ...(o.waited ? { waited: o.waited } : {}) } };
@@ -172,7 +174,16 @@ async function withBanner(out: unknown, sid: unknown, agent: string | undefined)
 }
 // The client name the hosting service attached to a server built for one stateless request (see clientName in makeServer).
 const hostedClient = new WeakMap<McpServer, string>();
+// SHIPVO_MCP_TOOLS limits the tools this server lists: "core" is the short set an agent needs to open an app and use its
+// screen, and a comma list names tools one by one. Every listed tool costs the agent tokens on each turn, so fewer is cheaper.
+export const CORE_TOOLS = ["list_apps", "phone_models", "open_app", "screen", "tap", "type", "scroll", "back", "screenshot", "set_device", "device_log", "open_url", "wait_for_event", "end_session"] as const;
+const TOOLSET: Set<string> | undefined = (() => {
+  const v = (process.env.SHIPVO_MCP_TOOLS ?? "").trim();
+  if (!v || v === "all") return undefined;
+  return new Set(v === "core" ? CORE_TOOLS : v.split(",").map((x) => x.trim()).filter(Boolean));
+})();
 const use = <S extends z.ZodRawShape>(server: McpServer, t: ToolDef<S>, cb: ToolCallback<S>) => {
+  if (TOOLSET && !TOOLSET.has(t.name)) return undefined;
   const clientName = (): string | undefined => server.server.getClientVersion()?.name ?? hostedClient.get(server);
   const guarded = async (args: unknown, extra: unknown) => {
     const trace = traceFromMeta((extra as { _meta?: unknown } | undefined)?._meta);
@@ -411,9 +422,61 @@ async function waiting(session: string, r: Act, w: Wait): Promise<{ r: Act; wait
   return { r: cur, waited: { matched, ms: Date.now() - t0 } };
 }
 use(server, tools.screen, async ({ session }) => { need(session); const r = await act({ session, action: "screen" }); if (r.ok && r.screen != null) trees.set(session, r.screen); return result(session, r); });
-use(server, tools.tap, async ({ session, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const at = await locating(session, ref); const first = await act({ session, action: "tap", ref }); if (first.ok && at) void recorder.tap(at); const w = await waiting(session, first, { wait_for, timeout_ms, settle }); return acted(session, "tap", w.r, { waited: w.waited, compact, step: { action: "tap", target: findTarget(trees.get(session), ref) } }); });
+// The approval guard (SHIPVO_GUARD): a tap on a payment or account-delete button waits for a person. A client that can show a
+// question gets one the model never sees; any other client gets approval_needed and must ask the person in chat.
+const GUARD = guardKinds(process.env.SHIPVO_GUARD);
+const guardAllowed = new Map<string, Set<GuardKind>>();
+async function guardTap(session: string, tree: string | undefined, target: string, approved: boolean | undefined): Promise<{ code: string; error: string } | undefined> {
+  if (!GUARD.length) return undefined;
+  const label = findTarget(tree, target)?.text, kind = guardedKind(label, GUARD);
+  if (!kind || approved === true || guardAllowed.get(session)?.has(kind)) return undefined;
+  const app = sessions.get(session)?.app ?? "the app";
+  if (server.server.getClientCapabilities()?.elicitation) {
+    const answer = await server.server.elicitInput({ message: guardQuestion(label!, kind, app), requestedSchema: { type: "object", properties: { decision: { type: "string", title: "Decision", enum: ["Allow", "Allow for this session", "Decline"] } }, required: ["decision"] } }).catch(() => undefined);
+    const d = answer?.action === "accept" ? String((answer.content as { decision?: unknown } | undefined)?.decision ?? "") : "";
+    if (d === "Allow for this session") { guardAllowed.set(session, (guardAllowed.get(session) ?? new Set()).add(kind)); return undefined; }
+    if (d === "Allow") return undefined;
+    return { code: "tap_declined", error: `the person declined the tap on "${label}". Nothing was tapped. Do not try another way to do the same thing; tell them what you stopped at.` };
+  }
+  return { code: "approval_needed", error: `"${label}" ${kind === "pay" ? "spends money" : kind === "delete" ? "deletes an account or its data" : "sends or publishes something"}, so a person must agree first. Nothing was tapped. Ask the person in chat; only after they say yes, call tap again with approved: true.` };
+}
+use(server, tools.tap, async ({ session, ref, then, approved, compact, wait_for, timeout_ms, settle }) => {
+  need(session);
+  const before = trees.get(session);
+  // One tap, then each step of the path on the screen that follows it. The path stops at the first step that is not there.
+  const path = [ref, ...(then ?? [])]; let last: Act | undefined; let done = 0; let missing: string | undefined; let finalStep: Step | undefined;
+  for (const [i, stepName] of path.entries()) {
+    let target = stepName;
+    if (i > 0) { const f = refForStep(last?.screen ?? "", stepName); if ("error" in f) { missing = `step ${i + 1} of ${path.length} ("${stepName}"): ${f.error}`; break; } target = f.ref; }
+    const held = await guardTap(session, last?.screen ?? before, target, approved);
+    if (held) { if (last?.ok && last.screen != null) trees.set(session, last.screen); return { ...text(`Error [${held.code}]: ${held.error}${i > 0 ? ` (${done} of ${path.length} taps were made before it)` : ""}`), isError: true as const, structuredContent: { ok: false, code: held.code, error: held.error, tapped: done } }; }
+    const at = await locating(session, target); const r = await act({ session, action: "tap", ref: target });
+    if (r.ok && at) void recorder.tap(at);
+    finalStep = { action: "tap", target: findTarget(last?.screen ?? trees.get(session), target) };
+    if (i < path.length - 1 && r.ok) steps.get(session)?.push({ ...finalStep, changed: true });
+    last = r; if (!r.ok || r.screen == null) break; done++;
+    if (i < path.length - 1) { const w = await waiting(session, r, { settle: true, timeout_ms: 1500 }); last = w.r; }
+  }
+  if (missing && last?.ok && last.screen != null) { trees.set(session, last.screen); return { ...text(`Error [path_step_not_found]: tapped ${done} of ${path.length}, then stopped at ${missing}\n\nScreen now:\n${last.screen}`), isError: true as const, structuredContent: { ok: false, code: "path_step_not_found", error: missing, tapped: done } }; }
+  const w = await waiting(session, last!, { wait_for, timeout_ms, settle });
+  // A path compares with the screen before its first tap, so the result says what the whole path changed.
+  if (then?.length && before !== undefined) trees.set(session, before);
+  const res = acted(session, "tap", w.r, { waited: w.waited, compact, step: finalStep });
+  return then?.length && "structuredContent" in res && !("isError" in res) ? { ...res, structuredContent: { ...res.structuredContent, tapped: done } } : res;
+});
 use(server, tools.type, 
-  async ({ session, ref, text: t, enter, compact, wait_for, timeout_ms, settle }) => { need(session); const tgt = findTarget(trees.get(session), ref); const w = await waiting(session, await act({ session, action: "type", ref, text: t, enter }), { wait_for, timeout_ms, settle }); return acted(session, "type", w.r, { waited: w.waited, compact, ref, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: tgt?.passwordLike, text: t } }); });
+  async ({ session, ref, text: t, enter, secret, compact, wait_for, timeout_ms, settle }) => {
+    need(session); const tgt = findTarget(trees.get(session), ref);
+    const first = (await act({ session, action: "type", ref, text: t, enter, ...(secret ? { secret: true } : {}) })) as Act & { secret?: boolean };
+    const w = await waiting(session, first, { wait_for, timeout_ms, settle });
+    // A password or one-time-code field, or secret: true: the text stays out of the result, the watch page, the room log and exports.
+    if (!(secret || first.secret)) return acted(session, "type", w.r, { waited: w.waited, compact, ref, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: tgt?.passwordLike, text: t } });
+    const hide = (x: string | null | undefined) => (x != null && t.length >= 4 ? x.split(t).join("••••") : x);
+    const res = acted(session, "type", { ...w.r, screen: hide(w.r.screen), value: undefined }, { waited: w.waited, compact, step: { action: "type", target: tgt, fieldLabel: tgt?.text, passwordLike: true } });
+    if ("isError" in res) return res;
+    const body = res.content[0]!.text.replace(/^(Change: [^\n]*)/, `$1\nValue of ${ref}: hidden (a secret field)`);
+    return { ...res, content: [{ type: "text" as const, text: body }], structuredContent: { ...("structuredContent" in res ? res.structuredContent : {}), secret: true } };
+  });
 use(server, tools.scroll, 
   async ({ session, direction, ref, compact, wait_for, timeout_ms, settle }) => { need(session); const box = ref ? await locating(session, ref, true) : undefined; const first = await act({ session, action: "scroll", direction, ref }); if (first.ok && recorder.drawing) void recorder.trail(...scrollTrail(direction, box)); const w = await waiting(session, first, { wait_for, timeout_ms, settle }); return acted(session, "scroll", w.r, { waited: w.waited, compact, step: { action: "scroll", direction } }); });
 use(server, tools.back, async ({ session, compact, wait_for, timeout_ms, settle }) => { need(session); const w = await waiting(session, await act({ session, action: "back" }), { wait_for, timeout_ms, settle }); return acted(session, "back", w.r, { waited: w.waited, compact, step: { action: "back" } }); });
@@ -490,7 +553,7 @@ const inboxTool = use(server, tools.inbox_view,
       ...(r.messages ?? []).slice(-10).map((m) => `- ${m.from} → ${m.to}${m.read ? "" : " (unread)"}: ${m.body}`),
       ...(r.tasks ?? []).slice(-5).map((h) => `- task ${h.from} → ${h.to} [${h.status}]: ${h.title}`)];
     return { ...text(lines.join("\n")), structuredContent: { session, me: r.me ?? null, messages: r.messages ?? [], tasks: r.tasks ?? [], unread_for_me: r.unread_for_me ?? 0, open_for_me: r.open_for_me ?? 0 } }; });
-inboxTool.update({ _meta: INBOX_TOOL_META });
+inboxTool?.update({ _meta: INBOX_TOOL_META });
 server.registerResource("assistant-inbox-widget", INBOX_WIDGET_URI, { title: "Assistant Inbox", description: "Live Assistant Inbox view for inbox_view results.", mimeType: MCP_APP_MIME, _meta: INBOX_WIDGET_META },
   async () => ({ contents: [{ uri: INBOX_WIDGET_URI, mimeType: MCP_APP_MIME, text: INBOX_WIDGET_HTML, _meta: INBOX_WIDGET_META }] }));
 use(server, tools.permission_log,

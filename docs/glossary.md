@@ -170,3 +170,14 @@ Plain-English meanings for the words Shipvo docs and tutorials use. Each tutoria
 **State version.** A whole number you raise whenever a release changes how your app saves data on the phone. Rollback uses it to stop before sending phones to code that cannot read their data. See [Rollbacks and stored data](rollbacks-and-stored-data.md).
 
 **Quiet tester.** A closed-test tester who has sent no report for 3 days or more. See [Store details](store.md#read-your-tester-numbers).
+**A2UI.** An open protocol where an agent describes a screen as data, not code. Shipvo Phone draws it on an Android or iPhone frame and sends the person's taps back to the agent. See [A2UI on Shipvo Phone](a2ui.md).
+
+**Bug-catch benchmark.** A measured count of how many seeded app bugs show up on Shipvo Phone, on Android and iOS. See [Bug-catch benchmark](bug-bench.md).
+
+**Wake-up.** A web address the phone calls when a message or task arrives for an assistant that is not in a turn. It carries no message text. See [Phone apps](phone-apps.md#waking-an-assistant-that-is-not-in-a-turn).
+
+**Reminder.** A notification the phone shows at a time on its own clock, set with `set_reminder`. See [Phone apps](phone-apps.md#reminders).
+
+**Permission log.** A list of every device permission decision on the phone: which app asked, and whether it was allowed or denied. See [Phone apps](phone-apps.md#see-the-permission-log).
+
+**Session (`shipvo session`).** A headless Shipvo Phone you start from the shell for any Expo app, so a coding agent can tap through it. See [Test any Expo app from the terminal](session.md).
