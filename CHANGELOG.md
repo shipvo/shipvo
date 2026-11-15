@@ -2,6 +2,42 @@
 
 Dated, newest first. Package versions are on npm under `@shipvo`.
 
+## 2026-11-15 (release)
+
+- **@shipvo/capacitor 0.0.4**: capacitor: Android uses a bsdiff patch when it fits, else the full bundle
+- **@shipvo/mcp 0.0.15**: bug-bench: agent jobs benchmark; mcp: a core tool list; mcp: approval guard on payment taps, and secret typing; mcp: changed lines by default after an action, and tap paths
+- **@shipvo/mcp-tools 0.0.3**: mcp: approval guard on payment taps, and secret typing; mcp: changed lines by default after an action, and tap paths
+- **@shipvo/sim 0.1.10**: mcp: approval guard on payment taps, and secret typing
+
+### Changes
+
+- mcp: new `room_report` tool returns one summary per session in a room (steps, seconds, errors, last screen title, notes). Error code: `no_room`.
+- spec: the gallery has two more specs, a project timeline and a focus timer with an animated progress bar.
+- cli: tests run `shipvo init --yes` on Expo managed, Expo prebuilt and bare React Native app fixtures and check the files it changes.
+- docs: Phone apps troubleshooting covers reminders, wake-ups and the accessibility audit; the glossary adds A2UI, wake-up, reminder, permission log, session and the bug-catch benchmark; the README lists A2UI, the bug-catch benchmark and the phone tools.
+- capacitor: on Android, `checkForUpdate` uses a BSDIFF40 patch when its `from_sha256` is the sha-256 of the current bundle, and reports `via: "patch"`. A bad patch, a wrong rebuilt hash or an over-budget patch falls back to the full bundle (`via: "full"`, `patchError`). New optional `BundleFiles.patch` and native `filePatch`; existing apps need no change. Android also needs `commons-compress` (the plugin's Gradle file adds it).
+- `@shipvo/mcp`: `SHIPVO_MCP_TOOLS=core` lists only the 14 tools an agent needs to open an app and use its screen; a comma list names tools one by one. Migration: none; unset lists every tool as before.
+- `apps/bug-bench`: `bench/agent-jobs.mjs` is the agent jobs benchmark. A real agent tests 8 screens through the MCP tools, each with the seeded bug and fixed, and is scored on its verdict; it reports passes, tokens, tool calls and seconds per server setup. See `docs/bug-bench.md`.
+- `@shipvo/mcp`: after `tap`, `type`, `scroll` and `back`, a `content changed` result now lists only the lines that changed (`+` added, `-` removed, `~` changed), with the same refs as the full screen. Migration: pass `compact: false` for the whole screen, or set `SHIPVO_MCP_FULL_SCREEN=1` on the server to keep whole screens everywhere.
+- `@shipvo/mcp`, `@shipvo/mcp-tools`: `tap` takes `then`, a list of up to 8 more taps by visible name or ref, so a known path is one call. A step that is not on the screen stops the path with `path_step_not_found`. Migration: none; new option.
+- `@shipvo/mcp`: with `SHIPVO_GUARD=on` on the server, a tap on a payment or account-delete button waits for a person. A client with MCP elicitation shows a question the model cannot answer; any other client gets `approval_needed` and repeats the tap with `approved: true` after the person agrees. `SHIPVO_GUARD` also takes `pay`, `delete` and `send` as a list. Migration: none; the guard is off unless the variable is set.
+- `@shipvo/mcp`, `@shipvo/sim`: text typed into a password or one-time-code field, or typed with `secret: true`, stays out of the tool result, the watch page and exported tests. The simulator's `type` action answers `secret: true` and `value: null` for such a field. Migration: a `type` on a password field no longer returns its value.
+
+## 2026-11-13 (release)
+
+- **@shipvo/mcp 0.0.14**: mcp-tools: publish @shipvo/mcp-tools
+- **@shipvo/mcp-tools 0.0.2**: mcp-tools: publish @shipvo/mcp-tools; sim: listen on this machine only; A2UI tools in @shipvo/mcp; a failed build reports its first error; mcp: phone models and framed screenshots; a speed benchmark; a refreshed skill; mcp: live Assistant Inbox view (MCP Apps) with auto-continue; mcp: open_app reuses an open session; hosted calls carry the assistant's name
+- **@shipvo/runtime 0.1.8**: runtime: scene host waits for activation before reporting
+- **@shipvo/spec 0.0.6**: spec: saveFile step saves CSV and other text as a file (slice 1 of #1460)
+
+### Changes
+
+- `@shipvo/spec`: new `saveFile` action step saves text, such as the result of `csv()`, as a file in a collection of the app. It needs the `files` device permission. Works the same on Android and iOS.
+- Migration: none; new step.
+- Tooling: `scripts/busy-apply/run.mjs` applies a staged update N times under a busy JS loop on the Android emulator and the iOS Simulator and counts crashes, reload time and empty native module state. No package API changes.
+- runtime: the iOS scene host test waits for the app to be active before it reports, so a slow Simulator launch no longer reads a trial-boot count too early.
+- `@shipvo/mcp-tools`: now published to npm. It exports the registry of every Shipvo MCP tool (`tools`, `toolList`, `describeTools()`) and the key-in-input checks. See `docs/mcp-tools.md`. Migration: none; `@shipvo/mcp` still bundles the registry it was built with.
+
 ## 2026-11-13 (release)
 
 - **@shipvo/cli 0.1.9**: sim: listen on this machine only; A2UI tools in @shipvo/mcp; a failed build reports its first error; sim: Shipvo Phone reads A2UI 1.0, and shipvo session opens A2UI messages on a phone; mcp: phone models and framed screenshots; a speed benchmark; a refreshed skill; sim: real phone models, a file-read fix, and fixes from running real apps; cli: shipvo session, any Expo app on Shipvo Phone from the shell, with framed screenshots and video

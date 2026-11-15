@@ -6,7 +6,7 @@ One row per user-visible feature or advantage. Each column is a link, or empty w
 
 Content agents take their next item from this list first (top to bottom, skipping cells already filled), then the rest of the table. The owner and the steward edit this list.
 
-0. Assistant Inbox (assistants message and hand tasks to each other on one phone; launch kit written 10 Nov; docs: [phone-apps](phone-apps.md#assistants-talking-to-each-other); tutorial, video and blog needed)
+0. Assistant Inbox (assistants message and hand tasks to each other on one phone; launch kit written 10 Nov; docs: [phone-apps](phone-apps.md#assistants-talking-to-each-other); tutorial and video needed; blog done 10 Nov)
 0b. Testing an email sign-in with the session inbox (launch kit written 10 Nov; docs: [email-sign-in](email-sign-in.md); tutorial, video and blog needed)
 1. Describe an app and it appears (`create_app`, `update_app`, `app_activity`; launch kit written 10 Nov; docs: [describe-an-app](describe-an-app.md); tutorial done 10 Nov; video done 10 Nov; blog done 10 Nov) and the browser playground (launch kit written 10 Nov; tutorial and video done 10 Nov; blog needed)
 1b. Chess on Shipvo Phone: the live demo at shipvo.dev/demos/chess (two phones, Android and iOS, playing in the browser; #1168) and two coding agents playing a full game through MCP (#1166, when merged). Blog done (10 Nov), tutorial done; video now for the live page; the agent-vs-agent video and launch kit once #1166 merges. Docs: [demos/chess](demos/chess.md) (live page, `--agents`, `--record`, troubleshooting).
@@ -25,7 +25,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | --- | --- | --- | --- | --- |
 | Chess on Shipvo Phone: live demo and two agents playing through MCP (`--agents`, `--record`) | [demos/chess](demos/chess.md) | [chess-on-two-phones](tutorials/chess-on-two-phones.md) | | [two-ai-agents-play-chess-on-two-phones](../blog/two-ai-agents-play-chess-on-two-phones.md) |
 | Describe an app and it appears (`create_app`, `update_app`, `app_activity`) | [describe-an-app](describe-an-app.md) | [describe-an-app](tutorials/describe-an-app.md) | [Describe an app and watch it appear on a phone](videos.md#describe-an-app-and-watch-it-appear-on-a-phone) | [describe-an-app-and-it-appears-on-a-phone](../blog/describe-an-app-and-it-appears-on-a-phone.md) |
-| Assistant Inbox (assistants message, hand off tasks and share reports on one phone) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | |
+| Assistant Inbox (assistants message, hand off tasks and share reports on one phone) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | [two-ai-assistants-one-phone-assistant-inbox](../blog/two-ai-assistants-one-phone-assistant-inbox.md) |
 | Test an email sign-in (`inbox_wait`, `phone.inbox`) | [email-sign-in](email-sign-in.md) | | | |
 | Browser playground (sample app on Android and iOS, device API, signed updates, many phones link) | [playground](playground.md) | [try-shipvo-in-your-browser](tutorials/try-shipvo-in-your-browser.md) | [Try Shipvo in your browser](videos.md#try-shipvo-in-your-browser-a-phone-device-features-and-a-rollback) | |
 | Create an app and run it in the simulator | [getting-started](getting-started.md) | [first-app](tutorials/first-app.md) | [Create your first app](videos.md) | [build-a-mobile-app-without-coding](../blog/build-a-mobile-app-without-coding.md) |
@@ -137,7 +137,7 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Prefixed element refs after a restart (`f1e2`, `p1e5`; `stale_ref`) | [agents](agents.md) | | | |
 | Spec `csv()` function to export a collection from an action | [phone-apps](phone-apps.md#export-data-as-csv), [app-spec](design/app-spec.md) | | | |
 | Roll back safely with a state version (`stateVersion`, `--allow-state-downgrade`) | [rollbacks-and-stored-data](rollbacks-and-stored-data.md) | | | |
-| Assistant Inbox (`send_message`, `check_inbox`, `hand_off`, `my_tasks`, `start_task`, `finish_task`; `{{ caller }}`) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | |
+| Assistant Inbox (`send_message`, `check_inbox`, `hand_off`, `my_tasks`, `start_task`, `finish_task`; `{{ caller }}`) | [phone-apps](phone-apps.md#assistants-talking-to-each-other) | | | [two-ai-assistants-one-phone-assistant-inbox](../blog/two-ai-assistants-one-phone-assistant-inbox.md) |
 | Session inbox for emailed codes and magic links (`inbox_wait`, `inbox_read`, `inbox_clear`, `phone.inbox`) | [email-sign-in](email-sign-in.md), [agents](agents.md) | | | |
 | Permissions detected from camera, scanner and file blocks; denied ones give `permission_denied` on a `navigate` screen | [phone-apps](phone-apps.md#device-permissions-per-app) | | | |
 | Key rotations in the audit log (`shipvo audit`, `action: key-rotation`) | [key-rotation](key-rotation.md#see-rotations-in-the-audit-log), [cli](cli.md#shipvo-audit) | | | |
@@ -145,3 +145,17 @@ Content agents take their next item from this list first (top to bottom, skippin
 | Lumi benchmark (`scripts/lumi/bench.mjs`: screens, flows and planted bugs on fixed apps) | [lumi-bench](lumi-bench.md) | | | |
 | App spec validator (`validate`, error paths and fixes, network and write permissions) | [app-spec-validator](app-spec-validator.md) | | | |
 | Crash-loop revert paths on Android (trial boots, promoted boots, 60 s window) | [android-crash-loop-paths](android-crash-loop-paths.md) | | | |
+| `shipvo session` (any Expo app on a headless phone, framed screenshots and video, phone models) | [session](session.md) | | | |
+| A2UI 1.0 on Shipvo Phone (`a2ui_send`, `a2ui_actions`, `shipvo session --a2ui`) | [a2ui](a2ui.md) | | | |
+| Bug-catch benchmark (23 seeded bugs on Android and iOS) | [bug-bench](bug-bench.md) | | | |
+| Accessibility audit (`a11y_audit`) | [phone-apps](phone-apps.md#check-accessibility) | | | |
+| Permission log (`permission_log`) | [phone-apps](phone-apps.md#see-the-permission-log) | | | |
+| Share sheet and clipboard across apps | [phone-apps](phone-apps.md#share-sheet-and-clipboard) | | | |
+| Whole-phone backup (`backup_phone`, `restore_phone`) | [phone-apps](phone-apps.md#back-up-and-restore-the-whole-phone) | | | |
+| Search across the phone (`search_phone`) | [phone-apps](phone-apps.md#search-across-the-phone) | | | |
+| Wi-Fi, mobile data and airplane mode (`get_connectivity`, `set_connectivity`) | [phone-apps](phone-apps.md#wi-fi-mobile-data-and-airplane-mode) | | | |
+| Reminders (`set_reminder`, `list_reminders`, `cancel_reminder`) | [phone-apps](phone-apps.md#reminders) | | | |
+| Wake-ups for assistants outside a turn (`register_wakeup`, `wait_for_event`, live inbox view) | [phone-apps](phone-apps.md#waking-an-assistant-that-is-not-in-a-turn) | | | |
+| Spec `saveFile` and `parseCsv` (save and import CSV on the phone) | [phone-apps](phone-apps.md#save-as-a-file) | | | |
+| Contacts, Messages and Clock first-party apps | [phone-apps](phone-apps.md#first-party-apps) | | | |
+
