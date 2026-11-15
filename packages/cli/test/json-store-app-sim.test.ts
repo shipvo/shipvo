@@ -202,7 +202,7 @@ describe("sim --json", () => {
     afterEach(() => { listener?.close(); listener = undefined; simMock.spawn = null; });
     it("prints one listening envelope", async () => {
       simApp();
-      simMock.spawn = (args) => { listener = createServer(); listener.listen(Number(args[args.indexOf("--port") + 1]), "127.0.0.1"); return new EventEmitter(); };
+      simMock.spawn = (args) => { listener = createServer(); listener.listen(Number(args[args.indexOf("--port") + 1]), "127.0.0.1"); return Object.assign(new EventEmitter(), { kill: () => true }); };
       const { createServer: probe } = await import("node:net");
       const p = probe(); await new Promise<void>((r) => p.listen(0, r)); const port = (p.address() as { port: number }).port; await new Promise((r) => p.close(r));
       const { doc, code } = await run(() => sim(["--port", String(port), "--skip-build", "--json"]));
@@ -213,7 +213,7 @@ describe("sim --json", () => {
     it("fails with sim_exited when the child exits before listening", async () => {
       simApp();
       const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
-      simMock.spawn = () => { const e = new EventEmitter(); setTimeout(() => e.emit("exit", 1), 20); return e; };
+      simMock.spawn = () => { const e = Object.assign(new EventEmitter(), { kill: () => true }); setTimeout(() => e.emit("exit", 1), 20); return e; };
       const { doc, code } = await run(() => sim(["--port", "45987", "--skip-build", "--json"]));
       expect(code).toBe(1); expect(doc.ok).toBe(false); expect(doc.code).toBe("sim_exited");
       expect(exit).toHaveBeenCalled();

@@ -1245,3 +1245,14 @@ server.keepAliveTimeout = 300_000; server.headersTimeout = 310_000; server.reque
 const HOST = arg("host", process.env.SHIPVO_SIM_HOST || "127.0.0.1");
 server.listen(PORT, HOST, () => console.log(`Shipvo UI simulator on http://${HOST === "127.0.0.1" ? "localhost" : HOST}:${PORT} (sessions in ${DIR})`));
 launchBrowser();
+// SIGTERM and SIGINT stop the server the same way: close the browser and the listener, then exit.
+let stopping = false;
+function shutdown() {
+  if (stopping) return;
+  stopping = true;
+  const force = setTimeout(() => process.exit(0), 5000); force.unref();
+  server.closeAllConnections?.();
+  server.close();
+  browserReady.then((b) => b.close()).catch(() => {}).finally(() => process.exit(0));
+}
+for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, shutdown);

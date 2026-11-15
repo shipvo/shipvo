@@ -181,6 +181,7 @@ async function simRun(argv: string[], json: boolean): Promise<Done | void> {
   const p = spawn(process.execPath, [server, "--port", port, "--app", cfg.appId, ...(a.dir ? ["--dir", a.dir] : [])], { stdio, env: { ...process.env, PN_CONTROL: cfg.controlPlane } });
   let exited = false;
   p.on("exit", (c) => { exited = true; process.exit(c ?? 0); });
+  for (const sig of ["SIGTERM", "SIGINT"] as const) process.on(sig, () => { if (!exited) p.kill(sig); else process.exit(0); });
   if (await waitListening(Number(port), () => exited)) {
     console.error(`Simulator on http://localhost:${port}/app/  (open_app("${cfg.appId}") from @shipvo/mcp; Ctrl-C to stop)`);
     const watchUrl = `http://localhost:${port}/watch`;
