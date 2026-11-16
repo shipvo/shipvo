@@ -6,7 +6,7 @@ on:
     - cron: "17 3 * * *"   # nightly: parity drifts when the app or the simulator changes
   workflow_dispatch:
     inputs:
-      build_url: { description: "EAS iOS simulator build (.tar.gz)", default: "https://expo.dev/artifacts/eas/3IKeDmTaD0sA_nvsR1omISmQsUbZfdql9bbCOTTQuik.tar.gz" }
+      build_url: { description: "EAS iOS simulator build (.tar.gz). Empty: use the latest tide-ios-simulator artifact from the ios-simulator workflow", default: "" }
   push:
     branches: [main]
     paths: [".github/workflows/parity-ios.yml", "apps/tide-and-tackle/sim/appium.mjs", "apps/tide-and-tackle/sim/parity-cloud.mjs"]
@@ -23,13 +23,21 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @shipvo/spec build   # the simulator imports @shipvo/spec/dist
       - name: Boot an iPhone simulator and install the app
+        env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           xcrun simctl list devices available | grep -E "iPhone" | head -5
           UDID=$(xcrun simctl list devices available -j | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const d=JSON.parse(s).devices;for(const k of Object.keys(d).reverse()){const x=d[k].find(v=>/^iPhone \d+$/.test(v.name));if(x){console.log(x.udid);return}}})")
           echo "UDID=$UDID" >> $GITHUB_ENV
           xcrun simctl boot "$UDID" || true
-          curl -sSL "${{ inputs.build_url || 'https://expo.dev/artifacts/eas/3IKeDmTaD0sA_nvsR1omISmQsUbZfdql9bbCOTTQuik.tar.gz' }}" -o app.tar.gz
-          mkdir app && tar -xzf app.tar.gz -C app && ls app
+          mkdir app
+          if [ -n "${{ inputs.build_url }}" ]; then
+            curl -fsSL "${{ inputs.build_url }}" -o app.tar.gz && tar -xzf app.tar.gz -C app
+          else
+            ID=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=tide-ios-simulator&per_page=20" --jq '[.artifacts[]|select(.expired==false)][0].id')
+            gh api "repos/${{ github.repository }}/actions/artifacts/$ID/zip" > art.zip
+            unzip -q art.zip -d art && unzip -q art/tide-ios-sim.zip -d app
+          fi
+          ls app
           xcrun simctl install "$UDID" app/*.app
           xcrun simctl list devices | grep Booted
       - name: Install Appium (XCUITest) and pre-build WebDriverAgent
